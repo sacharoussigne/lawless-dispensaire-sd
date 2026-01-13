@@ -1,0 +1,10 @@
+.discordButton {
+  background-color: #5865f2;
+  color: #fff;
+
+  transition: background-color 0.2s ;
+
+  &:hover {
+    background-color: #525ee0;
+  }
+}
