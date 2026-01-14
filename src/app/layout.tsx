@@ -27,15 +27,10 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    template: '%s | Lingzy',
-    default: 'Lingzy',
-    absolute: 'Lingzy',
+    template: '%s | Dispensaire Saint-Denis',
+    default: 'Dispensaire Saint-Denis',
+    absolute: 'Dispensaire Saint-Denis',
   },
-  description:
-    'Master languages with Lingzy - Your personal flashcard-based language learning companion. Practice, learn, and improve your language skills with interactive flashcards and personalized learning paths.',
-  keywords:
-    'language learning, education, language practice, interactive learning, language skills',
-  authors: [{ name: 'Lingzy Team' }],
   // viewport: 'width=device-width, initial-scale=1',
   // robots: "index, follow",
   // icons: {

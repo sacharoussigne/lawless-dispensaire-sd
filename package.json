@@ -19,6 +19,7 @@
     "@mantinex/dev-icons": "^2.0.0",
     "@prisma/adapter-pg": "^7.2.0",
     "@prisma/client": "^7.2.0",
+    "@tabler/icons-react": "^3.36.1",
     "better-auth": "^1.4.12",
     "dayjs": "^1.11.19",
     "dotenv": "^17.2.3",

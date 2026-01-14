@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export const routes = {
+  test: {
+    index: '/test',
+  },
   admin: {},
   api: {},
-  settings: {},
+  settings: {
+    index: '/settings',
+  },
   auth: {
     index: '/auth',
     login: '/auth/login',
