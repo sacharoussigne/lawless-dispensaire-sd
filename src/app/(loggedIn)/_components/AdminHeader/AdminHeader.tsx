@@ -8,7 +8,7 @@ import {
   Menu,
   UnstyledButton,
 } from '@mantine/core';
-import classes from './Header.module.scss';
+import classes from './AdminHeader.module.scss';
 import { authClient } from '@/lib/client';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -17,7 +17,7 @@ import { routes } from '@/types/routes';
 import Link from 'next/link';
 import { IconSettings, IconLogout } from '@tabler/icons-react';
 
-export default function Header({
+export default function AdminHeader({
   session,
 }: Readonly<{
   session: AuthSession | null;
@@ -42,7 +42,7 @@ export default function Header({
             <h1 className="text-2xl font-bold">
               <Link href={routes.test.index}>
                 <div className="flex items-center gap-2">
-                  Dispensaire Saint-Denis
+                  Dispensaire Saint-Denis - Administration
                 </div>
               </Link>
             </h1>
@@ -53,22 +53,10 @@ export default function Header({
               {session ? (
                 <>
                   <Link
-                    href={routes.test.index}
+                    href={routes.admin.locations}
                     className={classes.link}
                   >
-                    Stocks
-                  </Link>
-                  <Link
-                    href={routes.test.index}
-                    className={classes.link}
-                  >
-                    Commandes
-                  </Link>
-                  <Link
-                    href={routes.test.index}
-                    className={classes.link}
-                  >
-                    Compte
+                    Lieux
                   </Link>
                   <Menu
                     width={260}

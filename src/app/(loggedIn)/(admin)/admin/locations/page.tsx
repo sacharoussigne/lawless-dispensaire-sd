@@ -181,8 +181,7 @@ export default function LocationsPage() {
 
   return (
     <Container size="xl" py="xl">
-      <Group justify="space-between" mb="xl">
-        <Title order={1}>Dashboard Admin - Locations</Title>
+      <Group justify="end" mb="xl">
         <Button leftSection={<IconPlus size={16} />} onClick={openCreateModal}>
           Créer une location
         </Button>
