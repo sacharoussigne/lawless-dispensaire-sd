@@ -8,16 +8,19 @@ import {
   Paper,
   TextInput,
   Button,
-  Table,
   ActionIcon,
   Group,
   Modal,
   Stack,
   Select,
+  Badge,
+  Text,
+  Flex,
 } from '@mantine/core';
+import { DataTable } from 'mantine-datatable';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
-import { IconEdit, IconTrash, IconPlus } from '@tabler/icons-react';
+import { IconEdit, IconTrash, IconPlus, IconX } from '@tabler/icons-react';
 import { createShop, getShops, updateShop, deleteShop } from '@/app/_actions/shops';
 import { getLocations } from '@/app/_actions/locations';
 import { handleAction } from '@/lib/action';
@@ -41,6 +44,9 @@ function ShopsPageContent() {
   const [deleteModalOpened, setDeleteModalOpened] = useState(false);
   const [shopToDelete, setShopToDelete] = useState<ShopWithRelations | null>(null);
   const [locationFilter, setLocationFilter] = useState<string | null>(null);
+  const [nameFilter, setNameFilter] = useState<string>('');
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(10);
 
   const form = useForm({
     initialValues: {
@@ -49,7 +55,7 @@ function ShopsPageContent() {
     },
     validate: {
       name: (value) => (value.length < 1 ? 'Le nom est requis' : null),
-      locationId: (value) => (!value ? 'La location est requise' : null),
+      locationId: (value) => (!value ? 'Le lieu est requis' : null),
     },
   });
 
@@ -186,104 +192,171 @@ function ShopsPageContent() {
     label: location.name,
   }));
 
-  // Filtrer les magasins par location
-  const filteredShops = locationFilter
-    ? shops.filter((shop) => shop.locationId === locationFilter)
-    : shops;
+  // Filtrer les magasins par location et nom
+  const filteredShops = shops.filter((shop) => {
+    const matchesLocation = !locationFilter || shop.locationId === locationFilter;
+    const matchesName = !nameFilter || shop.name.toLowerCase().includes(nameFilter.toLowerCase());
+    return matchesLocation && matchesName;
+  });
 
-  const rows = filteredShops.map((shop) => (
-    <Table.Tr key={shop.id}>
-      <Table.Td>{shop.name}</Table.Td>
-      <Table.Td>{shop.location.name}</Table.Td>
-      <Table.Td>{shop.itemTypes.length}</Table.Td>
-      <Table.Td>
-        {new Date(shop.createdAt).toLocaleDateString('fr-FR')}
-      </Table.Td>
-      <Table.Td>
-        <Group gap="xs">
-          <ActionIcon
-            variant="light"
-            color="blue"
-            onClick={() => handleEdit(shop)}
-          >
-            <IconEdit size={16} />
-          </ActionIcon>
-          <ActionIcon
-            variant="light"
-            color="red"
-            onClick={() => {
-              setShopToDelete(shop);
-              setDeleteModalOpened(true);
-            }}
-          >
-            <IconTrash size={16} />
-          </ActionIcon>
-        </Group>
-      </Table.Td>
-    </Table.Tr>
-  ));
+  // Calculer la pagination
+  const totalRecords = filteredShops.length;
+  const paginatedShops = filteredShops.slice(
+    (page - 1) * pageSize,
+    page * pageSize
+  );
+
+  // Réinitialiser la page quand les filtres changent
+  useEffect(() => {
+    setPage(1);
+  }, [locationFilter, nameFilter]);
 
   const filterOptions = [
-    { value: '', label: 'Toutes les locations' },
+    { value: '', label: 'Tous les lieux' },
     ...locationOptions,
   ];
 
   return (
     <Container size="xl" py="xl">
       <Group justify="space-between" mb="xl">
-        <Title order={1}>Dashboard Admin - Magasins</Title>
+        <Title order={1}>Magasins</Title>
         <Button leftSection={<IconPlus size={16} />} onClick={openCreateModal}>
           Créer un magasin
         </Button>
       </Group>
 
-      <Paper shadow="sm" p="md" withBorder mb="md">
-        <Group>
-          <Select
-            label="Filtrer par location"
-            placeholder="Sélectionner une location"
-            data={filterOptions}
-            value={locationFilter || ''}
-            onChange={(value) => setLocationFilter(value || null)}
-            clearable
-            style={{ minWidth: 250 }}
-          />
-        </Group>
-      </Paper>
+      {/* Affichage des filtres actifs */}
+      {(locationFilter || nameFilter) && (
+        <Paper shadow="sm" p="md" withBorder mb="md">
+          <Flex align="center" gap="md" wrap="wrap">
+            <Text fw={500}>Filtres :</Text>
+            {locationFilter && (
+              <Badge
+                variant="light"
+                size="lg"
+                rightSection={
+                  <ActionIcon
+                    size="xs"
+                    color="blue"
+                    radius="xl"
+                    variant="transparent"
+                    onClick={() => setLocationFilter(null)}
+                  >
+                    <IconX size={12} />
+                  </ActionIcon>
+                }
+              >
+                Lieu: {locations.find((l) => l.id === locationFilter)?.name || 'Inconnu'}
+              </Badge>
+            )}
+            {nameFilter && (
+              <Badge
+                variant="light"
+                size="lg"
+                rightSection={
+                  <ActionIcon
+                    size="xs"
+                    color="blue"
+                    radius="xl"
+                    variant="transparent"
+                    onClick={() => setNameFilter('')}
+                  >
+                    <IconX size={12} />
+                  </ActionIcon>
+                }
+              >
+                Nom: {nameFilter}
+              </Badge>
+            )}
+          </Flex>
+        </Paper>
+      )}
 
       <Paper shadow="sm" p="md" withBorder>
-        <Table.ScrollContainer minWidth={800}>
-          <Table striped highlightOnHover>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Nom</Table.Th>
-                <Table.Th>Location</Table.Th>
-                <Table.Th>Nombre de types d'items</Table.Th>
-                <Table.Th>Date de création</Table.Th>
-                <Table.Th>Actions</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {loading ? (
-                <Table.Tr>
-                  <Table.Td colSpan={5} style={{ textAlign: 'center' }}>
-                    Chargement...
-                  </Table.Td>
-                </Table.Tr>
-              ) : rows.length === 0 ? (
-                <Table.Tr>
-                  <Table.Td colSpan={5} style={{ textAlign: 'center' }}>
-                    {locationFilter
-                      ? 'Aucun magasin trouvé pour cette location'
-                      : 'Aucun magasin trouvé'}
-                  </Table.Td>
-                </Table.Tr>
-              ) : (
-                rows
-              )}
-            </Table.Tbody>
-          </Table>
-        </Table.ScrollContainer>
+        <DataTable
+          records={paginatedShops}
+          columns={[
+            {
+              accessor: 'name',
+              title: 'Nom',
+              filter: (
+                <TextInput
+                  placeholder="Rechercher un nom..."
+                  value={nameFilter}
+                  onChange={(e) => setNameFilter(e.currentTarget.value)}
+                  style={{ minWidth: 200 }}
+                />
+              ),
+            },
+            {
+              accessor: 'location.name',
+              title: 'Lieu',
+              filter: (
+                <Select
+                  placeholder="Tous les lieux"
+                  data={filterOptions}
+                  value={locationFilter || ''}
+                  onChange={(value) => setLocationFilter(value || null)}
+                  clearable
+                  style={{ minWidth: 200 }}
+                />
+              ),
+            },
+            {
+              accessor: 'itemTypes.length',
+              title: "Nombre de types d'items",
+              render: (shop: ShopWithRelations) => shop.itemTypes.length,
+            },
+            {
+              accessor: 'createdAt',
+              title: 'Date de création',
+              render: (shop: ShopWithRelations) =>
+                new Date(shop.createdAt).toLocaleDateString('fr-FR'),
+            },
+            {
+              accessor: 'actions',
+              title: 'Actions',
+              render: (shop: ShopWithRelations) => (
+                <Group gap="xs">
+                  <ActionIcon
+                    variant="light"
+                    color="blue"
+                    onClick={() => handleEdit(shop)}
+                  >
+                    <IconEdit size={16} />
+                  </ActionIcon>
+                  <ActionIcon
+                    variant="light"
+                    color="red"
+                    onClick={() => {
+                      setShopToDelete(shop);
+                      setDeleteModalOpened(true);
+                    }}
+                  >
+                    <IconTrash size={16} />
+                  </ActionIcon>
+                </Group>
+              ),
+            },
+          ]}
+          fetching={loading}
+          noRecordsText={
+            locationFilter || nameFilter
+              ? 'Aucun magasin trouvé avec ces filtres'
+              : 'Aucun magasin trouvé'
+          }
+          striped
+          highlightOnHover
+          minHeight={200}
+          totalRecords={totalRecords}
+          recordsPerPage={pageSize}
+          page={page}
+          onPageChange={(p) => setPage(p)}
+          paginationSize="sm"
+          paginationText={({ from, to, totalRecords }) =>
+            `${from} - ${to} sur ${totalRecords} magasins`
+          }
+        />
       </Paper>
 
       {/* Modal de création/modification */}
@@ -306,8 +379,8 @@ function ShopsPageContent() {
               {...form.getInputProps('name')}
             />
             <Select
-              label="Location"
-              placeholder="Sélectionner une location"
+              label="Lieu"
+              placeholder="Sélectionner un lieu"
               data={locationOptions}
               required
               {...form.getInputProps('locationId')}

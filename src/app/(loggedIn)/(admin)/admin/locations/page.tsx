@@ -8,15 +8,18 @@ import {
   TextInput,
   Textarea,
   Button,
-  Table,
   ActionIcon,
   Group,
   Modal,
   Stack,
+  Badge,
+  Text,
+  Flex,
 } from '@mantine/core';
+import { DataTable } from 'mantine-datatable';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
-import { IconEdit, IconTrash, IconPlus } from '@tabler/icons-react';
+import { IconEdit, IconTrash, IconPlus, IconX } from '@tabler/icons-react';
 import { createLocation, getLocations, updateLocation, deleteLocation } from '@/app/_actions/locations';
 import { handleAction } from '@/lib/action';
 import { handleApiZodError } from '@/lib/services/zod';
@@ -36,6 +39,10 @@ export default function LocationsPage() {
   const [editingLocation, setEditingLocation] = useState<LocationWithShops | null>(null);
   const [deleteModalOpened, setDeleteModalOpened] = useState(false);
   const [locationToDelete, setLocationToDelete] = useState<LocationWithShops | null>(null);
+  const [nameFilter, setNameFilter] = useState<string>('');
+  const [descriptionFilter, setDescriptionFilter] = useState<string>('');
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(10);
 
   const form = useForm({
     initialValues: {
@@ -58,7 +65,7 @@ export default function LocationsPage() {
     } catch (error: any) {
       notifications.show({
         title: 'Erreur',
-        message: error.message || 'Erreur lors du chargement des locations',
+        message: error.message || 'Erreur lors du chargement des lieux',
         color: 'red',
       });
     } finally {
@@ -90,8 +97,8 @@ export default function LocationsPage() {
       notifications.show({
         title: 'Succès',
         message: editingLocation
-          ? 'Location modifiée avec succès'
-          : 'Location créée avec succès',
+          ? 'Lieu modifié avec succès'
+          : 'Lieu créé avec succès',
         color: 'green',
       });
       setModalOpened(false);
@@ -128,7 +135,7 @@ export default function LocationsPage() {
       handleAction(result);
       notifications.show({
         title: 'Succès',
-        message: 'Location supprimée avec succès',
+        message: 'Lieu supprimé avec succès',
         color: 'green',
       });
       setDeleteModalOpened(false);
@@ -149,90 +156,188 @@ export default function LocationsPage() {
     setModalOpened(true);
   };
 
-  const rows = locations.map((location) => (
-    <Table.Tr key={location.id}>
-      <Table.Td>{location.name}</Table.Td>
-      <Table.Td>{location.description || '-'}</Table.Td>
-      <Table.Td>
-        {location.shops.length > 0 ? (
-          <Link
-            href={`${routes.admin.shops}?locationId=${location.id}`}
-            style={{ textDecoration: 'none', color: 'inherit' }}
-          >
-            <span style={{ cursor: 'pointer', textDecoration: 'underline' }}>
-              {location.shops.length}
-            </span>
-          </Link>
-        ) : (
-          location.shops.length
-        )}
-      </Table.Td>
-      <Table.Td>
-        {new Date(location.createdAt).toLocaleDateString('fr-FR')}
-      </Table.Td>
-      <Table.Td>
-        <Group gap="xs">
-          <ActionIcon
-            variant="light"
-            color="blue"
-            onClick={() => handleEdit(location)}
-          >
-            <IconEdit size={16} />
-          </ActionIcon>
-          <ActionIcon
-            variant="light"
-            color="red"
-            onClick={() => {
-              setLocationToDelete(location);
-              setDeleteModalOpened(true);
-            }}
-          >
-            <IconTrash size={16} />
-          </ActionIcon>
-        </Group>
-      </Table.Td>
-    </Table.Tr>
-  ));
+  // Fonction pour normaliser les chaînes (enlever les accents et mettre en minuscule)
+  const normalizeString = (str: string): string => {
+    return str
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+  };
+
+  // Filtrer les lieux par nom et description
+  const filteredLocations = locations.filter((location) => {
+    const matchesName = !nameFilter || 
+      normalizeString(location.name).includes(normalizeString(nameFilter));
+    const matchesDescription = !descriptionFilter || 
+      (location.description && 
+       normalizeString(location.description).includes(normalizeString(descriptionFilter)));
+    return matchesName && matchesDescription;
+  });
+
+  // Calculer la pagination
+  const totalRecords = filteredLocations.length;
+  const paginatedLocations = filteredLocations.slice(
+    (page - 1) * pageSize,
+    page * pageSize
+  );
+
+  // Réinitialiser la page quand les filtres changent
+  useEffect(() => {
+    setPage(1);
+  }, [nameFilter, descriptionFilter]);
 
   return (
     <Container size="xl" py="xl">
-      <Group justify="end" mb="xl">
+      <Group justify="space-between" mb="xl">
+        <Title order={1}>Lieux</Title>
         <Button leftSection={<IconPlus size={16} />} onClick={openCreateModal}>
-          Créer une location
+          Créer un lieu
         </Button>
       </Group>
 
+      {/* Affichage des filtres actifs */}
+      {(nameFilter || descriptionFilter) && (
+        <Paper shadow="sm" p="md" withBorder mb="md">
+          <Flex align="center" gap="md" wrap="wrap">
+            <Text fw={500}>Filtres :</Text>
+            {nameFilter && (
+              <Badge
+                variant="light"
+                size="lg"
+                rightSection={
+                  <ActionIcon
+                    size="xs"
+                    color="blue"
+                    radius="xl"
+                    variant="transparent"
+                    onClick={() => setNameFilter('')}
+                  >
+                    <IconX size={12} />
+                  </ActionIcon>
+                }
+              >
+                Nom: {nameFilter}
+              </Badge>
+            )}
+            {descriptionFilter && (
+              <Badge
+                variant="light"
+                size="lg"
+                rightSection={
+                  <ActionIcon
+                    size="xs"
+                    color="blue"
+                    radius="xl"
+                    variant="transparent"
+                    onClick={() => setDescriptionFilter('')}
+                  >
+                    <IconX size={12} />
+                  </ActionIcon>
+                }
+              >
+                Description: {descriptionFilter}
+              </Badge>
+            )}
+          </Flex>
+        </Paper>
+      )}
+
       <Paper shadow="sm" p="md" withBorder>
-        <Table.ScrollContainer minWidth={800}>
-          <Table striped highlightOnHover>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Nom</Table.Th>
-                <Table.Th>Description</Table.Th>
-                <Table.Th>Nombre de boutiques</Table.Th>
-                <Table.Th>Date de création</Table.Th>
-                <Table.Th>Actions</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {loading ? (
-                <Table.Tr>
-                  <Table.Td colSpan={5} style={{ textAlign: 'center' }}>
-                    Chargement...
-                  </Table.Td>
-                </Table.Tr>
-              ) : rows.length === 0 ? (
-                <Table.Tr>
-                  <Table.Td colSpan={5} style={{ textAlign: 'center' }}>
-                    Aucune location trouvée
-                  </Table.Td>
-                </Table.Tr>
-              ) : (
-                rows
-              )}
-            </Table.Tbody>
-          </Table>
-        </Table.ScrollContainer>
+        <DataTable
+          records={paginatedLocations}
+          columns={[
+            {
+              accessor: 'name',
+              title: 'Nom',
+              filter: (
+                <TextInput
+                  placeholder="Rechercher un nom..."
+                  value={nameFilter}
+                  onChange={(e) => setNameFilter(e.currentTarget.value)}
+                  style={{ minWidth: 200 }}
+                />
+              ),
+            },
+            {
+              accessor: 'description',
+              title: 'Description',
+              render: (location: LocationWithShops) => location.description || '-',
+              filter: (
+                <TextInput
+                  placeholder="Rechercher une description..."
+                  value={descriptionFilter}
+                  onChange={(e) => setDescriptionFilter(e.currentTarget.value)}
+                  style={{ minWidth: 200 }}
+                />
+              ),
+            },
+            {
+              accessor: 'shops.length',
+              title: 'Nombre de magasins',
+              render: (location: LocationWithShops) =>
+                location.shops.length > 0 ? (
+                  <Link
+                    href={`${routes.admin.shops}?locationId=${location.id}`}
+                    style={{ textDecoration: 'none', color: 'inherit' }}
+                  >
+                    <span style={{ cursor: 'pointer', textDecoration: 'underline' }}>
+                      {location.shops.length}
+                    </span>
+                  </Link>
+                ) : (
+                  location.shops.length
+                ),
+            },
+            {
+              accessor: 'createdAt',
+              title: 'Date de création',
+              render: (location: LocationWithShops) =>
+                new Date(location.createdAt).toLocaleDateString('fr-FR'),
+            },
+            {
+              accessor: 'actions',
+              title: 'Actions',
+              render: (location: LocationWithShops) => (
+                <Group gap="xs">
+                  <ActionIcon
+                    variant="light"
+                    color="blue"
+                    onClick={() => handleEdit(location)}
+                  >
+                    <IconEdit size={16} />
+                  </ActionIcon>
+                  <ActionIcon
+                    variant="light"
+                    color="red"
+                    onClick={() => {
+                      setLocationToDelete(location);
+                      setDeleteModalOpened(true);
+                    }}
+                  >
+                    <IconTrash size={16} />
+                  </ActionIcon>
+                </Group>
+              ),
+            },
+          ]}
+          fetching={loading}
+          noRecordsText={
+            nameFilter || descriptionFilter
+              ? 'Aucun lieu trouvé avec ces filtres'
+              : 'Aucun lieu trouvé'
+          }
+          striped
+          highlightOnHover
+          minHeight={200}
+          totalRecords={totalRecords}
+          recordsPerPage={pageSize}
+          page={page}
+          onPageChange={(p) => setPage(p)}
+          paginationSize="sm"
+          paginationText={({ from, to, totalRecords }) =>
+            `${from} - ${to} sur ${totalRecords} lieux`
+          }
+        />
       </Paper>
 
       {/* Modal de création/modification */}
@@ -243,20 +348,20 @@ export default function LocationsPage() {
           form.reset();
           setEditingLocation(null);
         }}
-        title={editingLocation ? 'Modifier la location' : 'Créer une location'}
+        title={editingLocation ? 'Modifier le lieu' : 'Créer un lieu'}
         size="md"
       >
         <form onSubmit={form.onSubmit(handleSubmit)}>
           <Stack>
             <TextInput
               label="Nom"
-              placeholder="Nom de la location"
+              placeholder="Nom du lieu"
               required
               {...form.getInputProps('name')}
             />
             <Textarea
               label="Description"
-              placeholder="Description de la location (optionnel)"
+              placeholder="Description du lieu (optionnel)"
               rows={4}
               {...form.getInputProps('description')}
             />
@@ -291,11 +396,11 @@ export default function LocationsPage() {
       >
         <Stack>
           <p>
-            Êtes-vous sûr de vouloir supprimer la location{' '}
+            Êtes-vous sûr de vouloir supprimer le lieu{' '}
             <strong>{locationToDelete?.name}</strong> ?
             {locationToDelete && locationToDelete.shops.length > 0 && (
               <span style={{ color: 'red', display: 'block', marginTop: '8px' }}>
-                Attention : Cette location contient {locationToDelete.shops.length} boutique(s).
+                Attention : Ce lieu contient {locationToDelete.shops.length} magasin(s).
               </span>
             )}
           </p>
