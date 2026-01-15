@@ -133,8 +133,8 @@ model Location {
 model Shop {
   id          String          @id @default(uuid())
   name        String
-  locationId  String?
-  location    Location?       @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  locationId  String
+  location    Location         @relation(fields: [locationId], references: [id], onDelete: Cascade)
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
   itemTypes   ItemTypeShop[]

@@ -7,6 +7,7 @@ export const routes = {
   admin: {
     index: '/admin',
     locations: '/admin/locations',
+    shops: '/admin/shops',
   },
   api: {},
   settings: {
