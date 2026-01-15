@@ -21,6 +21,8 @@ import { createLocation, getLocations, updateLocation, deleteLocation } from '@/
 import { handleAction } from '@/lib/action';
 import { handleApiZodError } from '@/lib/services/zod';
 import { ParsedZodError } from '@/lib/errors/ParsedZodError';
+import { routes } from '@/types/routes';
+import Link from 'next/link';
 import type { Location } from '@prisma/client';
 
 interface LocationWithShops extends Location {
@@ -151,7 +153,20 @@ export default function LocationsPage() {
     <Table.Tr key={location.id}>
       <Table.Td>{location.name}</Table.Td>
       <Table.Td>{location.description || '-'}</Table.Td>
-      <Table.Td>{location.shops.length}</Table.Td>
+      <Table.Td>
+        {location.shops.length > 0 ? (
+          <Link
+            href={`${routes.admin.shops}?locationId=${location.id}`}
+            style={{ textDecoration: 'none', color: 'inherit' }}
+          >
+            <span style={{ cursor: 'pointer', textDecoration: 'underline' }}>
+              {location.shops.length}
+            </span>
+          </Link>
+        ) : (
+          location.shops.length
+        )}
+      </Table.Td>
       <Table.Td>
         {new Date(location.createdAt).toLocaleDateString('fr-FR')}
       </Table.Td>

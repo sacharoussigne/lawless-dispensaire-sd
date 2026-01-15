@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Container,
   Title,
@@ -29,7 +30,9 @@ interface ShopWithRelations extends Shop {
   itemTypes: { id: string }[];
 }
 
-export default function ShopsPage() {
+function ShopsPageContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [shops, setShops] = useState<ShopWithRelations[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,7 +87,20 @@ export default function ShopsPage() {
   useEffect(() => {
     loadShops();
     loadLocations();
-  }, []);
+    
+    // Préremplir le filtre depuis les query params
+    const locationIdFromUrl = searchParams.get('locationId');
+    if (locationIdFromUrl) {
+      setLocationFilter(locationIdFromUrl);
+      // Retirer le paramètre de l'URL
+      const newSearchParams = new URLSearchParams(searchParams.toString());
+      newSearchParams.delete('locationId');
+      const newUrl = newSearchParams.toString()
+        ? `${window.location.pathname}?${newSearchParams.toString()}`
+        : window.location.pathname;
+      router.replace(newUrl);
+    }
+  }, [searchParams, router]);
 
   const handleSubmit = async (values: typeof form.values) => {
     try {
@@ -352,6 +368,18 @@ export default function ShopsPage() {
         </Stack>
       </Modal>
     </Container>
+  );
+}
+
+export default function ShopsPage() {
+  return (
+    <Suspense fallback={
+      <Container size="xl" py="xl">
+        <div>Chargement...</div>
+      </Container>
+    }>
+      <ShopsPageContent />
+    </Suspense>
   );
 }
 
