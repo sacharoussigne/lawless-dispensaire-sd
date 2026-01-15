@@ -64,6 +64,12 @@ export default function AdminHeader({
                   >
                     Magasins
                   </Link>
+                  <Link
+                    href={routes.admin.itemTypes}
+                    className={classes.link}
+                  >
+                    Types d'items
+                  </Link>
                   <Menu
                     width={260}
                     position="bottom-end"

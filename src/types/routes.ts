@@ -8,6 +8,7 @@ export const routes = {
     index: '/admin',
     locations: '/admin/locations',
     shops: '/admin/shops',
+    itemTypes: '/admin/itemtypes',
   },
   api: {},
   settings: {
