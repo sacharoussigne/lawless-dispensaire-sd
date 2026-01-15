@@ -174,9 +174,14 @@ export default function LocationsPage() {
     return matchesName && matchesDescription;
   });
 
+  // Trier par nom
+  const sortedLocations = [...filteredLocations].sort((a, b) =>
+    a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' })
+  );
+
   // Calculer la pagination
-  const totalRecords = filteredLocations.length;
-  const paginatedLocations = filteredLocations.slice(
+  const totalRecords = sortedLocations.length;
+  const paginatedLocations = sortedLocations.slice(
     (page - 1) * pageSize,
     page * pageSize
   );
@@ -287,12 +292,6 @@ export default function LocationsPage() {
                 ) : (
                   location.shops.length
                 ),
-            },
-            {
-              accessor: 'createdAt',
-              title: 'Date de création',
-              render: (location: LocationWithShops) =>
-                new Date(location.createdAt).toLocaleDateString('fr-FR'),
             },
             {
               accessor: 'actions',

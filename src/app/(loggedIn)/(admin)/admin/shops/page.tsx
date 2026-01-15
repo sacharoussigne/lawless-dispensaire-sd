@@ -187,10 +187,12 @@ function ShopsPageContent() {
     setModalOpened(true);
   };
 
-  const locationOptions = locations.map((location) => ({
-    value: location.id,
-    label: location.name,
-  }));
+  const locationOptions = [...locations]
+    .sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }))
+    .map((location) => ({
+      value: location.id,
+      label: location.name,
+    }));
 
   // Filtrer les magasins par location et nom
   const filteredShops = shops.filter((shop) => {
@@ -199,9 +201,14 @@ function ShopsPageContent() {
     return matchesLocation && matchesName;
   });
 
+  // Trier par nom
+  const sortedShops = [...filteredShops].sort((a, b) =>
+    a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' })
+  );
+
   // Calculer la pagination
-  const totalRecords = filteredShops.length;
-  const paginatedShops = filteredShops.slice(
+  const totalRecords = sortedShops.length;
+  const paginatedShops = sortedShops.slice(
     (page - 1) * pageSize,
     page * pageSize
   );
@@ -306,12 +313,6 @@ function ShopsPageContent() {
               accessor: 'shopGroups.length',
               title: "Nombre de groupes de magasins",
               render: (shop: ShopWithRelations) => shop.shopGroups.length,
-            },
-            {
-              accessor: 'createdAt',
-              title: 'Date de création',
-              render: (shop: ShopWithRelations) =>
-                new Date(shop.createdAt).toLocaleDateString('fr-FR'),
             },
             {
               accessor: 'actions',
