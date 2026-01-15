@@ -4,7 +4,10 @@ export const routes = {
   test: {
     index: '/test',
   },
-  admin: {},
+  admin: {
+    index: '/admin',
+    locations: '/admin/locations',
+  },
   api: {},
   settings: {
     index: '/settings',

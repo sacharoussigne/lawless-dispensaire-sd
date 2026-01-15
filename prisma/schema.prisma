@@ -75,3 +75,125 @@ model Verification {
   @@index([identifier])
   @@map("verification")
 }
+
+model CategoryItem {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  items     Item[]
+
+  @@map("category_item")
+}
+
+model Item {
+  id            String            @id @default(uuid())
+  name          String
+  description   String?
+  idealQuantity Int
+  isCraftable   Boolean           @default(false)
+  categoryId    String?
+  category      CategoryItem?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  itemTypeId    String?
+  itemType      ItemType?          @relation(fields: [itemTypeId], references: [id], onDelete: SetNull)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  stockHistory  StockHistory[]
+  craftRecipes  CraftRecipe[]     @relation("CraftedItem")
+  usedInRecipes CraftRecipeItem[] @relation("UsedItem")
+
+  @@index([categoryId])
+  @@index([itemTypeId])
+  @@map("item")
+}
+
+model StockHistory {
+  id        String   @id @default(uuid())
+  itemId    String
+  quantity  Int
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  timestamp DateTime @default(now())
+
+  @@index([itemId])
+  @@index([timestamp])
+  @@map("stock_history")
+}
+
+model Location {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  shops       Shop[]
+
+  @@map("location")
+}
+
+model Shop {
+  id          String          @id @default(uuid())
+  name        String
+  locationId  String?
+  location    Location?       @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  itemTypes   ItemTypeShop[]
+
+  @@index([locationId])
+  @@map("shop")
+}
+
+model CraftRecipe {
+  id           String           @id @default(uuid())
+  craftedItemId String
+  craftedItem  Item             @relation("CraftedItem", fields: [craftedItemId], references: [id], onDelete: Cascade)
+  quantity     Int
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  ingredients  CraftRecipeItem[]
+
+  @@index([craftedItemId])
+  @@map("craft_recipe")
+}
+
+model CraftRecipeItem {
+  id            String      @id @default(uuid())
+  craftRecipeId String
+  craftRecipe   CraftRecipe @relation(fields: [craftRecipeId], references: [id], onDelete: Cascade)
+  usedItemId    String
+  usedItem      Item        @relation("UsedItem", fields: [usedItemId], references: [id], onDelete: Cascade)
+  quantity      Int
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([craftRecipeId])
+  @@index([usedItemId])
+  @@map("craft_recipe_item")
+}
+
+model ItemType {
+  id          String         @id @default(uuid())
+  name        String
+  description String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  items       Item[]
+  shops       ItemTypeShop[]
+
+  @@map("item_type")
+}
+
+model ItemTypeShop {
+  id         String   @id @default(uuid())
+  itemTypeId String
+  itemType   ItemType @relation(fields: [itemTypeId], references: [id], onDelete: Cascade)
+  shopId     String
+  shop       Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([itemTypeId, shopId])
+  @@index([itemTypeId])
+  @@index([shopId])
+  @@map("item_type_shop")
+}
