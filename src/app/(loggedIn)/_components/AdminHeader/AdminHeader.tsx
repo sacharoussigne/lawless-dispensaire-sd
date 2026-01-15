@@ -65,10 +65,10 @@ export default function AdminHeader({
                     Magasins
                   </Link>
                   <Link
-                    href={routes.admin.itemTypes}
+                    href={routes.admin.shopGroups}
                     className={classes.link}
                   >
-                    Types d'items
+                    Groupes de magasins
                   </Link>
                   <Menu
                     width={260}

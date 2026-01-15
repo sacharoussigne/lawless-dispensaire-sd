@@ -53,7 +53,7 @@ export async function createShop(data: {
             name: true,
           },
         },
-        itemTypes: {
+        shopGroups: {
           select: {
             id: true,
           },
@@ -94,7 +94,7 @@ export async function getShops() {
             name: true,
           },
         },
-        itemTypes: {
+        shopGroups: {
           select: {
             id: true,
           },
@@ -145,7 +145,7 @@ export async function updateShop(data: {
             name: true,
           },
         },
-        itemTypes: {
+        shopGroups: {
           select: {
             id: true,
           },

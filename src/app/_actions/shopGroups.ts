@@ -5,30 +5,30 @@ import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
 import { getAuthSession } from '@/lib/auth';
 
-// Schéma de validation pour créer un itemType
-const createItemTypeSchema = z.object({
+// Schéma de validation pour créer un groupe de magasins
+const createShopGroupSchema = z.object({
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
   description: z.string().max(1000, 'La description est trop longue').optional(),
   shopIds: z.array(z.string().uuid('ID de magasin invalide')).optional(),
 });
 
-// Schéma de validation pour modifier un itemType
-const updateItemTypeSchema = z.object({
+// Schéma de validation pour modifier un groupe de magasins
+const updateShopGroupSchema = z.object({
   id: z.string().uuid('ID invalide'),
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
   description: z.string().max(1000, 'La description est trop longue').optional(),
   shopIds: z.array(z.string().uuid('ID de magasin invalide')).optional(),
 });
 
-// Schéma pour supprimer un itemType
-const deleteItemTypeSchema = z.object({
+// Schéma pour supprimer un groupe de magasins
+const deleteShopGroupSchema = z.object({
   id: z.string().uuid('ID invalide'),
 });
 
 /**
- * Crée un nouveau type d'item
+ * Crée un nouveau groupe de magasins
  */
-export async function createItemType(data: {
+export async function createShopGroup(data: {
   name: string;
   description?: string;
   shopIds?: string[];
@@ -42,9 +42,9 @@ export async function createItemType(data: {
       };
     }
 
-    const validatedData = createItemTypeSchema.parse(data);
+    const validatedData = createShopGroupSchema.parse(data);
 
-    const itemType = await prisma.itemType.create({
+    const shopGroup = await prisma.shopGroup.create({
       data: {
         name: validatedData.name,
         description: validatedData.description,
@@ -63,9 +63,17 @@ export async function createItemType(data: {
           },
         },
         shops: {
-          select: {
-            id: true,
-            shopId: true,
+          include: {
+            shop: {
+              include: {
+                location: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -73,17 +81,17 @@ export async function createItemType(data: {
 
     return {
       status: 201,
-      data: itemType,
+      data: shopGroup,
     };
   } catch (error) {
-    return actionErrorParser(error, 'Erreur lors de la création du type d\'item');
+    return actionErrorParser(error, 'Erreur lors de la création du groupe de magasins');
   }
 }
 
 /**
- * Récupère tous les types d'items
+ * Récupère tous les groupes de magasins
  */
-export async function getItemTypes() {
+export async function getShopGroups() {
   try {
     const session = await getAuthSession();
     if (!session) {
@@ -93,7 +101,7 @@ export async function getItemTypes() {
       };
     }
 
-    const itemTypes = await prisma.itemType.findMany({
+    const shopGroups = await prisma.shopGroup.findMany({
       orderBy: {
         createdAt: 'desc',
       },
@@ -105,25 +113,34 @@ export async function getItemTypes() {
         },
         shops: {
           include: {
-            shop: true
-          }
+            shop: {
+              include: {
+                location: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
         },
       },
     });
 
     return {
       status: 200,
-      data: itemTypes,
+      data: shopGroups,
     };
   } catch (error) {
-    return actionErrorParser(error, 'Erreur lors de la récupération des types d\'items');
+    return actionErrorParser(error, 'Erreur lors de la récupération des groupes de magasins');
   }
 }
 
 /**
- * Modifie un type d'item existant
+ * Modifie un groupe de magasins existant
  */
-export async function updateItemType(data: {
+export async function updateShopGroup(data: {
   id: string;
   name: string;
   description?: string;
@@ -138,10 +155,10 @@ export async function updateItemType(data: {
       };
     }
 
-    const validatedData = updateItemTypeSchema.parse(data);
+    const validatedData = updateShopGroupSchema.parse(data);
 
     // Récupérer les relations existantes
-    const existingItemType = await prisma.itemType.findUnique({
+    const existingShopGroup = await prisma.shopGroup.findUnique({
       where: { id: validatedData.id },
       include: {
         shops: {
@@ -152,12 +169,12 @@ export async function updateItemType(data: {
       },
     });
 
-    const existingShopIds = existingItemType?.shops.map((s) => s.shopId) || [];
+    const existingShopIds = existingShopGroup?.shops.map((s) => s.shopId) || [];
     const newShopIds = validatedData.shopIds || [];
     const shopIdsToAdd = newShopIds.filter((id) => !existingShopIds.includes(id));
     const shopIdsToRemove = existingShopIds.filter((id) => !newShopIds.includes(id));
 
-    const itemType = await prisma.itemType.update({
+    const shopGroup = await prisma.shopGroup.update({
       where: {
         id: validatedData.id,
       },
@@ -178,9 +195,17 @@ export async function updateItemType(data: {
           },
         },
         shops: {
-          select: {
-            id: true,
-            shopId: true,
+          include: {
+            shop: {
+              include: {
+                location: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -188,17 +213,17 @@ export async function updateItemType(data: {
 
     return {
       status: 200,
-      data: itemType,
+      data: shopGroup,
     };
   } catch (error) {
-    return actionErrorParser(error, 'Erreur lors de la modification du type d\'item');
+    return actionErrorParser(error, 'Erreur lors de la modification du groupe de magasins');
   }
 }
 
 /**
- * Supprime un type d'item
+ * Supprime un groupe de magasins
  */
-export async function deleteItemType(data: { id: string }) {
+export async function deleteShopGroup(data: { id: string }) {
   try {
     const session = await getAuthSession();
     if (!session) {
@@ -208,9 +233,9 @@ export async function deleteItemType(data: { id: string }) {
       };
     }
 
-    const validatedData = deleteItemTypeSchema.parse(data);
+    const validatedData = deleteShopGroupSchema.parse(data);
 
-    await prisma.itemType.delete({
+    await prisma.shopGroup.delete({
       where: {
         id: validatedData.id,
       },
@@ -221,7 +246,7 @@ export async function deleteItemType(data: { id: string }) {
       data: { success: true },
     };
   } catch (error) {
-    return actionErrorParser(error, 'Erreur lors de la suppression du type d\'item');
+    return actionErrorParser(error, 'Erreur lors de la suppression du groupe de magasins');
   }
 }
 
