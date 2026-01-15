@@ -75,7 +75,7 @@ export async function getLocations() {
         createdAt: 'desc',
       },
       include: {
-        shops: {
+        companies: {
           select: {
             id: true,
             name: true,

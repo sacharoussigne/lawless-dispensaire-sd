@@ -94,8 +94,8 @@ model Item {
   isCraftable   Boolean           @default(false)
   categoryId    String?
   category      CategoryItem?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  shopGroupId   String?
-  shopGroup     ShopGroup?        @relation(fields: [shopGroupId], references: [id], onDelete: SetNull)
+  companyGroupId   String?
+  companyGroup     CompanyGroup?        @relation(fields: [companyGroupId], references: [id], onDelete: SetNull)
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
   stockHistory  StockHistory[]
@@ -103,7 +103,7 @@ model Item {
   usedInRecipes CraftRecipeItem[] @relation("UsedItem")
 
   @@index([categoryId])
-  @@index([shopGroupId])
+  @@index([companyGroupId])
   @@map("item")
 }
 
@@ -120,27 +120,27 @@ model StockHistory {
 }
 
 model Location {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   name        String
   description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  shops       Shop[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  companies   Company[]
 
   @@map("location")
 }
 
-model Shop {
-  id          String          @id @default(uuid())
+model Company {
+  id          String            @id @default(uuid())
   name        String
   locationId  String
-  location    Location         @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  shopGroups  ShopGroupShop[]
+  location    Location          @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  companyGroups CompanyGroupCompany[]
 
   @@index([locationId])
-  @@map("shop")
+  @@map("company")
 }
 
 model CraftRecipe {
@@ -171,29 +171,29 @@ model CraftRecipeItem {
   @@map("craft_recipe_item")
 }
 
-model ShopGroup {
-  id          String         @id @default(uuid())
+model CompanyGroup {
+  id          String                @id @default(uuid())
   name        String
   description String?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
   items       Item[]
-  shops       ShopGroupShop[]
+  companies   CompanyGroupCompany[]
 
-  @@map("shop_group")
+  @@map("company_group")
 }
 
-model ShopGroupShop {
-  id          String    @id @default(uuid())
-  shopGroupId String
-  shopGroup   ShopGroup @relation(fields: [shopGroupId], references: [id], onDelete: Cascade)
-  shopId      String
-  shop        Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+model CompanyGroupCompany {
+  id              String        @id @default(uuid())
+  companyGroupId  String
+  companyGroup    CompanyGroup  @relation(fields: [companyGroupId], references: [id], onDelete: Cascade)
+  companyId       String
+  company         Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
-  @@unique([shopGroupId, shopId])
-  @@index([shopGroupId])
-  @@index([shopId])
-  @@map("shop_group_shop")
+  @@unique([companyGroupId, companyId])
+  @@index([companyGroupId])
+  @@index([companyId])
+  @@map("company_group_company")
 }

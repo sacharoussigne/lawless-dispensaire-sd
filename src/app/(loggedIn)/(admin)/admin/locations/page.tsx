@@ -28,17 +28,17 @@ import { routes } from '@/types/routes';
 import Link from 'next/link';
 import type { Location } from '@prisma/client';
 
-interface LocationWithShops extends Location {
-  shops: { id: string; name: string }[];
+interface LocationWithCompanies extends Location {
+  companies: { id: string; name: string }[];
 }
 
 export default function LocationsPage() {
-  const [locations, setLocations] = useState<LocationWithShops[]>([]);
+  const [locations, setLocations] = useState<LocationWithCompanies[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpened, setModalOpened] = useState(false);
-  const [editingLocation, setEditingLocation] = useState<LocationWithShops | null>(null);
+  const [editingLocation, setEditingLocation] = useState<LocationWithCompanies | null>(null);
   const [deleteModalOpened, setDeleteModalOpened] = useState(false);
-  const [locationToDelete, setLocationToDelete] = useState<LocationWithShops | null>(null);
+  const [locationToDelete, setLocationToDelete] = useState<LocationWithCompanies | null>(null);
   const [nameFilter, setNameFilter] = useState<string>('');
   const [descriptionFilter, setDescriptionFilter] = useState<string>('');
   const [page, setPage] = useState(1);
@@ -118,7 +118,7 @@ export default function LocationsPage() {
     }
   };
 
-  const handleEdit = (location: LocationWithShops) => {
+  const handleEdit = (location: LocationWithCompanies) => {
     setEditingLocation(location);
     form.setValues({
       name: location.name,
@@ -266,7 +266,7 @@ export default function LocationsPage() {
             {
               accessor: 'description',
               title: 'Description',
-              render: (location: LocationWithShops) => location.description || '-',
+              render: (location: LocationWithCompanies) => location.description || '-',
               filter: (
                 <TextInput
                   placeholder="Rechercher une description..."
@@ -277,26 +277,26 @@ export default function LocationsPage() {
               ),
             },
             {
-              accessor: 'shops.length',
-              title: 'Nombre de magasins',
-              render: (location: LocationWithShops) =>
-                location.shops.length > 0 ? (
+              accessor: 'companies.length',
+              title: 'Nombre d\'entreprises',
+              render: (location: LocationWithCompanies) =>
+                location.companies.length > 0 ? (
                   <Link
-                    href={`${routes.admin.shops}?locationId=${location.id}`}
+                    href={`${routes.admin.companies}?locationId=${location.id}`}
                     style={{ textDecoration: 'none', color: 'inherit' }}
                   >
                     <span style={{ cursor: 'pointer', textDecoration: 'underline' }}>
-                      {location.shops.length}
+                      {location.companies.length}
                     </span>
                   </Link>
                 ) : (
-                  location.shops.length
+                  location.companies.length
                 ),
             },
             {
               accessor: 'actions',
               title: 'Actions',
-              render: (location: LocationWithShops) => (
+              render: (location: LocationWithCompanies) => (
                 <Group gap="xs">
                   <ActionIcon
                     variant="light"
@@ -397,9 +397,9 @@ export default function LocationsPage() {
           <p>
             Êtes-vous sûr de vouloir supprimer le lieu{' '}
             <strong>{locationToDelete?.name}</strong> ?
-            {locationToDelete && locationToDelete.shops.length > 0 && (
+            {locationToDelete && locationToDelete.companies.length > 0 && (
               <span style={{ color: 'red', display: 'block', marginTop: '8px' }}>
-                Attention : Ce lieu contient {locationToDelete.shops.length} magasin(s).
+                Attention : Ce lieu contient {locationToDelete.companies.length} entreprise(s).
               </span>
             )}
           </p>

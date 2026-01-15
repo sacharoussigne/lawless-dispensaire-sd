@@ -22,23 +22,23 @@ import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { IconEdit, IconTrash, IconPlus, IconX } from '@tabler/icons-react';
 import {
-  createShopGroup,
-  getShopGroups,
-  updateShopGroup,
-  deleteShopGroup,
-} from '@/app/_actions/shopGroups';
-import { getShops } from '@/app/_actions/shops';
+  createCompanyGroup,
+  getCompanyGroups,
+  updateCompanyGroup,
+  deleteCompanyGroup,
+} from '@/app/_actions/companyGroups';
+import { getCompanies } from '@/app/_actions/companies';
 import { handleAction } from '@/lib/action';
 import { handleApiZodError } from '@/lib/services/zod';
 import { ParsedZodError } from '@/lib/errors/ParsedZodError';
-import type { ShopGroup, Shop, Location } from '@prisma/client';
+import type { CompanyGroup, Company, Location } from '@prisma/client';
 
-interface ShopGroupWithRelations extends ShopGroup {
+interface CompanyGroupWithRelations extends CompanyGroup {
   items: { id: string }[];
-  shops: {
+  companies: {
     id: string;
-    shopId?: string;
-    shop: Shop & {
+    companyId?: string;
+    company: Company & {
       location: {
         id: string;
         name: string;
@@ -47,20 +47,20 @@ interface ShopGroupWithRelations extends ShopGroup {
   }[];
 }
 
-interface ShopWithRelations extends Shop {
+interface CompanyWithRelations extends Company {
   location: { id: string; name: string };
-  shopGroups: { id: string }[];
+  companyGroups: { id: string }[];
 }
 
-export default function ShopGroupsPage() {
-  const [shopGroups, setShopGroups] = useState<ShopGroupWithRelations[]>([]);
-  const [shops, setShops] = useState<ShopWithRelations[]>([]);
+export default function CompanyGroupsPage() {
+  const [companyGroups, setCompanyGroups] = useState<CompanyGroupWithRelations[]>([]);
+  const [companies, setCompanies] = useState<CompanyWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingShops, setLoadingShops] = useState(true);
+  const [loadingCompanies, setLoadingCompanies] = useState(true);
   const [modalOpened, setModalOpened] = useState(false);
-  const [editingShopGroup, setEditingShopGroup] = useState<ShopGroupWithRelations | null>(null);
+  const [editingCompanyGroup, setEditingCompanyGroup] = useState<CompanyGroupWithRelations | null>(null);
   const [deleteModalOpened, setDeleteModalOpened] = useState(false);
-  const [shopGroupToDelete, setShopGroupToDelete] = useState<ShopGroupWithRelations | null>(null);
+  const [companyGroupToDelete, setCompanyGroupToDelete] = useState<CompanyGroupWithRelations | null>(null);
   const [nameFilter, setNameFilter] = useState<string>('');
   const [descriptionFilter, setDescriptionFilter] = useState<string>('');
   const [page, setPage] = useState(1);
@@ -70,25 +70,25 @@ export default function ShopGroupsPage() {
     initialValues: {
       name: '',
       description: '',
-      shopIds: [] as string[],
+      companyIds: [] as string[],
     },
     validate: {
       name: (value) => (value.length < 1 ? 'Le nom est requis' : null),
     },
   });
 
-  const loadShopGroups = async () => {
+  const loadCompanyGroups = async () => {
     try {
       setLoading(true);
-      const result = await getShopGroups();
+      const result = await getCompanyGroups();
       const data = handleAction(result);
       if (data) {
-        setShopGroups(data);
+        setCompanyGroups(data);
       }
     } catch (error: any) {
       notifications.show({
         title: 'Erreur',
-        message: error.message || 'Erreur lors du chargement des groupes de magasins',
+        message: error.message || 'Erreur lors du chargement des groupes d\'entreprises',
         color: 'red',
       });
     } finally {
@@ -96,64 +96,64 @@ export default function ShopGroupsPage() {
     }
   };
 
-  const loadShops = async () => {
+  const loadCompanies = async () => {
     try {
-      setLoadingShops(true);
-      const result = await getShops();
+      setLoadingCompanies(true);
+      const result = await getCompanies();
       const data = handleAction(result);
       if (data && Array.isArray(data)) {
-        setShops(data);
+        setCompanies(data);
       } else {
-        setShops([]);
+        setCompanies([]);
       }
     } catch (error: any) {
-      console.error('Erreur lors du chargement des magasins:', error);
+      console.error('Erreur lors du chargement des entreprises:', error);
       notifications.show({
         title: 'Erreur',
-        message: error.message || 'Erreur lors du chargement des magasins',
+        message: error.message || 'Erreur lors du chargement des entreprises',
         color: 'red',
       });
-      setShops([]);
+      setCompanies([]);
     } finally {
-      setLoadingShops(false);
+      setLoadingCompanies(false);
     }
   };
 
   useEffect(() => {
-    loadShopGroups();
-    loadShops();
+    loadCompanyGroups();
+    loadCompanies();
   }, []);
 
   const handleSubmit = async (values: typeof form.values) => {
     try {
       let result;
-      if (editingShopGroup) {
-        result = await updateShopGroup({
-          id: editingShopGroup.id,
+      if (editingCompanyGroup) {
+        result = await updateCompanyGroup({
+          id: editingCompanyGroup.id,
           name: values.name,
           description: values.description || undefined,
-          shopIds: values.shopIds.length > 0 ? values.shopIds : undefined,
+          companyIds: values.companyIds.length > 0 ? values.companyIds : undefined,
         });
       } else {
-        result = await createShopGroup({
+        result = await createCompanyGroup({
           name: values.name,
           description: values.description || undefined,
-          shopIds: values.shopIds.length > 0 ? values.shopIds : undefined,
+          companyIds: values.companyIds.length > 0 ? values.companyIds : undefined,
         });
       }
 
       handleAction(result);
       notifications.show({
         title: 'Succès',
-        message: editingShopGroup
-          ? 'Groupe de magasins modifié avec succès'
-          : 'Groupe de magasins créé avec succès',
+        message: editingCompanyGroup
+          ? 'Groupe d\'entreprises modifié avec succès'
+          : 'Groupe d\'entreprises créé avec succès',
         color: 'green',
       });
       setModalOpened(false);
       form.reset();
-      setEditingShopGroup(null);
-      loadShopGroups();
+      setEditingCompanyGroup(null);
+      loadCompanyGroups();
     } catch (error: any) {
       if (error instanceof ParsedZodError) {
         handleApiZodError(error.error, form);
@@ -167,30 +167,30 @@ export default function ShopGroupsPage() {
     }
   };
 
-  const handleEdit = (shopGroup: ShopGroupWithRelations) => {
-    setEditingShopGroup(shopGroup);
+  const handleEdit = (companyGroup: CompanyGroupWithRelations) => {
+    setEditingCompanyGroup(companyGroup);
     form.setValues({
-      name: shopGroup.name,
-      description: shopGroup.description || '',
-      shopIds: shopGroup.shops.map((s) => s.shopId || s.id),
+      name: companyGroup.name,
+      description: companyGroup.description || '',
+      companyIds: companyGroup.companies.map((c) => c.companyId || c.id),
     });
     setModalOpened(true);
   };
 
   const handleDelete = async () => {
-    if (!shopGroupToDelete) return;
+    if (!companyGroupToDelete) return;
 
     try {
-      const result = await deleteShopGroup({ id: shopGroupToDelete.id });
+      const result = await deleteCompanyGroup({ id: companyGroupToDelete.id });
       handleAction(result);
       notifications.show({
         title: 'Succès',
-        message: 'Groupe de magasins supprimé avec succès',
+        message: 'Groupe d\'entreprises supprimé avec succès',
         color: 'green',
       });
       setDeleteModalOpened(false);
-      setShopGroupToDelete(null);
-      loadShopGroups();
+      setCompanyGroupToDelete(null);
+      loadCompanyGroups();
     } catch (error: any) {
       notifications.show({
         title: 'Erreur',
@@ -201,7 +201,7 @@ export default function ShopGroupsPage() {
   };
 
   const openCreateModal = () => {
-    setEditingShopGroup(null);
+    setEditingCompanyGroup(null);
     form.reset();
     setModalOpened(true);
   };
@@ -214,19 +214,19 @@ export default function ShopGroupsPage() {
       .replace(/[\u0300-\u036f]/g, '');
   };
 
-  // Filtrer les groupes de magasins par nom et description
-  const filteredShopGroups = shopGroups.filter((shopGroup) => {
+  // Filtrer les groupes d'entreprises par nom et description
+  const filteredCompanyGroups = companyGroups.filter((companyGroup) => {
     const matchesName = !nameFilter || 
-      normalizeString(shopGroup.name).includes(normalizeString(nameFilter));
+      normalizeString(companyGroup.name).includes(normalizeString(nameFilter));
     const matchesDescription = !descriptionFilter || 
-      (shopGroup.description && 
-       normalizeString(shopGroup.description).includes(normalizeString(descriptionFilter)));
+      (companyGroup.description && 
+       normalizeString(companyGroup.description).includes(normalizeString(descriptionFilter)));
     return matchesName && matchesDescription;
   });
 
   // Calculer la pagination
-  const totalRecords = filteredShopGroups.length;
-  const paginatedShopGroups = filteredShopGroups.slice(
+  const totalRecords = filteredCompanyGroups.length;
+  const paginatedCompanyGroups = filteredCompanyGroups.slice(
     (page - 1) * pageSize,
     page * pageSize
   );
@@ -239,9 +239,9 @@ export default function ShopGroupsPage() {
   return (
     <Container size="xl" py="xl">
       <Group justify="space-between" mb="xl">
-        <Title order={1}>Groupes de magasins</Title>
+        <Title order={1}>Groupes d'entreprises</Title>
         <Button leftSection={<IconPlus size={16} />} onClick={openCreateModal}>
-          Créer un groupe de magasins
+          Créer un groupe d'entreprises
         </Button>
       </Group>
 
@@ -294,7 +294,7 @@ export default function ShopGroupsPage() {
 
       <Paper shadow="sm" p="md" withBorder>
         <DataTable
-          records={paginatedShopGroups}
+          records={paginatedCompanyGroups}
           columns={[
             {
               accessor: 'name',
@@ -311,7 +311,7 @@ export default function ShopGroupsPage() {
             {
               accessor: 'description',
               title: 'Description',
-              render: (shopGroup: ShopGroupWithRelations) => shopGroup.description || '-',
+              render: (companyGroup: CompanyGroupWithRelations) => companyGroup.description || '-',
               filter: (
                 <TextInput
                   placeholder="Rechercher une description..."
@@ -324,22 +324,22 @@ export default function ShopGroupsPage() {
             {
               accessor: 'items.length',
               title: "Nombre d'items",
-              render: (shopGroup: ShopGroupWithRelations) => shopGroup.items.length,
+              render: (companyGroup: CompanyGroupWithRelations) => companyGroup.items.length,
             },
             {
-              accessor: 'shops',
-              title: 'Magasins',
-              render: (shopGroup: ShopGroupWithRelations) => (
+              accessor: 'companies',
+              title: 'Entreprises',
+              render: (companyGroup: CompanyGroupWithRelations) => (
                 <Group gap="xs">
-                  {shopGroup.shops.length === 0 ? (
+                  {companyGroup.companies.length === 0 ? (
                     <Text c="dimmed" size="sm">-</Text>
                   ) : (
-                    shopGroup.shops.map((shopRelation) => {
-                      const shop = shopRelation.shop;
-                      if (!shop) return null;
+                    companyGroup.companies.map((companyRelation) => {
+                      const company = companyRelation.company;
+                      if (!company) return null;
                       return (
-                        <Badge key={shopRelation.id} variant="light" size="sm">
-                          {shop.name} - {shop.location.name}
+                        <Badge key={companyRelation.id} variant="light" size="sm">
+                          {company.name} - {company.location.name}
                         </Badge>
                       );
                     })
@@ -350,12 +350,12 @@ export default function ShopGroupsPage() {
             {
               accessor: 'actions',
               title: 'Actions',
-              render: (shopGroup: ShopGroupWithRelations) => (
+              render: (companyGroup: CompanyGroupWithRelations) => (
                 <Group gap="xs">
                   <ActionIcon
                     variant="light"
                     color="blue"
-                    onClick={() => handleEdit(shopGroup)}
+                    onClick={() => handleEdit(companyGroup)}
                   >
                     <IconEdit size={16} />
                   </ActionIcon>
@@ -363,7 +363,7 @@ export default function ShopGroupsPage() {
                     variant="light"
                     color="red"
                     onClick={() => {
-                      setShopGroupToDelete(shopGroup);
+                      setCompanyGroupToDelete(companyGroup);
                       setDeleteModalOpened(true);
                     }}
                   >
@@ -376,8 +376,8 @@ export default function ShopGroupsPage() {
           fetching={loading}
           noRecordsText={
             nameFilter || descriptionFilter
-              ? 'Aucun groupe de magasins trouvé avec ces filtres'
-              : 'Aucun groupe de magasins trouvé'
+              ? 'Aucun groupe d\'entreprises trouvé avec ces filtres'
+              : 'Aucun groupe d\'entreprises trouvé'
           }
           striped
           highlightOnHover
@@ -388,7 +388,7 @@ export default function ShopGroupsPage() {
           onPageChange={(p) => setPage(p)}
           paginationSize="sm"
           paginationText={({ from, to, totalRecords }) =>
-            `${from} - ${to} sur ${totalRecords} groupes de magasins`
+            `${from} - ${to} sur ${totalRecords} groupes d'entreprises`
           }
         />
       </Paper>
@@ -399,40 +399,40 @@ export default function ShopGroupsPage() {
         onClose={() => {
           setModalOpened(false);
           form.reset();
-          setEditingShopGroup(null);
+          setEditingCompanyGroup(null);
         }}
-        title={editingShopGroup ? 'Modifier le groupe de magasins' : 'Créer un groupe de magasins'}
+        title={editingCompanyGroup ? 'Modifier le groupe d\'entreprises' : 'Créer un groupe d\'entreprises'}
         size="md"
       >
         <form onSubmit={form.onSubmit(handleSubmit)}>
           <Stack>
             <TextInput
               label="Nom"
-              placeholder="Nom du groupe de magasins"
+              placeholder="Nom du groupe d'entreprises"
               required
               {...form.getInputProps('name')}
             />
             <Textarea
               label="Description"
-              placeholder="Description du groupe de magasins (optionnel)"
+              placeholder="Description du groupe d'entreprises (optionnel)"
               rows={4}
               {...form.getInputProps('description')}
             />
             <MultiSelect
-              label="Magasins"
-              placeholder={loadingShops ? 'Chargement des magasins...' : shops.length === 0 ? 'Aucun magasin disponible' : 'Sélectionner des magasins'}
-              data={[...shops]
+              label="Entreprises"
+              placeholder={loadingCompanies ? 'Chargement des entreprises...' : companies.length === 0 ? 'Aucune entreprise disponible' : 'Sélectionner des entreprises'}
+              data={[...companies]
                 .sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }))
-                .map((shop) => ({
-                  value: shop.id,
-                  label: `${shop.name} - ${shop.location.name}`,
+                .map((company) => ({
+                  value: company.id,
+                  label: `${company.name} - ${company.location.name}`,
                 }))}
-              value={form.values.shopIds}
-              onChange={(value) => form.setFieldValue('shopIds', value)}
-              error={form.errors.shopIds}
+              value={form.values.companyIds}
+              onChange={(value) => form.setFieldValue('companyIds', value)}
+              error={form.errors.companyIds}
               searchable
               clearable
-              disabled={loadingShops}
+              disabled={loadingCompanies}
             />
             <Group justify="flex-end" mt="md">
               <Button
@@ -440,13 +440,13 @@ export default function ShopGroupsPage() {
                 onClick={() => {
                   setModalOpened(false);
                   form.reset();
-                  setEditingShopGroup(null);
+                  setEditingCompanyGroup(null);
                 }}
               >
                 Annuler
               </Button>
               <Button type="submit">
-                {editingShopGroup ? 'Modifier' : 'Créer'}
+                {editingCompanyGroup ? 'Modifier' : 'Créer'}
               </Button>
             </Group>
           </Stack>
@@ -458,18 +458,18 @@ export default function ShopGroupsPage() {
         opened={deleteModalOpened}
         onClose={() => {
           setDeleteModalOpened(false);
-          setShopGroupToDelete(null);
+          setCompanyGroupToDelete(null);
         }}
         title="Confirmer la suppression"
         size="md"
       >
         <Stack>
           <p>
-            Êtes-vous sûr de vouloir supprimer le groupe de magasins{' '}
-            <strong>{shopGroupToDelete?.name}</strong> ?
-            {shopGroupToDelete && (shopGroupToDelete.items.length > 0 || shopGroupToDelete.shops.length > 0) && (
+            Êtes-vous sûr de vouloir supprimer le groupe d'entreprises{' '}
+            <strong>{companyGroupToDelete?.name}</strong> ?
+            {companyGroupToDelete && (companyGroupToDelete.items.length > 0 || companyGroupToDelete.companies.length > 0) && (
               <span style={{ color: 'red', display: 'block', marginTop: '8px' }}>
-                Attention : Ce groupe de magasins contient {shopGroupToDelete.items.length} item(s) et {shopGroupToDelete.shops.length} magasin(s).
+                Attention : Ce groupe d'entreprises contient {companyGroupToDelete.items.length} item(s) et {companyGroupToDelete.companies.length} entreprise(s).
               </span>
             )}
           </p>
@@ -478,7 +478,7 @@ export default function ShopGroupsPage() {
               variant="subtle"
               onClick={() => {
                 setDeleteModalOpened(false);
-                setShopGroupToDelete(null);
+                setCompanyGroupToDelete(null);
               }}
             >
               Annuler

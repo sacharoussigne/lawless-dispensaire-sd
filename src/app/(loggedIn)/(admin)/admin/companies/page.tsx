@@ -21,28 +21,28 @@ import { DataTable } from 'mantine-datatable';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { IconEdit, IconTrash, IconPlus, IconX } from '@tabler/icons-react';
-import { createShop, getShops, updateShop, deleteShop } from '@/app/_actions/shops';
+import { createCompany, getCompanies, updateCompany, deleteCompany } from '@/app/_actions/companies';
 import { getLocations } from '@/app/_actions/locations';
 import { handleAction } from '@/lib/action';
 import { handleApiZodError } from '@/lib/services/zod';
 import { ParsedZodError } from '@/lib/errors/ParsedZodError';
-import type { Shop, Location } from '@prisma/client';
+import type { Company, Location } from '@prisma/client';
 
-interface ShopWithRelations extends Shop {
+interface CompanyWithRelations extends Company {
   location: { id: string; name: string };
-  shopGroups: { id: string }[];
+  companyGroups: { id: string }[];
 }
 
-function ShopsPageContent() {
+function CompaniesPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [shops, setShops] = useState<ShopWithRelations[]>([]);
+  const [companies, setCompanies] = useState<CompanyWithRelations[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpened, setModalOpened] = useState(false);
-  const [editingShop, setEditingShop] = useState<ShopWithRelations | null>(null);
+  const [editingCompany, setEditingCompany] = useState<CompanyWithRelations | null>(null);
   const [deleteModalOpened, setDeleteModalOpened] = useState(false);
-  const [shopToDelete, setShopToDelete] = useState<ShopWithRelations | null>(null);
+  const [companyToDelete, setCompanyToDelete] = useState<CompanyWithRelations | null>(null);
   const [locationFilter, setLocationFilter] = useState<string | null>(null);
   const [nameFilter, setNameFilter] = useState<string>('');
   const [page, setPage] = useState(1);
@@ -59,18 +59,18 @@ function ShopsPageContent() {
     },
   });
 
-  const loadShops = async () => {
+  const loadCompanies = async () => {
     try {
       setLoading(true);
-      const result = await getShops();
+      const result = await getCompanies();
       const data = handleAction(result);
       if (data) {
-        setShops(data);
+        setCompanies(data);
       }
     } catch (error: any) {
       notifications.show({
         title: 'Erreur',
-        message: error.message || 'Erreur lors du chargement des magasins',
+        message: error.message || 'Erreur lors du chargement des entreprises',
         color: 'red',
       });
     } finally {
@@ -91,7 +91,7 @@ function ShopsPageContent() {
   };
 
   useEffect(() => {
-    loadShops();
+    loadCompanies();
     loadLocations();
     
     // Préremplir le filtre depuis les query params
@@ -111,14 +111,14 @@ function ShopsPageContent() {
   const handleSubmit = async (values: typeof form.values) => {
     try {
       let result;
-      if (editingShop) {
-        result = await updateShop({
-          id: editingShop.id,
+      if (editingCompany) {
+        result = await updateCompany({
+          id: editingCompany.id,
           name: values.name,
           locationId: values.locationId,
         });
       } else {
-        result = await createShop({
+        result = await createCompany({
           name: values.name,
           locationId: values.locationId,
         });
@@ -127,15 +127,15 @@ function ShopsPageContent() {
       handleAction(result);
       notifications.show({
         title: 'Succès',
-        message: editingShop
-          ? 'Magasin modifié avec succès'
-          : 'Magasin créé avec succès',
+        message: editingCompany
+          ? 'Entreprise modifiée avec succès'
+          : 'Entreprise créée avec succès',
         color: 'green',
       });
       setModalOpened(false);
       form.reset();
-      setEditingShop(null);
-      loadShops();
+      setEditingCompany(null);
+      loadCompanies();
     } catch (error: any) {
       if (error instanceof ParsedZodError) {
         handleApiZodError(error.error, form);
@@ -149,29 +149,29 @@ function ShopsPageContent() {
     }
   };
 
-  const handleEdit = (shop: ShopWithRelations) => {
-    setEditingShop(shop);
+  const handleEdit = (company: CompanyWithRelations) => {
+    setEditingCompany(company);
     form.setValues({
-      name: shop.name,
-      locationId: shop.locationId,
+      name: company.name,
+      locationId: company.locationId,
     });
     setModalOpened(true);
   };
 
   const handleDelete = async () => {
-    if (!shopToDelete) return;
+    if (!companyToDelete) return;
 
     try {
-      const result = await deleteShop({ id: shopToDelete.id });
+      const result = await deleteCompany({ id: companyToDelete.id });
       handleAction(result);
       notifications.show({
         title: 'Succès',
-        message: 'Magasin supprimé avec succès',
+        message: 'Entreprise supprimée avec succès',
         color: 'green',
       });
       setDeleteModalOpened(false);
-      setShopToDelete(null);
-      loadShops();
+      setCompanyToDelete(null);
+      loadCompanies();
     } catch (error: any) {
       notifications.show({
         title: 'Erreur',
@@ -182,7 +182,7 @@ function ShopsPageContent() {
   };
 
   const openCreateModal = () => {
-    setEditingShop(null);
+    setEditingCompany(null);
     form.reset();
     setModalOpened(true);
   };
@@ -194,21 +194,21 @@ function ShopsPageContent() {
       label: location.name,
     }));
 
-  // Filtrer les magasins par location et nom
-  const filteredShops = shops.filter((shop) => {
-    const matchesLocation = !locationFilter || shop.locationId === locationFilter;
-    const matchesName = !nameFilter || shop.name.toLowerCase().includes(nameFilter.toLowerCase());
+  // Filtrer les entreprises par location et nom
+  const filteredCompanies = companies.filter((company) => {
+    const matchesLocation = !locationFilter || company.locationId === locationFilter;
+    const matchesName = !nameFilter || company.name.toLowerCase().includes(nameFilter.toLowerCase());
     return matchesLocation && matchesName;
   });
 
   // Trier par nom
-  const sortedShops = [...filteredShops].sort((a, b) =>
+  const sortedCompanies = [...filteredCompanies].sort((a, b) =>
     a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' })
   );
 
   // Calculer la pagination
-  const totalRecords = sortedShops.length;
-  const paginatedShops = sortedShops.slice(
+  const totalRecords = sortedCompanies.length;
+  const paginatedCompanies = sortedCompanies.slice(
     (page - 1) * pageSize,
     page * pageSize
   );
@@ -226,9 +226,9 @@ function ShopsPageContent() {
   return (
     <Container size="xl" py="xl">
       <Group justify="space-between" mb="xl">
-        <Title order={1}>Magasins</Title>
+        <Title order={1}>Entreprises</Title>
         <Button leftSection={<IconPlus size={16} />} onClick={openCreateModal}>
-          Créer un magasin
+          Créer une entreprise
         </Button>
       </Group>
 
@@ -281,7 +281,7 @@ function ShopsPageContent() {
 
       <Paper shadow="sm" p="md" withBorder>
         <DataTable
-          records={paginatedShops}
+          records={paginatedCompanies}
           columns={[
             {
               accessor: 'name',
@@ -310,19 +310,19 @@ function ShopsPageContent() {
               ),
             },
             {
-              accessor: 'shopGroups.length',
-              title: "Nombre de groupes de magasins",
-              render: (shop: ShopWithRelations) => shop.shopGroups.length,
+              accessor: 'companyGroups.length',
+              title: "Nombre de groupes d'entreprises",
+              render: (company: CompanyWithRelations) => company.companyGroups.length,
             },
             {
               accessor: 'actions',
               title: 'Actions',
-              render: (shop: ShopWithRelations) => (
+              render: (company: CompanyWithRelations) => (
                 <Group gap="xs">
                   <ActionIcon
                     variant="light"
                     color="blue"
-                    onClick={() => handleEdit(shop)}
+                    onClick={() => handleEdit(company)}
                   >
                     <IconEdit size={16} />
                   </ActionIcon>
@@ -330,7 +330,7 @@ function ShopsPageContent() {
                     variant="light"
                     color="red"
                     onClick={() => {
-                      setShopToDelete(shop);
+                      setCompanyToDelete(company);
                       setDeleteModalOpened(true);
                     }}
                   >
@@ -343,8 +343,8 @@ function ShopsPageContent() {
           fetching={loading}
           noRecordsText={
             locationFilter || nameFilter
-              ? 'Aucun magasin trouvé avec ces filtres'
-              : 'Aucun magasin trouvé'
+              ? 'Aucune entreprise trouvée avec ces filtres'
+              : 'Aucune entreprise trouvée'
           }
           striped
           highlightOnHover
@@ -355,7 +355,7 @@ function ShopsPageContent() {
           onPageChange={(p) => setPage(p)}
           paginationSize="sm"
           paginationText={({ from, to, totalRecords }) =>
-            `${from} - ${to} sur ${totalRecords} magasins`
+            `${from} - ${to} sur ${totalRecords} entreprises`
           }
         />
       </Paper>
@@ -366,16 +366,16 @@ function ShopsPageContent() {
         onClose={() => {
           setModalOpened(false);
           form.reset();
-          setEditingShop(null);
+          setEditingCompany(null);
         }}
-        title={editingShop ? 'Modifier le magasin' : 'Créer un magasin'}
+        title={editingCompany ? 'Modifier l\'entreprise' : 'Créer une entreprise'}
         size="md"
       >
         <form onSubmit={form.onSubmit(handleSubmit)}>
           <Stack>
             <TextInput
               label="Nom"
-              placeholder="Nom du magasin"
+              placeholder="Nom de l'entreprise"
               required
               {...form.getInputProps('name')}
             />
@@ -392,13 +392,13 @@ function ShopsPageContent() {
                 onClick={() => {
                   setModalOpened(false);
                   form.reset();
-                  setEditingShop(null);
+                  setEditingCompany(null);
                 }}
               >
                 Annuler
               </Button>
               <Button type="submit">
-                {editingShop ? 'Modifier' : 'Créer'}
+                {editingCompany ? 'Modifier' : 'Créer'}
               </Button>
             </Group>
           </Stack>
@@ -410,18 +410,18 @@ function ShopsPageContent() {
         opened={deleteModalOpened}
         onClose={() => {
           setDeleteModalOpened(false);
-          setShopToDelete(null);
+          setCompanyToDelete(null);
         }}
         title="Confirmer la suppression"
         size="md"
       >
         <Stack>
           <p>
-            Êtes-vous sûr de vouloir supprimer le magasin{' '}
-            <strong>{shopToDelete?.name}</strong> ?
-            {shopToDelete && shopToDelete.shopGroups.length > 0 && (
+            Êtes-vous sûr de vouloir supprimer l'entreprise{' '}
+            <strong>{companyToDelete?.name}</strong> ?
+            {companyToDelete && companyToDelete.companyGroups.length > 0 && (
               <span style={{ color: 'red', display: 'block', marginTop: '8px' }}>
-                Attention : Ce magasin contient {shopToDelete.shopGroups.length} groupe(s) de magasins.
+                Attention : Cette entreprise contient {companyToDelete.companyGroups.length} groupe(s) d'entreprises.
               </span>
             )}
           </p>
@@ -430,7 +430,7 @@ function ShopsPageContent() {
               variant="subtle"
               onClick={() => {
                 setDeleteModalOpened(false);
-                setShopToDelete(null);
+                setCompanyToDelete(null);
               }}
             >
               Annuler
@@ -445,14 +445,14 @@ function ShopsPageContent() {
   );
 }
 
-export default function ShopsPage() {
+export default function CompaniesPage() {
   return (
     <Suspense fallback={
       <Container size="xl" py="xl">
         <div>Chargement...</div>
       </Container>
     }>
-      <ShopsPageContent />
+      <CompaniesPageContent />
     </Suspense>
   );
 }

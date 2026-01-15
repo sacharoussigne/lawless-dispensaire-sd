@@ -59,16 +59,16 @@ export default function AdminHeader({
                     Lieux
                   </Link>
                   <Link
-                    href={routes.admin.shops}
+                    href={routes.admin.companies}
                     className={classes.link}
                   >
-                    Magasins
+                    Entreprises
                   </Link>
                   <Link
-                    href={routes.admin.shopGroups}
+                    href={routes.admin.companyGroups}
                     className={classes.link}
                   >
-                    Groupes de magasins
+                    Groupes d'entreprises
                   </Link>
                   <Menu
                     width={260}

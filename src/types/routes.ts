@@ -7,8 +7,8 @@ export const routes = {
   admin: {
     index: '/admin',
     locations: '/admin/locations',
-    shops: '/admin/shops',
-    shopGroups: '/admin/shopgroups',
+    companies: '/admin/companies',
+    companyGroups: '/admin/companygroups',
   },
   api: {},
   settings: {
