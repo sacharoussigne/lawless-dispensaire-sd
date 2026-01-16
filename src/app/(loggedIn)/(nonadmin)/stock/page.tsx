@@ -19,7 +19,6 @@ import { IconEdit, IconCheck, IconX, IconClipboardCheck, IconTools } from '@tabl
 import { getItemsWithStock, updateStock, craftItem } from '@/app/_actions/stock';
 import { handleAction } from '@/lib/action';
 import { notifications } from '@mantine/notifications';
-import type { Item, CategoryItem } from '@prisma/client';
 import CraftModal from './modals/CraftModal';
 import type { ItemWithRelations, CategoryWithItems } from '@/types/stock';
 
@@ -349,8 +348,28 @@ export default function StockPage() {
                   <Table.Tbody>
                     {categoryData.items.map((item) => {
                       const hasStockToday = item.stockToday !== null;
+                      const isStockLow = item.stockToday !== null && item.stockToday < item.idealQuantity;
+                      
+                      // Déterminer la couleur selon le type d'item
+                      let backgroundColor: string | undefined = undefined;
+                      if (isStockLow) {
+                        // Items craftables OU items non-craftables sans groupe d'entreprise
+                        if (item.isCraftable || (item.companyGroupId === null)) {
+                          backgroundColor = '#fff3cd'; // Jaune clair
+                        } 
+                        // Items non-craftables avec groupe d'entreprise
+                        else if (!item.isCraftable && item.companyGroupId !== null) {
+                          backgroundColor = '#f8d7da'; // Rouge clair
+                        }
+                      }
+                      
                       return (
-                        <Table.Tr key={item.id}>
+                        <Table.Tr 
+                          key={item.id}
+                          style={{
+                            backgroundColor,
+                          }}
+                        >
                           <Table.Td>
                             <Group gap="xs">
                               <Text fw={500}>{item.name}</Text>

@@ -103,6 +103,7 @@ model Item {
   stockHistory   StockHistory[]
   craftRecipes   CraftRecipe[]     @relation("CraftedItem")
   usedInRecipes  CraftRecipeItem[] @relation("UsedItem")
+  orderItems     OrderItem[]
 
   @@index([categoryId])
   @@index([companyGroupId])
@@ -140,6 +141,7 @@ model Company {
   createdAt     DateTime              @default(now())
   updatedAt     DateTime              @updatedAt
   companyGroups CompanyGroupCompany[]
+  orders        Order[]
 
   @@index([locationId])
   @@map("company")
@@ -200,4 +202,45 @@ model CompanyGroupCompany {
   @@index([companyGroupId])
   @@index([companyId])
   @@map("company_group_company")
+}
+
+enum OrderStatus {
+  DRAFT
+  LETTER_SENT
+  PROCESSING
+  READY
+  COMPLETED
+  CANCELLED
+}
+
+model Order {
+  id        String       @id @default(uuid())
+  name      String
+  status    OrderStatus  @default(DRAFT)
+  details   String?
+  companyId String
+  company   Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  items     OrderItem[]
+
+  @@index([companyId])
+  @@index([status])
+  @@map("order")
+}
+
+model OrderItem {
+  id        String   @id @default(uuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  itemId    String
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  quantity  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orderId, itemId])
+  @@index([orderId])
+  @@index([itemId])
+  @@map("order_item")
 }
