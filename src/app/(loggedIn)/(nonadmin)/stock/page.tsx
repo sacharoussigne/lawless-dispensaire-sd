@@ -15,11 +15,12 @@ import {
   ActionIcon,
   Tooltip,
 } from '@mantine/core';
-import { IconEdit, IconCheck, IconX, IconClipboardCheck, IconTools } from '@tabler/icons-react';
+import { IconEdit, IconCheck, IconX, IconClipboardCheck, IconTools, IconShoppingCart } from '@tabler/icons-react';
 import { getItemsWithStock, updateStock, craftItem } from '@/app/_actions/stock';
 import { handleAction } from '@/lib/action';
 import { notifications } from '@mantine/notifications';
 import CraftModal from './modals/CraftModal';
+import OrderModal from './modals/OrderModal';
 import type { ItemWithRelations, CategoryWithItems } from '@/types/stock';
 
 
@@ -67,6 +68,7 @@ export default function StockPage() {
 
   // État pour stocker les valeurs d'input brutes (avec expressions)
   const [stockInputValues, setStockInputValues] = useState<Record<string, string>>({});
+  const [orderModalOpened, setOrderModalOpened] = useState(false);
 
   const handleSaveStock = async () => {
     try {
@@ -254,6 +256,16 @@ export default function StockPage() {
   const itemsWithStockToday = items.filter((item) => item.stockToday !== null).length;
   const totalItems = items.length;
 
+  // Vérifier s'il y a des items non-craftables avec groupe d'entreprise qui ont besoin d'être restockés
+  const itemsNeedingRestock = items.filter(
+    (item) =>
+      !item.isCraftable &&
+      item.companyGroupId !== null &&
+      item.stockToday !== null &&
+      item.stockToday < item.idealQuantity
+  );
+  const hasItemsNeedingRestock = itemsNeedingRestock.length > 0;
+
   return (
     <Container size="xl" py="xl">
       <Group justify="space-between" mb="xl">
@@ -270,6 +282,16 @@ export default function StockPage() {
           )}
           {!isEditing ? (
             <Group>
+              {hasItemsNeedingRestock && (
+                <Button
+                  leftSection={<IconShoppingCart size={16} />}
+                  onClick={() => setOrderModalOpened(true)}
+                  variant="filled"
+                  color="orange"
+                >
+                  Créer une commande ({itemsNeedingRestock.length})
+                </Button>
+              )}
               <Button
                 leftSection={<IconTools size={16} />}
                 onClick={() => setCraftModalOpened(true)}
@@ -489,6 +511,14 @@ export default function StockPage() {
               color: 'red',
             });
           }
+        }}
+      />
+      <OrderModal
+        opened={orderModalOpened}
+        items={items}
+        onClose={() => setOrderModalOpened(false)}
+        onOrderCreated={async () => {
+          await loadItems(); // Recharger les items après création de la commande
         }}
       />
     </Container>
