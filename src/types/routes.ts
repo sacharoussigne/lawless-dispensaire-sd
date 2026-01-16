@@ -16,6 +16,9 @@ export const routes = {
   settings: {
     index: '/settings',
   },
+  stock: {
+    index: '/stock',
+  },
   auth: {
     index: '/auth',
     login: '/auth/login',

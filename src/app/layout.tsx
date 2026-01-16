@@ -14,6 +14,8 @@ import '@mantine/notifications/styles.css';
 import 'mantine-datatable/styles.css';
 
 import theme from '@/lib/theme';
+// Configuration dayjs avec fuseau horaire Europe/Paris
+import '@/lib/dayjs';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',

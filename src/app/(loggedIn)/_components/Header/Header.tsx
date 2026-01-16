@@ -53,7 +53,7 @@ export default function Header({
               {session ? (
                 <>
                   <Link
-                    href={routes.test.index}
+                    href={routes.stock.index}
                     className={classes.link}
                   >
                     Stocks
