@@ -183,11 +183,31 @@ export default function CraftModal({ opened, onClose, items, onCraft }: CraftMod
                     value={selectedRecipe}
                     onChange={(value) => setSelectedRecipe(value)}
                     required
+                    renderOption={({ option }) => {
+                      const recipe = craftRecipes.find((r) => r.id === option.value);
+                      return (
+                        <div>
+                          <div>{option.label}</div>
+                          {recipe?.recipeDescription && (
+                            <Text size="xs" c="dimmed" mt={2}>
+                              {recipe.recipeDescription}
+                            </Text>
+                          )}
+                        </div>
+                      );
+                    }}
                   />
                 ) : (
-                  <Text size="sm" c="dimmed">
-                    Recette : {craftRecipes[0]?.recipeName}
-                  </Text>
+                  <Stack gap="xs">
+                    <Text size="sm" c="dimmed">
+                      Recette : {craftRecipes[0]?.recipeName}
+                    </Text>
+                    {craftRecipes[0]?.recipeDescription && (
+                      <Text size="xs" c="dimmed">
+                        {craftRecipes[0].recipeDescription}
+                      </Text>
+                    )}
+                  </Stack>
                 )}
 
                 <NumberInput
@@ -205,18 +225,6 @@ export default function CraftModal({ opened, onClose, items, onCraft }: CraftMod
 
                   // Calculer le nombre de fois qu'on doit appliquer la recette
                   const recipeMultiplier = Math.ceil(craftQuantity / recipe.quantity);
-                  
-                  // Vérifier que tous les ingrédients ont un stock d'aujourd'hui ET assez de stock
-                  const allIngredientsHaveEnough = recipe.ingredients.every((ingredient) => {
-                    const requiredQuantity = ingredient.quantity * recipeMultiplier;
-                    const item = items.find((i) => i.id === ingredient.usedItemId);
-                    // Vérifier que le stock d'aujourd'hui existe
-                    if (item?.stockToday === null || item?.stockToday === undefined) {
-                      return false;
-                    }
-                    const availableStock = item.stockToday;
-                    return availableStock >= requiredQuantity;
-                  });
 
                   return (
                     <Stack gap="sm" mt="md">
