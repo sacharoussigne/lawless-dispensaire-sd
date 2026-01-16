@@ -94,13 +94,13 @@ export default function CraftModal({ opened, onClose, items, onCraft }: CraftMod
     onClose();
   };
 
-  const handleCraft = () => {
+  const handleCraft = async () => {
     if (!selectedCraftItem || !selectedRecipe) return;
-    onCraft(selectedCraftItem, selectedRecipe, craftQuantity);
+    await onCraft(selectedCraftItem, selectedRecipe, craftQuantity);
   };
 
-  const craftItem = items.find((i) => i.id === selectedCraftItem);
-  const hasCraftItemStockToday = craftItem?.stockToday !== null && craftItem?.stockToday !== undefined;
+  const selectedCraftItemData = items.find((i) => i.id === selectedCraftItem);
+  const hasCraftItemStockToday = selectedCraftItemData?.stockToday !== null && selectedCraftItemData?.stockToday !== undefined;
 
   const isCraftButtonDisabled = (() => {
     if (!selectedCraftItem || (!selectedRecipe && craftRecipes.length > 1) || craftQuantity < 1) {
@@ -115,12 +115,10 @@ export default function CraftModal({ opened, onClose, items, onCraft }: CraftMod
     const recipe = craftRecipes.find((r) => r.id === selectedRecipe) || craftRecipes[0];
     if (!recipe) return true;
     
-    // Calculer le nombre de fois qu'on doit appliquer la recette
-    const recipeMultiplier = Math.ceil(craftQuantity / recipe.quantity);
-    
+    // craftQuantity représente maintenant le nombre de fois qu'on craft la recette
     // Vérifier que tous les ingrédients ont un stock d'aujourd'hui ET assez de stock
     const allIngredientsHaveEnough = recipe.ingredients.every((ingredient) => {
-      const requiredQuantity = ingredient.quantity * recipeMultiplier;
+      const requiredQuantity = ingredient.quantity * craftQuantity;
       const item = items.find((i) => i.id === ingredient.usedItemId);
       // Vérifier que le stock d'aujourd'hui existe
       if (item?.stockToday === null || item?.stockToday === undefined) {
@@ -210,29 +208,39 @@ export default function CraftModal({ opened, onClose, items, onCraft }: CraftMod
                   </Stack>
                 )}
 
-                <NumberInput
-                  label="Quantité à craft"
-                  placeholder="Quantité"
-                  value={craftQuantity}
-                  onChange={(value) => setCraftQuantity(typeof value === 'number' ? value : 1)}
-                  min={1}
-                  required
-                />
+                {(() => {
+                  const recipe = craftRecipes.find((r) => r.id === selectedRecipe) || craftRecipes[0];
+                  if (!recipe) return null;
+                  
+                  const totalQuantity = craftQuantity * recipe.quantity;
+                  
+                  return (
+                    <>
+                      <NumberInput
+                        label="Nombre de fois à craft"
+                        placeholder="Nombre de fois"
+                        value={craftQuantity}
+                        onChange={(value) => setCraftQuantity(typeof value === 'number' ? value : 1)}
+                        min={1}
+                        required
+                        description={`Quantité totale produite : ${totalQuantity}`}
+                      />
+                    </>
+                  );
+                })()}
 
                 {(selectedRecipe || (craftRecipes.length === 1 && craftRecipes[0])) && (() => {
                   const recipe = craftRecipes.find((r) => r.id === selectedRecipe) || craftRecipes[0];
                   if (!recipe) return null;
 
-                  // Calculer le nombre de fois qu'on doit appliquer la recette
-                  const recipeMultiplier = Math.ceil(craftQuantity / recipe.quantity);
-
+                  // craftQuantity représente maintenant le nombre de fois qu'on craft la recette
                   return (
                     <Stack gap="sm" mt="md">
                       <Text fw={500}>Ingrédients nécessaires :</Text>
                       <Paper p="md" withBorder>
                         <Stack gap="xs">
                           {recipe.ingredients.map((ingredient) => {
-                            const requiredQuantity = ingredient.quantity * recipeMultiplier;
+                            const requiredQuantity = ingredient.quantity * craftQuantity;
                             const item = items.find((i) => i.id === ingredient.usedItemId);
                             const hasStockToday = item?.stockToday !== null && item?.stockToday !== undefined;
                             const availableStock = hasStockToday ? (item.stockToday ?? 0) : 0;

@@ -16,7 +16,7 @@ import {
   Tooltip,
 } from '@mantine/core';
 import { IconEdit, IconCheck, IconX, IconClipboardCheck, IconTools } from '@tabler/icons-react';
-import { getItemsWithStock, updateStock } from '@/app/_actions/stock';
+import { getItemsWithStock, updateStock, craftItem } from '@/app/_actions/stock';
 import { handleAction } from '@/lib/action';
 import { notifications } from '@mantine/notifications';
 import type { Item, CategoryItem } from '@prisma/client';
@@ -437,13 +437,39 @@ export default function StockPage() {
         opened={craftModalOpened}
         onClose={() => setCraftModalOpened(false)}
         items={items}
-        onCraft={(itemId, recipeId, quantity) => {
-          // TODO: Implémenter le craft
-          notifications.show({
-            title: 'Info',
-            message: 'Fonctionnalité de craft à implémenter',
-            color: 'blue',
-          });
+        onCraft={async (itemId, recipeId, times) => {
+          try {
+            const result = await craftItem({
+              craftedItemId: itemId,
+              recipeId,
+              times,
+            });
+            
+            if (result.status === 200 && 'data' in result && result.data && 'quantityProduced' in result.data) {
+              notifications.show({
+                title: 'Succès',
+                message: `Craft effectué avec succès ! ${result.data.quantityProduced} item(s) produit(s).`,
+                color: 'green',
+              });
+              setCraftModalOpened(false);
+              await loadItems(); // Recharger les items pour mettre à jour les stocks
+            } else {
+              const errorMessage = 'error' in result 
+                ? (typeof result.error === 'string' ? result.error : 'Erreur lors du craft')
+                : 'Erreur lors du craft';
+              notifications.show({
+                title: 'Erreur',
+                message: errorMessage,
+                color: 'red',
+              });
+            }
+          } catch (error: any) {
+            notifications.show({
+              title: 'Erreur',
+              message: error.message || 'Erreur lors du craft',
+              color: 'red',
+            });
+          }
         }}
       />
     </Container>
