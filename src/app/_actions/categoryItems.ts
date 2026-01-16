@@ -23,6 +23,14 @@ const deleteCategoryItemSchema = z.object({
   id: z.string().uuid('ID invalide'),
 });
 
+// Schéma pour réordonner les catégories
+const reorderCategoryItemsSchema = z.object({
+  items: z.array(z.object({
+    id: z.string().uuid('ID invalide'),
+    order: z.number().int(),
+  })),
+});
+
 /**
  * Crée une nouvelle catégorie d'item
  */
@@ -41,10 +49,23 @@ export async function createCategoryItem(data: {
 
     const validatedData = createCategoryItemSchema.parse(data);
 
+    // Récupérer le dernier ordre pour définir le nouvel ordre
+    const lastCategory = await prisma.categoryItem.findFirst({
+      orderBy: {
+        order: 'desc',
+      },
+      select: {
+        order: true,
+      },
+    });
+
+    const newOrder = lastCategory ? lastCategory.order + 1 : 0;
+
     const categoryItem = await prisma.categoryItem.create({
       data: {
         name: validatedData.name,
         color: validatedData.color || '#ffffff',
+        order: newOrder,
       },
     });
 
@@ -72,7 +93,7 @@ export async function getCategoryItems() {
 
     const categoryItems = await prisma.categoryItem.findMany({
       orderBy: {
-        createdAt: 'desc',
+        order: 'asc',
       },
       include: {
         items: {
@@ -158,6 +179,40 @@ export async function deleteCategoryItem(data: { id: string }) {
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la suppression de la catégorie d\'item');
+  }
+}
+
+/**
+ * Réordonne les catégories d'items
+ */
+export async function reorderCategoryItems(data: { items: { id: string; order: number }[] }) {
+  try {
+    const session = await getAuthSession();
+    if (!session) {
+      return {
+        status: 401,
+        error: 'Non autorisé',
+      };
+    }
+
+    const validatedData = reorderCategoryItemsSchema.parse(data);
+
+    // Mettre à jour l'ordre de chaque catégorie
+    await Promise.all(
+      validatedData.items.map(({ id, order }) =>
+        prisma.categoryItem.update({
+          where: { id },
+          data: { order },
+        })
+      )
+    );
+
+    return {
+      status: 200,
+      data: { success: true },
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors du réordonnancement des catégories d\'items');
   }
 }
 

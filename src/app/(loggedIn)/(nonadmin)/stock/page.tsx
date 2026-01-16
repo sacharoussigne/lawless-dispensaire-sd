@@ -10,8 +10,13 @@ import {
   Text,
   Badge,
   Stack,
+  Button,
+  TextInput,
+  ActionIcon,
+  Tooltip,
 } from '@mantine/core';
-import { getItemsWithStock } from '@/app/_actions/stock';
+import { IconEdit, IconCheck, IconX, IconClipboardCheck } from '@tabler/icons-react';
+import { getItemsWithStock, updateStock } from '@/app/_actions/stock';
 import { handleAction } from '@/lib/action';
 import { notifications } from '@mantine/notifications';
 import type { Item, CategoryItem } from '@prisma/client';
@@ -24,13 +29,16 @@ interface ItemWithRelations extends Item {
 }
 
 interface CategoryWithItems {
-  category: { id: string; name: string; color: string };
+  category: { id: string; name: string; color: string; order?: number };
   items: ItemWithRelations[];
 }
 
 export default function StockPage() {
   const [items, setItems] = useState<ItemWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [stockValues, setStockValues] = useState<Record<string, number | ''>>({});
+  const [saving, setSaving] = useState(false);
 
   const loadItems = async () => {
     try {
@@ -54,6 +62,136 @@ export default function StockPage() {
   useEffect(() => {
     loadItems();
   }, []);
+
+  // Initialiser les valeurs de stock avec les valeurs actuelles
+  useEffect(() => {
+    if (isEditing && items.length > 0) {
+      const initialValues: Record<string, number | ''> = {};
+      items.forEach((item) => {
+        initialValues[item.id] = item.stockToday !== null ? item.stockToday : '';
+      });
+      setStockValues(initialValues);
+    }
+  }, [isEditing, items]);
+
+  // État pour stocker les valeurs d'input brutes (avec expressions)
+  const [stockInputValues, setStockInputValues] = useState<Record<string, string>>({});
+
+  const handleSaveStock = async () => {
+    try {
+      setSaving(true);
+      const stockData = Object.entries(stockValues)
+        .filter(([_, value]) => value !== '' && value !== null)
+        .map(([itemId, quantity]) => ({
+          itemId,
+          quantity: typeof quantity === 'number' ? quantity : 0,
+        }));
+
+      if (stockData.length === 0) {
+        notifications.show({
+          title: 'Avertissement',
+          message: 'Aucun stock à sauvegarder',
+          color: 'yellow',
+        });
+        return;
+      }
+
+      const result = await updateStock(stockData);
+      handleAction(result);
+
+      notifications.show({
+        title: 'Succès',
+        message: 'Stock mis à jour avec succès',
+        color: 'green',
+      });
+
+      setIsEditing(false);
+      setStockValues({});
+      await loadItems();
+    } catch (error: any) {
+      notifications.show({
+        title: 'Erreur',
+        message: error.message || 'Erreur lors de la sauvegarde du stock',
+        color: 'red',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setStockValues({});
+  };
+
+  // Fonction pour évaluer une expression mathématique simple de manière sécurisée
+  const evaluateExpression = (expression: string): number | '' => {
+    if (!expression || expression.trim() === '') return '';
+    
+    // Nettoyer l'expression : enlever les espaces
+    const cleaned = expression.replace(/\s/g, '');
+    
+    // Vérifier que l'expression contient uniquement des caractères autorisés
+    // Permettre les chiffres, +, -, *, /, (, ), et le point pour les décimales
+    if (!/^[\d+\-*/().]+$/.test(cleaned)) {
+      return '';
+    }
+
+    try {
+      // Utiliser Function constructor pour évaluer de manière plus sécurisée que eval()
+      // On limite aux calculs mathématiques de base
+      const result = new Function('return ' + cleaned)();
+      if (typeof result === 'number' && !isNaN(result) && isFinite(result)) {
+        return Math.round(result); // Arrondir pour les entiers
+      }
+      return '';
+    } catch {
+      return '';
+    }
+  };
+
+  const handleStockInputChange = (itemId: string, value: string) => {
+    // Stocker la valeur brute pour l'affichage
+    setStockInputValues((prev) => ({
+      ...prev,
+      [itemId]: value,
+    }));
+
+    // Si l'expression contient des opérateurs, évaluer et stocker le résultat
+    const trimmed = value.trim();
+    if (trimmed === '') {
+      setStockValues((prev) => ({
+        ...prev,
+        [itemId]: '',
+      }));
+    } else if (/[\+\-\*\/]/.test(trimmed)) {
+      // Contient des opérateurs mathématiques, évaluer l'expression
+      const result = evaluateExpression(trimmed);
+      setStockValues((prev) => ({
+        ...prev,
+        [itemId]: result,
+      }));
+    } else {
+      // Sinon, convertir en nombre
+      const parsed = Number(trimmed);
+      const numValue = isNaN(parsed) ? '' : parsed;
+      setStockValues((prev) => ({
+        ...prev,
+        [itemId]: numValue,
+      }));
+    }
+  };
+
+  // Initialiser les valeurs d'input brutes
+  useEffect(() => {
+    if (isEditing && items.length > 0) {
+      const initialInputValues: Record<string, string> = {};
+      items.forEach((item) => {
+        initialInputValues[item.id] = item.stockToday !== null ? String(item.stockToday) : '';
+      });
+      setStockInputValues(initialInputValues);
+    }
+  }, [isEditing, items]);
 
   // Fonction pour calculer la luminosité d'une couleur hexadécimale
   const getLuminance = (hex: string): number => {
@@ -91,10 +229,19 @@ export default function StockPage() {
     return acc;
   }, {} as Record<string, CategoryWithItems>);
 
-  // Trier les catégories par nom
-  const sortedCategories = Object.values(itemsByCategory).sort((a, b) =>
-    a.category.name.localeCompare(b.category.name, 'fr', { sensitivity: 'base' })
-  );
+  // Trier les catégories par ordre puis par nom
+  const sortedCategories = Object.values(itemsByCategory).sort((a, b) => {
+    // Si les deux ont un ordre, trier par ordre
+    if (a.category.order !== undefined && b.category.order !== undefined) {
+      return a.category.order - b.category.order;
+    }
+    // Si seulement a a un ordre, a vient en premier
+    if (a.category.order !== undefined) return -1;
+    // Si seulement b a un ordre, b vient en premier
+    if (b.category.order !== undefined) return 1;
+    // Sinon, trier par nom
+    return a.category.name.localeCompare(b.category.name, 'fr', { sensitivity: 'base' });
+  });
 
   // Trier les items dans chaque catégorie par nom
   sortedCategories.forEach((cat) => {
@@ -103,11 +250,55 @@ export default function StockPage() {
     );
   });
 
+  // Compter les items avec stock fait aujourd'hui
+  const itemsWithStockToday = items.filter((item) => item.stockToday !== null).length;
+  const totalItems = items.length;
+
   return (
     <Container size="xl" py="xl">
-      <Title order={1} mb="xl">
-        Stock
-      </Title>
+      <Group justify="space-between" mb="xl">
+        <Title order={1}>Stock</Title>
+        <Group>
+          {itemsWithStockToday > 0 && (
+            <Badge
+              color={itemsWithStockToday === totalItems ? 'green' : 'yellow'}
+              variant="light"
+              size="lg"
+            >
+              {itemsWithStockToday}/{totalItems} items stockés aujourd'hui
+            </Badge>
+          )}
+          {!isEditing ? (
+            <Button
+              leftSection={<IconEdit size={16} />}
+              onClick={() => setIsEditing(true)}
+              variant="light"
+            >
+              {itemsWithStockToday > 0 ? 'Mettre à jour le stock' : 'Faire le stock'}
+            </Button>
+          ) : (
+            <Group>
+              <Button
+                leftSection={<IconX size={16} />}
+                onClick={handleCancelEdit}
+                variant="subtle"
+                color="gray"
+              >
+                Annuler
+              </Button>
+              <Button
+                leftSection={<IconCheck size={16} />}
+                onClick={handleSaveStock}
+                loading={saving}
+                variant="filled"
+                color="green"
+              >
+                Sauvegarder
+              </Button>
+            </Group>
+          )}
+        </Group>
+      </Group>
 
       {loading ? (
         <Text>Chargement...</Text>
@@ -141,31 +332,88 @@ export default function StockPage() {
                       <Table.Th>Quantité idéale</Table.Th>
                       <Table.Th>Stock J-1</Table.Th>
                       <Table.Th>Stock aujourd'hui</Table.Th>
+                      {isEditing && <Table.Th>Nouveau stock</Table.Th>}
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
-                    {categoryData.items.map((item) => (
-                      <Table.Tr key={item.id}>
-                        <Table.Td>
-                          <Text fw={500}>{item.name}</Text>
-                        </Table.Td>
-                        <Table.Td>{item.idealQuantity}</Table.Td>
-                        <Table.Td>
-                          {item.stockYesterday !== null ? (
-                            <Text>{item.stockYesterday}</Text>
-                          ) : (
-                            <Text c="dimmed">?</Text>
+                    {categoryData.items.map((item) => {
+                      const hasStockToday = item.stockToday !== null;
+                      return (
+                        <Table.Tr key={item.id}>
+                          <Table.Td>
+                            <Group gap="xs">
+                              <Text fw={500}>{item.name}</Text>
+                              {hasStockToday && (
+                                <Tooltip label="Stock déjà fait aujourd'hui">
+                                  <Badge
+                                    color="green"
+                                    variant="light"
+                                    size="sm"
+                                    leftSection={<IconClipboardCheck size={12} />}
+                                  >
+                                    Fait
+                                  </Badge>
+                                </Tooltip>
+                              )}
+                            </Group>
+                          </Table.Td>
+                          <Table.Td>{item.idealQuantity}</Table.Td>
+                          <Table.Td>
+                            {item.stockYesterday !== null ? (
+                              <Text>{item.stockYesterday}</Text>
+                            ) : (
+                              <Text c="dimmed">?</Text>
+                            )}
+                          </Table.Td>
+                          <Table.Td>
+                            {item.stockToday !== null ? (
+                              <Text fw={hasStockToday ? 600 : undefined}>
+                                {item.stockToday}
+                              </Text>
+                            ) : (
+                              <Text c="dimmed">?</Text>
+                            )}
+                          </Table.Td>
+                          {isEditing && (
+                            <Table.Td>
+                              <TextInput
+                                value={stockInputValues[item.id] ?? (item.stockToday !== null ? String(item.stockToday) : '')}
+                                onChange={(e) => handleStockInputChange(item.id, String(e.currentTarget.value))}
+                                onBlur={(e) => {
+                                  // Quand on quitte le champ, évaluer l'expression et mettre à jour l'affichage
+                                  const inputValue = e.currentTarget.value.trim();
+                                  if (inputValue === '') {
+                                    setStockInputValues((prev) => ({
+                                      ...prev,
+                                      [item.id]: '',
+                                    }));
+                                  } else if (/[\+\-\*\/]/.test(inputValue)) {
+                                    const result = evaluateExpression(inputValue);
+                                    if (result !== '') {
+                                      setStockInputValues((prev) => ({
+                                        ...prev,
+                                        [item.id]: String(result),
+                                      }));
+                                    }
+                                  }
+                                }}
+                                placeholder="Quantité (ex: 30 + 45)"
+                                style={{ maxWidth: 150 }}
+                                rightSection={
+                                  hasStockToday ? (
+                                    <Tooltip label="Mise à jour du stock existant">
+                                      <ActionIcon size="sm" variant="subtle" color="blue">
+                                        <IconEdit size={14} />
+                                      </ActionIcon>
+                                    </Tooltip>
+                                  ) : undefined
+                                }
+                              />
+                            </Table.Td>
                           )}
-                        </Table.Td>
-                        <Table.Td>
-                          {item.stockToday !== null ? (
-                            <Text>{item.stockToday}</Text>
-                          ) : (
-                            <Text c="dimmed">?</Text>
-                          )}
-                        </Table.Td>
-                      </Table.Tr>
-                    ))}
+                        </Table.Tr>
+                      );
+                    })}
                   </Table.Tbody>
                 </Table>
               </Paper>

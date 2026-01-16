@@ -19,13 +19,31 @@ import {
 import { DataTable } from 'mantine-datatable';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
-import { IconEdit, IconTrash, IconPlus, IconX } from '@tabler/icons-react';
+import { IconEdit, IconTrash, IconPlus, IconX, IconGripVertical } from '@tabler/icons-react';
 import {
   createCategoryItem,
   getCategoryItems,
   updateCategoryItem,
   deleteCategoryItem,
+  reorderCategoryItems,
 } from '@/app/_actions/categoryItems';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { handleAction } from '@/lib/action';
 import { handleApiZodError } from '@/lib/services/zod';
 import { ParsedZodError } from '@/lib/errors/ParsedZodError';
@@ -45,6 +63,17 @@ export default function CategoryItemsPage() {
   const [nameFilter, setNameFilter] = useState<string>('');
   const [page, setPage] = useState(1);
   const [pageSize] = useState(10);
+  const [reorderModalOpened, setReorderModalOpened] = useState(false);
+  const [reorderItems, setReorderItems] = useState<CategoryItemWithItems[]>([]);
+  const [savingOrder, setSavingOrder] = useState(false);
+
+  // Sensors pour le drag & drop dans la modal
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const form = useForm({
     initialValues: {
@@ -159,6 +188,51 @@ export default function CategoryItemsPage() {
     setModalOpened(true);
   };
 
+  const openReorderModal = () => {
+    setReorderItems([...sortedCategoryItems]);
+    setReorderModalOpened(true);
+  };
+
+  const handleSaveReorder = async () => {
+    try {
+      setSavingOrder(true);
+      const result = await reorderCategoryItems({
+        items: reorderItems.map((item, index) => ({
+          id: item.id,
+          order: index,
+        })),
+      });
+      handleAction(result);
+      notifications.show({
+        title: 'Succès',
+        message: 'Ordre des catégories mis à jour',
+        color: 'green',
+      });
+      setReorderModalOpened(false);
+      loadCategoryItems();
+    } catch (error: any) {
+      notifications.show({
+        title: 'Erreur',
+        message: error.message || 'Erreur lors de la mise à jour de l\'ordre',
+        color: 'red',
+      });
+    } finally {
+      setSavingOrder(false);
+    }
+  };
+
+  const handleReorderDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setReorderItems((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  };
+
   // Fonction pour normaliser les chaînes (enlever les accents et mettre en minuscule)
   const normalizeString = (str: string): string => {
     return str
@@ -174,10 +248,15 @@ export default function CategoryItemsPage() {
     return matchesName;
   });
 
-  // Trier par nom
-  const sortedCategoryItems = [...filteredCategoryItems].sort((a, b) =>
-    a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' })
-  );
+  // Trier par ordre puis par nom
+  const sortedCategoryItems = [...filteredCategoryItems].sort((a, b) => {
+    // Si les deux ont un ordre, trier par ordre
+    if (a.order !== undefined && b.order !== undefined) {
+      return a.order - b.order;
+    }
+    // Sinon, trier par nom
+    return a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' });
+  });
 
   // Calculer la pagination
   const totalRecords = sortedCategoryItems.length;
@@ -195,9 +274,18 @@ export default function CategoryItemsPage() {
     <Container size="xl" py="xl">
       <Group justify="space-between" mb="xl">
         <Title order={1}>Catégories d'items</Title>
-        <Button leftSection={<IconPlus size={16} />} onClick={openCreateModal}>
-          Créer une catégorie d'item
-        </Button>
+        <Group>
+          <Button
+            variant="light"
+            onClick={openReorderModal}
+            disabled={categoryItems.length === 0}
+          >
+            Réordonner
+          </Button>
+          <Button leftSection={<IconPlus size={16} />} onClick={openCreateModal}>
+            Créer une catégorie d'item
+          </Button>
+        </Group>
       </Group>
 
       {/* Affichage des filtres actifs */}
@@ -392,7 +480,106 @@ export default function CategoryItemsPage() {
           </Group>
         </Stack>
       </Modal>
+
+      {/* Modal de réordonnancement */}
+      <Modal
+        opened={reorderModalOpened}
+        onClose={() => {
+          setReorderModalOpened(false);
+          setReorderItems([]);
+        }}
+        title="Réordonner les catégories"
+        size="md"
+      >
+        <Stack>
+          <Text size="sm" c="dimmed" mb="md">
+            Glissez-déposez les catégories pour les réordonner
+          </Text>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleReorderDragEnd}
+          >
+            <SortableContext
+              items={reorderItems.map((item) => item.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <Stack gap="xs">
+                {reorderItems.map((categoryItem) => (
+                  <SortableRow key={categoryItem.id} categoryItem={categoryItem} />
+                ))}
+              </Stack>
+            </SortableContext>
+          </DndContext>
+          <Group justify="flex-end" mt="md">
+            <Button
+              variant="subtle"
+              onClick={() => {
+                setReorderModalOpened(false);
+                setReorderItems([]);
+              }}
+            >
+              Annuler
+            </Button>
+            <Button
+              onClick={handleSaveReorder}
+              loading={savingOrder}
+            >
+              Valider
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </Container>
+  );
+}
+
+// Composant pour une ligne draggable dans la modal
+function SortableRow({ categoryItem }: { categoryItem: CategoryItemWithItems }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: categoryItem.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        ...style,
+        padding: '12px',
+        marginBottom: '8px',
+        border: '1px solid #dee2e6',
+        borderRadius: '4px',
+        backgroundColor: isDragging ? '#f8f9fa' : 'white',
+        cursor: 'grab',
+      }}
+    >
+      <Group gap="xs">
+        <div
+          {...attributes}
+          {...listeners}
+          style={{
+            cursor: 'grab',
+            display: 'flex',
+            alignItems: 'center',
+            color: '#868e96',
+          }}
+        >
+          <IconGripVertical size={20} />
+        </div>
+        <Text fw={500}>{categoryItem.name}</Text>
+      </Group>
+    </div>
   );
 }
 

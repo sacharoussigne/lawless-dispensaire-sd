@@ -6,6 +6,7 @@ import { getAuthSession } from '@/lib/auth';
 import {
   getTodayStart,
   getYesterdayStart,
+  getTomorrowStart,
   formatDate,
 } from '@/lib/date';
 
@@ -30,7 +31,14 @@ export async function getItemsWithStock() {
         createdAt: 'desc',
       },
       include: {
-        category: true,
+        category: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+            order: true,
+          },
+        },
         companyGroup: {
           select: {
             id: true,
@@ -80,6 +88,72 @@ export async function getItemsWithStock() {
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la récupération des items avec stock');
+  }
+}
+
+/**
+ * Met à jour le stock pour plusieurs items
+ * Si un stock existe déjà aujourd'hui, il est mis à jour
+ * Sinon, un nouveau stock est créé
+ */
+export async function updateStock(data: { itemId: string; quantity: number }[]) {
+  try {
+    const session = await getAuthSession();
+    if (!session) {
+      return {
+        status: 401,
+        error: 'Non autorisé',
+      };
+    }
+
+    const today = getTodayStart();
+    const tomorrow = getTomorrowStart();
+
+    // Pour chaque item, créer ou mettre à jour le stock
+    const results = await Promise.all(
+      data.map(async ({ itemId, quantity }) => {
+        // Vérifier si un stock existe déjà aujourd'hui
+        const existingStock = await prisma.stockHistory.findFirst({
+          where: {
+            itemId,
+            timestamp: {
+              gte: today,
+              lt: tomorrow,
+            },
+          },
+          orderBy: {
+            timestamp: 'desc',
+          },
+        });
+
+        if (existingStock) {
+          // Mettre à jour le stock existant
+          return prisma.stockHistory.update({
+            where: {
+              id: existingStock.id,
+            },
+            data: {
+              quantity,
+            },
+          });
+        } else {
+          // Créer un nouveau stock
+          return prisma.stockHistory.create({
+            data: {
+              itemId,
+              quantity,
+            },
+          });
+        }
+      })
+    );
+
+    return {
+      status: 200,
+      data: results,
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de la mise à jour du stock');
   }
 }
 
