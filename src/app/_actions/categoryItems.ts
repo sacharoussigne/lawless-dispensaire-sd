@@ -8,12 +8,14 @@ import { getAuthSession } from '@/lib/auth';
 // Schéma de validation pour créer une catégorie d'item
 const createCategoryItemSchema = z.object({
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
+  color: z.string().min(1, 'La couleur est requise').max(7, 'La couleur doit être au format hexadécimal').default('#ffffff'),
 });
 
 // Schéma de validation pour modifier une catégorie d'item
 const updateCategoryItemSchema = z.object({
   id: z.string().uuid('ID invalide'),
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
+  color: z.string().min(1, 'La couleur est requise').max(7, 'La couleur doit être au format hexadécimal').default('#ffffff'),
 });
 
 // Schéma pour supprimer une catégorie d'item
@@ -26,6 +28,7 @@ const deleteCategoryItemSchema = z.object({
  */
 export async function createCategoryItem(data: {
   name: string;
+  color?: string;
 }) {
   try {
     const session = await getAuthSession();
@@ -41,6 +44,7 @@ export async function createCategoryItem(data: {
     const categoryItem = await prisma.categoryItem.create({
       data: {
         name: validatedData.name,
+        color: validatedData.color || '#ffffff',
       },
     });
 
@@ -95,6 +99,7 @@ export async function getCategoryItems() {
 export async function updateCategoryItem(data: {
   id: string;
   name: string;
+  color?: string;
 }) {
   try {
     const session = await getAuthSession();
@@ -113,6 +118,7 @@ export async function updateCategoryItem(data: {
       },
       data: {
         name: validatedData.name,
+        color: validatedData.color || '#ffffff',
       },
     });
 

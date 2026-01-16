@@ -14,6 +14,7 @@ import {
   Badge,
   Text,
   Flex,
+  ColorInput,
 } from '@mantine/core';
 import { DataTable } from 'mantine-datatable';
 import { useForm } from '@mantine/form';
@@ -48,9 +49,11 @@ export default function CategoryItemsPage() {
   const form = useForm({
     initialValues: {
       name: '',
+      color: '#ffffff',
     },
     validate: {
       name: (value) => (value.length < 1 ? 'Le nom est requis' : null),
+      color: (value) => (!value || value.length < 1 ? 'La couleur est requise' : null),
     },
   });
 
@@ -84,10 +87,12 @@ export default function CategoryItemsPage() {
         result = await updateCategoryItem({
           id: editingCategoryItem.id,
           name: values.name,
+          color: values.color || '#ffffff',
         });
       } else {
         result = await createCategoryItem({
           name: values.name,
+          color: values.color || '#ffffff',
         });
       }
 
@@ -120,6 +125,7 @@ export default function CategoryItemsPage() {
     setEditingCategoryItem(categoryItem);
     form.setValues({
       name: categoryItem.name,
+      color: categoryItem.color || '#ffffff',
     });
     setModalOpened(true);
   };
@@ -237,6 +243,24 @@ export default function CategoryItemsPage() {
               ),
             },
             {
+              accessor: 'color',
+              title: 'Couleur',
+              render: (categoryItem: CategoryItemWithItems) => (
+                <Group gap="xs">
+                  <div
+                    style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: 4,
+                      backgroundColor: categoryItem.color,
+                      border: '1px solid #dee2e6',
+                    }}
+                  />
+                  <Text size="sm">{categoryItem.color}</Text>
+                </Group>
+              ),
+            },
+            {
               accessor: 'items.length',
               title: "Nombre d'items",
               render: (categoryItem: CategoryItemWithItems) => categoryItem.items.length,
@@ -305,6 +329,13 @@ export default function CategoryItemsPage() {
               placeholder="Nom de la catégorie d'item"
               required
               {...form.getInputProps('name')}
+            />
+            <ColorInput
+              label="Couleur"
+              placeholder="Sélectionner une couleur"
+              format="hex"
+              required
+              {...form.getInputProps('color')}
             />
             <Group justify="flex-end" mt="md">
               <Button

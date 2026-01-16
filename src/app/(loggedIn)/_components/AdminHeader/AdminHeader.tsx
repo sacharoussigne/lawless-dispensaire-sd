@@ -85,6 +85,11 @@ export default function AdminHeader({
                           Catégories d'items
                         </Menu.Item>
                       </Link>
+                      <Link href={routes.admin.items}>
+                        <Menu.Item>
+                          Items
+                        </Menu.Item>
+                      </Link>
                     </Menu.Dropdown>
                   </Menu>
                   <Menu

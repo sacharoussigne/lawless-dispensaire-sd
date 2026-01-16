@@ -10,6 +10,7 @@ export const routes = {
     companies: '/admin/companies',
     companyGroups: '/admin/companygroups',
     categoryItems: '/admin/categoryitems',
+    items: '/admin/items',
   },
   api: {},
   settings: {
