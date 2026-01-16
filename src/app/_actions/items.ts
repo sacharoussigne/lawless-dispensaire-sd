@@ -53,6 +53,21 @@ export async function createItem(data: {
 
     const validatedData = createItemSchema.parse(data);
 
+    // Récupérer le dernier ordre pour cette catégorie
+    const lastItem = await prisma.item.findFirst({
+      where: {
+        categoryId: validatedData.categoryId,
+      },
+      orderBy: {
+        order: 'desc',
+      },
+      select: {
+        order: true,
+      },
+    });
+
+    const newOrder = lastItem ? lastItem.order + 1 : 0;
+
     const item = await prisma.item.create({
       data: {
         name: validatedData.name,
@@ -61,6 +76,7 @@ export async function createItem(data: {
         isCraftable: validatedData.isCraftable ?? false,
         categoryId: validatedData.categoryId,
         companyGroupId: validatedData.companyGroupId,
+        order: newOrder,
       },
     });
 
@@ -87,11 +103,28 @@ export async function getItems() {
     }
 
     const items = await prisma.item.findMany({
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: [
+        {
+          category: {
+            order: 'asc',
+          },
+        },
+        {
+          order: 'asc',
+        },
+        {
+          name: 'asc',
+        },
+      ],
       include: {
-        category: true,
+        category: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+            order: true,
+          },
+        },
         companyGroup: {
           select: {
             id: true,
@@ -183,6 +216,48 @@ export async function deleteItem(data: { id: string }) {
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la suppression de l\'item');
+  }
+}
+
+// Schéma pour réordonner les items
+const reorderItemsSchema = z.object({
+  items: z.array(z.object({
+    id: z.string().uuid('ID invalide'),
+    order: z.number().int(),
+  })),
+});
+
+/**
+ * Réordonne les items
+ */
+export async function reorderItems(data: { items: { id: string; order: number }[] }) {
+  try {
+    const session = await getAuthSession();
+    if (!session) {
+      return {
+        status: 401,
+        error: 'Non autorisé',
+      };
+    }
+
+    const validatedData = reorderItemsSchema.parse(data);
+
+    // Mettre à jour l'ordre de chaque item
+    await Promise.all(
+      validatedData.items.map(({ id, order }) =>
+        prisma.item.update({
+          where: { id },
+          data: { order },
+        })
+      )
+    );
+
+    return {
+      status: 200,
+      data: { success: true },
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors du réordonnancement des items');
   }
 }
 

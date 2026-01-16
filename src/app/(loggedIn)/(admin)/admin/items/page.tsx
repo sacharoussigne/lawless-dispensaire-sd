@@ -22,6 +22,23 @@ import {
   Divider,
 } from '@mantine/core';
 import { DataTable } from 'mantine-datatable';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import {
@@ -30,12 +47,14 @@ import {
   IconPlus,
   IconX,
   IconTools,
+  IconGripVertical,
 } from '@tabler/icons-react';
 import {
   createItem,
   getItems,
   updateItem,
   deleteItem,
+  reorderItems,
 } from '@/app/_actions/items';
 import { getCategoryItems } from '@/app/_actions/categoryItems';
 import { getCompanyGroups } from '@/app/_actions/companyGroups';
@@ -101,6 +120,19 @@ function ItemsPageContent() {
     null
   );
   const [craftableFilter, setCraftableFilter] = useState<string | null>(null);
+  const [reorderModalOpened, setReorderModalOpened] = useState(false);
+  const [selectedCategoryForReorder, setSelectedCategoryForReorder] = useState<string | null>(null);
+  const [reorderItemsList, setReorderItemsList] = useState<ItemWithRelations[]>([]);
+  const [savingOrder, setSavingOrder] = useState(false);
+  
+  // Sensors pour le drag & drop dans la modal
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   const [nameFilter, setNameFilter] = useState<string>('');
   const [descriptionFilter, setDescriptionFilter] = useState<string>('');
   const [page, setPage] = useState(1);
@@ -273,6 +305,67 @@ function ItemsPageContent() {
     setEditingItem(null);
     form.reset();
     setModalOpened(true);
+  };
+
+  const openReorderModal = () => {
+    setSelectedCategoryForReorder(null);
+    setReorderItemsList([]);
+    setReorderModalOpened(true);
+  };
+
+  const handleCategorySelectForReorder = (categoryId: string) => {
+    const categoryItems = items.filter((item) => item.categoryId === categoryId);
+    setSelectedCategoryForReorder(categoryId);
+    setReorderItemsList([...categoryItems].sort((a, b) => {
+      if (a.order !== undefined && b.order !== undefined) {
+        return a.order - b.order;
+      }
+      return a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' });
+    }));
+  };
+
+  const handleSaveReorder = async () => {
+    if (!selectedCategoryForReorder || reorderItemsList.length === 0) return;
+
+    try {
+      setSavingOrder(true);
+      const result = await reorderItems({
+        items: reorderItemsList.map((item, index) => ({
+          id: item.id,
+          order: index,
+        })),
+      });
+      handleAction(result);
+      notifications.show({
+        title: 'Succès',
+        message: 'Ordre des items mis à jour',
+        color: 'green',
+      });
+      setReorderModalOpened(false);
+      setSelectedCategoryForReorder(null);
+      setReorderItemsList([]);
+      loadItems();
+    } catch (error: any) {
+      notifications.show({
+        title: 'Erreur',
+        message: error.message || 'Erreur lors de la mise à jour de l\'ordre',
+        color: 'red',
+      });
+    } finally {
+      setSavingOrder(false);
+    }
+  };
+
+  const handleReorderDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setReorderItemsList((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
   };
 
   const loadCraftRecipes = async (itemId: string) => {
@@ -535,9 +628,18 @@ function ItemsPageContent() {
     <Container size="xl" py="xl">
       <Group justify="space-between" mb="xl">
         <Title order={1}>Items</Title>
-        <Button leftSection={<IconPlus size={16} />} onClick={openCreateModal}>
-          Créer un item
-        </Button>
+        <Group>
+          <Button
+            variant="light"
+            onClick={openReorderModal}
+            disabled={items.length === 0}
+          >
+            Réordonner
+          </Button>
+          <Button leftSection={<IconPlus size={16} />} onClick={openCreateModal}>
+            Créer un item
+          </Button>
+        </Group>
       </Group>
 
       {/* Affichage des filtres actifs */}
@@ -1150,7 +1252,145 @@ function ItemsPageContent() {
           </Group>
         </Stack>
       </Modal>
+
+      {/* Modal de réordonnancement */}
+      <Modal
+        opened={reorderModalOpened}
+        onClose={() => {
+          setReorderModalOpened(false);
+          setSelectedCategoryForReorder(null);
+          setReorderItemsList([]);
+        }}
+        title="Réordonner les items"
+        size="md"
+      >
+        <Stack>
+          {!selectedCategoryForReorder ? (
+            <>
+              <Text size="sm" c="dimmed" mb="md">
+                Sélectionnez une catégorie pour réordonner ses items
+              </Text>
+              <Select
+                label="Catégorie"
+                placeholder="Choisir une catégorie"
+                data={categoryOptions}
+                searchable
+                onChange={(value) => {
+                  if (value) {
+                    handleCategorySelectForReorder(value);
+                  }
+                }}
+              />
+            </>
+          ) : (
+            <>
+              <Group justify="space-between" mb="md">
+                <Text fw={500}>
+                  {categoryItems.find((c) => c.id === selectedCategoryForReorder)?.name || 'Catégorie'}
+                </Text>
+                <Button
+                  variant="subtle"
+                  size="xs"
+                  onClick={() => {
+                    setSelectedCategoryForReorder(null);
+                    setReorderItemsList([]);
+                  }}
+                >
+                  Changer de catégorie
+                </Button>
+              </Group>
+              <Text size="sm" c="dimmed" mb="md">
+                Glissez-déposez les items pour les réordonner
+              </Text>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleReorderDragEnd}
+              >
+                <SortableContext
+                  items={reorderItemsList.map((item) => item.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <Stack gap="xs">
+                    {reorderItemsList.map((item) => (
+                      <SortableItemRow key={item.id} item={item} />
+                    ))}
+                  </Stack>
+                </SortableContext>
+              </DndContext>
+              <Group justify="flex-end" mt="md">
+                <Button
+                  variant="subtle"
+                  onClick={() => {
+                    setReorderModalOpened(false);
+                    setSelectedCategoryForReorder(null);
+                    setReorderItemsList([]);
+                  }}
+                >
+                  Annuler
+                </Button>
+                <Button
+                  onClick={handleSaveReorder}
+                  loading={savingOrder}
+                  disabled={reorderItemsList.length === 0}
+                >
+                  Valider
+                </Button>
+              </Group>
+            </>
+          )}
+        </Stack>
+      </Modal>
     </Container>
+  );
+}
+
+// Composant pour une ligne draggable dans la modal
+function SortableItemRow({ item }: { item: ItemWithRelations }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        ...style,
+        padding: '12px',
+        marginBottom: '8px',
+        border: '1px solid #dee2e6',
+        borderRadius: '4px',
+        backgroundColor: isDragging ? '#f8f9fa' : 'white',
+        cursor: 'grab',
+      }}
+    >
+      <Group gap="xs">
+        <div
+          {...attributes}
+          {...listeners}
+          style={{
+            cursor: 'grab',
+            display: 'flex',
+            alignItems: 'center',
+            color: '#868e96',
+          }}
+        >
+          <IconGripVertical size={20} />
+        </div>
+        <Text fw={500}>{item.name}</Text>
+      </Group>
+    </div>
   );
 }
 

@@ -30,7 +30,17 @@ export async function getItemsWithStock() {
       orderBy: {
         createdAt: 'desc',
       },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        idealQuantity: true,
+        isCraftable: true,
+        categoryId: true,
+        companyGroupId: true,
+        order: true,
+        createdAt: true,
+        updatedAt: true,
         category: {
           select: {
             id: true,

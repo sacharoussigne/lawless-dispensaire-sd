@@ -21,8 +21,18 @@ import { handleAction } from '@/lib/action';
 import { notifications } from '@mantine/notifications';
 import type { Item, CategoryItem } from '@prisma/client';
 
-interface ItemWithRelations extends Item {
-  category: { id: string; name: string; color: string } | null;
+interface ItemWithRelations {
+  id: string;
+  name: string;
+  description: string | null;
+  idealQuantity: number;
+  isCraftable: boolean;
+  categoryId: string;
+  companyGroupId: string | null;
+  order: number;
+  createdAt: Date;
+  updatedAt: Date;
+  category: { id: string; name: string; color: string; order?: number } | null;
   companyGroup: { id: string; name: string } | null;
   stockToday: number | null;
   stockYesterday: number | null;
@@ -243,11 +253,20 @@ export default function StockPage() {
     return a.category.name.localeCompare(b.category.name, 'fr', { sensitivity: 'base' });
   });
 
-  // Trier les items dans chaque catégorie par nom
+  // Trier les items dans chaque catégorie par ordre puis par nom
   sortedCategories.forEach((cat) => {
-    cat.items.sort((a, b) =>
-      a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' })
-    );
+    cat.items.sort((a, b) => {
+      // Si les deux ont un ordre, trier par ordre
+      if (a.order !== undefined && b.order !== undefined) {
+        return a.order - b.order;
+      }
+      // Si seulement a a un ordre, a vient en premier
+      if (a.order !== undefined) return -1;
+      // Si seulement b a un ordre, b vient en premier
+      if (b.order !== undefined) return 1;
+      // Sinon, trier par nom
+      return a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' });
+    });
   });
 
   // Compter les items avec stock fait aujourd'hui

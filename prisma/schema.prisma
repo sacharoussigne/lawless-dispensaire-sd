@@ -97,6 +97,7 @@ model Item {
   category       CategoryItem      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   companyGroupId String?
   companyGroup   CompanyGroup?     @relation(fields: [companyGroupId], references: [id], onDelete: SetNull)
+  order          Int               @default(0)
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
   stockHistory   StockHistory[]
