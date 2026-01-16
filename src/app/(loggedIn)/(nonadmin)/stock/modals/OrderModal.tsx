@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Modal,
   Select,
@@ -14,12 +14,13 @@ import {
   ActionIcon,
   Text,
   Badge,
+  Alert,
 } from '@mantine/core';
-import { IconTrash } from '@tabler/icons-react';
+import { IconTrash, IconAlertTriangle } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { getCompanyGroups } from '@/app/_actions/companyGroups';
 import { getItems } from '@/app/_actions/items';
-import { createOrder } from '@/app/_actions/orders';
+import { getOrders, createOrder } from '@/app/_actions/orders';
 import { handleAction } from '@/lib/action';
 import type { ItemWithRelations } from '@/types/stock';
 
@@ -43,6 +44,24 @@ interface CompanyGroupWithCompanies {
   companies: Array<{ companyId: string; company: { id: string; name: string } }>;
 }
 
+interface ExistingOrder {
+  id: string;
+  name: string;
+  status: string;
+  company: {
+    id: string;
+    name: string;
+  };
+  items: Array<{
+    itemId: string;
+    quantity: number;
+    item: {
+      id: string;
+      name: string;
+    };
+  }>;
+}
+
 export default function OrderModal({ 
   opened, 
   onClose, 
@@ -58,6 +77,7 @@ export default function OrderModal({
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
+  const [existingOrders, setExistingOrders] = useState<ExistingOrder[]>([]);
 
   // Charger les groupes d'entreprises et les entreprises
   useEffect(() => {
@@ -95,16 +115,16 @@ export default function OrderModal({
       }
 
       // Attendre que les items soient chargés avant de filtrer les groupes
-      const itemsToUse = items.length > 0 ? items : allItems;
+      const itemsToUseForFiltering = items.length > 0 ? items : allItems;
       
       if (groupsData) {
         let filteredGroups = groupsData;
         
         // Filtrer les groupes d'entreprises pour ne garder que ceux qui ont au moins un item non-craftable
-        if (itemsToUse.length > 0) {
+        if (itemsToUseForFiltering.length > 0) {
           filteredGroups = groupsData.filter((group) => {
             // Vérifier s'il y a au moins un item non-craftable lié à ce groupe
-            const hasItems = itemsToUse.some(
+            const hasItems = itemsToUseForFiltering.some(
               (item) => !item.isCraftable && item.companyGroupId === group.id
             );
             
@@ -112,7 +132,7 @@ export default function OrderModal({
             
             // Si prefillItemsNeedingRestock est true, vérifier aussi qu'il y a des items nécessitant un réapprovisionnement
             if (prefillItemsNeedingRestock) {
-              return itemsToUse.some(
+              return itemsToUseForFiltering.some(
                 (item) =>
                   !item.isCraftable &&
                   item.companyGroupId === group.id &&
@@ -146,6 +166,46 @@ export default function OrderModal({
     }
   };
 
+  // Créer une version stable de itemsToUse avec useMemo
+  const itemsToUse = useMemo(() => {
+    return items.length > 0 ? items : allItems;
+  }, [items, allItems]);
+
+  // Charger les commandes existantes quand un groupe d'entreprise est sélectionné
+  useEffect(() => {
+    const loadExistingOrders = async () => {
+      if (!selectedCompanyGroupId) {
+        setExistingOrders([]);
+        return;
+      }
+
+      try {
+        const result = await getOrders();
+        const ordersData = handleAction(result);
+        
+        if (ordersData) {
+          // Obtenir les IDs des entreprises du groupe sélectionné
+          const selectedGroup = companyGroups.find((g) => g.id === selectedCompanyGroupId);
+          const companyIds = selectedGroup?.companies.map((c) => c.company.id) || [];
+          
+          // Filtrer les commandes : non terminées/annulées et appartenant au groupe
+          const activeOrders = ordersData.filter((order: ExistingOrder) => {
+            const isActive = order.status !== 'COMPLETED' && order.status !== 'CANCELLED';
+            const belongsToGroup = companyIds.includes(order.company.id);
+            return isActive && belongsToGroup;
+          });
+          
+          setExistingOrders(activeOrders);
+        }
+      } catch (error: any) {
+        // Silently fail, ce n'est pas critique
+        console.error('Erreur lors du chargement des commandes existantes:', error);
+      }
+    };
+
+    loadExistingOrders();
+  }, [selectedCompanyGroupId, companyGroups]);
+
   // Quand un groupe d'entreprise est sélectionné, initialiser les items qui ont besoin d'être restockés (si prefillItemsNeedingRestock est true)
   useEffect(() => {
     if (!selectedCompanyGroupId) {
@@ -153,8 +213,6 @@ export default function OrderModal({
       setSelectedCompanyId(null);
       return;
     }
-
-    const itemsToUse = items.length > 0 ? items : allItems;
     
     if (prefillItemsNeedingRestock && itemsToUse.length > 0) {
       const itemsNeedingRestock = itemsToUse.filter(
@@ -175,14 +233,14 @@ export default function OrderModal({
       });
 
       setOrderItems(initialOrderItems);
-    } else {
+    } else if (!prefillItemsNeedingRestock) {
       // Si on ne préremplit pas, on laisse la liste vide pour que l'utilisateur ajoute manuellement
       setOrderItems([]);
     }
     
     // Réinitialiser la sélection d'entreprise quand on change de groupe
     setSelectedCompanyId(null);
-  }, [selectedCompanyGroupId, prefillItemsNeedingRestock]);
+  }, [selectedCompanyGroupId, prefillItemsNeedingRestock, itemsToUse]);
 
   // Réinitialiser le formulaire quand la modal se ferme
   useEffect(() => {
@@ -197,7 +255,6 @@ export default function OrderModal({
   // Obtenir les items disponibles pour le groupe sélectionné
   const getAvailableItemsForGroup = () => {
     if (!selectedCompanyGroupId) return [];
-    const itemsToUse = items.length > 0 ? items : allItems;
     return itemsToUse.filter(
       (item) => !item.isCraftable && item.companyGroupId === selectedCompanyGroupId
     );
@@ -272,6 +329,20 @@ export default function OrderModal({
   const orderItemIds = getOrderItemIds();
   const canAddMoreItems = availableItems.some((item) => !orderItemIds.has(item.id));
 
+  // Vérifier si des items de la commande en cours sont déjà dans une commande existante
+  const conflictingOrders = useMemo(() => {
+    if (orderItems.length === 0 || existingOrders.length === 0) {
+      return [];
+    }
+
+    const currentItemIds = new Set(orderItems.map((oi) => oi.itemId));
+    
+    return existingOrders.filter((order) => {
+      // Vérifier si au moins un item de la commande en cours est dans cette commande existante
+      return order.items.some((orderItem) => currentItemIds.has(orderItem.itemId));
+    });
+  }, [orderItems, existingOrders]);
+
   return (
     <Modal
       opened={opened}
@@ -315,6 +386,32 @@ export default function OrderModal({
 
         {selectedCompanyGroupId && (
           <>
+            {conflictingOrders.length > 0 && (
+              <Alert
+                icon={<IconAlertTriangle size={16} />}
+                title="Commande en cours"
+                color="yellow"
+              >
+                <Text size="sm">
+                  Une ou plusieurs commandes en cours pour ce groupe d'entreprises contiennent déjà certains articles que vous souhaitez commander :
+                </Text>
+                <Stack gap="xs" mt="xs">
+                  {conflictingOrders.map((order) => {
+                    const conflictingItems = order.items.filter((orderItem) =>
+                      orderItems.some((oi) => oi.itemId === orderItem.itemId)
+                    );
+                    return (
+                      <Text key={order.id} size="sm" fw={500}>
+                        • {order.name} ({order.company.name}) : {conflictingItems.map((item) => item.item.name).join(', ')}
+                      </Text>
+                    );
+                  })}
+                </Stack>
+                <Text size="sm" mt="xs" c="dimmed">
+                  Vérifiez si vous souhaitez vraiment créer une nouvelle commande ou si vous devriez plutôt modifier la commande existante.
+                </Text>
+              </Alert>
+            )}
 
             <Textarea
               label="Détails (optionnel)"
@@ -344,7 +441,6 @@ export default function OrderModal({
                 </Table.Thead>
                 <Table.Tbody>
                   {orderItems.map((orderItem) => {
-                    const itemsToUse = items.length > 0 ? items : allItems;
                     const item = itemsToUse.find((i) => i.id === orderItem.itemId) || orderItem.item;
                     const stockToday = item.stockToday ?? 0;
                     const finalQuantity = stockToday + orderItem.quantity;
