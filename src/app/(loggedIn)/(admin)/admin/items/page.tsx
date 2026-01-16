@@ -76,7 +76,7 @@ import type {
 } from '@prisma/client';
 
 interface ItemWithRelations extends Item {
-  category: { id: string; name: string; color: string } | null;
+  category: { id: string; name: string; color: string; order?: number } | null;
   companyGroup: { id: string; name: string } | null;
 }
 
@@ -550,7 +550,15 @@ function ItemsPageContent() {
   };
 
   const categoryOptions = [...categoryItems]
-    .sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }))
+    .sort((a, b) => {
+      // Trier par order puis par nom
+      if (a.order !== undefined && b.order !== undefined) {
+        return a.order - b.order;
+      }
+      if (a.order !== undefined) return -1;
+      if (b.order !== undefined) return 1;
+      return a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' });
+    })
     .map((category) => ({
       value: category.id,
       label: category.name,
@@ -1164,6 +1172,15 @@ function ItemsPageContent() {
                   placeholder="Sélectionner un item"
                   data={items
                     .filter((item) => item.id !== selectedItemForCraft?.id)
+                    .sort((a, b) => {
+                      // Trier par order puis par nom
+                      if (a.order !== undefined && b.order !== undefined) {
+                        return a.order - b.order;
+                      }
+                      if (a.order !== undefined) return -1;
+                      if (b.order !== undefined) return 1;
+                      return a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' });
+                    })
                     .map((item) => ({
                       value: item.id,
                       label: item.name,
