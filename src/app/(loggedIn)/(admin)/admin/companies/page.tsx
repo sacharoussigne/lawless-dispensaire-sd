@@ -310,15 +310,10 @@ function CompaniesPageContent() {
               ),
             },
             {
-              accessor: 'companyGroups.length',
-              title: "Nombre de groupes d'entreprises",
-              render: (company: CompanyWithRelations) => company.companyGroups.length,
-            },
-            {
               accessor: 'actions',
               title: 'Actions',
               render: (company: CompanyWithRelations) => (
-                <Group gap="xs">
+                <Group gap="xs" wrap="nowrap">
                   <ActionIcon
                     variant="light"
                     color="blue"

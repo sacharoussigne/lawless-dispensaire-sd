@@ -224,9 +224,14 @@ export default function CompanyGroupsPage() {
     return matchesName && matchesDescription;
   });
 
+  // Trier par nom
+  const sortedCompanyGroups = [...filteredCompanyGroups].sort((a, b) =>
+    a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' })
+  );
+
   // Calculer la pagination
-  const totalRecords = filteredCompanyGroups.length;
-  const paginatedCompanyGroups = filteredCompanyGroups.slice(
+  const totalRecords = sortedCompanyGroups.length;
+  const paginatedCompanyGroups = sortedCompanyGroups.slice(
     (page - 1) * pageSize,
     page * pageSize
   );
@@ -351,7 +356,7 @@ export default function CompanyGroupsPage() {
               accessor: 'actions',
               title: 'Actions',
               render: (companyGroup: CompanyGroupWithRelations) => (
-                <Group gap="xs">
+                <Group gap="xs" wrap="nowrap">
                   <ActionIcon
                     variant="light"
                     color="blue"
