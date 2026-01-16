@@ -80,6 +80,11 @@ export default function AdminHeader({
                           Groupes d'entreprises
                         </Menu.Item>
                       </Link>
+                      <Link href={routes.admin.categoryItems}>
+                        <Menu.Item>
+                          Catégories d'items
+                        </Menu.Item>
+                      </Link>
                     </Menu.Dropdown>
                   </Menu>
                   <Menu

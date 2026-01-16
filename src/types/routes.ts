@@ -9,6 +9,7 @@ export const routes = {
     locations: '/admin/locations',
     companies: '/admin/companies',
     companyGroups: '/admin/companygroups',
+    categoryItems: '/admin/categoryitems',
   },
   api: {},
   settings: {
