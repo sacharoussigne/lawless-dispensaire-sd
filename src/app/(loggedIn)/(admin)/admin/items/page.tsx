@@ -18,22 +18,55 @@ import {
   Flex,
   NumberInput,
   Switch,
+  Table,
+  Divider,
 } from '@mantine/core';
 import { DataTable } from 'mantine-datatable';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
-import { IconEdit, IconTrash, IconPlus, IconX } from '@tabler/icons-react';
-import { createItem, getItems, updateItem, deleteItem } from '@/app/_actions/items';
+import {
+  IconEdit,
+  IconTrash,
+  IconPlus,
+  IconX,
+  IconTools,
+} from '@tabler/icons-react';
+import {
+  createItem,
+  getItems,
+  updateItem,
+  deleteItem,
+} from '@/app/_actions/items';
 import { getCategoryItems } from '@/app/_actions/categoryItems';
 import { getCompanyGroups } from '@/app/_actions/companyGroups';
+import {
+  getCraftRecipesByItemId,
+  createCraftRecipe,
+  updateCraftRecipe,
+  deleteCraftRecipe,
+} from '@/app/_actions/craftRecipes';
 import { handleAction } from '@/lib/action';
 import { handleApiZodError } from '@/lib/services/zod';
 import { ParsedZodError } from '@/lib/errors/ParsedZodError';
-import type { Item, CategoryItem, CompanyGroup } from '@prisma/client';
+import type {
+  Item,
+  CategoryItem,
+  CompanyGroup,
+  CraftRecipe,
+  CraftRecipeItem,
+} from '@prisma/client';
 
 interface ItemWithRelations extends Item {
   category: { id: string; name: string; color: string } | null;
   companyGroup: { id: string; name: string } | null;
+}
+
+interface CraftRecipeItemWithItem extends CraftRecipeItem {
+  usedItem: { id: string; name: string };
+}
+
+interface CraftRecipeWithIngredients extends CraftRecipe {
+  ingredients: CraftRecipeItemWithItem[];
 }
 
 function ItemsPageContent() {
@@ -42,11 +75,31 @@ function ItemsPageContent() {
   const [companyGroups, setCompanyGroups] = useState<CompanyGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpened, setModalOpened] = useState(false);
-  const [editingItem, setEditingItem] = useState<ItemWithRelations | null>(null);
+  const [editingItem, setEditingItem] = useState<ItemWithRelations | null>(
+    null
+  );
   const [deleteModalOpened, setDeleteModalOpened] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState<ItemWithRelations | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<ItemWithRelations | null>(
+    null
+  );
+  const [craftRecipesModalOpened, setCraftRecipesModalOpened] = useState(false);
+  const [selectedItemForCraft, setSelectedItemForCraft] =
+    useState<ItemWithRelations | null>(null);
+  const [craftRecipes, setCraftRecipes] = useState<
+    CraftRecipeWithIngredients[]
+  >([]);
+  const [loadingCraftRecipes, setLoadingCraftRecipes] = useState(false);
+  const [craftRecipeModalOpened, setCraftRecipeModalOpened] = useState(false);
+  const [editingCraftRecipe, setEditingCraftRecipe] =
+    useState<CraftRecipeWithIngredients | null>(null);
+  const [deleteCraftRecipeModalOpened, setDeleteCraftRecipeModalOpened] =
+    useState(false);
+  const [craftRecipeToDelete, setCraftRecipeToDelete] =
+    useState<CraftRecipeWithIngredients | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
-  const [companyGroupFilter, setCompanyGroupFilter] = useState<string | null>(null);
+  const [companyGroupFilter, setCompanyGroupFilter] = useState<string | null>(
+    null
+  );
   const [craftableFilter, setCraftableFilter] = useState<string | null>(null);
   const [nameFilter, setNameFilter] = useState<string>('');
   const [descriptionFilter, setDescriptionFilter] = useState<string>('');
@@ -64,7 +117,8 @@ function ItemsPageContent() {
     },
     validate: {
       name: (value) => (value.length < 1 ? 'Le nom est requis' : null),
-      idealQuantity: (value) => (value < 0 ? 'La quantité idéale doit être positive' : null),
+      idealQuantity: (value) =>
+        value < 0 ? 'La quantité idéale doit être positive' : null,
       categoryId: (value) => (!value ? 'La catégorie est requise' : null),
     },
   });
@@ -129,7 +183,9 @@ function ItemsPageContent() {
     try {
       let result;
       // Si l'item est craftable, on force companyGroupId à null
-      const companyGroupId = values.isCraftable ? undefined : (values.companyGroupId || undefined);
+      const companyGroupId = values.isCraftable
+        ? undefined
+        : values.companyGroupId || undefined;
 
       if (editingItem) {
         result = await updateItem({
@@ -219,6 +275,155 @@ function ItemsPageContent() {
     setModalOpened(true);
   };
 
+  const loadCraftRecipes = async (itemId: string) => {
+    try {
+      setLoadingCraftRecipes(true);
+      const result = await getCraftRecipesByItemId(itemId);
+      const data = handleAction(result);
+      if (data) {
+        setCraftRecipes(data);
+      }
+    } catch (error: any) {
+      notifications.show({
+        title: 'Erreur',
+        message:
+          error.message || 'Erreur lors du chargement des recettes de craft',
+        color: 'red',
+      });
+    } finally {
+      setLoadingCraftRecipes(false);
+    }
+  };
+
+  const craftRecipeForm = useForm({
+    initialValues: {
+      recipeName: '',
+      recipeDescription: '',
+      quantity: 1,
+      ingredients: [] as { usedItemId: string; quantity: number }[],
+    },
+    validate: {
+      recipeName: (value) =>
+        value.length < 1 ? 'Le nom de la recette est requis' : null,
+      quantity: (value) =>
+        value < 1 ? 'La quantité doit être au moins 1' : null,
+      ingredients: (value) =>
+        value.length < 1 ? 'Au moins un ingrédient est requis' : null,
+    },
+  });
+
+  const handleOpenCraftRecipeModal = (recipe?: CraftRecipeWithIngredients) => {
+    if (recipe) {
+      setEditingCraftRecipe(recipe);
+      craftRecipeForm.setValues({
+        recipeName: recipe.recipeName,
+        recipeDescription: recipe.recipeDescription || '',
+        quantity: recipe.quantity,
+        ingredients: recipe.ingredients.map((ing) => ({
+          usedItemId: ing.usedItemId,
+          quantity: ing.quantity,
+        })),
+      });
+    } else {
+      setEditingCraftRecipe(null);
+      craftRecipeForm.setValues({
+        recipeName: '',
+        recipeDescription: '',
+        quantity: 1,
+        ingredients: [],
+      });
+    }
+    setCraftRecipeModalOpened(true);
+  };
+
+  const handleSubmitCraftRecipe = async (
+    values: typeof craftRecipeForm.values
+  ) => {
+    if (!selectedItemForCraft) return;
+
+    try {
+      let result;
+      if (editingCraftRecipe) {
+        result = await updateCraftRecipe({
+          id: editingCraftRecipe.id,
+          recipeName: values.recipeName,
+          recipeDescription: values.recipeDescription || undefined,
+          quantity: values.quantity,
+          ingredients: values.ingredients,
+        });
+      } else {
+        result = await createCraftRecipe({
+          recipeName: values.recipeName,
+          recipeDescription: values.recipeDescription || undefined,
+          craftedItemId: selectedItemForCraft.id,
+          quantity: values.quantity,
+          ingredients: values.ingredients,
+        });
+      }
+
+      handleAction(result);
+      notifications.show({
+        title: 'Succès',
+        message: editingCraftRecipe
+          ? 'Recette de craft modifiée avec succès'
+          : 'Recette de craft créée avec succès',
+        color: 'green',
+      });
+      setCraftRecipeModalOpened(false);
+      craftRecipeForm.reset();
+      setEditingCraftRecipe(null);
+      if (selectedItemForCraft) {
+        loadCraftRecipes(selectedItemForCraft.id);
+      }
+    } catch (error: any) {
+      if (error instanceof ParsedZodError) {
+        handleApiZodError(error.error, craftRecipeForm);
+      } else {
+        notifications.show({
+          title: 'Erreur',
+          message: error.message || 'Erreur lors de la sauvegarde',
+          color: 'red',
+        });
+      }
+    }
+  };
+
+  const handleDeleteCraftRecipe = async () => {
+    if (!craftRecipeToDelete) return;
+
+    try {
+      const result = await deleteCraftRecipe({ id: craftRecipeToDelete.id });
+      handleAction(result);
+      notifications.show({
+        title: 'Succès',
+        message: 'Recette de craft supprimée avec succès',
+        color: 'green',
+      });
+      setDeleteCraftRecipeModalOpened(false);
+      setCraftRecipeToDelete(null);
+      if (selectedItemForCraft) {
+        loadCraftRecipes(selectedItemForCraft.id);
+      }
+    } catch (error: any) {
+      notifications.show({
+        title: 'Erreur',
+        message: error.message || 'Erreur lors de la suppression',
+        color: 'red',
+      });
+    }
+  };
+
+  const addIngredient = () => {
+    craftRecipeForm.insertListItem('ingredients', {
+      usedItemId: '',
+      quantity: 1,
+    });
+  };
+
+  const removeIngredient = (index: number) => {
+    craftRecipeForm.removeListItem('ingredients', index);
+  };
+
   // Fonction pour normaliser les chaînes (enlever les accents et mettre en minuscule)
   const normalizeString = (str: string): string => {
     return str
@@ -236,7 +441,9 @@ function ItemsPageContent() {
 
     // Appliquer la formule de luminance relative
     const [rs, gs, bs] = [r, g, b].map((val) => {
-      return val <= 0.03928 ? val / 12.92 : Math.pow((val + 0.055) / 1.055, 2.4);
+      return val <= 0.03928
+        ? val / 12.92
+        : Math.pow((val + 0.055) / 1.055, 2.4);
     });
 
     return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
@@ -265,17 +472,30 @@ function ItemsPageContent() {
 
   // Filtrer les items
   const filteredItems = items.filter((item) => {
-    const matchesName = !nameFilter || 
+    const matchesName =
+      !nameFilter ||
       normalizeString(item.name).includes(normalizeString(nameFilter));
-    const matchesDescription = !descriptionFilter || 
-      (item.description && 
-       normalizeString(item.description).includes(normalizeString(descriptionFilter)));
-    const matchesCategory = !categoryFilter || item.categoryId === categoryFilter;
-    const matchesCompanyGroup = !companyGroupFilter || item.companyGroupId === companyGroupFilter;
-    const matchesCraftable = craftableFilter === null || 
+    const matchesDescription =
+      !descriptionFilter ||
+      (item.description &&
+        normalizeString(item.description).includes(
+          normalizeString(descriptionFilter)
+        ));
+    const matchesCategory =
+      !categoryFilter || item.categoryId === categoryFilter;
+    const matchesCompanyGroup =
+      !companyGroupFilter || item.companyGroupId === companyGroupFilter;
+    const matchesCraftable =
+      craftableFilter === null ||
       (craftableFilter === 'true' && item.isCraftable) ||
       (craftableFilter === 'false' && !item.isCraftable);
-    return matchesName && matchesDescription && matchesCategory && matchesCompanyGroup && matchesCraftable;
+    return (
+      matchesName &&
+      matchesDescription &&
+      matchesCategory &&
+      matchesCompanyGroup &&
+      matchesCraftable
+    );
   });
 
   // Trier par nom
@@ -293,7 +513,13 @@ function ItemsPageContent() {
   // Réinitialiser la page quand les filtres changent
   useEffect(() => {
     setPage(1);
-  }, [categoryFilter, companyGroupFilter, craftableFilter, nameFilter, descriptionFilter]);
+  }, [
+    categoryFilter,
+    companyGroupFilter,
+    craftableFilter,
+    nameFilter,
+    descriptionFilter,
+  ]);
 
   const categoryFilterOptions = [
     { value: '', label: 'Toutes les catégories' },
@@ -301,7 +527,7 @@ function ItemsPageContent() {
   ];
 
   const companyGroupFilterOptions = [
-    { value: '', label: 'Tous les groupes d\'entreprises' },
+    { value: '', label: "Tous les groupes d'entreprises" },
     ...companyGroupOptions,
   ];
 
@@ -315,7 +541,11 @@ function ItemsPageContent() {
       </Group>
 
       {/* Affichage des filtres actifs */}
-      {(categoryFilter || companyGroupFilter || craftableFilter || nameFilter || descriptionFilter) && (
+      {(categoryFilter ||
+        companyGroupFilter ||
+        craftableFilter ||
+        nameFilter ||
+        descriptionFilter) && (
         <Paper shadow="sm" p="md" withBorder mb="md">
           <Flex align="center" gap="md" wrap="wrap">
             <Text fw={500}>Filtres :</Text>
@@ -335,7 +565,9 @@ function ItemsPageContent() {
                   </ActionIcon>
                 }
               >
-                Catégorie: {categoryItems.find((c) => c.id === categoryFilter)?.name || 'Inconnu'}
+                Catégorie:{' '}
+                {categoryItems.find((c) => c.id === categoryFilter)?.name ||
+                  'Inconnu'}
               </Badge>
             )}
             {companyGroupFilter && (
@@ -354,7 +586,9 @@ function ItemsPageContent() {
                   </ActionIcon>
                 }
               >
-                Groupe: {companyGroups.find((g) => g.id === companyGroupFilter)?.name || 'Inconnu'}
+                Groupe:{' '}
+                {companyGroups.find((g) => g.id === companyGroupFilter)?.name ||
+                  'Inconnu'}
               </Badge>
             )}
             {craftableFilter && (
@@ -484,13 +718,25 @@ function ItemsPageContent() {
             {
               accessor: 'isCraftable',
               title: 'Craftable',
-              render: (item: ItemWithRelations) => (
+              render: (item: ItemWithRelations) =>
                 item.isCraftable ? (
-                  <Badge color="green" variant="light">Oui</Badge>
+                  <Badge
+                    color="green"
+                    variant="light"
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => {
+                      setSelectedItemForCraft(item);
+                      setCraftRecipesModalOpened(true);
+                      loadCraftRecipes(item.id);
+                    }}
+                  >
+                    Oui
+                  </Badge>
                 ) : (
-                  <Badge color="gray" variant="light">Non</Badge>
-                )
-              ),
+                  <Badge color="gray" variant="light">
+                    Non
+                  </Badge>
+                ),
               filter: (
                 <Select
                   placeholder="Tous"
@@ -508,8 +754,9 @@ function ItemsPageContent() {
             },
             {
               accessor: 'companyGroup.name',
-              title: 'Groupe d\'entreprises',
-              render: (item: ItemWithRelations) => item.companyGroup?.name || '-',
+              title: "Groupe d'entreprises",
+              render: (item: ItemWithRelations) =>
+                item.companyGroup?.name || '-',
               filter: (
                 <Select
                   placeholder="Tous les groupes"
@@ -525,7 +772,21 @@ function ItemsPageContent() {
               accessor: 'actions',
               title: 'Actions',
               render: (item: ItemWithRelations) => (
-                <Group gap="xs" wrap="nowrap">
+                <Group gap="xs" wrap="nowrap" justify="flex-end">
+                  {item.isCraftable && (
+                    <ActionIcon
+                      variant="light"
+                      color="orange"
+                      onClick={() => {
+                        setSelectedItemForCraft(item);
+                        setCraftRecipesModalOpened(true);
+                        loadCraftRecipes(item.id);
+                      }}
+                      title="Gérer les recettes de craft"
+                    >
+                      <IconTools size={16} />
+                    </ActionIcon>
+                  )}
                   <ActionIcon
                     variant="light"
                     color="blue"
@@ -549,7 +810,11 @@ function ItemsPageContent() {
           ]}
           fetching={loading}
           noRecordsText={
-            categoryFilter || companyGroupFilter || craftableFilter || nameFilter || descriptionFilter
+            categoryFilter ||
+            companyGroupFilter ||
+            craftableFilter ||
+            nameFilter ||
+            descriptionFilter
               ? 'Aucun item trouvé avec ces filtres'
               : 'Aucun item trouvé'
           }
@@ -575,7 +840,7 @@ function ItemsPageContent() {
           form.reset();
           setEditingItem(null);
         }}
-        title={editingItem ? 'Modifier l\'item' : 'Créer un item'}
+        title={editingItem ? "Modifier l'item" : 'Créer un item'}
         size="md"
       >
         <form onSubmit={form.onSubmit(handleSubmit)}>
@@ -671,19 +936,234 @@ function ItemsPageContent() {
           </Group>
         </Stack>
       </Modal>
+
+      {/* Modal de gestion des recettes de craft */}
+      <Modal
+        opened={craftRecipesModalOpened}
+        onClose={() => {
+          setCraftRecipesModalOpened(false);
+          setSelectedItemForCraft(null);
+          setCraftRecipes([]);
+        }}
+        title={`Recettes de craft - ${selectedItemForCraft?.name}`}
+        size="xl"
+      >
+        <Stack>
+          <Group justify="space-between">
+            <Text>Liste des recettes de craft pour cet item</Text>
+            <Button
+              leftSection={<IconPlus size={16} />}
+              onClick={() => handleOpenCraftRecipeModal()}
+            >
+              Ajouter une recette
+            </Button>
+          </Group>
+
+          {loadingCraftRecipes ? (
+            <Text>Chargement...</Text>
+          ) : craftRecipes.length === 0 ? (
+            <Text c="dimmed">Aucune recette de craft pour cet item</Text>
+          ) : (
+            <Table striped highlightOnHover>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>Nom</Table.Th>
+                  <Table.Th>Description</Table.Th>
+                  <Table.Th>Quantité produite</Table.Th>
+                  <Table.Th>Ingrédients</Table.Th>
+                  <Table.Th>Actions</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {craftRecipes.map((recipe) => (
+                  <Table.Tr key={recipe.id}>
+                    <Table.Td>{recipe.recipeName}</Table.Td>
+                    <Table.Td>{recipe.recipeDescription || '-'}</Table.Td>
+                    <Table.Td>{recipe.quantity}</Table.Td>
+                    <Table.Td>
+                      <Stack gap="xs">
+                        {recipe.ingredients.map((ing, idx) => (
+                          <Text key={idx} size="sm">
+                            {ing.quantity}x {ing.usedItem.name}
+                          </Text>
+                        ))}
+                      </Stack>
+                    </Table.Td>
+                    <Table.Td>
+                      <Group gap="xs" wrap="nowrap">
+                        <ActionIcon
+                          variant="light"
+                          color="blue"
+                          onClick={() => handleOpenCraftRecipeModal(recipe)}
+                        >
+                          <IconEdit size={16} />
+                        </ActionIcon>
+                        <ActionIcon
+                          variant="light"
+                          color="red"
+                          onClick={() => {
+                            setCraftRecipeToDelete(recipe);
+                            setDeleteCraftRecipeModalOpened(true);
+                          }}
+                        >
+                          <IconTrash size={16} />
+                        </ActionIcon>
+                      </Group>
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          )}
+        </Stack>
+      </Modal>
+
+      {/* Modal de création/modification de recette de craft */}
+      <Modal
+        opened={craftRecipeModalOpened}
+        onClose={() => {
+          setCraftRecipeModalOpened(false);
+          craftRecipeForm.reset();
+          setEditingCraftRecipe(null);
+        }}
+        title={
+          editingCraftRecipe
+            ? 'Modifier la recette de craft'
+            : 'Créer une recette de craft'
+        }
+        size="lg"
+      >
+        <form onSubmit={craftRecipeForm.onSubmit(handleSubmitCraftRecipe)}>
+          <Stack>
+            <TextInput
+              label="Nom de la recette"
+              placeholder="Nom de la recette"
+              required
+              {...craftRecipeForm.getInputProps('recipeName')}
+            />
+            <Textarea
+              label="Description"
+              placeholder="Description de la recette (optionnel)"
+              rows={3}
+              {...craftRecipeForm.getInputProps('recipeDescription')}
+            />
+            <NumberInput
+              label="Quantité produite"
+              placeholder="Quantité produite"
+              required
+              min={1}
+              {...craftRecipeForm.getInputProps('quantity')}
+            />
+            <Divider label="Ingrédients" labelPosition="left" />
+            {craftRecipeForm.values.ingredients.map((ingredient, index) => (
+              <Group key={index} align="flex-end" gap="xs">
+                <Select
+                  label={`Ingrédient ${index + 1}`}
+                  placeholder="Sélectionner un item"
+                  data={items
+                    .filter((item) => item.id !== selectedItemForCraft?.id)
+                    .map((item) => ({
+                      value: item.id,
+                      label: item.name,
+                    }))}
+                  required
+                  searchable
+                  style={{ flex: 1 }}
+                  {...craftRecipeForm.getInputProps(
+                    `ingredients.${index}.usedItemId`
+                  )}
+                />
+                <NumberInput
+                  label="Quantité"
+                  placeholder="Qty"
+                  required
+                  min={1}
+                  style={{ width: 120 }}
+                  {...craftRecipeForm.getInputProps(
+                    `ingredients.${index}.quantity`
+                  )}
+                />
+                <ActionIcon
+                  color="red"
+                  variant="light"
+                  onClick={() => removeIngredient(index)}
+                  disabled={craftRecipeForm.values.ingredients.length === 1}
+                >
+                  <IconTrash size={16} />
+                </ActionIcon>
+              </Group>
+            ))}
+            <Button
+              variant="light"
+              leftSection={<IconPlus size={16} />}
+              onClick={addIngredient}
+            >
+              Ajouter un ingrédient
+            </Button>
+            <Group justify="flex-end" mt="md">
+              <Button
+                variant="subtle"
+                onClick={() => {
+                  setCraftRecipeModalOpened(false);
+                  craftRecipeForm.reset();
+                  setEditingCraftRecipe(null);
+                }}
+              >
+                Annuler
+              </Button>
+              <Button type="submit">
+                {editingCraftRecipe ? 'Modifier' : 'Créer'}
+              </Button>
+            </Group>
+          </Stack>
+        </form>
+      </Modal>
+
+      {/* Modal de confirmation de suppression de recette de craft */}
+      <Modal
+        opened={deleteCraftRecipeModalOpened}
+        onClose={() => {
+          setDeleteCraftRecipeModalOpened(false);
+          setCraftRecipeToDelete(null);
+        }}
+        title="Confirmer la suppression"
+        size="md"
+      >
+        <Stack>
+          <p>
+            Êtes-vous sûr de vouloir supprimer la recette de craft{' '}
+            <strong>{craftRecipeToDelete?.recipeName}</strong> ?
+          </p>
+          <Group justify="flex-end" mt="md">
+            <Button
+              variant="subtle"
+              onClick={() => {
+                setDeleteCraftRecipeModalOpened(false);
+                setCraftRecipeToDelete(null);
+              }}
+            >
+              Annuler
+            </Button>
+            <Button color="red" onClick={handleDeleteCraftRecipe}>
+              Supprimer
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </Container>
   );
 }
 
 export default function ItemsPage() {
   return (
-    <Suspense fallback={
-      <Container size="xl" py="xl">
-        <div>Chargement...</div>
-      </Container>
-    }>
+    <Suspense
+      fallback={
+        <Container size="xl" py="xl">
+          <div>Chargement...</div>
+        </Container>
+      }
+    >
       <ItemsPageContent />
     </Suspense>
   );
 }
-
