@@ -19,6 +19,9 @@ export const routes = {
   stock: {
     index: '/stock',
   },
+  orders: {
+    index: '/orders',
+  },
   auth: {
     index: '/auth',
     login: '/auth/login',

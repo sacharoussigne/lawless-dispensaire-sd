@@ -18,6 +18,7 @@ import {
 import { IconTrash } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { getCompanyGroups } from '@/app/_actions/companyGroups';
+import { getItems } from '@/app/_actions/items';
 import { createOrder } from '@/app/_actions/orders';
 import { handleAction } from '@/lib/action';
 import type { ItemWithRelations } from '@/types/stock';
@@ -25,8 +26,9 @@ import type { ItemWithRelations } from '@/types/stock';
 interface OrderModalProps {
   opened: boolean;
   onClose: () => void;
-  items: ItemWithRelations[];
+  items?: ItemWithRelations[]; // Optionnel pour permettre l'utilisation depuis la page orders
   onOrderCreated?: () => void;
+  prefillItemsNeedingRestock?: boolean; // Si true, préremplit les items nécessitant un réapprovisionnement
 }
 
 interface OrderItem {
@@ -41,8 +43,15 @@ interface CompanyGroupWithCompanies {
   companies: Array<{ companyId: string; company: { id: string; name: string } }>;
 }
 
-export default function OrderModal({ opened, onClose, items, onOrderCreated }: OrderModalProps) {
+export default function OrderModal({ 
+  opened, 
+  onClose, 
+  items = [], 
+  onOrderCreated,
+  prefillItemsNeedingRestock = true,
+}: OrderModalProps) {
   const [companyGroups, setCompanyGroups] = useState<CompanyGroupWithCompanies[]>([]);
+  const [allItems, setAllItems] = useState<ItemWithRelations[]>([]);
   const [selectedCompanyGroupId, setSelectedCompanyGroupId] = useState<string | null>(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   const [orderDetails, setOrderDetails] = useState('');
@@ -60,12 +69,66 @@ export default function OrderModal({ opened, onClose, items, onOrderCreated }: O
   const loadData = async () => {
     try {
       setLoadingData(true);
-      const groupsResult = await getCompanyGroups();
-      const groupsData = handleAction(groupsResult);
+      const [groupsResult, itemsResult] = await Promise.all([
+        getCompanyGroups(),
+        // Si on n'a pas d'items fournis (depuis la page orders), les charger
+        items.length === 0 ? getItems() : Promise.resolve({ status: 200, data: [] }),
+      ]);
 
+      const groupsData = handleAction(groupsResult);
+      
+      // Si on n'a pas d'items fournis, charger les items depuis l'API
+      if (items.length === 0) {
+        const itemsData = handleAction(itemsResult);
+        if (itemsData) {
+          // Convertir les items en ItemWithRelations (sans stock)
+          setAllItems(
+            itemsData.map((item) => ({
+              ...item,
+              stockToday: null,
+              stockYesterday: null,
+            }))
+          );
+        }
+      } else {
+        setAllItems(items);
+      }
+
+      // Attendre que les items soient chargés avant de filtrer les groupes
+      const itemsToUse = items.length > 0 ? items : allItems;
+      
       if (groupsData) {
+        let filteredGroups = groupsData;
+        
+        // Filtrer les groupes d'entreprises pour ne garder que ceux qui ont au moins un item non-craftable
+        if (itemsToUse.length > 0) {
+          filteredGroups = groupsData.filter((group) => {
+            // Vérifier s'il y a au moins un item non-craftable lié à ce groupe
+            const hasItems = itemsToUse.some(
+              (item) => !item.isCraftable && item.companyGroupId === group.id
+            );
+            
+            if (!hasItems) return false;
+            
+            // Si prefillItemsNeedingRestock est true, vérifier aussi qu'il y a des items nécessitant un réapprovisionnement
+            if (prefillItemsNeedingRestock) {
+              return itemsToUse.some(
+                (item) =>
+                  !item.isCraftable &&
+                  item.companyGroupId === group.id &&
+                  item.stockToday !== null &&
+                  item.stockToday < item.idealQuantity
+              );
+            }
+            
+            return true;
+          });
+        } else {
+          filteredGroups = groupsData;
+        }
+
         setCompanyGroups(
-          groupsData.map((g) => ({
+          filteredGroups.map((g) => ({
             id: g.id,
             name: g.name,
             companies: g.companies || [],
@@ -83,10 +146,18 @@ export default function OrderModal({ opened, onClose, items, onOrderCreated }: O
     }
   };
 
-  // Quand un groupe d'entreprise est sélectionné, initialiser les items qui ont besoin d'être restockés
+  // Quand un groupe d'entreprise est sélectionné, initialiser les items qui ont besoin d'être restockés (si prefillItemsNeedingRestock est true)
   useEffect(() => {
-    if (selectedCompanyGroupId) {
-      const itemsNeedingRestock = items.filter(
+    if (!selectedCompanyGroupId) {
+      setOrderItems([]);
+      setSelectedCompanyId(null);
+      return;
+    }
+
+    const itemsToUse = items.length > 0 ? items : allItems;
+    
+    if (prefillItemsNeedingRestock && itemsToUse.length > 0) {
+      const itemsNeedingRestock = itemsToUse.filter(
         (item) =>
           !item.isCraftable &&
           item.companyGroupId === selectedCompanyGroupId &&
@@ -105,11 +176,13 @@ export default function OrderModal({ opened, onClose, items, onOrderCreated }: O
 
       setOrderItems(initialOrderItems);
     } else {
+      // Si on ne préremplit pas, on laisse la liste vide pour que l'utilisateur ajoute manuellement
       setOrderItems([]);
     }
+    
     // Réinitialiser la sélection d'entreprise quand on change de groupe
     setSelectedCompanyId(null);
-  }, [selectedCompanyGroupId, items, companyGroups]);
+  }, [selectedCompanyGroupId, prefillItemsNeedingRestock]);
 
   // Réinitialiser le formulaire quand la modal se ferme
   useEffect(() => {
@@ -124,7 +197,8 @@ export default function OrderModal({ opened, onClose, items, onOrderCreated }: O
   // Obtenir les items disponibles pour le groupe sélectionné
   const getAvailableItemsForGroup = () => {
     if (!selectedCompanyGroupId) return [];
-    return items.filter(
+    const itemsToUse = items.length > 0 ? items : allItems;
+    return itemsToUse.filter(
       (item) => !item.isCraftable && item.companyGroupId === selectedCompanyGroupId
     );
   };
@@ -257,28 +331,42 @@ export default function OrderModal({ opened, onClose, items, onOrderCreated }: O
                 <Table.Thead>
                   <Table.Tr>
                     <Table.Th>Item</Table.Th>
-                    <Table.Th>Stock actuel</Table.Th>
-                    <Table.Th>Quantité idéale</Table.Th>
+                    {prefillItemsNeedingRestock && items.length > 0 && items[0].stockToday !== null && (
+                      <>
+                        <Table.Th>Stock actuel</Table.Th>
+                        <Table.Th>Quantité idéale</Table.Th>
+                        <Table.Th>Quantité finale</Table.Th>
+                      </>
+                    )}
                     <Table.Th>Quantité à commander</Table.Th>
-                    <Table.Th>Quantité finale</Table.Th>
                     <Table.Th style={{ width: 50 }}></Table.Th>
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
                   {orderItems.map((orderItem) => {
-                    const item = orderItem.item;
+                    const itemsToUse = items.length > 0 ? items : allItems;
+                    const item = itemsToUse.find((i) => i.id === orderItem.itemId) || orderItem.item;
                     const stockToday = item.stockToday ?? 0;
-                    const quantityNeeded = item.idealQuantity - stockToday;
                     const finalQuantity = stockToday + orderItem.quantity;
+                    const hasStockInfo = item.stockToday !== null && prefillItemsNeedingRestock && items.length > 0;
                     return (
                       <Table.Tr key={orderItem.itemId}>
                         <Table.Td>{item.name}</Table.Td>
-                        <Table.Td>
-                          <Badge color={stockToday < item.idealQuantity ? 'red' : 'green'}>
-                            {stockToday}
-                          </Badge>
-                        </Table.Td>
-                        <Table.Td>{item.idealQuantity}</Table.Td>
+                        {hasStockInfo && (
+                          <>
+                            <Table.Td>
+                              <Badge color={stockToday < item.idealQuantity ? 'red' : 'green'}>
+                                {stockToday}
+                              </Badge>
+                            </Table.Td>
+                            <Table.Td>{item.idealQuantity}</Table.Td>
+                            <Table.Td>
+                              <Badge color={finalQuantity >= item.idealQuantity ? 'green' : 'orange'}>
+                                {finalQuantity}
+                              </Badge>
+                            </Table.Td>
+                          </>
+                        )}
                         <Table.Td>
                           <NumberInput
                             value={orderItem.quantity}
@@ -286,11 +374,6 @@ export default function OrderModal({ opened, onClose, items, onOrderCreated }: O
                             min={1}
                             style={{ maxWidth: 120 }}
                           />
-                        </Table.Td>
-                        <Table.Td>
-                          <Badge color={finalQuantity >= item.idealQuantity ? 'green' : 'orange'}>
-                            {finalQuantity}
-                          </Badge>
                         </Table.Td>
                         <Table.Td>
                           <ActionIcon

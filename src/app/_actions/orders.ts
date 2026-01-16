@@ -115,3 +115,150 @@ export async function createOrder(data: {
   }
 }
 
+// Schéma de validation pour modifier une commande
+const updateOrderSchema = z.object({
+  id: z.string().uuid('ID invalide'),
+  name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long').optional(),
+  status: z.enum(['DRAFT', 'LETTER_SENT', 'PROCESSING', 'READY', 'COMPLETED', 'CANCELLED']).optional(),
+  details: z.string().max(1000, 'Les détails sont trop longs').optional(),
+});
+
+// Schéma pour supprimer une commande
+const deleteOrderSchema = z.object({
+  id: z.string().uuid('ID invalide'),
+});
+
+/**
+ * Récupère toutes les commandes
+ */
+export async function getOrders() {
+  try {
+    const session = await getAuthSession();
+    if (!session) {
+      return {
+        status: 401,
+        error: 'Non autorisé',
+      };
+    }
+
+    const orders = await prisma.order.findMany({
+      orderBy: {
+        createdAt: 'desc',
+      },
+      include: {
+        company: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        items: {
+          include: {
+            item: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return {
+      status: 200,
+      data: orders,
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de la récupération des commandes');
+  }
+}
+
+/**
+ * Modifie une commande existante
+ */
+export async function updateOrder(data: {
+  id: string;
+  name?: string;
+  status?: 'DRAFT' | 'LETTER_SENT' | 'PROCESSING' | 'READY' | 'COMPLETED' | 'CANCELLED';
+  details?: string;
+}) {
+  try {
+    const session = await getAuthSession();
+    if (!session) {
+      return {
+        status: 401,
+        error: 'Non autorisé',
+      };
+    }
+
+    const validatedData = updateOrderSchema.parse(data);
+
+    const order = await prisma.order.update({
+      where: {
+        id: validatedData.id,
+      },
+      data: {
+        name: validatedData.name,
+        status: validatedData.status,
+        details: validatedData.details,
+      },
+      include: {
+        company: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        items: {
+          include: {
+            item: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return {
+      status: 200,
+      data: order,
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de la modification de la commande');
+  }
+}
+
+/**
+ * Supprime une commande
+ */
+export async function deleteOrder(data: { id: string }) {
+  try {
+    const session = await getAuthSession();
+    if (!session) {
+      return {
+        status: 401,
+        error: 'Non autorisé',
+      };
+    }
+
+    const validatedData = deleteOrderSchema.parse(data);
+
+    await prisma.order.delete({
+      where: {
+        id: validatedData.id,
+      },
+    });
+
+    return {
+      status: 200,
+      data: { success: true },
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de la suppression de la commande');
+  }
+}
+
