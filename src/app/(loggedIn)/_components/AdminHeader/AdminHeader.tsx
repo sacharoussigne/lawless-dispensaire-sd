@@ -52,24 +52,36 @@ export default function AdminHeader({
             <Group>
               {session ? (
                 <>
-                  <Link
-                    href={routes.admin.locations}
-                    className={classes.link}
+                  <Menu
+                    width={260}
+                    position="bottom-start"
+                    transitionProps={{ transition: 'pop-top-left' }}
+                    withinPortal
                   >
-                    Lieux
-                  </Link>
-                  <Link
-                    href={routes.admin.companies}
-                    className={classes.link}
-                  >
-                    Entreprises
-                  </Link>
-                  <Link
-                    href={routes.admin.companyGroups}
-                    className={classes.link}
-                  >
-                    Groupes d'entreprises
-                  </Link>
+                    <Menu.Target>
+                      <Button variant="subtle" className={classes.link}>
+                        Administration
+                      </Button>
+                    </Menu.Target>
+                    <Menu.Dropdown>
+                      <Menu.Label>Gestion</Menu.Label>
+                      <Link href={routes.admin.locations}>
+                        <Menu.Item>
+                          Lieux
+                        </Menu.Item>
+                      </Link>
+                      <Link href={routes.admin.companies}>
+                        <Menu.Item>
+                          Entreprises
+                        </Menu.Item>
+                      </Link>
+                      <Link href={routes.admin.companyGroups}>
+                        <Menu.Item>
+                          Groupes d'entreprises
+                        </Menu.Item>
+                      </Link>
+                    </Menu.Dropdown>
+                  </Menu>
                   <Menu
                     width={260}
                     position="bottom-end"
