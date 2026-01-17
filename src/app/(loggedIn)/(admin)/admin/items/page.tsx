@@ -390,13 +390,13 @@ function ItemsPageContent() {
 
   const craftRecipeForm = useForm({
     initialValues: {
-      recipeName: '',
-      recipeDescription: '',
+      name: '',
+      description: '',
       quantity: 1,
       ingredients: [] as { usedItemId: string; quantity: number }[],
     },
     validate: {
-      recipeName: (value) =>
+      name: (value) =>
         value.length < 1 ? 'Le nom de la recette est requis' : null,
       quantity: (value) =>
         value < 1 ? 'La quantité doit être au moins 1' : null,
@@ -409,8 +409,8 @@ function ItemsPageContent() {
     if (recipe) {
       setEditingCraftRecipe(recipe);
       craftRecipeForm.setValues({
-        recipeName: recipe.recipeName,
-        recipeDescription: recipe.recipeDescription || '',
+        name: recipe.name,
+        description: recipe.description || '',
         quantity: recipe.quantity,
         ingredients: recipe.ingredients.map((ing) => ({
           usedItemId: ing.usedItemId,
@@ -420,8 +420,8 @@ function ItemsPageContent() {
     } else {
       setEditingCraftRecipe(null);
       craftRecipeForm.setValues({
-        recipeName: '',
-        recipeDescription: '',
+        name: '',
+        description: '',
         quantity: 1,
         ingredients: [],
       });
@@ -439,15 +439,15 @@ function ItemsPageContent() {
       if (editingCraftRecipe) {
         result = await updateCraftRecipe({
           id: editingCraftRecipe.id,
-          recipeName: values.recipeName,
-          recipeDescription: values.recipeDescription || undefined,
+          name: values.name,
+          description: values.description || undefined,
           quantity: values.quantity,
           ingredients: values.ingredients,
         });
       } else {
         result = await createCraftRecipe({
-          recipeName: values.recipeName,
-          recipeDescription: values.recipeDescription || undefined,
+          name: values.name,
+          description: values.description || undefined,
           craftedItemId: selectedItemForCraft.id,
           quantity: values.quantity,
           ingredients: values.ingredients,
@@ -1087,8 +1087,8 @@ function ItemsPageContent() {
               <Table.Tbody>
                 {craftRecipes.map((recipe) => (
                   <Table.Tr key={recipe.id}>
-                    <Table.Td>{recipe.recipeName}</Table.Td>
-                    <Table.Td>{recipe.recipeDescription || '-'}</Table.Td>
+                    <Table.Td>{recipe.name}</Table.Td>
+                    <Table.Td>{recipe.description || '-'}</Table.Td>
                     <Table.Td>{recipe.quantity}</Table.Td>
                     <Table.Td>
                       <Stack gap="xs">
@@ -1149,13 +1149,13 @@ function ItemsPageContent() {
               label="Nom de la recette"
               placeholder="Nom de la recette"
               required
-              {...craftRecipeForm.getInputProps('recipeName')}
+              {...craftRecipeForm.getInputProps('name')}
             />
             <Textarea
               label="Description"
               placeholder="Description de la recette (optionnel)"
               rows={3}
-              {...craftRecipeForm.getInputProps('recipeDescription')}
+              {...craftRecipeForm.getInputProps('description')}
             />
             <NumberInput
               label="Quantité produite"
@@ -1251,7 +1251,7 @@ function ItemsPageContent() {
         <Stack>
           <p>
             Êtes-vous sûr de vouloir supprimer la recette de craft{' '}
-            <strong>{craftRecipeToDelete?.recipeName}</strong> ?
+            <strong>{craftRecipeToDelete?.name}</strong> ?
           </p>
           <Group justify="flex-end" mt="md">
             <Button

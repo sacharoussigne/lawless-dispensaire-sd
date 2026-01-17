@@ -19,8 +19,8 @@ import type { ItemWithRelations } from '@/types/stock';
 
 interface CraftRecipeWithIngredients {
   id: string;
-  recipeName: string;
-  recipeDescription: string | null;
+  name: string;
+  description: string | null;
   craftedItemId: string;
   quantity: number;
   ingredients: {
@@ -226,7 +226,7 @@ export default function CraftModal({ opened, onClose, items, canCraft = true, on
                     placeholder="Sélectionner une recette"
                     data={craftRecipes.map((recipe) => ({
                       value: recipe.id,
-                      label: recipe.recipeName,
+                      label: recipe.name,
                     }))}
                     value={selectedRecipe}
                     onChange={(value) => setSelectedRecipe(value)}
@@ -236,9 +236,9 @@ export default function CraftModal({ opened, onClose, items, canCraft = true, on
                       return (
                         <div>
                           <div>{option.label}</div>
-                          {recipe?.recipeDescription && (
+                          {recipe?.description && (
                             <Text size="xs" c="dimmed" mt={2}>
-                              {recipe.recipeDescription}
+                              {recipe.description}
                             </Text>
                           )}
                         </div>
@@ -248,11 +248,11 @@ export default function CraftModal({ opened, onClose, items, canCraft = true, on
                 ) : (
                   <Stack gap="xs">
                     <Text size="sm" c="dimmed">
-                      Recette : {craftRecipes[0]?.recipeName}
+                      Recette : {craftRecipes[0]?.name}
                     </Text>
-                    {craftRecipes[0]?.recipeDescription && (
+                    {craftRecipes[0]?.description && (
                       <Text size="xs" c="dimmed">
-                        {craftRecipes[0].recipeDescription}
+                        {craftRecipes[0].description}
                       </Text>
                     )}
                   </Stack>

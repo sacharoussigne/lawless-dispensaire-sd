@@ -7,8 +7,8 @@ import { getAuthSession } from '@/lib/auth';
 
 // Schéma de validation pour créer une recette de craft
 const createCraftRecipeSchema = z.object({
-  recipeName: z.string().min(1, 'Le nom de la recette est requis').max(255, 'Le nom est trop long'),
-  recipeDescription: z.string().max(1000, 'La description est trop longue').optional(),
+  name: z.string().min(1, 'Le nom de la recette est requis').max(255, 'Le nom est trop long'),
+  description: z.string().max(1000, 'La description est trop longue').optional(),
   craftedItemId: z.string().uuid('ID d\'item invalide'),
   quantity: z.number().int().min(1, 'La quantité doit être au moins 1'),
   ingredients: z.array(z.object({
@@ -20,8 +20,8 @@ const createCraftRecipeSchema = z.object({
 // Schéma de validation pour modifier une recette de craft
 const updateCraftRecipeSchema = z.object({
   id: z.string().uuid('ID invalide'),
-  recipeName: z.string().min(1, 'Le nom de la recette est requis').max(255, 'Le nom est trop long'),
-  recipeDescription: z.string().max(1000, 'La description est trop longue').optional(),
+  name: z.string().min(1, 'Le nom de la recette est requis').max(255, 'Le nom est trop long'),
+  description: z.string().max(1000, 'La description est trop longue').optional(),
   quantity: z.number().int().min(1, 'La quantité doit être au moins 1'),
   ingredients: z.array(z.object({
     usedItemId: z.string().uuid('ID d\'item invalide'),
@@ -81,8 +81,8 @@ export async function getCraftRecipesByItemId(itemId: string) {
  * Crée une nouvelle recette de craft
  */
 export async function createCraftRecipe(data: {
-  recipeName: string;
-  recipeDescription?: string;
+  name: string;
+  description?: string;
   craftedItemId: string;
   quantity: number;
   ingredients: { usedItemId: string; quantity: number }[];
@@ -100,8 +100,8 @@ export async function createCraftRecipe(data: {
 
     const craftRecipe = await prisma.craftRecipe.create({
       data: {
-        recipeName: validatedData.recipeName,
-        recipeDescription: validatedData.recipeDescription,
+        name: validatedData.name,
+        description: validatedData.description,
         craftedItemId: validatedData.craftedItemId,
         quantity: validatedData.quantity,
         ingredients: {
@@ -139,8 +139,8 @@ export async function createCraftRecipe(data: {
  */
 export async function updateCraftRecipe(data: {
   id: string;
-  recipeName: string;
-  recipeDescription?: string;
+  name: string;
+  description?: string;
   quantity: number;
   ingredients: { usedItemId: string; quantity: number }[];
 }) {
@@ -168,8 +168,8 @@ export async function updateCraftRecipe(data: {
         id: validatedData.id,
       },
       data: {
-        recipeName: validatedData.recipeName,
-        recipeDescription: validatedData.recipeDescription,
+        name: validatedData.name,
+        description: validatedData.description,
         quantity: validatedData.quantity,
         ingredients: {
           create: validatedData.ingredients.map((ing) => ({

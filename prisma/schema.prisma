@@ -146,11 +146,10 @@ model Company {
   @@index([locationId])
   @@map("company")
 }
-
 model CraftRecipe {
   id                String            @id @default(uuid())
-  recipeName        String
-  recipeDescription String?
+  name              String
+  description       String?
   craftedItemId     String
   craftedItem       Item              @relation("CraftedItem", fields: [craftedItemId], references: [id], onDelete: Cascade)
   quantity          Int
@@ -161,7 +160,6 @@ model CraftRecipe {
   @@index([craftedItemId])
   @@map("craft_recipe")
 }
-
 model CraftRecipeItem {
   id            String      @id @default(uuid())
   craftRecipeId String
