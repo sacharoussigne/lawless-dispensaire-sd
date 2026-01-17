@@ -77,6 +77,11 @@ export default function AdminHeader({
                         </>
                       )}
                       <Menu.Label>Gestion</Menu.Label>
+                      <Link href={routes.admin.overwriteStock}>
+                        <Menu.Item>
+                          Écraser les stocks
+                        </Menu.Item>
+                      </Link>
                       <Link href={routes.admin.locations}>
                         <Menu.Item>
                           Lieux

@@ -12,6 +12,7 @@ export const routes = {
     categoryItems: '/admin/categoryitems',
     items: '/admin/items',
     users: '/admin/users',
+    overwriteStock: '/admin/overwrite-stock',
   },
   api: {},
   settings: {

@@ -8,6 +8,7 @@ import {
   getYesterdayStart,
   getTomorrowStart,
   formatDate,
+  getStartOfDay,
 } from '@/lib/date';
 
 /**
@@ -418,6 +419,143 @@ export async function addOrderItemsToStock(orderId: string) {
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de l\'ajout des items au stock');
+  }
+}
+
+/**
+ * Récupère tous les items avec leurs stocks pour une date donnée
+ */
+export async function getItemsWithStockForDate(date: Date) {
+  try {
+    const session = await getAuthSession();
+    if (!session) {
+      return {
+        status: 401,
+        error: 'Non autorisé',
+      };
+    }
+
+    const dayStart = getStartOfDay(date);
+    const dayEnd = new Date(dayStart);
+    dayEnd.setDate(dayEnd.getDate() + 1);
+
+    const items = await prisma.item.findMany({
+      orderBy: {
+        createdAt: 'desc',
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        idealQuantity: true,
+        isCraftable: true,
+        categoryId: true,
+        companyGroupId: true,
+        order: true,
+        createdAt: true,
+        updatedAt: true,
+        category: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+            order: true,
+          },
+        },
+        companyGroup: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        stockHistory: {
+          where: {
+            timestamp: {
+              gte: dayStart,
+              lt: dayEnd,
+            },
+          },
+          orderBy: {
+            timestamp: 'desc',
+          },
+        },
+      },
+    });
+
+    // Pour chaque item, trouver le dernier stock du jour sélectionné
+    const itemsWithStock = items.map((item) => {
+      const stockForDate = item.stockHistory.length > 0 
+        ? item.stockHistory[0] // Le plus récent du jour
+        : null;
+
+      return {
+        ...item,
+        stockForDate: stockForDate?.quantity ?? null,
+        stockHistoryId: stockForDate?.id ?? null,
+      };
+    });
+
+    return {
+      status: 200,
+      data: itemsWithStock,
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de la récupération des items avec stock');
+  }
+}
+
+/**
+ * Écrase les stocks pour une date donnée
+ * Supprime tous les stocks existants pour cette date et crée de nouveaux stocks
+ */
+export async function overwriteStockForDate(data: {
+  date: Date;
+  stocks: { itemId: string; quantity: number }[];
+}) {
+  try {
+    const session = await getAuthSession();
+    if (!session) {
+      return {
+        status: 401,
+        error: 'Non autorisé',
+      };
+    }
+
+    const dayStart = getStartOfDay(data.date);
+    const dayEnd = new Date(dayStart);
+    dayEnd.setDate(dayEnd.getDate() + 1);
+
+    // Supprimer tous les stocks existants pour cette date
+    await prisma.stockHistory.deleteMany({
+      where: {
+        timestamp: {
+          gte: dayStart,
+          lt: dayEnd,
+        },
+      },
+    });
+
+    // Créer les nouveaux stocks
+    const results = await Promise.all(
+      data.stocks
+        .filter((stock) => stock.quantity !== null && stock.quantity !== undefined)
+        .map(async ({ itemId, quantity }) => {
+          return prisma.stockHistory.create({
+            data: {
+              itemId,
+              quantity,
+              timestamp: dayStart,
+            },
+          });
+        })
+    );
+
+    return {
+      status: 200,
+      data: results,
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de l\'écrasement des stocks');
   }
 }
 
