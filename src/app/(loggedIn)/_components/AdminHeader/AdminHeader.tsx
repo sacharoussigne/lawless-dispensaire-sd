@@ -40,7 +40,7 @@ export default function AdminHeader({
         <Container size={'lg'}>
           <div className={'flex justify-between items-center w-full h-[60px]'}>
             <h1 className="text-2xl font-bold">
-              <Link href={routes.test.index}>
+              <Link href={routes.stock.index}>
                 <div className="flex items-center gap-2">
                   Dispensaire Saint-Denis - Administration
                 </div>

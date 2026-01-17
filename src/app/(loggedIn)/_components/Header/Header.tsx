@@ -40,7 +40,7 @@ export default function Header({
         <Container size={'lg'}>
           <div className={'flex justify-between items-center w-full h-[60px]'}>
             <h1 className="text-2xl font-bold">
-              <Link href={routes.test.index}>
+              <Link href={routes.stock.index}>
                 <div className="flex items-center gap-2">
                   Dispensaire Saint-Denis
                 </div>
@@ -64,12 +64,12 @@ export default function Header({
                   >
                     Commandes
                   </Link>
-                  <Link
+                  {/* <Link
                     href={routes.test.index}
                     className={classes.link}
                   >
                     Compte
-                  </Link>
+                  </Link> */}
                   <Menu
                     width={260}
                     position="bottom-end"

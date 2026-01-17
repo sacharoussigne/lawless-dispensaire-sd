@@ -20,17 +20,17 @@ export default function BottomBar({ session }: Readonly<BottomBarProps>) {
   return (
     <div className={classes.bottomBar}>
       <Group justify="space-around" w="100%" hiddenFrom="sm">
-        <Link href={routes.test.index}>
+        <Link href={routes.stock.index}>
           <UnstyledButton className={classes.bottomBarButton}>
             <Stack align="center" gap={5}>
               <IconBookmarkFilled
                 size={24}
                 stroke={1.5}
-                color={pathname.startsWith(routes.test.index) ? 'blue' : 'gray'}
+                color={pathname.startsWith(routes.stock.index) ? 'blue' : 'gray'}
               />
               <Text
                 size="xs"
-                c={pathname.startsWith(routes.test.index) ? 'blue' : 'gray'}
+                c={pathname.startsWith(routes.stock.index) ? 'blue' : 'gray'}
               >
                 Test
               </Text>

@@ -99,15 +99,49 @@ export default function CraftModal({ opened, onClose, items, onCraft }: CraftMod
     await onCraft(selectedCraftItem, selectedRecipe, craftQuantity);
   };
 
+  // Helper pour obtenir le stock disponible et savoir s'il vient d'aujourd'hui
+  const getAvailableStock = (item: ItemWithRelations | undefined) => {
+    if (!item) return { stock: null, isToday: false };
+    
+    if (item.stockToday !== null && item.stockToday !== undefined) {
+      return { stock: item.stockToday, isToday: true };
+    }
+    
+    // Si pas de stock aujourd'hui, utiliser le stock d'hier (ou le dernier disponible)
+    if (item.stockYesterday !== null && item.stockYesterday !== undefined) {
+      return { stock: item.stockYesterday, isToday: false };
+    }
+    
+    return { stock: null, isToday: false };
+  };
+
   const selectedCraftItemData = items.find((i) => i.id === selectedCraftItem);
+  const craftItemStock = getAvailableStock(selectedCraftItemData);
   const hasCraftItemStockToday = selectedCraftItemData?.stockToday !== null && selectedCraftItemData?.stockToday !== undefined;
+  const hasCraftItemStock = craftItemStock.stock !== null;
+
+  // Vérifier si au moins un ingrédient ou l'item crafté utilise un stock d'un jour précédent
+  const usesOldStock = (() => {
+    if (!selectedCraftItem || !hasCraftItemStock) return false;
+    
+    if (!craftItemStock.isToday) return true;
+    
+    const recipe = craftRecipes.find((r) => r.id === selectedRecipe) || craftRecipes[0];
+    if (!recipe) return false;
+    
+    return recipe.ingredients.some((ingredient) => {
+      const item = items.find((i) => i.id === ingredient.usedItemId);
+      const stock = getAvailableStock(item);
+      return stock.stock !== null && !stock.isToday;
+    });
+  })();
 
   const isCraftButtonDisabled = (() => {
     if (!selectedCraftItem || (!selectedRecipe && craftRecipes.length > 1) || craftQuantity < 1) {
       return true;
     }
     
-    // Vérifier que l'item à craft a un stock d'aujourd'hui
+    // Vérifier que l'item à craft a un stock d'aujourd'hui (obligatoire pour craft)
     if (!hasCraftItemStockToday) {
       return true;
     }
@@ -164,12 +198,22 @@ export default function CraftModal({ opened, onClose, items, onCraft }: CraftMod
 
         {selectedCraftItem && craftRecipes.length > 0 && (
           <>
-            {!hasCraftItemStockToday ? (
+            {!hasCraftItemStock ? (
               <Text c="red" size="sm" mt="md">
-                Le stock d'aujourd'hui n'est pas fait pour cet item. Veuillez d'abord faire le stock.
+                Aucun stock disponible pour cet item.
               </Text>
             ) : (
               <>
+                {usesOldStock && (
+                  <Text c="orange" size="sm" mt="md" fw={500}>
+                    ⚠️ Certains stocks affichés proviennent d'un jour précédent. Le craft n'est pas possible sans le stock d'aujourd'hui.
+                  </Text>
+                )}
+                {selectedCraftItemData && craftItemStock.stock !== null && (
+                  <Text size="sm" c={craftItemStock.isToday ? 'dimmed' : 'orange'} mt="xs">
+                    Stock disponible : {craftItemStock.stock} {craftItemStock.isToday ? '' : '(jour précédent)'}
+                  </Text>
+                )}
                 {craftRecipes.length > 1 ? (
                   <Select
                     label="Recette"
@@ -242,9 +286,9 @@ export default function CraftModal({ opened, onClose, items, onCraft }: CraftMod
                           {recipe.ingredients.map((ingredient) => {
                             const requiredQuantity = ingredient.quantity * craftQuantity;
                             const item = items.find((i) => i.id === ingredient.usedItemId);
-                            const hasStockToday = item?.stockToday !== null && item?.stockToday !== undefined;
-                            const availableStock = hasStockToday ? (item.stockToday ?? 0) : 0;
-                            const hasEnough = hasStockToday && availableStock >= requiredQuantity;
+                            const stockInfo = getAvailableStock(item);
+                            const availableStock = stockInfo.stock ?? 0;
+                            const hasEnough = stockInfo.isToday && availableStock >= requiredQuantity;
 
                             return (
                               <Group key={ingredient.id} justify="space-between" wrap="nowrap">
@@ -255,21 +299,21 @@ export default function CraftModal({ opened, onClose, items, onCraft }: CraftMod
                                   <Text size="sm" c={hasEnough ? 'green' : 'red'}>
                                     {requiredQuantity} requis
                                   </Text>
-                                  {hasStockToday ? (
+                                  {stockInfo.stock !== null ? (
                                     <>
-                                      <Text size="sm" c="dimmed">
-                                        / {availableStock} disponible
+                                      <Text size="sm" c={stockInfo.isToday ? 'dimmed' : 'orange'}>
+                                        / {availableStock} disponible{stockInfo.isToday ? '' : ' (jour précédent)'}
                                       </Text>
                                       {hasEnough ? (
                                         <Badge color="green" size="sm">✓</Badge>
                                       ) : (
-                                        <Badge color="red" size="sm">✗</Badge>
+                                        <Badge color={stockInfo.isToday ? 'red' : 'orange'} size="sm">✗</Badge>
                                       )}
                                     </>
                                   ) : (
                                     <>
                                       <Text size="sm" c="red">
-                                        Stock d'aujourd'hui non fait
+                                        Aucun stock disponible
                                       </Text>
                                       <Badge color="red" size="sm">✗</Badge>
                                     </>

@@ -7,6 +7,6 @@ export default async function Home() {
   if (!session) {
       redirect(routes.auth.login)
   } else {
-      redirect(routes.test.index)
+      redirect(routes.stock.index)
   }
 }
