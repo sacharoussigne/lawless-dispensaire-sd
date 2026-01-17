@@ -29,7 +29,7 @@ export async function middleware(req: NextRequest) {
     middlewares.push(hasManagementAccessMiddleware);
     
     // Pour la page users, on vérifie aussi que l'utilisateur a le rôle admin
-    if (pathname === routes.admin.users) {
+    if (pathname === routes.admin.users || pathname === routes.admin.overwriteStock) {
       middlewares.push(hasAdminRoleMiddleware);
     }
   } else {

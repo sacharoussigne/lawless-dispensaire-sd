@@ -38,139 +38,140 @@ export default function AdminHeader({
   };
 
   return (
-      <header className={`${classes.header} mb-10`}>
-        <Container size={'lg'}>
-          <div className={'flex justify-between items-center w-full h-[60px]'}>
-            <h1 className="text-2xl font-bold">
-              <Link href={routes.stock.index}>
-                <div className="flex items-center gap-2">
-                  Dispensaire Saint-Denis - Administration
-                </div>
-              </Link>
-            </h1>
+    <header className={`${classes.header} mb-10`}>
+      <Container size={'lg'}>
+        <div className={'flex justify-between items-center w-full h-[60px]'}>
+          <h1 className="text-2xl font-bold">
+            <Link href={routes.stock.index}>
+              <div className="flex items-center gap-2">
+                Dispensaire Saint-Denis - Administration
+              </div>
+            </Link>
+          </h1>
 
-            {session && <div className="flex gap-4"></div>}
+          {session && <div className="flex gap-4"></div>}
 
-            <Group>
-              {session ? (
-                <>
-                  <Menu
-                    width={260}
-                    position="bottom-start"
-                    transitionProps={{ transition: 'pop-top-left' }}
-                    withinPortal
-                  >
-                    <Menu.Target>
-                      <Button variant="subtle" className={classes.link}>
-                        Administration
-                      </Button>
-                    </Menu.Target>
-                    <Menu.Dropdown>
-                      {userRole === 'admin' && (
-                        <>
-                          <Link href={routes.admin.users}>
-                            <Menu.Item>
-                              Gestion Utilisateur
-                            </Menu.Item>
-                          </Link>
-                          <Menu.Divider />
-                        </>
-                      )}
-                      <Menu.Label>Gestion</Menu.Label>
-                      <Link href={routes.admin.overwriteStock}>
-                        <Menu.Item>
-                          Écraser les stocks
-                        </Menu.Item>
-                      </Link>
-                      <Link href={routes.admin.locations}>
-                        <Menu.Item>
-                          Lieux
-                        </Menu.Item>
-                      </Link>
-                      <Link href={routes.admin.companies}>
-                        <Menu.Item>
-                          Entreprises
-                        </Menu.Item>
-                      </Link>
-                      <Link href={routes.admin.companyGroups}>
-                        <Menu.Item>
-                          Groupes d'entreprises
-                        </Menu.Item>
-                      </Link>
-                      <Link href={routes.admin.categoryItems}>
-                        <Menu.Item>
-                          Catégories d'items
-                        </Menu.Item>
-                      </Link>
-                      <Link href={routes.admin.items}>
-                        <Menu.Item>
-                          Items
-                        </Menu.Item>
-                      </Link>
-                    </Menu.Dropdown>
-                  </Menu>
-                  <Menu
-                    width={260}
-                    position="bottom-end"
-                    transitionProps={{ transition: 'pop-top-right' }}
-                    onClose={() => setUserMenuOpened(false)}
-                    onOpen={() => setUserMenuOpened(true)}
-                    withinPortal
-                  >
-                    <Menu.Target>
-                      <UnstyledButton
-                        className={`user ${userMenuOpened ? 'userActive' : ''}`}
-                      >
-                        <Group gap={7}>
-                          <Avatar
-                            alt={session.user.name}
-                            radius="xl"
-                            size={40}
-                            src={session.user.image ?? null}
-                          />
-                        </Group>
-                      </UnstyledButton>
-                    </Menu.Target>
-                    <Menu.Dropdown>
-                      {permissions?.application.access && (
-                        <>
-                          <Link href={routes.stock.index}>
-                            <Menu.Item
-                              leftSection={<IconUser size={16} stroke={1.5} />}
-                            >
-                              Espace Utilisateur
-                            </Menu.Item>
-                          </Link>
-                          <Menu.Divider />
-                        </>
-                      )}
-                      <Menu.Label>Settings</Menu.Label>
-                      <Link href={routes.settings.index}>
-                        <Menu.Item
-                          leftSection={<IconSettings size={16} stroke={1.5} />}
-                        >
-                          Settings
-                        </Menu.Item>
-                      </Link>
-                      <Menu.Divider />
-                      <Menu.Item
-                        leftSection={<IconLogout size={16} stroke={1.5} />}
-                        onClick={handleLogout}
-                      >
-                        Logout
+          <Group>
+            {session ? (
+              <>
+                <Menu
+                  width={260}
+                  position="bottom-start"
+                  transitionProps={{ transition: 'pop-top-left' }}
+                  withinPortal
+                >
+                  <Menu.Target>
+                    <Button variant="subtle" className={classes.link}>
+                      Administration
+                    </Button>
+                  </Menu.Target>
+                  <Menu.Dropdown>
+                    {userRole === 'admin' && (
+                      <>
+                        <Menu.Label>Admin</Menu.Label>
+                        <Link href={routes.admin.users}>
+                          <Menu.Item>
+                            Gestion Utilisateur
+                          </Menu.Item>
+                        </Link>
+                        <Link href={routes.admin.overwriteStock}>
+                          <Menu.Item>
+                            Écraser les stocks
+                          </Menu.Item>
+                        </Link>
+                        <Menu.Divider />
+                      </>
+                    )}
+                    <Menu.Label>Gestion</Menu.Label>
+                    <Link href={routes.admin.items}>
+                      <Menu.Item>
+                        Objets
                       </Menu.Item>
-                    </Menu.Dropdown>
-                  </Menu>
-                </>
-              ) : (
-                <>
-                  <Button variant="default">Log in</Button>
-                  <Button>Sign up</Button>
-                </>
-              )}
-            </Group>
-          </div>
-        </Container>
-      </header>
+                    </Link>
+                    <Link href={routes.admin.categoryItems}>
+                      <Menu.Item>
+                        Catégories d'objets
+                      </Menu.Item>
+                    </Link>
+                    <Link href={routes.admin.companies}>
+                      <Menu.Item>
+                        Entreprises
+                      </Menu.Item>
+                    </Link>
+                    <Link href={routes.admin.companyGroups}>
+                      <Menu.Item>
+                        Groupes d'entreprises
+                      </Menu.Item>
+                    </Link>
+                    <Link href={routes.admin.locations}>
+                      <Menu.Item>
+                        Lieux
+                      </Menu.Item>
+                    </Link>
+                  </Menu.Dropdown>
+                </Menu>
+                <Menu
+                  width={260}
+                  position="bottom-end"
+                  transitionProps={{ transition: 'pop-top-right' }}
+                  onClose={() => setUserMenuOpened(false)}
+                  onOpen={() => setUserMenuOpened(true)}
+                  withinPortal
+                >
+                  <Menu.Target>
+                    <UnstyledButton
+                      className={`user ${userMenuOpened ? 'userActive' : ''}`}
+                    >
+                      <Group gap={7}>
+                        <Avatar
+                          alt={session.user.name}
+                          radius="xl"
+                          size={40}
+                          src={session.user.image ?? null}
+                        />
+                      </Group>
+                    </UnstyledButton>
+                  </Menu.Target>
+                  <Menu.Dropdown>
+                    {permissions?.application.access && (
+                      <>
+                        <Link href={routes.stock.index}>
+                          <Menu.Item
+                            leftSection={<IconUser size={16} stroke={1.5} />}
+                          >
+                            Espace Utilisateur
+                          </Menu.Item>
+                        </Link>
+                        <Menu.Divider />
+                      </>
+                    )}
+                    {/* <Menu.Label>Settings</Menu.Label>
+                    <Link href={routes.settings.index}>
+                      <Menu.Item
+                        leftSection={<IconSettings size={16} stroke={1.5} />}
+                      >
+                        Settings
+                      </Menu.Item>
+                    </Link> */}
+                    {/* <Menu.Divider /> */}
+                    <Menu.Item
+                      leftSection={<IconLogout size={16} stroke={1.5} />}
+                      onClick={handleLogout}
+                    >
+                      Logout
+                    </Menu.Item>
+                  </Menu.Dropdown>
+                </Menu>
+              </>
+            ) : (
+              <>
+                <Button variant="default">Log in</Button>
+                <Button>Sign up</Button>
+              </>
+            )}
+          </Group>
+        </div>
+      </Container>
+    </header>
   );
 }

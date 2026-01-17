@@ -107,15 +107,15 @@ export default function Header({
                           <Menu.Divider />
                         </>
                       )}
-                      <Menu.Label>Settings</Menu.Label>
+                      {/* <Menu.Label>Settings</Menu.Label>
                       <Link href={routes.settings.index}>
                         <Menu.Item
                           leftSection={<IconSettings size={16} stroke={1.5} />}
                         >
                           Settings
                         </Menu.Item>
-                      </Link>
-                      <Menu.Divider />
+                      </Link> */}
+                      {/* <Menu.Divider /> */}
                       <Menu.Item
                         leftSection={<IconLogout size={16} stroke={1.5} />}
                         onClick={handleLogout}
