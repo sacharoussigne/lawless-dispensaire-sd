@@ -5,9 +5,9 @@ import { defaultStatements, adminAc, userAc } from "better-auth/plugins/admin/ac
 const defaultApplicationPermissions = {
     stock: ["view", "create", "update", "delete", "craft-read", "craft-write"],
     orders: ["view", "create", "update", "delete"],
-    items: ["view", "create", "update", "delete"],
-    companies: ["view", "create", "update", "delete"],
-    application: ["access"],
+    // items: ["view", "create", "update", "delete"],
+    // companies: ["view", "create", "update", "delete"],
+    application: ["access", "management"],
 };
 export const statement = {
     ...defaultStatements, // Les permissions par défaut (user, session)
@@ -24,8 +24,8 @@ const user = ac.newRole({
     ...userAc.statements,
     stock: [],
     orders: [],
-    items: [],
-    companies: [],
+    // items: [],
+    // companies: [],
     application: []
 });
 
@@ -38,8 +38,8 @@ const employee = ac.newRole({
     ...userAc.statements,
     stock: ["view", "craft-read"],
     orders: ["view"],
-    items: ["view"],
-    companies: ["view"],
+    // items: ["view"],
+    // companies: ["view"],
     application: ["access"],
 });
 
@@ -47,9 +47,9 @@ const inventory_manager = ac.newRole({
     ...userAc.statements,
     stock: ["view", "create", "update", "delete", "craft-read", "craft-write"],
     orders: ["view", "create", "update", "delete"],
-    items: ["view"],
-    companies: ["view"],
-    application: ["access"],
+    // items: ["view"],
+    // companies: ["view"],
+    application: ["access", "management"],
 });
 
 // Map des rôles pour faciliter l'accès

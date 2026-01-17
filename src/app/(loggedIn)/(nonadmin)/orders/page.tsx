@@ -31,8 +31,7 @@ import { getOrderStatusLabel, getOrderStatusColor, OrderStatusEnum } from '@/typ
 import OrderModal from '@/app/(loggedIn)/(nonadmin)/stock/modals/OrderModal';
 import { checkOrderItemsStockToday } from '@/app/_actions/stock';
 import type { Order } from '@prisma/client';
-import { authClient } from '@/lib/client';
-import { checkRolePermission } from '@/lib/auth/permissions';
+import { usePermissions } from '@/app/_contexts/PermissionsContext';
 
 interface OrderItem {
   id: string;
@@ -73,11 +72,7 @@ export default function OrdersPage() {
   } | null>(null);
   const [checkingStock, setCheckingStock] = useState(false);
   
-  // Permissions
-  const [canViewOrders, setCanViewOrders] = useState(false);
-  const [canCreateOrder, setCanCreateOrder] = useState(false);
-  const [canUpdateOrder, setCanUpdateOrder] = useState(false);
-  const [canDeleteOrder, setCanDeleteOrder] = useState(false);
+  const { permissions } = usePermissions();
 
   const form = useForm({
     initialValues: {
@@ -121,16 +116,6 @@ export default function OrdersPage() {
 
   useEffect(() => {
     loadOrders();
-    // Charger la session pour vérifier les permissions
-    authClient.getSession().then((session) => {
-      if (session?.data?.user?.role) {
-        const role = session.data.user.role;
-        setCanViewOrders(checkRolePermission(role, 'orders', 'view'));
-        setCanCreateOrder(checkRolePermission(role, 'orders', 'create'));
-        setCanUpdateOrder(checkRolePermission(role, 'orders', 'update'));
-        setCanDeleteOrder(checkRolePermission(role, 'orders', 'delete'));
-      }
-    });
   }, []);
 
   const handleSubmit = async (values: typeof form.values) => {
@@ -296,7 +281,7 @@ export default function OrdersPage() {
     <Container size="xl" py="xl">
       <Group justify="space-between" mb="xl">
         <Title order={1}>Commandes</Title>
-        {canCreateOrder && (
+        {permissions?.orders.create && (
           <Button
             leftSection={<IconPlus size={16} />}
             onClick={() => setCreateModalOpened(true)}
@@ -371,7 +356,7 @@ export default function OrdersPage() {
                 const isCompleted = order.status === OrderStatusEnum.COMPLETED;
                 return (
                   <Group gap="xs" wrap="nowrap" justify="flex-end">
-                    {canViewOrders && (
+                    {permissions?.orders.view && (
                       <ActionIcon
                         variant="light"
                         color="blue"
@@ -380,7 +365,7 @@ export default function OrdersPage() {
                         <IconEye size={16} />
                       </ActionIcon>
                     )}
-                    {canUpdateOrder && (
+                    {permissions?.orders.update && (
                       <ActionIcon
                         variant="light"
                         color="gray"
@@ -391,7 +376,7 @@ export default function OrdersPage() {
                         <IconEdit size={16} />
                       </ActionIcon>
                     )}
-                    {canDeleteOrder && (
+                    {permissions?.orders.delete && (
                       <ActionIcon
                         variant="light"
                         color="red"

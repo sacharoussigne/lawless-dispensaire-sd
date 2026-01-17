@@ -22,16 +22,11 @@ import { notifications } from '@mantine/notifications';
 import CraftModal from './modals/CraftModal';
 import OrderModal from './modals/OrderModal';
 import type { ItemWithRelations, CategoryWithItems } from '@/types/stock';
-import { authClient } from '@/lib/client';
-import { checkRolePermission } from '@/lib/auth/permissions';
+import { usePermissions } from '@/app/_contexts/PermissionsContext';
 
 
 export default function StockPage() {
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [canUpdateStock, setCanUpdateStock] = useState(false);
-  const [canCraftWrite, setCanCraftWrite] = useState(false);
-  const [canCraftRead, setCanCraftRead] = useState(false);
-  const [canCreateOrder, setCanCreateOrder] = useState(false);
+  const { permissions } = usePermissions();
   const [items, setItems] = useState<ItemWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -60,17 +55,6 @@ export default function StockPage() {
 
   useEffect(() => {
     loadItems();
-    // Charger la session pour vérifier les permissions
-    authClient.getSession().then((session) => {
-      if (session?.data?.user?.role) {
-        const role = session.data.user.role;
-        setUserRole(role);
-        setCanUpdateStock(checkRolePermission(role, 'stock', 'update'));
-        setCanCraftWrite(checkRolePermission(role, 'stock', 'craft-write'));
-        setCanCraftRead(checkRolePermission(role, 'stock', 'craft-read'));
-        setCanCreateOrder(checkRolePermission(role, 'orders', 'create'));
-      }
-    });
   }, []);
 
   // Initialiser les valeurs de stock avec les valeurs actuelles
@@ -300,7 +284,7 @@ export default function StockPage() {
           )}
           {!isEditing ? (
             <Group>
-              {hasItemsNeedingRestock && canCreateOrder && (
+              {hasItemsNeedingRestock && permissions?.orders.create && (
                 <Button
                   leftSection={<IconShoppingCart size={16} />}
                   onClick={() => setOrderModalOpened(true)}
@@ -310,7 +294,7 @@ export default function StockPage() {
                   Créer une commande ({itemsNeedingRestock.length})
                 </Button>
               )}
-              {(canCraftRead || canCraftWrite) && (
+              {(permissions?.stock.craftRead || permissions?.stock.craftWrite) && (
                 <Button
                   leftSection={<IconTools size={16} />}
                   onClick={() => setCraftModalOpened(true)}
@@ -320,7 +304,7 @@ export default function StockPage() {
                   Craft
                 </Button>
               )}
-              {canUpdateStock && (
+              {permissions?.stock.update && (
                 <Button
                   leftSection={<IconEdit size={16} />}
                   onClick={() => setIsEditing(true)}
@@ -386,7 +370,7 @@ export default function StockPage() {
                       <Table.Th>Quantité idéale</Table.Th>
                       <Table.Th>Stock J-1</Table.Th>
                       <Table.Th>Stock aujourd'hui</Table.Th>
-                      {isEditing && canUpdateStock && <Table.Th>Nouveau stock</Table.Th>}
+                      {isEditing && permissions?.stock.update && <Table.Th>Nouveau stock</Table.Th>}
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
@@ -448,7 +432,7 @@ export default function StockPage() {
                               <Text c="dimmed">?</Text>
                             )}
                           </Table.Td>
-                          {isEditing && canUpdateStock && (
+                          {isEditing && permissions?.stock.update && (
                             <Table.Td>
                               <TextInput
                                 value={stockInputValues[item.id] ?? (item.stockToday !== null ? String(item.stockToday) : '')}
@@ -500,9 +484,9 @@ export default function StockPage() {
         opened={craftModalOpened}
         onClose={() => setCraftModalOpened(false)}
         items={items}
-        canCraft={canCraftWrite}
+        canCraft={permissions?.stock.craftWrite ?? false}
         onCraft={async (itemId, recipeId, times) => {
-          if (!canCraftWrite) {
+          if (!permissions?.stock.craftWrite) {
             notifications.show({
               title: 'Permission refusée',
               message: 'Vous n\'avez pas la permission d\'effectuer un craft.',
