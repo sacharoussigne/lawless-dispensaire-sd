@@ -31,6 +31,12 @@ import { getOrderStatusLabel, getOrderStatusColor, OrderStatusEnum } from '@/typ
 import OrderModal from '@/app/(loggedIn)/(nonadmin)/stock/modals/OrderModal';
 import { checkOrderItemsStockToday } from '@/app/_actions/stock';
 import type { Order } from '@prisma/client';
+import { defaultStatements, adminAc, userAc } from "better-auth/plugins/admin/access";
+
+
+console.log(defaultStatements);
+console.log(adminAc);
+console.log(userAc);
 
 interface OrderItem {
   id: string;

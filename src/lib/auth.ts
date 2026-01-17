@@ -1,9 +1,10 @@
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { nextCookies } from 'better-auth/next-js';
-import { admin, openAPI } from 'better-auth/plugins';
+import { admin as adminPlugin, openAPI } from 'better-auth/plugins';
 import { headers } from 'next/headers';
 import prisma from '@/lib/prisma';
+import { ac, admin, user, employee, inventory_manager } from './auth/permissions';
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
@@ -12,7 +13,15 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
-  plugins: [nextCookies(), openAPI(), admin()],
+  plugins: [nextCookies(), openAPI(), adminPlugin({
+    ac: ac,
+    roles: {
+      admin,
+      user,
+      employee,
+      inventory_manager,
+    }
+  })],
   socialProviders: {
     discord: {
       clientId: process.env.DISCORD_CLIENT_ID as string,

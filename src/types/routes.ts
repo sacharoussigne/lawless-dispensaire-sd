@@ -29,6 +29,7 @@ export const routes = {
     register: '/auth/register',
     resetPassword: '/auth/reset-password',
     verifyEmail: '/auth/verify-email',
+    noAccess: '/auth/no-access',
   },
   redirect: (request: NextRequest, route: string) => {
     return NextResponse.redirect(new URL(route, request.url));
