@@ -347,34 +347,41 @@ export default function OrdersPage() {
             {
               accessor: 'actions',
               title: 'Actions',
-              render: (order: OrderWithRelations) => (
-                <Group gap="xs" wrap="nowrap" justify="flex-end">
-                  <ActionIcon
-                    variant="light"
-                    color="blue"
-                    onClick={() => handleViewDetails(order)}
-                  >
-                    <IconEye size={16} />
-                  </ActionIcon>
-                  <ActionIcon
-                    variant="light"
-                    color="gray"
-                    onClick={() => handleEdit(order)}
-                  >
-                    <IconEdit size={16} />
-                  </ActionIcon>
-                  <ActionIcon
-                    variant="light"
-                    color="red"
-                    onClick={() => {
-                      setOrderToDelete(order);
-                      setDeleteModalOpened(true);
-                    }}
-                  >
-                    <IconTrash size={16} />
-                  </ActionIcon>
-                </Group>
-              ),
+              render: (order: OrderWithRelations) => {
+                const isCompleted = order.status === OrderStatusEnum.COMPLETED;
+                return (
+                  <Group gap="xs" wrap="nowrap" justify="flex-end">
+                    <ActionIcon
+                      variant="light"
+                      color="blue"
+                      onClick={() => handleViewDetails(order)}
+                    >
+                      <IconEye size={16} />
+                    </ActionIcon>
+                    <ActionIcon
+                      variant="light"
+                      color="gray"
+                      onClick={() => handleEdit(order)}
+                      disabled={isCompleted}
+                      title={isCompleted ? 'Les commandes terminées ne peuvent pas être modifiées' : 'Modifier'}
+                    >
+                      <IconEdit size={16} />
+                    </ActionIcon>
+                    <ActionIcon
+                      variant="light"
+                      color="red"
+                      onClick={() => {
+                        setOrderToDelete(order);
+                        setDeleteModalOpened(true);
+                      }}
+                      disabled={isCompleted}
+                      title={isCompleted ? 'Les commandes terminées ne peuvent pas être supprimées' : 'Supprimer'}
+                    >
+                      <IconTrash size={16} />
+                    </ActionIcon>
+                  </Group>
+                );
+              },
             },
           ]}
           totalRecords={totalRecords}
@@ -405,6 +412,7 @@ export default function OrdersPage() {
               placeholder="Nom de la commande"
               required
               {...form.getInputProps('name')}
+              disabled={editingOrder?.status === OrderStatusEnum.COMPLETED}
             />
             <Select
               label="Statut"
@@ -412,6 +420,7 @@ export default function OrdersPage() {
               required
               value={form.values.status}
               onChange={(value) => handleStatusChange(value as OrderStatusEnum)}
+              disabled={editingOrder?.status === OrderStatusEnum.COMPLETED}
             />
             {form.values.status === OrderStatusEnum.COMPLETED && (
               <Stack gap="xs">
@@ -450,6 +459,7 @@ export default function OrdersPage() {
               placeholder="Détails de la commande"
               minRows={3}
               {...form.getInputProps('details')}
+              disabled={editingOrder?.status === OrderStatusEnum.COMPLETED}
             />
             <Group justify="flex-end" mt="md">
               <Button
@@ -462,7 +472,12 @@ export default function OrdersPage() {
               >
                 Annuler
               </Button>
-              <Button type="submit">Enregistrer</Button>
+              <Button 
+                type="submit"
+                disabled={editingOrder?.status === OrderStatusEnum.COMPLETED}
+              >
+                Enregistrer
+              </Button>
             </Group>
           </Stack>
         </form>

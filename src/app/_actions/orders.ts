@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
 import { getAuthSession } from '@/lib/auth';
 import { addOrderItemsToStock } from '@/app/_actions/stock';
+import type { OrderStatus } from '@prisma/client';
 
 // Schéma de validation pour créer une commande
 const createOrderSchema = z.object({
@@ -202,6 +203,21 @@ export async function updateOrder(data: {
       select: { status: true },
     });
 
+    if (!oldOrder) {
+      return {
+        status: 404,
+        error: 'Commande non trouvée',
+      };
+    }
+
+    // Empêcher la modification d'une commande terminée
+    if (oldOrder.status === ('COMPLETED' as OrderStatus)) {
+      return {
+        status: 403,
+        error: 'Les commandes terminées ne peuvent pas être modifiées',
+      };
+    }
+
     const order = await prisma.order.update({
       where: {
         id: validatedData.id,
@@ -233,8 +249,7 @@ export async function updateOrder(data: {
 
     // Si le statut passe à COMPLETED et qu'on doit ajouter au stock
     if (
-      oldOrder &&
-      oldOrder.status !== 'COMPLETED' &&
+      oldOrder.status !== ('COMPLETED' as OrderStatus) &&
       validatedData.status === 'COMPLETED' &&
       data.addToStock === true
     ) {
@@ -273,6 +288,27 @@ export async function deleteOrder(data: { id: string }) {
     }
 
     const validatedData = deleteOrderSchema.parse(data);
+
+    // Vérifier le statut de la commande avant de la supprimer
+    const order = await prisma.order.findUnique({
+      where: { id: validatedData.id },
+      select: { status: true },
+    });
+
+    if (!order) {
+      return {
+        status: 404,
+        error: 'Commande non trouvée',
+      };
+    }
+
+    // Empêcher la suppression d'une commande terminée
+    if (order.status === ('COMPLETED' as OrderStatus)) {
+      return {
+        status: 403,
+        error: 'Les commandes terminées ne peuvent pas être supprimées',
+      };
+    }
 
     await prisma.order.delete({
       where: {
