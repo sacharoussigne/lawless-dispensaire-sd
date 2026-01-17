@@ -38,10 +38,11 @@ interface CraftModalProps {
   opened: boolean;
   onClose: () => void;
   items: ItemWithRelations[];
+  canCraft?: boolean; // Si false, l'utilisateur peut seulement voir mais pas craft
   onCraft: (itemId: string, recipeId: string, quantity: number) => void;
 }
 
-export default function CraftModal({ opened, onClose, items, onCraft }: CraftModalProps) {
+export default function CraftModal({ opened, onClose, items, canCraft = true, onCraft }: CraftModalProps) {
   const [selectedCraftItem, setSelectedCraftItem] = useState<string | null>(null);
   const [craftQuantity, setCraftQuantity] = useState<number>(1);
   const [selectedRecipe, setSelectedRecipe] = useState<string | null>(null);
@@ -137,6 +138,11 @@ export default function CraftModal({ opened, onClose, items, onCraft }: CraftMod
   })();
 
   const isCraftButtonDisabled = (() => {
+    // Si l'utilisateur n'a pas la permission de craft, désactiver le bouton
+    if (!canCraft) {
+      return true;
+    }
+    
     if (!selectedCraftItem || (!selectedRecipe && craftRecipes.length > 1) || craftQuantity < 1) {
       return true;
     }
@@ -348,10 +354,19 @@ export default function CraftModal({ opened, onClose, items, onCraft }: CraftMod
           <Button variant="subtle" onClick={handleClose}>
             Annuler
           </Button>
-          <Button onClick={handleCraft} disabled={isCraftButtonDisabled}>
+          <Button 
+            onClick={handleCraft} 
+            disabled={isCraftButtonDisabled}
+            title={!canCraft ? "Vous n'avez pas la permission d'effectuer un craft" : undefined}
+          >
             Craft
           </Button>
         </Group>
+        {!canCraft && (
+          <Text c="orange" size="sm" mt="md">
+            ⚠️ Vous avez uniquement la permission de lecture. Vous ne pouvez pas effectuer de craft.
+          </Text>
+        )}
       </Stack>
     </Modal>
   );
