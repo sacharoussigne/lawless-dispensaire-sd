@@ -15,7 +15,8 @@ import { useState } from 'react';
 import { AuthSession } from '@/types/session';
 import { routes } from '@/types/routes';
 import Link from 'next/link';
-import { IconSettings, IconLogout } from '@tabler/icons-react';
+import { IconSettings, IconLogout, IconShield } from '@tabler/icons-react';
+import { usePermissions } from '@/app/_contexts/PermissionsContext';
 
 export default function Header({
   session,
@@ -24,6 +25,7 @@ export default function Header({
 }>) {
   const router = useRouter();
   const [userMenuOpened, setUserMenuOpened] = useState(false);
+  const { permissions } = usePermissions();
 
   const handleLogout = async () => {
     await authClient.signOut({
@@ -93,6 +95,18 @@ export default function Header({
                       </UnstyledButton>
                     </Menu.Target>
                     <Menu.Dropdown>
+                      {permissions?.application.management && (
+                        <>
+                          <Link href={routes.admin.index}>
+                            <Menu.Item
+                              leftSection={<IconShield size={16} stroke={1.5} />}
+                            >
+                              Administration
+                            </Menu.Item>
+                          </Link>
+                          <Menu.Divider />
+                        </>
+                      )}
                       <Menu.Label>Settings</Menu.Label>
                       <Link href={routes.settings.index}>
                         <Menu.Item

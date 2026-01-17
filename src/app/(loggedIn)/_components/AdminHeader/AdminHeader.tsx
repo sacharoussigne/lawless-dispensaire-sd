@@ -15,7 +15,8 @@ import { useState } from 'react';
 import { AuthSession } from '@/types/session';
 import { routes } from '@/types/routes';
 import Link from 'next/link';
-import { IconSettings, IconLogout } from '@tabler/icons-react';
+import { IconSettings, IconLogout, IconUser } from '@tabler/icons-react';
+import { usePermissions } from '@/app/_contexts/PermissionsContext';
 
 export default function AdminHeader({
   session,
@@ -24,6 +25,7 @@ export default function AdminHeader({
 }>) {
   const router = useRouter();
   const [userMenuOpened, setUserMenuOpened] = useState(false);
+  const { permissions, userRole } = usePermissions();
 
   const handleLogout = async () => {
     await authClient.signOut({
@@ -64,6 +66,16 @@ export default function AdminHeader({
                       </Button>
                     </Menu.Target>
                     <Menu.Dropdown>
+                      {userRole === 'admin' && (
+                        <>
+                          <Link href={routes.admin.users}>
+                            <Menu.Item>
+                              Gestion Utilisateur
+                            </Menu.Item>
+                          </Link>
+                          <Menu.Divider />
+                        </>
+                      )}
                       <Menu.Label>Gestion</Menu.Label>
                       <Link href={routes.admin.locations}>
                         <Menu.Item>
@@ -115,6 +127,18 @@ export default function AdminHeader({
                       </UnstyledButton>
                     </Menu.Target>
                     <Menu.Dropdown>
+                      {permissions?.application.access && (
+                        <>
+                          <Link href={routes.stock.index}>
+                            <Menu.Item
+                              leftSection={<IconUser size={16} stroke={1.5} />}
+                            >
+                              Espace Utilisateur
+                            </Menu.Item>
+                          </Link>
+                          <Menu.Divider />
+                        </>
+                      )}
                       <Menu.Label>Settings</Menu.Label>
                       <Link href={routes.settings.index}>
                         <Menu.Item
