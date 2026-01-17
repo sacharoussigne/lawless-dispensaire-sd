@@ -1,0 +1,244 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  //   url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id
+  name          String
+  email         String
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  role          String?
+  banned        Boolean?  @default(false)
+  banReason     String?
+  banExpires    DateTime?
+  sessions      Session[]
+  accounts      Account[]
+
+  @@unique([email])
+  @@map("user")
+}
+
+model Session {
+  id             String   @id
+  expiresAt      DateTime
+  token          String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  ipAddress      String?
+  userAgent      String?
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  impersonatedBy String?
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+model CategoryItem {
+  id        String   @id @default(uuid())
+  name      String
+  color     String   @default("#ffffff")
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  items     Item[]
+
+  @@map("category_item")
+}
+
+model Item {
+  id             String            @id @default(uuid())
+  name           String
+  description    String?
+  idealQuantity  Int
+  isCraftable    Boolean           @default(false)
+  categoryId     String
+  category       CategoryItem      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  companyGroupId String?
+  companyGroup   CompanyGroup?     @relation(fields: [companyGroupId], references: [id], onDelete: SetNull)
+  order          Int               @default(0)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  stockHistory   StockHistory[]
+  craftRecipes   CraftRecipe[]     @relation("CraftedItem")
+  usedInRecipes  CraftRecipeItem[] @relation("UsedItem")
+  orderItems     OrderItem[]
+
+  @@index([categoryId])
+  @@index([companyGroupId])
+  @@map("item")
+}
+
+model StockHistory {
+  id        String   @id @default(uuid())
+  itemId    String
+  quantity  Int
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  timestamp DateTime @default(now())
+
+  @@index([itemId])
+  @@index([timestamp])
+  @@map("stock_history")
+}
+
+model Location {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  companies   Company[]
+
+  @@map("location")
+}
+
+model Company {
+  id            String                @id @default(uuid())
+  name          String
+  locationId    String
+  location      Location              @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  companyGroups CompanyGroupCompany[]
+  orders        Order[]
+
+  @@index([locationId])
+  @@map("company")
+}
+model CraftRecipe {
+  id                String            @id @default(uuid())
+  name              String
+  description       String?
+  craftedItemId     String
+  craftedItem       Item              @relation("CraftedItem", fields: [craftedItemId], references: [id], onDelete: Cascade)
+  quantity          Int
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  ingredients       CraftRecipeItem[]
+
+  @@index([craftedItemId])
+  @@map("craft_recipe")
+}
+model CraftRecipeItem {
+  id            String      @id @default(uuid())
+  craftRecipeId String
+  craftRecipe   CraftRecipe @relation(fields: [craftRecipeId], references: [id], onDelete: Cascade)
+  usedItemId    String
+  usedItem      Item        @relation("UsedItem", fields: [usedItemId], references: [id], onDelete: Cascade)
+  quantity      Int
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([craftRecipeId])
+  @@index([usedItemId])
+  @@map("craft_recipe_item")
+}
+
+model CompanyGroup {
+  id          String                @id @default(uuid())
+  name        String
+  description String?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  items       Item[]
+  companies   CompanyGroupCompany[]
+
+  @@map("company_group")
+}
+
+model CompanyGroupCompany {
+  id             String       @id @default(uuid())
+  companyGroupId String
+  companyGroup   CompanyGroup @relation(fields: [companyGroupId], references: [id], onDelete: Cascade)
+  companyId      String
+  company        Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([companyGroupId, companyId])
+  @@index([companyGroupId])
+  @@index([companyId])
+  @@map("company_group_company")
+}
+
+enum OrderStatus {
+  DRAFT
+  LETTER_SENT
+  PROCESSING
+  READY
+  COMPLETED
+  CANCELLED
+}
+
+model Order {
+  id        String       @id @default(uuid())
+  name      String
+  status    OrderStatus  @default(DRAFT)
+  details   String?
+  companyId String
+  company   Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  items     OrderItem[]
+
+  @@index([companyId])
+  @@index([status])
+  @@map("order")
+}
+
+model OrderItem {
+  id        String   @id @default(uuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  itemId    String
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  quantity  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orderId, itemId])
+  @@index([orderId])
+  @@index([itemId])
+  @@map("order_item")
+}
