@@ -3,49 +3,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { authClient } from '@/lib/client';
 import { checkRolePermission } from '@/lib/auth/permissions';
-
-interface Permissions {
-  // Stock permissions
-  stock: {
-    view: boolean;
-    create: boolean;
-    update: boolean;
-    delete: boolean;
-    craftRead: boolean;
-    craftWrite: boolean;
-  };
-  // Orders permissions
-  orders: {
-    view: boolean;
-    create: boolean;
-    update: boolean;
-    delete: boolean;
-  };
-  // Items permissions
-  items: {
-    view: boolean;
-    create: boolean;
-    update: boolean;
-    delete: boolean;
-  };
-  // Companies permissions
-  companies: {
-    view: boolean;
-    create: boolean;
-    update: boolean;
-    delete: boolean;
-  };
-  // Application permission
-  application: {
-    access: boolean;
-  };
-}
-
-interface PermissionsContextType {
-  permissions: Permissions | null;
-  userRole: string | null;
-  loading: boolean;
-}
+import { Permissions, PermissionsContextType } from '@/types/permissions';
 
 const PermissionsContext = createContext<PermissionsContextType>({
   permissions: null,
@@ -81,20 +39,9 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
             update: checkRolePermission(role, 'orders', 'update'),
             delete: checkRolePermission(role, 'orders', 'delete'),
           },
-          items: {
-            view: checkRolePermission(role, 'items', 'view'),
-            create: checkRolePermission(role, 'items', 'create'),
-            update: checkRolePermission(role, 'items', 'update'),
-            delete: checkRolePermission(role, 'items', 'delete'),
-          },
-          companies: {
-            view: checkRolePermission(role, 'companies', 'view'),
-            create: checkRolePermission(role, 'companies', 'create'),
-            update: checkRolePermission(role, 'companies', 'update'),
-            delete: checkRolePermission(role, 'companies', 'delete'),
-          },
           application: {
             access: checkRolePermission(role, 'application', 'access'),
+            management: checkRolePermission(role, 'application', 'management'),
           },
         };
 

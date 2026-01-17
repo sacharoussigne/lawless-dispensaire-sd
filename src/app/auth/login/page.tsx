@@ -12,7 +12,7 @@ export default async function LoginPage() {
   const session = await getAuthSession();
 
   if (session) {
-    redirect(routes.languages.index);
+    redirect(routes.stock.index);
   }
   return <Login />;
 }

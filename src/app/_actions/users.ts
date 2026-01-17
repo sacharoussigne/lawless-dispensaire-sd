@@ -3,6 +3,7 @@
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
 import { z } from 'zod';
+import prisma from '@/lib/prisma';
 
 const createUserSchema = z.object({
   email: z.string().email(),
@@ -62,7 +63,7 @@ export async function listUsers(params?: {
 export async function createUser(data: z.infer<typeof createUserSchema>) {
   try {
     const validated = createUserSchema.parse(data);
-    
+
     const result = await auth.api.createUser({
       body: {
         email: validated.email,
@@ -94,12 +95,14 @@ export async function createUser(data: z.infer<typeof createUserSchema>) {
 export async function updateUser(data: z.infer<typeof updateUserSchema>) {
   try {
     const validated = updateUserSchema.parse(data);
-    
-    const result = await auth.api.updateUser({
+
+    const result = await auth.api.adminUpdateUser({
       body: {
-        id: validated.id,
-        name: validated.name,
-        role: validated.role,
+        userId: validated.id,
+        data: {
+          name: validated.name,
+          role: validated.role,
+        }
       },
       headers: await headers(),
     });
@@ -125,11 +128,11 @@ export async function updateUser(data: z.infer<typeof updateUserSchema>) {
 export async function setPassword(data: z.infer<typeof setPasswordSchema>) {
   try {
     const validated = setPasswordSchema.parse(data);
-    
-    const result = await auth.api.setPassword({
+
+    const result = await auth.api.setUserPassword({
       body: {
         userId: validated.userId,
-        password: validated.password,
+        newPassword: validated.password,
       },
       headers: await headers(),
     });
@@ -155,17 +158,18 @@ export async function setPassword(data: z.infer<typeof setPasswordSchema>) {
 export async function deleteUser(data: z.infer<typeof deleteUserSchema>) {
   try {
     const validated = deleteUserSchema.parse(data);
-    
-    const result = await auth.api.deleteUser({
-      body: {
+
+    // Suppression directe via Prisma
+    // Les sessions et accounts seront supprimés automatiquement grâce à onDelete: Cascade
+    await prisma.user.delete({
+      where: {
         id: validated.id,
       },
-      headers: await headers(),
     });
 
     return {
       status: 200,
-      data: result,
+      data: { success: true },
     };
   } catch (error: any) {
     if (error instanceof z.ZodError) {
@@ -183,7 +187,7 @@ export async function deleteUser(data: z.infer<typeof deleteUserSchema>) {
 
 export async function impersonateUser(userId: string) {
   try {
-    const result = await auth.api.impersonate({
+    const result = await auth.api.impersonateUser({
       body: {
         userId,
       },
