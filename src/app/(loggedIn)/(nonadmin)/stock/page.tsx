@@ -259,13 +259,17 @@ export default function StockPage() {
   const totalItems = items.length;
 
   // Vérifier s'il y a des items non-craftables avec groupe d'entreprise qui ont besoin d'être restockés
-  const itemsNeedingRestock = items.filter(
-    (item) =>
-      !item.isCraftable &&
-      item.companyGroupId !== null &&
-      item.stockToday !== null &&
-      item.stockToday < item.idealQuantity
-  );
+  const itemsNeedingRestock = items.filter((item) => {
+    if (!item.isCraftable && item.companyGroupId !== null) {
+      // Utiliser stockToday si disponible, sinon stockYesterday si disponible
+      const currentStock = item.stockToday !== null 
+        ? item.stockToday 
+        : (item.stockYesterday !== null ? item.stockYesterday : null);
+      
+      return currentStock !== null && currentStock < item.idealQuantity;
+    }
+    return false;
+  });
   const hasItemsNeedingRestock = itemsNeedingRestock.length > 0;
 
   return (
@@ -376,7 +380,14 @@ export default function StockPage() {
                   <Table.Tbody>
                     {categoryData.items.map((item) => {
                       const hasStockToday = item.stockToday !== null;
-                      const isStockLow = item.stockToday !== null && item.stockToday < item.idealQuantity;
+                      
+                      // Déterminer le stock à utiliser pour vérifier si c'est bas
+                      // Utiliser stockToday si disponible, sinon stockYesterday si disponible
+                      const currentStock = item.stockToday !== null 
+                        ? item.stockToday 
+                        : (item.stockYesterday !== null ? item.stockYesterday : null);
+                      
+                      const isStockLow = currentStock !== null && currentStock < item.idealQuantity;
                       
                       // Déterminer la couleur selon le type d'item
                       let backgroundColor: string | undefined = undefined;
