@@ -5,6 +5,7 @@ import { hasToBeLoggedOutMiddleware } from './middlewares/hasToBeLoggedOutMiddle
 import { hasToBeLoggedInMiddleware } from './middlewares/hasToBeLoggedInMiddleware';
 import { hasApplicationAccessMiddleware } from './middlewares/hasApplicationAccessMiddleware';
 import { hasManagementAccessMiddleware } from './middlewares/hasManagementAccessMiddleware';
+import { hasAdminRoleMiddleware } from './middlewares/hasAdminRoleMiddleware';
 import { chain } from './middlewares/chain';
 
 export async function middleware(req: NextRequest) {
@@ -26,6 +27,11 @@ export async function middleware(req: NextRequest) {
     middlewares.push(hasToBeLoggedInMiddleware);
     middlewares.push(hasApplicationAccessMiddleware);
     middlewares.push(hasManagementAccessMiddleware);
+    
+    // Pour la page users, on vérifie aussi que l'utilisateur a le rôle admin
+    if (pathname === routes.admin.users) {
+      middlewares.push(hasAdminRoleMiddleware);
+    }
   } else {
     // Pour les autres routes, on vérifie d'abord la connexion, puis l'accès à l'application
     middlewares.push(hasToBeLoggedInMiddleware);

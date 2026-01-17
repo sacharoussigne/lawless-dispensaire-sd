@@ -11,6 +11,7 @@ export const routes = {
     companyGroups: '/admin/companygroups',
     categoryItems: '/admin/categoryitems',
     items: '/admin/items',
+    users: '/admin/users',
   },
   api: {},
   settings: {

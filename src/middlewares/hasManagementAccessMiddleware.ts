@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { routes } from "@/types/routes";
-import { forbiddenResponse } from "@/lib/response";
 import { checkRolePermission } from "@/lib/auth/permissions";
 
 export async function hasManagementAccessMiddleware(
@@ -17,11 +15,8 @@ export async function hasManagementAccessMiddleware(
   const hasManagementAccess = checkRolePermission(userRole, "application", "management");
 
   if (!hasManagementAccess) {
-    if (request.headers.get("content-type") === "application/json") {
-      return forbiddenResponse({ error: "Vous n'avez pas accès à la gestion de l'application" });
-    }
-    // Rediriger vers la page d'accès refusé au management
-    return routes.redirect(request, routes.auth.noManagementAccess);
+    // Retourner 403 Forbidden sans contenu
+    return new NextResponse(null, { status: 403 });
   }
 
   return NextResponse.next();
