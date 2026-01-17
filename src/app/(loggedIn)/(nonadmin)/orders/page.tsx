@@ -134,9 +134,9 @@ export default function OrdersPage() {
       
       let message = 'Commande modifiée avec succès';
       if (values.status === OrderStatusEnum.COMPLETED && addToStock) {
-        message += '. Les items ont été ajoutés au stock.';
+        message += '. Les objets ont été ajoutés au stock.';
       } else if (values.status === OrderStatusEnum.COMPLETED && !addToStock && stockCheckResult?.allHaveStockToday) {
-        message += '. Les items n\'ont pas été ajoutés au stock.';
+        message += '. Les objets n\'ont pas été ajoutés au stock.';
       }
       
       notifications.show({
@@ -186,7 +186,7 @@ export default function OrdersPage() {
         const data = handleAction(result);
         if (data) {
           setStockCheckResult(data);
-          // Si tous les items ont un stock, proposer d'ajouter automatiquement
+          // Si tous les objets ont un stock, proposer d'ajouter automatiquement
           if (data.allHaveStockToday) {
             setAddToStock(true);
           } else {
@@ -335,7 +335,7 @@ export default function OrdersPage() {
             },
             {
               accessor: 'items',
-              title: "Nombre d'items",
+              title: "Nombre d'objets",
               render: (order: OrderWithRelations) => order.items.length,
             },
             {
@@ -443,18 +443,18 @@ export default function OrdersPage() {
                   <>
                     {!stockCheckResult.allHaveStockToday ? (
                       <Text size="sm" c="orange" fw={500}>
-                        ⚠️ Le stock d'aujourd'hui n'est pas fait pour certains items. Les items ne peuvent pas être ajoutés automatiquement au stock.
+                        ⚠️ Le stock d'aujourd'hui n'est pas fait pour certains objets. Les objets ne peuvent pas être ajoutés automatiquement au stock.
                       </Text>
                     ) : (
                       <Checkbox
-                        label="Ajouter automatiquement les items au stock d'aujourd'hui"
+                        label="Ajouter automatiquement les objets au stock d'aujourd'hui"
                         checked={addToStock}
                         onChange={(event) => setAddToStock(event.currentTarget.checked)}
                       />
                     )}
                     {stockCheckResult.items.some((item) => !item.hasStockToday) && (
                       <Text size="xs" c="dimmed" mt="xs">
-                        Items sans stock d'aujourd'hui :{' '}
+                        Objets sans stock d'aujourd'hui :{' '}
                         {stockCheckResult.items
                           .filter((item) => !item.hasStockToday)
                           .map((item) => item.itemName)
@@ -539,11 +539,11 @@ export default function OrdersPage() {
               </Text>
             </Group>
             <Divider />
-            <Text fw={500}>Items :</Text>
+            <Text fw={500}>Objets :</Text>
             <Table striped highlightOnHover>
               <Table.Thead>
                 <Table.Tr>
-                  <Table.Th>Item</Table.Th>
+                  <Table.Th>Objet</Table.Th>
                   <Table.Th>Quantité</Table.Th>
                 </Table.Tr>
               </Table.Thead>

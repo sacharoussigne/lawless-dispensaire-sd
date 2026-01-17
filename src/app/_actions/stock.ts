@@ -98,7 +98,7 @@ export async function getItemsWithStock() {
       data: itemsWithStock,
     };
   } catch (error) {
-    return actionErrorParser(error, 'Erreur lors de la récupération des items avec stock');
+    return actionErrorParser(error, 'Erreur lors de la récupération des objets avec stock');
   }
 }
 
@@ -418,7 +418,7 @@ export async function addOrderItemsToStock(orderId: string) {
       data: { success: true },
     };
   } catch (error) {
-    return actionErrorParser(error, 'Erreur lors de l\'ajout des items au stock');
+    return actionErrorParser(error, 'Erreur lors de l\'ajout des objets au stock');
   }
 }
 
@@ -500,7 +500,7 @@ export async function getItemsWithStockForDate(date: Date) {
       data: itemsWithStock,
     };
   } catch (error) {
-    return actionErrorParser(error, 'Erreur lors de la récupération des items avec stock');
+    return actionErrorParser(error, 'Erreur lors de la récupération des objets avec stock');
   }
 }
 

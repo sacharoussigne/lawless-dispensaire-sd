@@ -18,7 +18,7 @@ const createOrderSchema = z.object({
       itemId: z.string().uuid('ID d\'item invalide'),
       quantity: z.number().int().min(1, 'La quantité doit être au moins 1'),
     })
-  ).min(1, 'Au moins un item est requis'),
+  ).min(1, 'Au moins un objet est requis'),
 });
 
 /**

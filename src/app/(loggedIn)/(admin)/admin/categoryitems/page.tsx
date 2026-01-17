@@ -97,7 +97,7 @@ export default function CategoryItemsPage() {
     } catch (error: any) {
       notifications.show({
         title: 'Erreur',
-        message: error.message || 'Erreur lors du chargement des catégories d\'items',
+        message: error.message || 'Erreur lors du chargement des catégories d\'objets',
         color: 'red',
       });
     } finally {
@@ -129,8 +129,8 @@ export default function CategoryItemsPage() {
       notifications.show({
         title: 'Succès',
         message: editingCategoryItem
-          ? 'Catégorie d\'item modifiée avec succès'
-          : 'Catégorie d\'item créée avec succès',
+          ? 'Catégorie d\'objet modifiée avec succès'
+          : 'Catégorie d\'objet créée avec succès',
         color: 'green',
       });
       setModalOpened(false);
@@ -167,7 +167,7 @@ export default function CategoryItemsPage() {
       handleAction(result);
       notifications.show({
         title: 'Succès',
-        message: 'Catégorie d\'item supprimée avec succès',
+        message: 'Catégorie d\'objet supprimée avec succès',
         color: 'green',
       });
       setDeleteModalOpened(false);
@@ -273,7 +273,7 @@ export default function CategoryItemsPage() {
   return (
     <Container size="xl" py="xl">
       <Group justify="space-between" mb="xl">
-        <Title order={1}>Catégories d'items</Title>
+        <Title order={1}>Catégories d'objets</Title>
         <Group>
           <Button
             variant="light"
@@ -283,7 +283,7 @@ export default function CategoryItemsPage() {
             Réordonner
           </Button>
           <Button leftSection={<IconPlus size={16} />} onClick={openCreateModal}>
-            Créer une catégorie d'item
+            Créer une catégorie d'objet
           </Button>
         </Group>
       </Group>
@@ -350,7 +350,7 @@ export default function CategoryItemsPage() {
             },
             {
               accessor: 'items.length',
-              title: "Nombre d'items",
+              title: "Nombre d'objets",
               render: (categoryItem: CategoryItemWithItems) => categoryItem.items.length,
             },
             {
@@ -382,8 +382,8 @@ export default function CategoryItemsPage() {
           fetching={loading}
           noRecordsText={
             nameFilter
-              ? 'Aucune catégorie d\'item trouvée avec ces filtres'
-              : 'Aucune catégorie d\'item trouvée'
+              ? 'Aucune catégorie d\'objet trouvée avec ces filtres'
+              : 'Aucune catégorie d\'objet trouvée'
           }
           striped
           highlightOnHover
@@ -394,7 +394,7 @@ export default function CategoryItemsPage() {
           onPageChange={(p) => setPage(p)}
           paginationSize="sm"
           paginationText={({ from, to, totalRecords }) =>
-            `${from} - ${to} sur ${totalRecords} catégories d'items`
+            `${from} - ${to} sur ${totalRecords} catégories d'objets`
           }
         />
       </Paper>
@@ -407,14 +407,14 @@ export default function CategoryItemsPage() {
           form.reset();
           setEditingCategoryItem(null);
         }}
-        title={editingCategoryItem ? 'Modifier la catégorie d\'item' : 'Créer une catégorie d\'item'}
+        title={editingCategoryItem ? 'Modifier la catégorie d\'objet' : 'Créer une catégorie d\'objet'}
         size="md"
       >
         <form onSubmit={form.onSubmit(handleSubmit)}>
           <Stack>
             <TextInput
               label="Nom"
-              placeholder="Nom de la catégorie d'item"
+              placeholder="Nom de la catégorie d'objet"
               required
               {...form.getInputProps('name')}
             />
@@ -456,11 +456,11 @@ export default function CategoryItemsPage() {
       >
         <Stack>
           <p>
-            Êtes-vous sûr de vouloir supprimer la catégorie d'item{' '}
+            Êtes-vous sûr de vouloir supprimer la catégorie d'objet{' '}
             <strong>{categoryItemToDelete?.name}</strong> ?
             {categoryItemToDelete && categoryItemToDelete.items.length > 0 && (
               <span style={{ color: 'red', display: 'block', marginTop: '8px' }}>
-                Attention : Cette catégorie contient {categoryItemToDelete.items.length} item(s).
+                Attention : Cette catégorie contient {categoryItemToDelete.items.length} objet(s).
               </span>
             )}
           </p>

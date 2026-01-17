@@ -175,13 +175,13 @@ export default function CraftModal({ opened, onClose, items, canCraft = true, on
     <Modal
       opened={opened}
       onClose={handleClose}
-      title="Craft d'item"
+      title="Craft d'objet"
       size="lg"
     >
       <Stack>
         <Select
-          label="Item à craft"
-          placeholder="Sélectionner un item craftable"
+          label="Objet à craft"
+          placeholder="Sélectionner un objet craftable"
           data={items
             .filter((item) => item.isCraftable)
             .sort((a, b) => {
@@ -206,7 +206,7 @@ export default function CraftModal({ opened, onClose, items, canCraft = true, on
           <>
             {!hasCraftItemStock ? (
               <Text c="red" size="sm" mt="md">
-                Aucun stock disponible pour cet item.
+                Aucun stock disponible pour cet objet.
               </Text>
             ) : (
               <>
@@ -340,7 +340,7 @@ export default function CraftModal({ opened, onClose, items, canCraft = true, on
 
         {selectedCraftItem && craftRecipes.length === 0 && !loadingRecipes && (
           <Text c="dimmed" size="sm">
-            Aucune recette disponible pour cet item
+            Aucune recette disponible pour cet objet
           </Text>
         )}
 

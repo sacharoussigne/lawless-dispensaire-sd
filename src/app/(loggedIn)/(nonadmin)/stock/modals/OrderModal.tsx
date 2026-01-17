@@ -421,13 +421,13 @@ export default function OrderModal({
               minRows={3}
             />
 
-            <Text fw={500}>Items de la commande</Text>
+            <Text fw={500}>Objets de la commande</Text>
 
             {orderItems.length > 0 ? (
               <Table striped highlightOnHover>
                 <Table.Thead>
                   <Table.Tr>
-                    <Table.Th>Item</Table.Th>
+                    <Table.Th>Objet</Table.Th>
                     {prefillItemsNeedingRestock && items.length > 0 && items[0].stockToday !== null && (
                       <>
                         <Table.Th>Stock actuel</Table.Th>
@@ -487,14 +487,14 @@ export default function OrderModal({
               </Table>
             ) : (
               <Text c="dimmed" ta="center" py="md">
-                Aucun item dans la commande. Utilisez le champ ci-dessous pour ajouter un item.
+                Aucun objet dans la commande. Utilisez le champ ci-dessous pour ajouter un objet.
               </Text>
             )}
 
             {selectedCompanyGroupId && canAddMoreItems && (
               <Select
-                label="Ajouter un item"
-                placeholder="Sélectionner un item à ajouter"
+                label="Ajouter un objet"
+                placeholder="Sélectionner un objet à ajouter"
                 data={availableItems
                   .filter((item) => !orderItemIds.has(item.id))
                   .map((item) => ({ value: item.id, label: item.name }))}

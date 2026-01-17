@@ -166,7 +166,7 @@ function ItemsPageContent() {
     } catch (error: any) {
       notifications.show({
         title: 'Erreur',
-        message: error.message || 'Erreur lors du chargement des items',
+        message: error.message || 'Erreur lors du chargement des objets',
         color: 'red',
       });
     } finally {
@@ -244,8 +244,8 @@ function ItemsPageContent() {
       notifications.show({
         title: 'Succès',
         message: editingItem
-          ? 'Item modifié avec succès'
-          : 'Item créé avec succès',
+          ? 'Objet modifié avec succès'
+          : 'Objet créé avec succès',
         color: 'green',
       });
       setModalOpened(false);
@@ -286,7 +286,7 @@ function ItemsPageContent() {
       handleAction(result);
       notifications.show({
         title: 'Succès',
-        message: 'Item supprimé avec succès',
+        message: 'Objet supprimé avec succès',
         color: 'green',
       });
       setDeleteModalOpened(false);
@@ -338,7 +338,7 @@ function ItemsPageContent() {
       handleAction(result);
       notifications.show({
         title: 'Succès',
-        message: 'Ordre des items mis à jour',
+        message: 'Ordre des objets mis à jour',
         color: 'green',
       });
       setReorderModalOpened(false);
@@ -635,7 +635,7 @@ function ItemsPageContent() {
   return (
     <Container size="xl" py="xl">
       <Group justify="space-between" mb="xl">
-        <Title order={1}>Items</Title>
+        <Title order={1}>Objets</Title>
         <Group>
           <Button
             variant="light"
@@ -645,7 +645,7 @@ function ItemsPageContent() {
             Réordonner
           </Button>
           <Button leftSection={<IconPlus size={16} />} onClick={openCreateModal}>
-            Créer un item
+            Créer un objet
           </Button>
         </Group>
       </Group>
@@ -925,8 +925,8 @@ function ItemsPageContent() {
             craftableFilter ||
             nameFilter ||
             descriptionFilter
-              ? 'Aucun item trouvé avec ces filtres'
-              : 'Aucun item trouvé'
+              ? 'Aucun objet trouvé avec ces filtres'
+              : 'Aucun objet trouvé'
           }
           striped
           highlightOnHover
@@ -937,7 +937,7 @@ function ItemsPageContent() {
           onPageChange={(p) => setPage(p)}
           paginationSize="sm"
           paginationText={({ from, to, totalRecords }) =>
-            `${from} - ${to} sur ${totalRecords} items`
+            `${from} - ${to} sur ${totalRecords} objets`
           }
         />
       </Paper>
@@ -950,20 +950,20 @@ function ItemsPageContent() {
           form.reset();
           setEditingItem(null);
         }}
-        title={editingItem ? "Modifier l'item" : 'Créer un item'}
+        title={editingItem ? "Modifier l'objet" : 'Créer un objet'}
         size="md"
       >
         <form onSubmit={form.onSubmit(handleSubmit)}>
           <Stack>
             <TextInput
               label="Nom"
-              placeholder="Nom de l'item"
+              placeholder="Nom de l'objet"
               required
               {...form.getInputProps('name')}
             />
             <Textarea
               label="Description"
-              placeholder="Description de l'item (optionnel)"
+              placeholder="Description de l'objet (optionnel)"
               rows={4}
               {...form.getInputProps('description')}
             />
@@ -1027,7 +1027,7 @@ function ItemsPageContent() {
       >
         <Stack>
           <p>
-            Êtes-vous sûr de vouloir supprimer l'item{' '}
+            Êtes-vous sûr de vouloir supprimer l'objet{' '}
             <strong>{itemToDelete?.name}</strong> ?
           </p>
           <Group justify="flex-end" mt="md">
@@ -1060,7 +1060,7 @@ function ItemsPageContent() {
       >
         <Stack>
           <Group justify="space-between">
-            <Text>Liste des recettes de craft pour cet item</Text>
+            <Text>Liste des recettes de craft pour cet objet</Text>
             <Button
               leftSection={<IconPlus size={16} />}
               onClick={() => handleOpenCraftRecipeModal()}
@@ -1072,7 +1072,7 @@ function ItemsPageContent() {
           {loadingCraftRecipes ? (
             <Text>Chargement...</Text>
           ) : craftRecipes.length === 0 ? (
-            <Text c="dimmed">Aucune recette de craft pour cet item</Text>
+            <Text c="dimmed">Aucune recette de craft pour cet objet</Text>
           ) : (
             <Table striped highlightOnHover>
               <Table.Thead>
@@ -1169,7 +1169,7 @@ function ItemsPageContent() {
               <Group key={index} align="flex-end" gap="xs">
                 <Select
                   label={`Ingrédient ${index + 1}`}
-                  placeholder="Sélectionner un item"
+                  placeholder="Sélectionner un objet"
                   data={items
                     .filter((item) => item.id !== selectedItemForCraft?.id)
                     .sort((a, b) => {
@@ -1278,14 +1278,14 @@ function ItemsPageContent() {
           setSelectedCategoryForReorder(null);
           setReorderItemsList([]);
         }}
-        title="Réordonner les items"
+        title="Réordonner les objets"
         size="md"
       >
         <Stack>
           {!selectedCategoryForReorder ? (
             <>
               <Text size="sm" c="dimmed" mb="md">
-                Sélectionnez une catégorie pour réordonner ses items
+                Sélectionnez une catégorie pour réordonner ses objets
               </Text>
               <Select
                 label="Catégorie"
@@ -1317,7 +1317,7 @@ function ItemsPageContent() {
                 </Button>
               </Group>
               <Text size="sm" c="dimmed" mb="md">
-                Glissez-déposez les items pour les réordonner
+                Glissez-déposez les objets pour les réordonner
               </Text>
               <DndContext
                 sensors={sensors}

@@ -80,7 +80,7 @@ export default function OverwriteStockPage() {
     } catch (error: any) {
       notifications.show({
         title: 'Erreur',
-        message: error.message || 'Erreur lors du chargement des items',
+        message: error.message || 'Erreur lors du chargement des objets',
         color: 'red',
       });
       // En cas d'erreur, réinitialiser aussi
@@ -194,7 +194,7 @@ export default function OverwriteStockPage() {
               columns={[
                 {
                   accessor: 'name',
-                  title: 'Item',
+                  title: 'Objet',
                   render: (item: ItemWithStock) => (
                     <Text fw={500}>{item.name}</Text>
                   ),
@@ -231,7 +231,7 @@ export default function OverwriteStockPage() {
                 },
               ]}
               fetching={loading}
-              noRecordsText="Aucun item trouvé"
+              noRecordsText="Aucun objet trouvé"
             />
 
             <Group justify="flex-end" mt="md">

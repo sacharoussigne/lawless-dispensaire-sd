@@ -45,7 +45,7 @@ export default function StockPage() {
     } catch (error: any) {
       notifications.show({
         title: 'Erreur',
-        message: error.message || 'Erreur lors du chargement des items',
+        message: error.message || 'Erreur lors du chargement des objets',
         color: 'red',
       });
     } finally {
@@ -279,7 +279,7 @@ export default function StockPage() {
               variant="light"
               size="lg"
             >
-              {itemsWithStockToday}/{totalItems} items stockés aujourd'hui
+              {itemsWithStockToday}/{totalItems} objets stockés aujourd'hui
             </Badge>
           )}
           {!isEditing ? (
@@ -341,7 +341,7 @@ export default function StockPage() {
       {loading ? (
         <Text>Chargement...</Text>
       ) : sortedCategories.length === 0 ? (
-        <Text c="dimmed">Aucun item trouvé</Text>
+        <Text c="dimmed">Aucun objet trouvé</Text>
       ) : (
         <Stack gap="xl">
           {sortedCategories.map((categoryData) => {
@@ -360,7 +360,7 @@ export default function StockPage() {
                     {categoryData.category.name}
                   </Badge>
                   <Text c="dimmed" size="sm">
-                    {categoryData.items.length} item(s)
+                    {categoryData.items.length} objet(s)
                   </Text>
                 </Group>
                 <Table striped highlightOnHover>
@@ -504,7 +504,7 @@ export default function StockPage() {
             if (result.status === 200 && 'data' in result && result.data && 'quantityProduced' in result.data) {
               notifications.show({
                 title: 'Succès',
-                message: `Craft effectué avec succès ! ${result.data.quantityProduced} item(s) produit(s).`,
+                message: `Craft effectué avec succès ! ${result.data.quantityProduced} objet(s) produit(s).`,
                 color: 'green',
               });
               setCraftModalOpened(false);

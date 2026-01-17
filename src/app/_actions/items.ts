@@ -85,7 +85,7 @@ export async function createItem(data: {
       data: item,
     };
   } catch (error) {
-    return actionErrorParser(error, 'Erreur lors de la création de l\'item');
+    return actionErrorParser(error, 'Erreur lors de la création de l\'objet');
   }
 }
 
@@ -139,7 +139,7 @@ export async function getItems() {
       data: items,
     };
   } catch (error) {
-    return actionErrorParser(error, 'Erreur lors de la récupération des items');
+    return actionErrorParser(error, 'Erreur lors de la récupération des objets');
   }
 }
 
@@ -185,7 +185,7 @@ export async function updateItem(data: {
       data: item,
     };
   } catch (error) {
-    return actionErrorParser(error, 'Erreur lors de la modification de l\'item');
+    return actionErrorParser(error, 'Erreur lors de la modification de l\'objet');
   }
 }
 
@@ -215,7 +215,7 @@ export async function deleteItem(data: { id: string }) {
       data: { success: true },
     };
   } catch (error) {
-    return actionErrorParser(error, 'Erreur lors de la suppression de l\'item');
+    return actionErrorParser(error, 'Erreur lors de la suppression de l\'objet');
   }
 }
 
@@ -257,7 +257,7 @@ export async function reorderItems(data: { items: { id: string; order: number }[
       data: { success: true },
     };
   } catch (error) {
-    return actionErrorParser(error, 'Erreur lors du réordonnancement des items');
+    return actionErrorParser(error, 'Erreur lors du réordonnancement des objets');
   }
 }
 

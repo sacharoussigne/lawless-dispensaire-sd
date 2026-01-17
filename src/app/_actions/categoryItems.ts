@@ -74,7 +74,7 @@ export async function createCategoryItem(data: {
       data: categoryItem,
     };
   } catch (error) {
-    return actionErrorParser(error, 'Erreur lors de la création de la catégorie d\'item');
+    return actionErrorParser(error, 'Erreur lors de la création de la catégorie d\'objet');
   }
 }
 
@@ -110,7 +110,7 @@ export async function getCategoryItems() {
       data: categoryItems,
     };
   } catch (error) {
-    return actionErrorParser(error, 'Erreur lors de la récupération des catégories d\'items');
+    return actionErrorParser(error, 'Erreur lors de la récupération des catégories d\'objets');
   }
 }
 
@@ -148,7 +148,7 @@ export async function updateCategoryItem(data: {
       data: categoryItem,
     };
   } catch (error) {
-    return actionErrorParser(error, 'Erreur lors de la modification de la catégorie d\'item');
+    return actionErrorParser(error, 'Erreur lors de la modification de la catégorie d\'objet');
   }
 }
 
@@ -178,7 +178,7 @@ export async function deleteCategoryItem(data: { id: string }) {
       data: { success: true },
     };
   } catch (error) {
-    return actionErrorParser(error, 'Erreur lors de la suppression de la catégorie d\'item');
+    return actionErrorParser(error, 'Erreur lors de la suppression de la catégorie d\'objet');
   }
 }
 
@@ -212,7 +212,7 @@ export async function reorderCategoryItems(data: { items: { id: string; order: n
       data: { success: true },
     };
   } catch (error) {
-    return actionErrorParser(error, 'Erreur lors du réordonnancement des catégories d\'items');
+    return actionErrorParser(error, 'Erreur lors du réordonnancement des catégories d\'objets');
   }
 }
 
