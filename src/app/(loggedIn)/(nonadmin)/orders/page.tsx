@@ -17,6 +17,7 @@ import {
   Text,
   Table,
   Divider,
+  Checkbox,
 } from '@mantine/core';
 import { DataTable } from 'mantine-datatable';
 import { useForm } from '@mantine/form';
@@ -28,6 +29,7 @@ import { handleApiZodError } from '@/lib/services/zod';
 import { ParsedZodError } from '@/lib/errors/ParsedZodError';
 import { getOrderStatusLabel, getOrderStatusColor, OrderStatusEnum } from '@/types/enum/orderStatus';
 import OrderModal from '@/app/(loggedIn)/(nonadmin)/stock/modals/OrderModal';
+import { checkOrderItemsStockToday } from '@/app/_actions/stock';
 import type { Order } from '@prisma/client';
 
 interface OrderItem {
@@ -62,6 +64,12 @@ export default function OrdersPage() {
   const [nameFilter, setNameFilter] = useState<string>('');
   const [page, setPage] = useState(1);
   const [pageSize] = useState(10);
+  const [addToStock, setAddToStock] = useState(false);
+  const [stockCheckResult, setStockCheckResult] = useState<{
+    allHaveStockToday: boolean;
+    items: Array<{ itemId: string; itemName: string; hasStockToday: boolean }>;
+  } | null>(null);
+  const [checkingStock, setCheckingStock] = useState(false);
 
   const form = useForm({
     initialValues: {
@@ -116,17 +124,28 @@ export default function OrdersPage() {
         name: values.name,
         status: values.status,
         details: values.details || undefined,
+        addToStock: values.status === OrderStatusEnum.COMPLETED ? addToStock : undefined,
       });
 
       handleAction(result);
+      
+      let message = 'Commande modifiée avec succès';
+      if (values.status === OrderStatusEnum.COMPLETED && addToStock) {
+        message += '. Les items ont été ajoutés au stock.';
+      } else if (values.status === OrderStatusEnum.COMPLETED && !addToStock && stockCheckResult?.allHaveStockToday) {
+        message += '. Les items n\'ont pas été ajoutés au stock.';
+      }
+      
       notifications.show({
         title: 'Succès',
-        message: 'Commande modifiée avec succès',
+        message,
         color: 'green',
       });
       setModalOpened(false);
       form.reset();
       setEditingOrder(null);
+      setAddToStock(false);
+      setStockCheckResult(null);
       loadOrders();
     } catch (error: any) {
       if (error instanceof ParsedZodError) {
@@ -148,7 +167,42 @@ export default function OrdersPage() {
       status: order.status as OrderStatusEnum,
       details: order.details || '',
     });
+    setAddToStock(false);
+    setStockCheckResult(null);
     setModalOpened(true);
+  };
+
+  // Vérifier le stock quand le statut change vers COMPLETED
+  const handleStatusChange = async (status: OrderStatusEnum) => {
+    form.setFieldValue('status', status);
+    
+    if (status === OrderStatusEnum.COMPLETED && editingOrder) {
+      setCheckingStock(true);
+      try {
+        const result = await checkOrderItemsStockToday(editingOrder.id);
+        const data = handleAction(result);
+        if (data) {
+          setStockCheckResult(data);
+          // Si tous les items ont un stock, proposer d'ajouter automatiquement
+          if (data.allHaveStockToday) {
+            setAddToStock(true);
+          } else {
+            setAddToStock(false);
+          }
+        }
+      } catch (error: any) {
+        notifications.show({
+          title: 'Erreur',
+          message: error.message || 'Erreur lors de la vérification du stock',
+          color: 'red',
+        });
+      } finally {
+        setCheckingStock(false);
+      }
+    } else {
+      setStockCheckResult(null);
+      setAddToStock(false);
+    }
   };
 
   const handleViewDetails = (order: OrderWithRelations) => {
@@ -339,6 +393,8 @@ export default function OrdersPage() {
           setModalOpened(false);
           form.reset();
           setEditingOrder(null);
+          setAddToStock(false);
+          setStockCheckResult(null);
         }}
         title={editingOrder ? 'Modifier la commande' : 'Créer une commande'}
       >
@@ -354,8 +410,41 @@ export default function OrdersPage() {
               label="Statut"
               data={statusOptions}
               required
-              {...form.getInputProps('status')}
+              value={form.values.status}
+              onChange={(value) => handleStatusChange(value as OrderStatusEnum)}
             />
+            {form.values.status === OrderStatusEnum.COMPLETED && (
+              <Stack gap="xs">
+                {checkingStock ? (
+                  <Text size="sm" c="dimmed">
+                    Vérification du stock...
+                  </Text>
+                ) : stockCheckResult ? (
+                  <>
+                    {!stockCheckResult.allHaveStockToday ? (
+                      <Text size="sm" c="orange" fw={500}>
+                        ⚠️ Le stock d'aujourd'hui n'est pas fait pour certains items. Les items ne peuvent pas être ajoutés automatiquement au stock.
+                      </Text>
+                    ) : (
+                      <Checkbox
+                        label="Ajouter automatiquement les items au stock d'aujourd'hui"
+                        checked={addToStock}
+                        onChange={(event) => setAddToStock(event.currentTarget.checked)}
+                      />
+                    )}
+                    {stockCheckResult.items.some((item) => !item.hasStockToday) && (
+                      <Text size="xs" c="dimmed" mt="xs">
+                        Items sans stock d'aujourd'hui :{' '}
+                        {stockCheckResult.items
+                          .filter((item) => !item.hasStockToday)
+                          .map((item) => item.itemName)
+                          .join(', ')}
+                      </Text>
+                    )}
+                  </>
+                ) : null}
+              </Stack>
+            )}
             <Textarea
               label="Détails (optionnel)"
               placeholder="Détails de la commande"

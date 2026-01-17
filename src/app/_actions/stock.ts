@@ -334,3 +334,168 @@ export async function craftItem(data: {
   }
 }
 
+/**
+ * Ajoute les items d'une commande au stock d'aujourd'hui
+ * Additionne les quantités aux stocks existants
+ */
+export async function addOrderItemsToStock(orderId: string) {
+  try {
+    const session = await getAuthSession();
+    if (!session) {
+      return {
+        status: 401,
+        error: 'Non autorisé',
+      };
+    }
+
+    // Récupérer la commande avec ses items
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: {
+          include: {
+            item: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      return {
+        status: 404,
+        error: 'Commande non trouvée',
+      };
+    }
+
+    const today = getTodayStart();
+    const tomorrow = getTomorrowStart();
+
+    // Pour chaque item de la commande, ajouter la quantité au stock
+    await prisma.$transaction(async (tx) => {
+      for (const orderItem of order.items) {
+        // Récupérer le stock d'aujourd'hui
+        const existingStock = await tx.stockHistory.findFirst({
+          where: {
+            itemId: orderItem.itemId,
+            timestamp: {
+              gte: today,
+              lt: tomorrow,
+            },
+          },
+          orderBy: {
+            timestamp: 'desc',
+          },
+        });
+
+        if (existingStock) {
+          // Additionner la quantité au stock existant
+          await tx.stockHistory.update({
+            where: { id: existingStock.id },
+            data: {
+              quantity: existingStock.quantity + orderItem.quantity,
+            },
+          });
+        } else {
+          // Créer un nouveau stock avec la quantité de la commande
+          await tx.stockHistory.create({
+            data: {
+              itemId: orderItem.itemId,
+              quantity: orderItem.quantity,
+            },
+          });
+        }
+      }
+    });
+
+    return {
+      status: 200,
+      data: { success: true },
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de l\'ajout des items au stock');
+  }
+}
+
+/**
+ * Vérifie si tous les items d'une commande ont un stock d'aujourd'hui
+ */
+export async function checkOrderItemsStockToday(orderId: string) {
+  try {
+    const session = await getAuthSession();
+    if (!session) {
+      return {
+        status: 401,
+        error: 'Non autorisé',
+      };
+    }
+
+    // Récupérer la commande avec ses items
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: {
+          include: {
+            item: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      return {
+        status: 404,
+        error: 'Commande non trouvée',
+      };
+    }
+
+    const today = getTodayStart();
+    const tomorrow = getTomorrowStart();
+
+    // Vérifier le stock d'aujourd'hui pour chaque item
+    const stockChecks = await Promise.all(
+      order.items.map(async (orderItem) => {
+        const stockToday = await prisma.stockHistory.findFirst({
+          where: {
+            itemId: orderItem.itemId,
+            timestamp: {
+              gte: today,
+              lt: tomorrow,
+            },
+          },
+          orderBy: {
+            timestamp: 'desc',
+          },
+        });
+
+        return {
+          itemId: orderItem.itemId,
+          itemName: orderItem.item.name,
+          hasStockToday: stockToday !== null,
+        };
+      })
+    );
+
+    const allHaveStockToday = stockChecks.every((check) => check.hasStockToday);
+
+    return {
+      status: 200,
+      data: {
+        allHaveStockToday,
+        items: stockChecks,
+      },
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de la vérification du stock');
+  }
+}
+

@@ -4,6 +4,7 @@ import { z } from 'zod/v3';
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
 import { getAuthSession } from '@/lib/auth';
+import { addOrderItemsToStock } from '@/app/_actions/stock';
 
 // Schéma de validation pour créer une commande
 const createOrderSchema = z.object({
@@ -182,6 +183,7 @@ export async function updateOrder(data: {
   name?: string;
   status?: 'DRAFT' | 'LETTER_SENT' | 'PROCESSING' | 'READY' | 'COMPLETED' | 'CANCELLED';
   details?: string;
+  addToStock?: boolean;
 }) {
   try {
     const session = await getAuthSession();
@@ -193,6 +195,12 @@ export async function updateOrder(data: {
     }
 
     const validatedData = updateOrderSchema.parse(data);
+
+    // Récupérer l'ancien statut pour vérifier si on passe à COMPLETED
+    const oldOrder = await prisma.order.findUnique({
+      where: { id: validatedData.id },
+      select: { status: true },
+    });
 
     const order = await prisma.order.update({
       where: {
@@ -222,6 +230,25 @@ export async function updateOrder(data: {
         },
       },
     });
+
+    // Si le statut passe à COMPLETED et qu'on doit ajouter au stock
+    if (
+      oldOrder &&
+      oldOrder.status !== 'COMPLETED' &&
+      validatedData.status === 'COMPLETED' &&
+      data.addToStock === true
+    ) {
+      const stockResult = await addOrderItemsToStock(validatedData.id);
+      if (stockResult.status !== 200) {
+        // Si l'ajout au stock échoue, on retourne quand même la commande mise à jour
+        // mais avec un avertissement
+        return {
+          status: 200,
+          data: order,
+          warning: 'La commande a été mise à jour mais l\'ajout au stock a échoué',
+        };
+      }
+    }
 
     return {
       status: 200,
