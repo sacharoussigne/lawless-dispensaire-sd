@@ -3,6 +3,7 @@ import { adminClient } from "better-auth/client/plugins"
 import { ac, admin, user, employee, inventory_manager } from './auth/permissions';
 
 export const authClient = createAuthClient({
+  baseURL: process.env.NEXT_PUBLIC_API_URL,
   plugins: [
     adminClient({
       ac: ac,
