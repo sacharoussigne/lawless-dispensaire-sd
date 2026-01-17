@@ -11,6 +11,7 @@ export const routes = {
     companyGroups: '/admin/companygroups',
     categoryItems: '/admin/categoryitems',
     items: '/admin/items',
+    users: '/admin/users',
   },
   api: {},
   settings: {
@@ -29,6 +30,8 @@ export const routes = {
     register: '/auth/register',
     resetPassword: '/auth/reset-password',
     verifyEmail: '/auth/verify-email',
+    noAccess: '/auth/no-access',
+    noManagementAccess: '/auth/no-management-access',
   },
   redirect: (request: NextRequest, route: string) => {
     return NextResponse.redirect(new URL(route, request.url));

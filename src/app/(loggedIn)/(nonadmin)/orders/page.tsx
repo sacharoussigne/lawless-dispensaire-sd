@@ -31,6 +31,7 @@ import { getOrderStatusLabel, getOrderStatusColor, OrderStatusEnum } from '@/typ
 import OrderModal from '@/app/(loggedIn)/(nonadmin)/stock/modals/OrderModal';
 import { checkOrderItemsStockToday } from '@/app/_actions/stock';
 import type { Order } from '@prisma/client';
+import { usePermissions } from '@/app/_contexts/PermissionsContext';
 
 interface OrderItem {
   id: string;
@@ -70,6 +71,8 @@ export default function OrdersPage() {
     items: Array<{ itemId: string; itemName: string; hasStockToday: boolean }>;
   } | null>(null);
   const [checkingStock, setCheckingStock] = useState(false);
+  
+  const { permissions } = usePermissions();
 
   const form = useForm({
     initialValues: {
@@ -278,12 +281,14 @@ export default function OrdersPage() {
     <Container size="xl" py="xl">
       <Group justify="space-between" mb="xl">
         <Title order={1}>Commandes</Title>
-        <Button
-          leftSection={<IconPlus size={16} />}
-          onClick={() => setCreateModalOpened(true)}
-        >
-          Créer une commande
-        </Button>
+        {permissions?.orders.create && (
+          <Button
+            leftSection={<IconPlus size={16} />}
+            onClick={() => setCreateModalOpened(true)}
+          >
+            Créer une commande
+          </Button>
+        )}
       </Group>
 
       {/* Tableau des commandes */}
@@ -351,34 +356,40 @@ export default function OrdersPage() {
                 const isCompleted = order.status === OrderStatusEnum.COMPLETED;
                 return (
                   <Group gap="xs" wrap="nowrap" justify="flex-end">
-                    <ActionIcon
-                      variant="light"
-                      color="blue"
-                      onClick={() => handleViewDetails(order)}
-                    >
-                      <IconEye size={16} />
-                    </ActionIcon>
-                    <ActionIcon
-                      variant="light"
-                      color="gray"
-                      onClick={() => handleEdit(order)}
-                      disabled={isCompleted}
-                      title={isCompleted ? 'Les commandes terminées ne peuvent pas être modifiées' : 'Modifier'}
-                    >
-                      <IconEdit size={16} />
-                    </ActionIcon>
-                    <ActionIcon
-                      variant="light"
-                      color="red"
-                      onClick={() => {
-                        setOrderToDelete(order);
-                        setDeleteModalOpened(true);
-                      }}
-                      disabled={isCompleted}
-                      title={isCompleted ? 'Les commandes terminées ne peuvent pas être supprimées' : 'Supprimer'}
-                    >
-                      <IconTrash size={16} />
-                    </ActionIcon>
+                    {permissions?.orders.view && (
+                      <ActionIcon
+                        variant="light"
+                        color="blue"
+                        onClick={() => handleViewDetails(order)}
+                      >
+                        <IconEye size={16} />
+                      </ActionIcon>
+                    )}
+                    {permissions?.orders.update && (
+                      <ActionIcon
+                        variant="light"
+                        color="gray"
+                        onClick={() => handleEdit(order)}
+                        disabled={isCompleted}
+                        title={isCompleted ? 'Les commandes terminées ne peuvent pas être modifiées' : 'Modifier'}
+                      >
+                        <IconEdit size={16} />
+                      </ActionIcon>
+                    )}
+                    {permissions?.orders.delete && (
+                      <ActionIcon
+                        variant="light"
+                        color="red"
+                        onClick={() => {
+                          setOrderToDelete(order);
+                          setDeleteModalOpened(true);
+                        }}
+                        disabled={isCompleted}
+                        title={isCompleted ? 'Les commandes terminées ne peuvent pas être supprimées' : 'Supprimer'}
+                      >
+                        <IconTrash size={16} />
+                      </ActionIcon>
+                    )}
                   </Group>
                 );
               },

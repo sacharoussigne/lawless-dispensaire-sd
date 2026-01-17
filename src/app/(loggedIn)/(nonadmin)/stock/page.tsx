@@ -22,9 +22,11 @@ import { notifications } from '@mantine/notifications';
 import CraftModal from './modals/CraftModal';
 import OrderModal from './modals/OrderModal';
 import type { ItemWithRelations, CategoryWithItems } from '@/types/stock';
+import { usePermissions } from '@/app/_contexts/PermissionsContext';
 
 
 export default function StockPage() {
+  const { permissions } = usePermissions();
   const [items, setItems] = useState<ItemWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -282,7 +284,7 @@ export default function StockPage() {
           )}
           {!isEditing ? (
             <Group>
-              {hasItemsNeedingRestock && (
+              {hasItemsNeedingRestock && permissions?.orders.create && (
                 <Button
                   leftSection={<IconShoppingCart size={16} />}
                   onClick={() => setOrderModalOpened(true)}
@@ -292,21 +294,25 @@ export default function StockPage() {
                   Créer une commande ({itemsNeedingRestock.length})
                 </Button>
               )}
-              <Button
-                leftSection={<IconTools size={16} />}
-                onClick={() => setCraftModalOpened(true)}
-                variant="light"
-                color="blue"
-              >
-                Craft
-              </Button>
-              <Button
-                leftSection={<IconEdit size={16} />}
-                onClick={() => setIsEditing(true)}
-                variant="light"
-              >
-                {itemsWithStockToday > 0 ? 'Mettre à jour le stock' : 'Faire le stock'}
-              </Button>
+              {(permissions?.stock.craftRead || permissions?.stock.craftWrite) && (
+                <Button
+                  leftSection={<IconTools size={16} />}
+                  onClick={() => setCraftModalOpened(true)}
+                  variant="light"
+                  color="blue"
+                >
+                  Craft
+                </Button>
+              )}
+              {permissions?.stock.update && (
+                <Button
+                  leftSection={<IconEdit size={16} />}
+                  onClick={() => setIsEditing(true)}
+                  variant="light"
+                >
+                  {itemsWithStockToday > 0 ? 'Mettre à jour le stock' : 'Faire le stock'}
+                </Button>
+              )}
             </Group>
           ) : (
             <Group>
@@ -364,7 +370,7 @@ export default function StockPage() {
                       <Table.Th>Quantité idéale</Table.Th>
                       <Table.Th>Stock J-1</Table.Th>
                       <Table.Th>Stock aujourd'hui</Table.Th>
-                      {isEditing && <Table.Th>Nouveau stock</Table.Th>}
+                      {isEditing && permissions?.stock.update && <Table.Th>Nouveau stock</Table.Th>}
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
@@ -426,7 +432,7 @@ export default function StockPage() {
                               <Text c="dimmed">?</Text>
                             )}
                           </Table.Td>
-                          {isEditing && (
+                          {isEditing && permissions?.stock.update && (
                             <Table.Td>
                               <TextInput
                                 value={stockInputValues[item.id] ?? (item.stockToday !== null ? String(item.stockToday) : '')}
@@ -478,7 +484,16 @@ export default function StockPage() {
         opened={craftModalOpened}
         onClose={() => setCraftModalOpened(false)}
         items={items}
+        canCraft={permissions?.stock.craftWrite ?? false}
         onCraft={async (itemId, recipeId, times) => {
+          if (!permissions?.stock.craftWrite) {
+            notifications.show({
+              title: 'Permission refusée',
+              message: 'Vous n\'avez pas la permission d\'effectuer un craft.',
+              color: 'red',
+            });
+            return;
+          }
           try {
             const result = await craftItem({
               craftedItemId: itemId,
