@@ -13,7 +13,7 @@ import { handleAction } from '@/lib/action';
 import { notifications } from '@mantine/notifications';
 import { ItemModal } from './components/ItemModal';
 import { DeleteItemModal } from './components/DeleteItemModal';
-import { ActiveFilters } from './components/ActiveFilters';
+import { ActiveFilters } from '@/app/_components/ActiveFilters/ActiveFilters';
 import { ItemsTable } from './components/ItemsTable';
 import { ReorderModal } from './components/ReorderModal';
 import { CraftRecipesModal } from './components/CraftRecipesModal';
@@ -155,18 +155,40 @@ export default function ItemsPageClient({
       </Group>
 
       <ActiveFilters
-        categoryFilter={categoryFilter}
-        companyGroupFilter={companyGroupFilter}
-        craftableFilter={craftableFilter}
-        nameFilter={nameFilter}
-        descriptionFilter={descriptionFilter}
-        categoryItems={categoryItems}
-        companyGroups={companyGroups}
-        onRemoveCategoryFilter={() => setCategoryFilter(null)}
-        onRemoveCompanyGroupFilter={() => setCompanyGroupFilter(null)}
-        onRemoveCraftableFilter={() => setCraftableFilter(null)}
-        onRemoveNameFilter={() => setNameFilter('')}
-        onRemoveDescriptionFilter={() => setDescriptionFilter('')}
+        filters={[
+          {
+            label: 'Catégorie',
+            value: categoryFilter,
+            onRemove: () => setCategoryFilter(null),
+            displayValue: categoryFilter
+              ? categoryItems.find((c) => c.id === categoryFilter)?.name || 'Inconnu'
+              : undefined,
+          },
+          {
+            label: 'Groupe',
+            value: companyGroupFilter,
+            onRemove: () => setCompanyGroupFilter(null),
+            displayValue: companyGroupFilter
+              ? companyGroups.find((g) => g.id === companyGroupFilter)?.name || 'Inconnu'
+              : undefined,
+          },
+          {
+            label: 'Craftable',
+            value: craftableFilter,
+            onRemove: () => setCraftableFilter(null),
+            displayValue: craftableFilter === 'true' ? 'Oui' : craftableFilter === 'false' ? 'Non' : undefined,
+          },
+          {
+            label: 'Nom',
+            value: nameFilter,
+            onRemove: () => setNameFilter(''),
+          },
+          {
+            label: 'Description',
+            value: descriptionFilter,
+            onRemove: () => setDescriptionFilter(''),
+          },
+        ]}
       />
 
       <ItemsTable

@@ -13,7 +13,7 @@ import { handleAction } from '@/lib/action';
 import { notifications } from '@mantine/notifications';
 import { CategoryItemModal } from './components/CategoryItemModal';
 import { DeleteCategoryItemModal } from './components/DeleteCategoryItemModal';
-import { ActiveFilters } from './components/ActiveFilters';
+import { ActiveFilters } from '@/app/_components/ActiveFilters/ActiveFilters';
 import { CategoryItemsTable } from './components/CategoryItemsTable';
 import { ReorderCategoryItemsModal } from './components/ReorderCategoryItemsModal';
 import type { CategoryItemWithItems } from '@/types/categoryItems';
@@ -123,8 +123,13 @@ export default function CategoryItemsPageClient({
       </Group>
 
       <ActiveFilters
-        nameFilter={nameFilter}
-        onRemoveNameFilter={() => setNameFilter('')}
+        filters={[
+          {
+            label: 'Nom',
+            value: nameFilter,
+            onRemove: () => setNameFilter(''),
+          },
+        ]}
       />
 
       <CategoryItemsTable
