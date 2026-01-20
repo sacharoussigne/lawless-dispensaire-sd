@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { routes } from '@/types/routes';
 
 export const metadata: Metadata = {
-  title: 'Signup',
+  title: 'Inscription',
 };
 
 export default async function LoginPage() {

@@ -8,7 +8,7 @@ export async function hasToBeLoggedInMiddleware(
 ) {
   if (!session) {
     if (request.headers.get("content-type") === "application/json") {
-      return unauthorizedResponse({ error: "Not authorized" });
+      return unauthorizedResponse({ error: "Non autorisé" });
     }
     return routes.redirect(request, routes.auth.login);
   }

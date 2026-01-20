@@ -17,7 +17,7 @@ import Link from 'next/link';
 import { useForm } from '@mantine/form';
 import { DiscordButton } from '@/app/components/SocialButtons/DiscordButton';
 import { authClient, signInWithDiscord } from '@/lib/client';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function Login() {
@@ -33,26 +33,10 @@ export default function Login() {
 
     validate: {
       email: (value) =>
-        /^\S+@\S+$/.test(value.trim()) ? null : 'Invalid email',
-      password: (value) => (!!value.trim() ? null : 'Password is required'),
+        /^\S+@\S+$/.test(value.trim()) ? null : 'Email invalide',
+      password: (value) => (!!value.trim() ? null : 'Le mot de passe est requis'),
     },
   });
-
-  // useEffect(() => {
-  //   if(process.env.NEXT_PUBLIC_APP_ENV === "dev") {
-  //     (async () => {
-  //       await authClient.signIn.email({
-  //         email: "test@gmail.com",
-  //         password: "egeggergerg",
-  //         fetchOptions: {
-  //           onSuccess: () => {
-  //             router.refresh();
-  //           }
-  //         }
-  //       });
-  //     })();
-  //   }
-  // }, []);
 
   const handleSubmit = async (values: { email: string; password: string }) => {
     setAuthError(undefined);
@@ -79,25 +63,24 @@ export default function Login() {
   return (
     <Container size={420} my={40}>
       {/*<Title ta="center" className={classes.title}>*/}
-      <Title ta="center">Welcome back ! </Title>
+      <Title ta="center">Bon retour ! </Title>
       <Text c="dimmed" size="sm" ta="center" mt={5}>
-        Do not have an account yet?{' '}
+        Vous n'avez pas encore de compte ?{' '}
         <Link href={'/auth/signup'}>
           <Anchor size="sm" component="button">
-            Create account
+            Créer un compte
           </Anchor>
         </Link>
       </Text>
 
       <Paper withBorder shadow="md" p={30} mt={30} radius="md">
         <Group grow mb="md" mt="md">
-          {/* <GoogleButton radius="xl">Google</GoogleButton> */}
           <DiscordButton radius="xl" onClick={signInWithDiscord}>
             Discord
           </DiscordButton>
         </Group>
         <Divider
-          label="Or continue with email"
+          label="Ou continuer avec l'email"
           labelPosition="center"
           my="lg"
         />
@@ -105,23 +88,23 @@ export default function Login() {
           <TextInput
             label="Email"
             type="email"
-            placeholder="you@example.com"
+            placeholder="vous@exemple.com"
             required
             key={form.key('email')}
             {...form.getInputProps('email')}
           />
           <PasswordInput
-            label="Password"
-            placeholder="Your password"
+            label="Mot de passe"
+            placeholder="Votre mot de passe"
             required
             mt="md"
             key={form.key('password')}
             {...form.getInputProps('password')}
           />
           <Group justify="space-between" mt="lg">
-            <Checkbox label="Remember me" />
+            <Checkbox label="Se souvenir de moi" />
             <Anchor component="button" size="sm">
-              Forgot password?
+              Mot de passe oublié ?
             </Anchor>
           </Group>
           {authError && (
@@ -136,7 +119,7 @@ export default function Login() {
             loading={isLoading}
             disabled={isLoading}
           >
-            Sign in
+            Se connecter
           </Button>
         </form>
       </Paper>

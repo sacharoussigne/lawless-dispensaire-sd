@@ -14,7 +14,6 @@ import '@mantine/notifications/styles.css';
 import 'mantine-datatable/styles.css';
 
 import theme from '@/lib/theme';
-// Configuration dayjs avec fuseau horaire Europe/Paris
 import '@/lib/dayjs';
 
 const geistSans = Geist({
@@ -33,11 +32,6 @@ export const metadata: Metadata = {
     default: 'Dispensaire Saint-Denis',
     absolute: 'Dispensaire Saint-Denis',
   },
-  // viewport: 'width=device-width, initial-scale=1',
-  // robots: "index, follow",
-  // icons: {
-  //   icon: "/favicon.ico",
-  // },
 };
 
 export default async function RootLayout({
@@ -46,7 +40,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" {...mantineHtmlProps}>
+    <html lang="fr" {...mantineHtmlProps}>
       <head>
         <link rel="icon" href="/favicon.png" type="image/png" />
         <ColorSchemeScript />

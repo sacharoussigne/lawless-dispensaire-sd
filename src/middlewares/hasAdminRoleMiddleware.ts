@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { routes } from "@/types/routes";
+import { forbiddenResponse } from "@/lib/response";
 
 export async function hasAdminRoleMiddleware(
   request: NextRequest,
@@ -13,8 +15,12 @@ export async function hasAdminRoleMiddleware(
   const userRole = session.user?.role;
   
   if (userRole !== 'admin') {
-    // Retourner 404 Not Found sans contenu (pour masquer l'existence de la page)
-    return new NextResponse(null, { status: 404 });
+    // Pour les requêtes JSON, retourner une erreur JSON
+    if (request.headers.get("content-type") === "application/json") {
+      return forbiddenResponse({ error: "Accès administrateur requis" });
+    }
+    // Sinon, rediriger vers la page no-management-access (car c'est généralement pour les pages admin)
+    return routes.redirect(request, routes.auth.noManagementAccess);
   }
 
   return NextResponse.next();

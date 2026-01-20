@@ -1,5 +1,8 @@
 import { Metadata } from 'next';
 import { Container, Title, Text } from '@mantine/core';
+import { redirect } from 'next/navigation';
+import { getAuthSession } from '@/lib/auth';
+import { checkRolePermission } from '@/lib/auth/permissions';
 import LogoutButton from './LogoutButton';
 
 export const metadata: Metadata = {
@@ -7,6 +10,16 @@ export const metadata: Metadata = {
 };
 
 export default async function NoAccessPage() {
+  // Vérifier si l'utilisateur a maintenant accès
+  const session = await getAuthSession();
+  if (session?.user?.role) {
+    const hasAccess = checkRolePermission(session.user.role, 'application', 'access');
+    if (hasAccess) {
+      // Si l'utilisateur a maintenant accès, rediriger vers la page d'accueil
+      redirect('/');
+    }
+  }
+
   return (
     <Container size="sm" style={{ marginTop: '10vh' }}>
       <div style={{ textAlign: 'center' }}>
