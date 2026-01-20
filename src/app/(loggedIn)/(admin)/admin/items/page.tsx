@@ -19,8 +19,8 @@ async function ItemsContent() {
   return (
     <ItemsPageClient
       initialItems={items}
-      initialCategoryItems={categoryItems}
-      initialCompanyGroups={companyGroups}
+      categoryItems={categoryItems}
+      companyGroups={companyGroups}
     />
   );
 }
