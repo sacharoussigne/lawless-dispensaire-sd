@@ -19,7 +19,7 @@ export async function hasApplicationAccessMiddleware(
   if (!hasAccess) {
     // Pour les requêtes JSON, retourner une erreur JSON
     if (request.headers.get("content-type") === "application/json") {
-      return forbiddenResponse({ error: "Access denied" });
+      return forbiddenResponse({ error: "Accès refusé" });
     }
     // Sinon, rediriger vers la page no-access
     return routes.redirect(request, routes.auth.noAccess);

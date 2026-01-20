@@ -17,7 +17,7 @@ export async function hasAdminRoleMiddleware(
   if (userRole !== 'admin') {
     // Pour les requêtes JSON, retourner une erreur JSON
     if (request.headers.get("content-type") === "application/json") {
-      return forbiddenResponse({ error: "Admin access required" });
+      return forbiddenResponse({ error: "Accès administrateur requis" });
     }
     // Sinon, rediriger vers la page no-management-access (car c'est généralement pour les pages admin)
     return routes.redirect(request, routes.auth.noManagementAccess);

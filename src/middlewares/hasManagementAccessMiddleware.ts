@@ -19,7 +19,7 @@ export async function hasManagementAccessMiddleware(
   if (!hasManagementAccess) {
     // Pour les requêtes JSON, retourner une erreur JSON
     if (request.headers.get("content-type") === "application/json") {
-      return forbiddenResponse({ error: "Management access denied" });
+      return forbiddenResponse({ error: "Accès à la gestion refusé" });
     }
     // Sinon, rediriger vers la page no-management-access
     return routes.redirect(request, routes.auth.noManagementAccess);

@@ -983,7 +983,7 @@ function ItemsPageContent() {
               {...form.getInputProps('categoryId')}
             />
             <Switch
-              label="Craftable"
+              label="Peut être crafté"
               {...form.getInputProps('isCraftable', { type: 'checkbox' })}
             />
             {!form.values.isCraftable && (

@@ -120,15 +120,15 @@ export default function Header({
                         leftSection={<IconLogout size={16} stroke={1.5} />}
                         onClick={handleLogout}
                       >
-                        Logout
+                        Déconnexion
                       </Menu.Item>
                     </Menu.Dropdown>
                   </Menu>
                 </>
               ) : (
                 <>
-                  <Button variant="default">Log in</Button>
-                  <Button>Sign up</Button>
+                  <Button variant="default">Se connecter</Button>
+                  <Button>S'inscrire</Button>
                 </>
               )}
             </Group>
