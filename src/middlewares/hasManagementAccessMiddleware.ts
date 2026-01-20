@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRolePermission } from "@/lib/auth/permissions";
+import { routes } from "@/types/routes";
+import { forbiddenResponse } from "@/lib/response";
 
 export async function hasManagementAccessMiddleware(
   request: NextRequest,
@@ -15,8 +17,12 @@ export async function hasManagementAccessMiddleware(
   const hasManagementAccess = checkRolePermission(userRole, "application", "management");
 
   if (!hasManagementAccess) {
-    // Retourner 403 Forbidden sans contenu
-    return new NextResponse(null, { status: 403 });
+    // Pour les requêtes JSON, retourner une erreur JSON
+    if (request.headers.get("content-type") === "application/json") {
+      return forbiddenResponse({ error: "Management access denied" });
+    }
+    // Sinon, rediriger vers la page no-management-access
+    return routes.redirect(request, routes.auth.noManagementAccess);
   }
 
   return NextResponse.next();
