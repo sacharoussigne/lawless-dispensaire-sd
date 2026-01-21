@@ -1,6 +1,7 @@
 import { listUsers } from '@/app/_actions/users';
 import UsersPageClient from './UsersPageClient';
 import { SuspenseLoader } from '@/app/_components/SuspenseLoader/SuspenseLoader';
+import { getDataOrThrow } from '@/lib/response';
 import type { User } from '@/types/users';
 
 async function UsersContent() {
@@ -11,23 +12,18 @@ async function UsersContent() {
     sortDirection: 'desc',
   });
 
-  const users: User[] =
-    result.status === 200 && 'data' in result && result.data?.users
-      ? result.data.users.map((user: any) => ({
-          ...user,
-          role: user.role ?? null,
-        }))
-      : [];
+  // Lance une erreur si la réponse est une erreur (sera capturée par error.tsx)
+  const data = getDataOrThrow(result, 'Erreur lors du chargement des utilisateurs');
 
-  const totalRecords =
-    result.status === 200 && 'data' in result && result.data?.total
-      ? result.data.total
-      : 0;
+  const users: User[] = (data.users || []).map((user: any) => ({
+    ...user,
+    role: user.role ?? null,
+  }));
 
   return (
     <UsersPageClient
       initialUsers={users}
-      initialTotalRecords={totalRecords}
+      initialTotalRecords={data.total || 0}
     />
   );
 }

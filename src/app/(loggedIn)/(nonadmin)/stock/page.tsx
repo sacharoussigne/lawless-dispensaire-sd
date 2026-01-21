@@ -1,10 +1,13 @@
 import { getItemsWithStock } from '@/app/_actions/stock';
 import StockPageClient from './StockPageClient';
 import { SuspenseLoader } from '@/app/_components/SuspenseLoader/SuspenseLoader';
+import { getDataOrThrow } from '@/lib/response';
 
 async function StockContent() {
   const result = await getItemsWithStock();
-  const items = result.status === 200 && 'data' in result && result.data ? result.data : [];
+  
+  // Lance une erreur si la réponse est une erreur (sera capturée par error.tsx)
+  const items = getDataOrThrow(result, 'Erreur lors du chargement du stock');
 
   return <StockPageClient initialItems={items} />;
 }
