@@ -3,6 +3,7 @@ import BottomBar from '@/app/(loggedIn)/_components/BottomBar/BottomBar';
 import { getAuthSession } from '@/lib/auth';
 import { Container } from '@mantine/core';
 import { PermissionsProvider } from '@/app/_contexts/PermissionsContext';
+import { calculatePermissions } from '@/lib/auth/calculatePermissions';
 
 export default async function LanguageLayout({
   children,
@@ -12,9 +13,11 @@ export default async function LanguageLayout({
   params: Promise<{ userLanguageAlias?: string }>;
 }) {
   const session = await getAuthSession();
+  const role = session?.user?.role || null;
+  const permissions = calculatePermissions(role);
 
   return (
-    <PermissionsProvider>
+    <PermissionsProvider initialPermissions={permissions} initialRole={role}>
       <Header session={session as any} />
 
       <Container size={'lg'} className={'flex-1 pb-[72px] sm:pb-0'}>
