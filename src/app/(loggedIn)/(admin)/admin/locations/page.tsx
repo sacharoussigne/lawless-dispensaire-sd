@@ -1,13 +1,13 @@
 import { getLocations } from '@/app/_actions/locations';
 import LocationsPageClient from './LocationsPageClient';
 import { SuspenseLoader } from '@/app/_components/SuspenseLoader/SuspenseLoader';
-import type { LocationWithCompanies } from '@/types/locations';
+import { getDataOrThrow } from '@/lib/response';
 
 async function LocationsContent() {
   const result = await getLocations();
 
-  const locations: LocationWithCompanies[] =
-    result.status === 200 && 'data' in result && result.data ? result.data : [];
+  // Lance une erreur si la réponse est une erreur (sera capturée par error.tsx)
+  const locations = getDataOrThrow(result, 'Erreur lors du chargement des emplacements');
 
   return <LocationsPageClient initialLocations={locations} />;
 }
