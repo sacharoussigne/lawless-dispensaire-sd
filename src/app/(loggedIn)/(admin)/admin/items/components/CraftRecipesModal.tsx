@@ -9,6 +9,7 @@ import {
   Table,
   Group,
   ActionIcon,
+  Badge,
 } from '@mantine/core';
 import { IconPlus, IconEdit, IconTrash } from '@tabler/icons-react';
 import { getCraftRecipesByItemId } from '@/app/_actions/craftRecipes';
@@ -112,6 +113,7 @@ export function CraftRecipesModal({
                   <Table.Th>Description</Table.Th>
                   <Table.Th>Quantité produite</Table.Th>
                   <Table.Th>Ingrédients</Table.Th>
+                  <Table.Th>Activé</Table.Th>
                   <Table.Th>Actions</Table.Th>
                 </Table.Tr>
               </Table.Thead>
@@ -129,6 +131,17 @@ export function CraftRecipesModal({
                           </Text>
                         ))}
                       </Stack>
+                    </Table.Td>
+                    <Table.Td>
+                      {recipe.isEnabled ? (
+                        <Badge color="green" variant="light">
+                          Oui
+                        </Badge>
+                      ) : (
+                        <Badge color="red" variant="light">
+                          Non
+                        </Badge>
+                      )}
                     </Table.Td>
                     <Table.Td>
                       <Group gap="xs" wrap="nowrap">

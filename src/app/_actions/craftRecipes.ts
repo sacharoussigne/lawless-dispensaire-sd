@@ -11,6 +11,7 @@ const createCraftRecipeSchema = z.object({
   description: z.string().max(1000, 'La description est trop longue').optional(),
   craftedItemId: z.string().uuid('ID d\'item invalide'),
   quantity: z.number().int().min(1, 'La quantité doit être au moins 1'),
+  isEnabled: z.boolean().default(true),
   ingredients: z.array(z.object({
     usedItemId: z.string().uuid('ID d\'item invalide'),
     quantity: z.number().int().min(1, 'La quantité doit être au moins 1'),
@@ -23,6 +24,7 @@ const updateCraftRecipeSchema = z.object({
   name: z.string().min(1, 'Le nom de la recette est requis').max(255, 'Le nom est trop long'),
   description: z.string().max(1000, 'La description est trop longue').optional(),
   quantity: z.number().int().min(1, 'La quantité doit être au moins 1'),
+  isEnabled: z.boolean().default(true),
   ingredients: z.array(z.object({
     usedItemId: z.string().uuid('ID d\'item invalide'),
     quantity: z.number().int().min(1, 'La quantité doit être au moins 1'),
@@ -36,8 +38,10 @@ const deleteCraftRecipeSchema = z.object({
 
 /**
  * Récupère toutes les recettes de craft pour un item
+ * @param itemId - ID de l'item
+ * @param onlyEnabled - Si true, ne retourne que les recettes activées (par défaut: false pour la page admin)
  */
-export async function getCraftRecipesByItemId(itemId: string) {
+export async function getCraftRecipesByItemId(itemId: string, onlyEnabled: boolean = false) {
   try {
     const session = await getAuthSession();
     if (!session) {
@@ -50,6 +54,7 @@ export async function getCraftRecipesByItemId(itemId: string) {
     const craftRecipes = await prisma.craftRecipe.findMany({
       where: {
         craftedItemId: itemId,
+        ...(onlyEnabled && { isEnabled: true }),
       },
       include: {
         ingredients: {
@@ -85,6 +90,7 @@ export async function createCraftRecipe(data: {
   description?: string;
   craftedItemId: string;
   quantity: number;
+  isEnabled?: boolean;
   ingredients: { usedItemId: string; quantity: number }[];
 }) {
   try {
@@ -104,6 +110,7 @@ export async function createCraftRecipe(data: {
         description: validatedData.description,
         craftedItemId: validatedData.craftedItemId,
         quantity: validatedData.quantity,
+        isEnabled: validatedData.isEnabled ?? true,
         ingredients: {
           create: validatedData.ingredients.map((ing) => ({
             usedItemId: ing.usedItemId,
@@ -142,6 +149,7 @@ export async function updateCraftRecipe(data: {
   name: string;
   description?: string;
   quantity: number;
+  isEnabled?: boolean;
   ingredients: { usedItemId: string; quantity: number }[];
 }) {
   try {
@@ -171,6 +179,7 @@ export async function updateCraftRecipe(data: {
         name: validatedData.name,
         description: validatedData.description,
         quantity: validatedData.quantity,
+        isEnabled: validatedData.isEnabled ?? true,
         ingredients: {
           create: validatedData.ingredients.map((ing) => ({
             usedItemId: ing.usedItemId,

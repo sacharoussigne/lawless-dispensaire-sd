@@ -65,7 +65,7 @@ export default function CraftModal({ opened, onClose, items, canCraft = true, on
     if (value) {
       setLoadingRecipes(true);
       try {
-        const result = await getCraftRecipesByItemId(value);
+        const result = await getCraftRecipesByItemId(value, true); // onlyEnabled = true pour la modal de craft
         const data = handleAction(result);
         if (data) {
           setCraftRecipes(data);

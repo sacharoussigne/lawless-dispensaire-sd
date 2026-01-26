@@ -154,6 +154,7 @@ model CraftRecipe {
   craftedItemId     String
   craftedItem       Item              @relation("CraftedItem", fields: [craftedItemId], references: [id], onDelete: Cascade)
   quantity          Int
+  isEnabled         Boolean           @default(true)
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   ingredients       CraftRecipeItem[]
