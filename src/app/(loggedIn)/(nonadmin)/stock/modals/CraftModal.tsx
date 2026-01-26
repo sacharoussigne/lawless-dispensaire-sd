@@ -65,7 +65,7 @@ export default function CraftModal({ opened, onClose, items, canCraft = true, on
     if (value) {
       setLoadingRecipes(true);
       try {
-        const result = await getCraftRecipesByItemId(value);
+        const result = await getCraftRecipesByItemId(value, true); // onlyEnabled = true pour la modal de craft
         const data = handleAction(result);
         if (data) {
           setCraftRecipes(data);
@@ -137,39 +137,60 @@ export default function CraftModal({ opened, onClose, items, canCraft = true, on
     });
   })();
 
-  const isCraftButtonDisabled = (() => {
-    // Si l'utilisateur n'a pas la permission de craft, désactiver le bouton
+  const craftButtonDisabledReason = (() => {
+    // Si l'utilisateur n'a pas la permission de craft
     if (!canCraft) {
-      return true;
+      return "Vous n'avez pas la permission d'effectuer un craft";
     }
     
     if (!selectedCraftItem || (!selectedRecipe && craftRecipes.length > 1) || craftQuantity < 1) {
-      return true;
+      return null; // Pas de message spécifique pour ces cas
     }
     
     // Vérifier que l'item à craft a un stock d'aujourd'hui (obligatoire pour craft)
     if (!hasCraftItemStockToday) {
-      return true;
+      if (!hasCraftItemStock) {
+        return "Aucun stock disponible pour cet objet";
+      }
+      return "Le stock d'aujourd'hui est requis pour effectuer un craft";
     }
     
     const recipe = craftRecipes.find((r) => r.id === selectedRecipe) || craftRecipes[0];
-    if (!recipe) return true;
+    if (!recipe) return null;
     
     // craftQuantity représente maintenant le nombre de fois qu'on craft la recette
     // Vérifier que tous les ingrédients ont un stock d'aujourd'hui ET assez de stock
-    const allIngredientsHaveEnough = recipe.ingredients.every((ingredient) => {
+    const ingredientChecks = recipe.ingredients.map((ingredient) => {
       const requiredQuantity = ingredient.quantity * craftQuantity;
       const item = items.find((i) => i.id === ingredient.usedItemId);
       // Vérifier que le stock d'aujourd'hui existe
       if (item?.stockToday === null || item?.stockToday === undefined) {
-        return false;
+        return { hasStock: false, hasEnough: false, itemName: item?.name || ingredient.usedItem.name };
       }
       const availableStock = item.stockToday;
-      return availableStock >= requiredQuantity;
+      return { 
+        hasStock: true, 
+        hasEnough: availableStock >= requiredQuantity,
+        itemName: item.name,
+        required: requiredQuantity,
+        available: availableStock
+      };
     });
     
-    return !allIngredientsHaveEnough;
+    const missingStockItems = ingredientChecks.filter(check => !check.hasStock);
+    if (missingStockItems.length > 0) {
+      return `Stock d'aujourd'hui manquant pour : ${missingStockItems.map(c => c.itemName).join(', ')}`;
+    }
+    
+    const insufficientStockItems = ingredientChecks.filter(check => !check.hasEnough);
+    if (insufficientStockItems.length > 0) {
+      return `Stock insuffisant pour : ${insufficientStockItems.map(c => `${c.itemName} (${c.required} requis, ${c.available} disponible)`).join(', ')}`;
+    }
+    
+    return null; // Tout est OK
   })();
+
+  const isCraftButtonDisabled = craftButtonDisabledReason !== null;
 
   return (
     <Modal
@@ -204,137 +225,134 @@ export default function CraftModal({ opened, onClose, items, canCraft = true, on
 
         {selectedCraftItem && craftRecipes.length > 0 && (
           <>
-            {!hasCraftItemStock ? (
-              <Text c="red" size="sm" mt="md">
-                Aucun stock disponible pour cet objet.
+            {!hasCraftItemStock && (
+              <Text c="orange" size="sm" mt="md" fw={500}>
+                ⚠️ Aucun stock disponible pour cet objet. Le craft n'est pas possible sans stock.
               </Text>
-            ) : (
-              <>
-                {usesOldStock && (
-                  <Text c="orange" size="sm" mt="md" fw={500}>
-                    ⚠️ Certains stocks affichés proviennent d'un jour précédent. Le craft n'est pas possible sans le stock d'aujourd'hui.
-                  </Text>
-                )}
-                {selectedCraftItemData && craftItemStock.stock !== null && (
-                  <Text size="sm" c={craftItemStock.isToday ? 'dimmed' : 'orange'} mt="xs">
-                    Stock disponible : {craftItemStock.stock} {craftItemStock.isToday ? '' : '(jour précédent)'}
-                  </Text>
-                )}
-                {craftRecipes.length > 1 ? (
-                  <Select
-                    label="Recette"
-                    placeholder="Sélectionner une recette"
-                    data={craftRecipes.map((recipe) => ({
-                      value: recipe.id,
-                      label: recipe.name,
-                    }))}
-                    value={selectedRecipe}
-                    onChange={(value) => setSelectedRecipe(value)}
-                    required
-                    renderOption={({ option }) => {
-                      const recipe = craftRecipes.find((r) => r.id === option.value);
-                      return (
-                        <div>
-                          <div>{option.label}</div>
-                          {recipe?.description && (
-                            <Text size="xs" c="dimmed" mt={2}>
-                              {recipe.description}
-                            </Text>
-                          )}
-                        </div>
-                      );
-                    }}
-                  />
-                ) : (
-                  <Stack gap="xs">
-                    <Text size="sm" c="dimmed">
-                      Recette : {craftRecipes[0]?.name}
-                    </Text>
-                    {craftRecipes[0]?.description && (
-                      <Text size="xs" c="dimmed">
-                        {craftRecipes[0].description}
-                      </Text>
-                    )}
-                  </Stack>
-                )}
-
-                {(() => {
-                  const recipe = craftRecipes.find((r) => r.id === selectedRecipe) || craftRecipes[0];
-                  if (!recipe) return null;
-                  
-                  const totalQuantity = craftQuantity * recipe.quantity;
-                  
-                  return (
-                    <>
-                      <NumberInput
-                        label="Nombre de fois à craft"
-                        placeholder="Nombre de fois"
-                        value={craftQuantity}
-                        onChange={(value) => setCraftQuantity(typeof value === 'number' ? value : 1)}
-                        min={1}
-                        required
-                        description={`Quantité totale produite : ${totalQuantity}`}
-                      />
-                    </>
-                  );
-                })()}
-
-                {(selectedRecipe || (craftRecipes.length === 1 && craftRecipes[0])) && (() => {
-                  const recipe = craftRecipes.find((r) => r.id === selectedRecipe) || craftRecipes[0];
-                  if (!recipe) return null;
-
-                  // craftQuantity représente maintenant le nombre de fois qu'on craft la recette
-                  return (
-                    <Stack gap="sm" mt="md">
-                      <Text fw={500}>Ingrédients nécessaires :</Text>
-                      <Paper p="md" withBorder>
-                        <Stack gap="xs">
-                          {recipe.ingredients.map((ingredient) => {
-                            const requiredQuantity = ingredient.quantity * craftQuantity;
-                            const item = items.find((i) => i.id === ingredient.usedItemId);
-                            const stockInfo = getAvailableStock(item);
-                            const availableStock = stockInfo.stock ?? 0;
-                            const hasEnough = stockInfo.isToday && availableStock >= requiredQuantity;
-
-                            return (
-                              <Group key={ingredient.id} justify="space-between" wrap="nowrap">
-                                <Text size="sm" style={{ flex: 1 }}>
-                                  {ingredient.usedItem.name}
-                                </Text>
-                                <Group gap="xs" wrap="nowrap">
-                                  <Text size="sm" c={hasEnough ? 'green' : 'red'}>
-                                    {requiredQuantity} requis
-                                  </Text>
-                                  {stockInfo.stock !== null ? (
-                                    <>
-                                      <Text size="sm" c={stockInfo.isToday ? 'dimmed' : 'orange'}>
-                                        / {availableStock} disponible{stockInfo.isToday ? '' : ' (jour précédent)'}
-                                      </Text>
-                                      {hasEnough ? (
-                                        <Badge color="green" size="sm">✓</Badge>
-                                      ) : (
-                                        <Badge color={stockInfo.isToday ? 'red' : 'orange'} size="sm">✗</Badge>
-                                      )}
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Text size="sm" c="red">
-                                        Aucun stock disponible
-                                      </Text>
-                                      <Badge color="red" size="sm">✗</Badge>
-                                    </>
-                                  )}
-                                </Group>
-                              </Group>
-                            );
-                          })}
-                        </Stack>
-                      </Paper>
-                    </Stack>
-                  );
-                })()}
-              </>
             )}
+            {hasCraftItemStock && usesOldStock && (
+              <Text c="orange" size="sm" mt="md" fw={500}>
+                ⚠️ Certains stocks affichés proviennent d'un jour précédent. Le craft n'est pas possible sans le stock d'aujourd'hui.
+              </Text>
+            )}
+            {selectedCraftItemData && craftItemStock.stock !== null && (
+              <Text size="sm" c={craftItemStock.isToday ? 'dimmed' : 'orange'} mt="xs">
+                Stock disponible : {craftItemStock.stock} {craftItemStock.isToday ? '' : '(jour précédent)'}
+              </Text>
+            )}
+            {craftRecipes.length > 1 ? (
+              <Select
+                label="Recette"
+                placeholder="Sélectionner une recette"
+                data={craftRecipes.map((recipe) => ({
+                  value: recipe.id,
+                  label: recipe.name,
+                }))}
+                value={selectedRecipe}
+                onChange={(value) => setSelectedRecipe(value)}
+                required
+                renderOption={({ option }) => {
+                  const recipe = craftRecipes.find((r) => r.id === option.value);
+                  return (
+                    <div>
+                      <div>{option.label}</div>
+                      {recipe?.description && (
+                        <Text size="xs" c="dimmed" mt={2}>
+                          {recipe.description}
+                        </Text>
+                      )}
+                    </div>
+                  );
+                }}
+              />
+            ) : (
+              <Stack gap="xs">
+                <Text size="sm" c="dimmed">
+                  Recette : {craftRecipes[0]?.name}
+                </Text>
+                {craftRecipes[0]?.description && (
+                  <Text size="xs" c="dimmed">
+                    {craftRecipes[0].description}
+                  </Text>
+                )}
+              </Stack>
+            )}
+
+            {(() => {
+              const recipe = craftRecipes.find((r) => r.id === selectedRecipe) || craftRecipes[0];
+              if (!recipe) return null;
+              
+              const totalQuantity = craftQuantity * recipe.quantity;
+              
+              return (
+                <>
+                  <NumberInput
+                    label="Nombre de fois à craft"
+                    placeholder="Nombre de fois"
+                    value={craftQuantity}
+                    onChange={(value) => setCraftQuantity(typeof value === 'number' ? value : 1)}
+                    min={1}
+                    required
+                    description={`Quantité totale produite : ${totalQuantity}`}
+                  />
+                </>
+              );
+            })()}
+
+            {(selectedRecipe || (craftRecipes.length === 1 && craftRecipes[0])) && (() => {
+              const recipe = craftRecipes.find((r) => r.id === selectedRecipe) || craftRecipes[0];
+              if (!recipe) return null;
+
+              // craftQuantity représente maintenant le nombre de fois qu'on craft la recette
+              return (
+                <Stack gap="sm" mt="md">
+                  <Text fw={500}>Ingrédients nécessaires :</Text>
+                  <Paper p="md" withBorder>
+                    <Stack gap="xs">
+                      {recipe.ingredients.map((ingredient) => {
+                        const requiredQuantity = ingredient.quantity * craftQuantity;
+                        const item = items.find((i) => i.id === ingredient.usedItemId);
+                        const stockInfo = getAvailableStock(item);
+                        const availableStock = stockInfo.stock ?? 0;
+                        const hasEnough = stockInfo.isToday && availableStock >= requiredQuantity;
+
+                        return (
+                          <Group key={ingredient.id} justify="space-between" wrap="nowrap">
+                            <Text size="sm" style={{ flex: 1 }}>
+                              {ingredient.usedItem.name}
+                            </Text>
+                            <Group gap="xs" wrap="nowrap">
+                              <Text size="sm" c={hasEnough ? 'green' : 'red'}>
+                                {requiredQuantity} requis
+                              </Text>
+                              {stockInfo.stock !== null ? (
+                                <>
+                                  <Text size="sm" c={stockInfo.isToday ? 'dimmed' : 'orange'}>
+                                    / {availableStock} disponible{stockInfo.isToday ? '' : ' (jour précédent)'}
+                                  </Text>
+                                  {hasEnough ? (
+                                    <Badge color="green" size="sm">✓</Badge>
+                                  ) : (
+                                    <Badge color={stockInfo.isToday ? 'red' : 'orange'} size="sm">✗</Badge>
+                                  )}
+                                </>
+                              ) : (
+                                <>
+                                  <Text size="sm" c="red">
+                                    Aucun stock disponible
+                                  </Text>
+                                  <Badge color="red" size="sm">✗</Badge>
+                                </>
+                              )}
+                            </Group>
+                          </Group>
+                        );
+                      })}
+                    </Stack>
+                  </Paper>
+                </Stack>
+              );
+            })()}
           </>
         )}
 
@@ -357,14 +375,14 @@ export default function CraftModal({ opened, onClose, items, canCraft = true, on
           <Button 
             onClick={handleCraft} 
             disabled={isCraftButtonDisabled}
-            title={!canCraft ? "Vous n'avez pas la permission d'effectuer un craft" : undefined}
+            title={craftButtonDisabledReason || undefined}
           >
             Craft
           </Button>
         </Group>
-        {!canCraft && (
+        {craftButtonDisabledReason && (
           <Text c="orange" size="sm" mt="md">
-            ⚠️ Vous avez uniquement la permission de lecture. Vous ne pouvez pas effectuer de craft.
+            ⚠️ {craftButtonDisabledReason}
           </Text>
         )}
       </Stack>

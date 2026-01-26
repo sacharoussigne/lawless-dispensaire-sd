@@ -12,6 +12,7 @@ import {
   Group,
   ActionIcon,
   Select,
+  Switch,
 } from '@mantine/core';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
 import { useForm } from '@mantine/form';
@@ -47,6 +48,7 @@ export function CraftRecipeModal({
       name: '',
       description: '',
       quantity: 1,
+      isEnabled: true,
       ingredients: [] as { usedItemId: string; quantity: number }[],
     },
     validate: {
@@ -65,6 +67,7 @@ export function CraftRecipeModal({
         name: editingRecipe.name,
         description: editingRecipe.description || '',
         quantity: editingRecipe.quantity,
+        isEnabled: editingRecipe.isEnabled ?? true,
         ingredients: editingRecipe.ingredients.map((ing) => ({
           usedItemId: ing.usedItemId,
           quantity: ing.quantity,
@@ -75,6 +78,7 @@ export function CraftRecipeModal({
         name: '',
         description: '',
         quantity: 1,
+        isEnabled: true,
         ingredients: [],
       });
     }
@@ -91,6 +95,7 @@ export function CraftRecipeModal({
           name: values.name,
           description: values.description || undefined,
           quantity: values.quantity,
+          isEnabled: values.isEnabled,
           ingredients: values.ingredients,
         });
       } else {
@@ -99,6 +104,7 @@ export function CraftRecipeModal({
           description: values.description || undefined,
           craftedItemId: selectedItem.id,
           quantity: values.quantity,
+          isEnabled: values.isEnabled,
           ingredients: values.ingredients,
         });
       }
@@ -187,6 +193,11 @@ export function CraftRecipeModal({
             required
             min={1}
             {...craftRecipeForm.getInputProps('quantity')}
+          />
+          <Switch
+            label="Activé"
+            description="Si désactivé, la recette ne sera pas visible dans la modal de craft"
+            {...craftRecipeForm.getInputProps('isEnabled', { type: 'checkbox' })}
           />
           <Divider label="Ingrédients" labelPosition="left" />
           {craftRecipeForm.values.ingredients.map((ingredient, index) => (

@@ -11,6 +11,7 @@ const createItemSchema = z.object({
   description: z.string().max(1000, 'La description est trop longue').optional(),
   idealQuantity: z.number().int().min(0, 'La quantité idéale doit être positive'),
   isCraftable: z.boolean().default(false),
+  isEnabled: z.boolean().default(true),
   categoryId: z.string().uuid('ID de catégorie invalide').min(1, 'La catégorie est requise'),
   companyGroupId: z.string().uuid('ID de groupe d\'entreprise invalide').optional(),
 });
@@ -22,6 +23,7 @@ const updateItemSchema = z.object({
   description: z.string().max(1000, 'La description est trop longue').optional(),
   idealQuantity: z.number().int().min(0, 'La quantité idéale doit être positive'),
   isCraftable: z.boolean().default(false),
+  isEnabled: z.boolean().default(true),
   categoryId: z.string().uuid('ID de catégorie invalide').min(1, 'La catégorie est requise'),
   companyGroupId: z.string().uuid('ID de groupe d\'entreprise invalide').optional(),
 });
@@ -39,6 +41,7 @@ export async function createItem(data: {
   description?: string;
   idealQuantity: number;
   isCraftable?: boolean;
+  isEnabled?: boolean;
   categoryId: string;
   companyGroupId?: string;
 }) {
@@ -74,6 +77,7 @@ export async function createItem(data: {
         description: validatedData.description,
         idealQuantity: validatedData.idealQuantity,
         isCraftable: validatedData.isCraftable ?? false,
+        isEnabled: validatedData.isEnabled ?? true,
         categoryId: validatedData.categoryId,
         companyGroupId: validatedData.companyGroupId,
         order: newOrder,
@@ -152,6 +156,7 @@ export async function updateItem(data: {
   description?: string;
   idealQuantity: number;
   isCraftable?: boolean;
+  isEnabled?: boolean;
   categoryId: string;
   companyGroupId?: string;
 }) {
@@ -175,6 +180,7 @@ export async function updateItem(data: {
         description: validatedData.description,
         idealQuantity: validatedData.idealQuantity,
         isCraftable: validatedData.isCraftable ?? false,
+        isEnabled: validatedData.isEnabled ?? true,
         categoryId: validatedData.categoryId,
         companyGroupId: validatedData.companyGroupId,
       },

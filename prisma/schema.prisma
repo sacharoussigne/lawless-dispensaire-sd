@@ -93,6 +93,7 @@ model Item {
   description    String?
   idealQuantity  Int
   isCraftable    Boolean           @default(false)
+  isEnabled      Boolean           @default(true)
   categoryId     String
   category       CategoryItem      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   companyGroupId String?
@@ -153,6 +154,7 @@ model CraftRecipe {
   craftedItemId     String
   craftedItem       Item              @relation("CraftedItem", fields: [craftedItemId], references: [id], onDelete: Cascade)
   quantity          Int
+  isEnabled         Boolean           @default(true)
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   ingredients       CraftRecipeItem[]
