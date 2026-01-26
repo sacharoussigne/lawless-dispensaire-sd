@@ -202,6 +202,20 @@ export function ItemsTable({
             ),
           },
           {
+            accessor: 'isEnabled',
+            title: 'Activé',
+            render: (item: ItemWithRelations) =>
+              item.isEnabled ? (
+                <Badge color="green" variant="light">
+                  Oui
+                </Badge>
+              ) : (
+                <Badge color="red" variant="light">
+                  Non
+                </Badge>
+              ),
+          },
+          {
             accessor: 'companyGroup.name',
             title: "Groupe d'entreprises",
             render: (item: ItemWithRelations) => item.companyGroup?.name || '-',

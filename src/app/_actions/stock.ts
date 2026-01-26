@@ -28,6 +28,9 @@ export async function getItemsWithStock() {
     const yesterday = getYesterdayStart();
 
     const items = await prisma.item.findMany({
+      where: {
+        isEnabled: true,
+      },
       orderBy: {
         createdAt: 'desc',
       },
@@ -440,6 +443,9 @@ export async function getItemsWithStockForDate(date: Date) {
     dayEnd.setDate(dayEnd.getDate() + 1);
 
     const items = await prisma.item.findMany({
+      where: {
+        isEnabled: true,
+      },
       orderBy: {
         createdAt: 'desc',
       },

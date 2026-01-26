@@ -93,6 +93,7 @@ model Item {
   description    String?
   idealQuantity  Int
   isCraftable    Boolean           @default(false)
+  isEnabled      Boolean           @default(true)
   categoryId     String
   category       CategoryItem      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   companyGroupId String?

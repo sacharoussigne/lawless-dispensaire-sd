@@ -43,6 +43,7 @@ export function ItemModal({
       description: '',
       idealQuantity: 0,
       isCraftable: false,
+      isEnabled: true,
       categoryId: '',
       companyGroupId: '',
     },
@@ -69,6 +70,7 @@ export function ItemModal({
         description: editingItem.description || '',
         idealQuantity: editingItem.idealQuantity,
         isCraftable: editingItem.isCraftable,
+        isEnabled: editingItem.isEnabled ?? true,
         categoryId: editingItem.categoryId || '',
         companyGroupId: editingItem.companyGroupId || '',
       });
@@ -92,6 +94,7 @@ export function ItemModal({
           description: values.description || undefined,
           idealQuantity: values.idealQuantity,
           isCraftable: values.isCraftable,
+          isEnabled: values.isEnabled,
           categoryId: values.categoryId,
           companyGroupId,
         });
@@ -101,6 +104,7 @@ export function ItemModal({
           description: values.description || undefined,
           idealQuantity: values.idealQuantity,
           isCraftable: values.isCraftable,
+          isEnabled: values.isEnabled,
           categoryId: values.categoryId,
           companyGroupId,
         });
@@ -204,6 +208,11 @@ export function ItemModal({
               {...form.getInputProps('companyGroupId')}
             />
           )}
+          <Switch
+            label="Activé"
+            description="Si désactivé, l'objet ne sera pas visible dans la page de stock"
+            {...form.getInputProps('isEnabled', { type: 'checkbox' })}
+          />
           <Group justify="flex-end" mt="md">
             <Button
               variant="subtle"
