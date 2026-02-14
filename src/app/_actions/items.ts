@@ -92,9 +92,13 @@ export async function createItem(data: {
       },
     });
 
+    // Convertir le Decimal en number pour la sérialisation
     return {
       status: 201,
-      data: item,
+      data: {
+        ...item,
+        price: item.price ? Number(item.price) : null,
+      },
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la création de l\'objet');
@@ -146,9 +150,15 @@ export async function getItems() {
       },
     });
 
+    // Convertir les Decimal en number pour la sérialisation
+    const serializedItems = items.map((item) => ({
+      ...item,
+      price: item.price ? Number(item.price) : null,
+    }));
+
     return {
       status: 200,
-      data: items,
+      data: serializedItems,
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la récupération des objets');
@@ -198,9 +208,13 @@ export async function updateItem(data: {
       },
     });
 
+    // Convertir le Decimal en number pour la sérialisation
     return {
       status: 200,
-      data: item,
+      data: {
+        ...item,
+        price: item.price ? Number(item.price) : null,
+      },
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la modification de l\'objet');

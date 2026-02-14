@@ -66,6 +66,14 @@ interface ExistingOrder {
   }>;
 }
 
+// Fonction utilitaire pour convertir le prix en nombre
+const normalizePrice = (price: unknown): number | null => {
+  if (price == null) return null;
+  if (typeof price === 'number') return price;
+  const numPrice = Number(price);
+  return isNaN(numPrice) ? null : numPrice;
+};
+
 export default function OrderModal({ 
   opened, 
   onClose, 
@@ -112,12 +120,20 @@ export default function OrderModal({
               ...item,
               stockToday: null,
               stockYesterday: null,
-              price: item.price ? Number(item.price) : null,
+              price: normalizePrice(item.price),
+              canBeSold: item.canBeSold ?? false,
             }))
           );
         }
       } else {
-        setAllItems(items);
+        // Si les items sont fournis en props, s'assurer qu'ils ont les bonnes propriétés
+        setAllItems(
+          items.map((item: any) => ({
+            ...item,
+            price: normalizePrice(item.price),
+            canBeSold: item.canBeSold ?? false,
+          }))
+        );
       }
 
       if (groupsData) {
@@ -211,7 +227,7 @@ export default function OrderModal({
         }
       } catch (error: any) {
         // Silently fail, ce n'est pas critique
-        console.error('Erreur lors du chargement des commandes existantes:', error);
+        // Les commandes existantes sont un bonus, pas une fonctionnalité critique
       }
     };
 
@@ -277,10 +293,21 @@ export default function OrderModal({
   const getAvailableItemsForGroup = () => {
     if (!selectedCompanyGroupId && orderType === OrderTypeEnum.INCOMING) return [];
     // Pour les commandes sortantes (OUTGOING), on ne peut choisir que les items qui peuvent être vendus
-    // Pour les commandes entrantes (INCOMING), on filtre par groupe et non-craftable
+    // Un item peut être vendu si canBeSold est true OU s'il n'est pas craftable et a un prix
     if (orderType === OrderTypeEnum.OUTGOING) {
-      return itemsToUse.filter((item) => !item.isCraftable && item.canBeSold === true);
+      return itemsToUse.filter((item) => {
+        // Un item peut être vendu si :
+        // 1. canBeSold est explicitement true (peut être craftable ou non)
+        // 2. OU il n'est pas craftable ET il a un prix défini
+        const hasCanBeSold = item.canBeSold === true;
+        const price = normalizePrice(item.price);
+        const hasPrice = price != null && price > 0;
+        const isNotCraftableWithPrice = !item.isCraftable && hasPrice;
+        
+        return hasCanBeSold || isNotCraftableWithPrice;
+      });
     }
+    // Pour les commandes entrantes (INCOMING), on filtre par groupe et non-craftable
     return itemsToUse.filter(
       (item) => !item.isCraftable && item.companyGroupId === selectedCompanyGroupId
     );
@@ -370,6 +397,11 @@ export default function OrderModal({
     });
   }, [orderItems, existingOrders]);
 
+  // Déterminer si on peut afficher la section des items
+  const canShowItems = 
+    (orderType === OrderTypeEnum.INCOMING && selectedCompanyGroupId) ||
+    (orderType === OrderTypeEnum.OUTGOING && selectedCompanyId);
+
   return (
     <Modal
       opened={opened}
@@ -424,7 +456,7 @@ export default function OrderModal({
           />
         </Group>
 
-        {selectedCompanyGroupId && (
+        {canShowItems && (
           <>
             {conflictingOrders.length > 0 && (
               <Alert
@@ -531,13 +563,18 @@ export default function OrderModal({
               </Text>
             )}
 
-            {selectedCompanyGroupId && canAddMoreItems && (
+            {selectedCompanyId && (
               <Select
                 label="Ajouter un objet"
-                placeholder="Sélectionner un objet à ajouter"
+                placeholder={
+                  availableItems.length === 0
+                    ? "Aucun objet vendable disponible"
+                    : "Sélectionner un objet à ajouter"
+                }
                 data={availableItems
                   .filter((item) => !orderItemIds.has(item.id))
                   .map((item) => ({ value: item.id, label: item.name }))}
+                disabled={availableItems.length === 0 || !canAddMoreItems}
                 onChange={(value) => {
                   if (value) {
                     const itemToAdd = availableItems.find((item) => item.id === value);

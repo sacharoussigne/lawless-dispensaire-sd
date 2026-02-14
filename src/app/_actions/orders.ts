@@ -4,7 +4,7 @@ import { z } from 'zod/v3';
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
 import { getAuthSession } from '@/lib/auth';
-import { addOrderItemsToStock } from '@/app/_actions/stock';
+import { addOrderItemsToStock, removeOrderItemsFromStock } from '@/app/_actions/stock';
 import type { OrderStatus } from '@prisma/client';
 
 // Schéma de validation pour créer une commande
@@ -202,10 +202,10 @@ export async function updateOrder(data: {
 
     const validatedData = updateOrderSchema.parse(data);
 
-    // Récupérer l'ancien statut pour vérifier si on passe à COMPLETED
+    // Récupérer l'ancien statut et le type pour vérifier si on passe à COMPLETED
     const oldOrder = await prisma.order.findUnique({
       where: { id: validatedData.id },
-      select: { status: true },
+      select: { status: true, type: true },
     });
 
     if (!oldOrder) {
@@ -253,21 +253,36 @@ export async function updateOrder(data: {
       },
     });
 
-    // Si le statut passe à COMPLETED et qu'on doit ajouter au stock
+    // Déterminer le type de commande (utiliser le nouveau type si fourni, sinon l'ancien)
+    const orderType = validatedData.type || oldOrder.type;
+
+    // Si le statut passe à COMPLETED
     if (
       oldOrder.status !== ('COMPLETED' as OrderStatus) &&
-      validatedData.status === 'COMPLETED' &&
-      data.addToStock === true
+      validatedData.status === 'COMPLETED'
     ) {
-      const stockResult = await addOrderItemsToStock(validatedData.id);
-      if (stockResult.status !== 200) {
-        // Si l'ajout au stock échoue, on retourne quand même la commande mise à jour
-        // mais avec un avertissement
-        return {
-          status: 200,
-          data: order,
-          warning: 'La commande a été mise à jour mais l\'ajout au stock a échoué',
-        };
+      // Pour les commandes entrantes (INCOMING), ajouter au stock si demandé
+      if (orderType === 'INCOMING' && data.addToStock === true) {
+        const stockResult = await addOrderItemsToStock(validatedData.id);
+        if (stockResult.status !== 200) {
+          return {
+            status: 200,
+            data: order,
+            warning: 'La commande a été mise à jour mais l\'ajout au stock a échoué',
+          };
+        }
+      }
+      
+      // Pour les commandes sortantes (OUTGOING), retirer du stock automatiquement
+      if (orderType === 'OUTGOING') {
+        const stockResult = await removeOrderItemsFromStock(validatedData.id);
+        if (stockResult.status !== 200) {
+          return {
+            status: 200,
+            data: order,
+            warning: stockResult.error || 'La commande a été mise à jour mais le retrait du stock a échoué',
+          };
+        }
       }
     }
 

@@ -26,7 +26,7 @@ import {
   getOrderTypeLabel,
   OrderTypeEnum,
 } from '@/types/enum/orderType';
-import { checkOrderItemsStockToday } from '@/app/_actions/stock';
+import { checkOrderItemsStockToday, checkOrderItemsStockSufficient } from '@/app/_actions/stock';
 import type { OrderWithRelations } from '@/types/orders';
 
 interface EditOrderModalProps {
@@ -71,7 +71,15 @@ export function EditOrderModal({
   const [addToStock, setAddToStock] = useState(false);
   const [stockCheckResult, setStockCheckResult] = useState<{
     allHaveStockToday: boolean;
-    items: Array<{ itemId: string; itemName: string; hasStockToday: boolean }>;
+    allHaveEnoughStock?: boolean;
+    items: Array<{ 
+      itemId: string; 
+      itemName: string; 
+      hasStockToday: boolean;
+      currentStock?: number;
+      requiredQuantity?: number;
+      hasEnoughStock?: boolean;
+    }>;
   } | null>(null);
   const [checkingStock, setCheckingStock] = useState(false);
 
@@ -106,14 +114,28 @@ export function EditOrderModal({
     if (status === OrderStatusEnum.COMPLETED && editingOrder) {
       setCheckingStock(true);
       try {
-        const result = await checkOrderItemsStockToday(editingOrder.id);
-        const data = handleAction(result);
-        if (data) {
-          setStockCheckResult(data);
-          if (data.allHaveStockToday) {
-            setAddToStock(true);
-          } else {
-            setAddToStock(false);
+        const orderType = form.values.type || (editingOrder.type as OrderTypeEnum);
+        
+        // Pour les commandes sortantes, vérifier qu'on a assez de stock
+        if (orderType === OrderTypeEnum.OUTGOING) {
+          const result = await checkOrderItemsStockSufficient(editingOrder.id);
+          const data = handleAction(result);
+          if (data) {
+            setStockCheckResult(data);
+            // Pour les commandes sortantes, on ne peut pas terminer si on n'a pas assez de stock
+            setAddToStock(false); // Pas de checkbox pour les commandes sortantes
+          }
+        } else {
+          // Pour les commandes entrantes, vérifier si le stock d'aujourd'hui existe
+          const result = await checkOrderItemsStockToday(editingOrder.id);
+          const data = handleAction(result);
+          if (data) {
+            setStockCheckResult(data);
+            if (data.allHaveStockToday) {
+              setAddToStock(true);
+            } else {
+              setAddToStock(false);
+            }
           }
         }
       } catch (error: any) {
@@ -148,14 +170,20 @@ export function EditOrderModal({
       handleAction(result);
 
       let message = 'Commande modifiée avec succès';
-      if (values.status === OrderStatusEnum.COMPLETED && addToStock) {
-        message += '. Les objets ont été ajoutés au stock.';
-      } else if (
-        values.status === OrderStatusEnum.COMPLETED &&
-        !addToStock &&
-        stockCheckResult?.allHaveStockToday
-      ) {
-        message += ". Les objets n'ont pas été ajoutés au stock.";
+      const orderType = values.type || (editingOrder.type as OrderTypeEnum);
+      
+      if (values.status === OrderStatusEnum.COMPLETED) {
+        if (orderType === OrderTypeEnum.OUTGOING) {
+          if (stockCheckResult?.allHaveEnoughStock) {
+            message += '. Les objets ont été retirés du stock.';
+          } else {
+            message += ". Les objets n'ont pas pu être retirés du stock (stock insuffisant ou non fait).";
+          }
+        } else if (addToStock) {
+          message += '. Les objets ont été ajoutés au stock.';
+        } else if (stockCheckResult?.allHaveStockToday) {
+          message += ". Les objets n'ont pas été ajoutés au stock.";
+        }
       }
 
       notifications.show({
@@ -227,20 +255,60 @@ export function EditOrderModal({
                 </Text>
               ) : stockCheckResult ? (
                 <>
-                  {!stockCheckResult.allHaveStockToday ? (
-                    <Text size="sm" c="orange" fw={500}>
-                      ⚠️ Le stock d'aujourd'hui n'est pas fait pour certains objets. Les
-                      objets ne peuvent pas être ajoutés automatiquement au stock.
-                    </Text>
-                  ) : (
-                    <Checkbox
-                      label="Ajouter automatiquement les objets au stock d'aujourd'hui"
-                      checked={addToStock}
-                      onChange={(event) =>
-                        setAddToStock(event.currentTarget.checked)
+                  {(() => {
+                    const orderType = form.values.type || (editingOrder?.type as OrderTypeEnum);
+                    
+                    // Pour les commandes sortantes
+                    if (orderType === OrderTypeEnum.OUTGOING) {
+                      if (!stockCheckResult.allHaveStockToday) {
+                        return (
+                          <Text size="sm" c="orange" fw={500}>
+                            ⚠️ Le stock d'aujourd'hui n'est pas fait pour certains objets. Les
+                            objets ne peuvent pas être retirés du stock.
+                          </Text>
+                        );
                       }
-                    />
-                  )}
+                      if (!stockCheckResult.allHaveEnoughStock) {
+                        const insufficientItems = stockCheckResult.items
+                          .filter((item) => !item.hasEnoughStock)
+                          .map((item) => `${item.itemName} (stock: ${item.currentStock}, requis: ${item.requiredQuantity})`);
+                        return (
+                          <>
+                            <Text size="sm" c="red" fw={500}>
+                              ⚠️ Stock insuffisant pour certains objets. Les objets ne peuvent pas être retirés du stock.
+                            </Text>
+                            <Text size="xs" c="dimmed" mt="xs">
+                              Objets avec stock insuffisant : {insufficientItems.join(', ')}
+                            </Text>
+                          </>
+                        );
+                      }
+                      return (
+                        <Text size="sm" c="green" fw={500}>
+                          ✓ Stock suffisant. Les objets seront automatiquement retirés du stock lors de la sauvegarde.
+                        </Text>
+                      );
+                    }
+                    
+                    // Pour les commandes entrantes
+                    if (!stockCheckResult.allHaveStockToday) {
+                      return (
+                        <Text size="sm" c="orange" fw={500}>
+                          ⚠️ Le stock d'aujourd'hui n'est pas fait pour certains objets. Les
+                          objets ne peuvent pas être ajoutés automatiquement au stock.
+                        </Text>
+                      );
+                    }
+                    return (
+                      <Checkbox
+                        label="Ajouter automatiquement les objets au stock d'aujourd'hui"
+                        checked={addToStock}
+                        onChange={(event) =>
+                          setAddToStock(event.currentTarget.checked)
+                        }
+                      />
+                    );
+                  })()}
                   {stockCheckResult.items.some((item) => !item.hasStockToday) && (
                     <Text size="xs" c="dimmed" mt="xs">
                       Objets sans stock d'aujourd'hui :{' '}
