@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
   Modal,
   Stack,
@@ -11,10 +11,15 @@ import {
   Group,
   Text,
   Checkbox,
+  NumberInput,
+  Table,
+  ActionIcon,
 } from '@mantine/core';
+import { IconTrash } from '@tabler/icons-react';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { updateOrder } from '@/app/_actions/orders';
+import { getItems } from '@/app/_actions/items';
 import { handleAction } from '@/lib/action';
 import { handleApiZodError } from '@/lib/services/zod';
 import { ParsedZodError } from '@/lib/errors/ParsedZodError';
@@ -22,8 +27,23 @@ import {
   getOrderStatusLabel,
   OrderStatusEnum,
 } from '@/types/enum/orderStatus';
-import { checkOrderItemsStockToday } from '@/app/_actions/stock';
+import {
+  getOrderTypeLabel,
+  OrderTypeEnum,
+} from '@/types/enum/orderType';
+import { checkOrderItemsStockToday, checkOrderItemsStockSufficient } from '@/app/_actions/stock';
 import type { OrderWithRelations } from '@/types/orders';
+import type { ItemWithRelations } from '@/types/stock';
+
+interface OrderItem {
+  itemId: string;
+  quantity: number;
+  item: {
+    id: string;
+    name: string;
+    price: number | null;
+  };
+}
 
 interface EditOrderModalProps {
   opened: boolean;
@@ -53,6 +73,11 @@ const statusOptions: { value: string; label: string }[] = [
   },
 ];
 
+const typeOptions: { value: string; label: string }[] = [
+  { value: OrderTypeEnum.INCOMING, label: getOrderTypeLabel(OrderTypeEnum.INCOMING) },
+  { value: OrderTypeEnum.OUTGOING, label: getOrderTypeLabel(OrderTypeEnum.OUTGOING) },
+];
+
 export function EditOrderModal({
   opened,
   onClose,
@@ -62,32 +87,187 @@ export function EditOrderModal({
   const [addToStock, setAddToStock] = useState(false);
   const [stockCheckResult, setStockCheckResult] = useState<{
     allHaveStockToday: boolean;
-    items: Array<{ itemId: string; itemName: string; hasStockToday: boolean }>;
+    allHaveEnoughStock?: boolean;
+    items: Array<{ 
+      itemId: string; 
+      itemName: string; 
+      hasStockToday: boolean;
+      currentStock?: number;
+      requiredQuantity?: number;
+      hasEnoughStock?: boolean;
+    }>;
   } | null>(null);
   const [checkingStock, setCheckingStock] = useState(false);
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+  const [allItems, setAllItems] = useState<ItemWithRelations[]>([]);
+  const [loadingItems, setLoadingItems] = useState(false);
+
+  // Fonction utilitaire pour convertir le prix en nombre
+  const normalizePrice = (price: unknown): number | null => {
+    if (price == null) return null;
+    if (typeof price === 'number') return price;
+    const numPrice = Number(price);
+    return isNaN(numPrice) ? null : numPrice;
+  };
 
   const form = useForm({
     initialValues: {
       name: '',
       status: OrderStatusEnum.DRAFT,
+      type: OrderTypeEnum.INCOMING,
       details: '',
+      price: '' as number | '',
     },
     validate: {
       name: (value) => (value.length < 1 ? 'Le nom est requis' : null),
     },
   });
 
+  // Charger les items disponibles
+  useEffect(() => {
+    if (opened) {
+      const loadItems = async () => {
+        try {
+          setLoadingItems(true);
+          const result = await getItems();
+          const itemsData = handleAction(result);
+          if (itemsData) {
+            setAllItems(
+              itemsData.map((item: any) => ({
+                ...item,
+                stockToday: null,
+                stockYesterday: null,
+                price: normalizePrice(item.price),
+                canBeSold: item.canBeSold ?? false,
+              }))
+            );
+          }
+        } catch (error: any) {
+          notifications.show({
+            title: 'Erreur',
+            message: error.message || 'Erreur lors du chargement des items',
+            color: 'red',
+          });
+        } finally {
+          setLoadingItems(false);
+        }
+      };
+      loadItems();
+    }
+  }, [opened]);
+
+  // Initialiser les items de la commande
+  useEffect(() => {
+    if (editingOrder) {
+      setOrderItems(
+        editingOrder.items.map((item) => ({
+          itemId: item.itemId,
+          quantity: item.quantity,
+          item: {
+            id: item.item.id,
+            name: item.item.name,
+            price: item.item.price,
+          },
+        }))
+      );
+    }
+  }, [editingOrder, opened]);
+
+  // Calculer le prix total pour les commandes sortantes
+  const calculatedPrice = useMemo(() => {
+    const orderType = form.values.type || (editingOrder?.type as OrderTypeEnum);
+    if (orderType !== OrderTypeEnum.OUTGOING) return null;
+    
+    const total = orderItems.reduce((sum, orderItem) => {
+      const itemPrice = orderItem.item.price;
+      if (itemPrice != null && itemPrice > 0) {
+        return sum + itemPrice * orderItem.quantity;
+      }
+      return sum;
+    }, 0);
+    
+    return total > 0 ? total : null;
+  }, [orderItems, form.values.type, editingOrder]);
+
   useEffect(() => {
     if (editingOrder) {
       form.setValues({
         name: editingOrder.name,
         status: editingOrder.status as OrderStatusEnum,
+        type: (editingOrder.type || OrderTypeEnum.INCOMING) as OrderTypeEnum,
         details: editingOrder.details || '',
+        price: editingOrder.price != null ? editingOrder.price : '',
       });
       setAddToStock(false);
       setStockCheckResult(null);
     }
   }, [editingOrder, opened]);
+
+  // Obtenir les items disponibles selon le type de commande
+  const getAvailableItems = () => {
+    const orderType = form.values.type || (editingOrder?.type as OrderTypeEnum);
+    
+    if (orderType === OrderTypeEnum.OUTGOING) {
+      // Pour les commandes sortantes, on peut choisir les items qui peuvent être vendus
+      return allItems.filter((item) => {
+        const hasCanBeSold = item.canBeSold === true;
+        const price = normalizePrice(item.price);
+        const hasPrice = price != null && price > 0;
+        const isNotCraftableWithPrice = !item.isCraftable && hasPrice;
+        
+        return hasCanBeSold || isNotCraftableWithPrice;
+      });
+    }
+    
+    // Pour les commandes entrantes, on filtre par groupe d'entreprise
+    // On récupère le groupe d'entreprise depuis les items existants
+    if (orderItems.length > 0) {
+      const firstItem = allItems.find((item) => item.id === orderItems[0].itemId);
+      const companyGroupId = firstItem?.companyGroupId;
+      
+      if (companyGroupId) {
+        return allItems.filter(
+          (item) => !item.isCraftable && item.companyGroupId === companyGroupId
+        );
+      }
+    }
+    
+    return [];
+  };
+
+  // Retirer un item de la commande
+  const handleRemoveItem = (itemId: string) => {
+    setOrderItems(orderItems.filter((oi) => oi.itemId !== itemId));
+  };
+
+  // Mettre à jour la quantité d'un item
+  const handleQuantityChange = (itemId: string, quantity: number | string) => {
+    const numQuantity = typeof quantity === 'number' ? quantity : (quantity === '' ? 1 : Number(quantity) || 1);
+    setOrderItems(
+      orderItems.map((oi) =>
+        oi.itemId === itemId ? { ...oi, quantity: numQuantity } : oi
+      )
+    );
+  };
+
+  // Ajouter un item à la commande
+  const handleAddItem = (itemId: string) => {
+    const itemToAdd = allItems.find((item) => item.id === itemId);
+    if (itemToAdd && !orderItems.some((oi) => oi.itemId === itemId)) {
+      setOrderItems([
+        ...orderItems,
+        {
+          itemId: itemToAdd.id,
+          quantity: 1,
+          item: {
+            id: itemToAdd.id,
+            name: itemToAdd.name,
+            price: normalizePrice(itemToAdd.price),
+          },
+        },
+      ]);
+    }
+  };
 
   const handleStatusChange = async (status: OrderStatusEnum) => {
     form.setFieldValue('status', status);
@@ -95,14 +275,28 @@ export function EditOrderModal({
     if (status === OrderStatusEnum.COMPLETED && editingOrder) {
       setCheckingStock(true);
       try {
-        const result = await checkOrderItemsStockToday(editingOrder.id);
-        const data = handleAction(result);
-        if (data) {
-          setStockCheckResult(data);
-          if (data.allHaveStockToday) {
-            setAddToStock(true);
-          } else {
-            setAddToStock(false);
+        const orderType = form.values.type || (editingOrder.type as OrderTypeEnum);
+        
+        // Pour les commandes sortantes, vérifier qu'on a assez de stock
+        if (orderType === OrderTypeEnum.OUTGOING) {
+          const result = await checkOrderItemsStockSufficient(editingOrder.id);
+          const data = handleAction(result);
+          if (data) {
+            setStockCheckResult(data);
+            // Pour les commandes sortantes, on ne peut pas terminer si on n'a pas assez de stock
+            setAddToStock(false); // Pas de checkbox pour les commandes sortantes
+          }
+        } else {
+          // Pour les commandes entrantes, vérifier si le stock d'aujourd'hui existe
+          const result = await checkOrderItemsStockToday(editingOrder.id);
+          const data = handleAction(result);
+          if (data) {
+            setStockCheckResult(data);
+            if (data.allHaveStockToday) {
+              setAddToStock(true);
+            } else {
+              setAddToStock(false);
+            }
           }
         }
       } catch (error: any) {
@@ -123,12 +317,27 @@ export function EditOrderModal({
   const handleSubmit = async (values: typeof form.values) => {
     if (!editingOrder) return;
 
+    if (orderItems.length === 0) {
+      notifications.show({
+        title: 'Erreur',
+        message: 'La commande doit contenir au moins un article',
+        color: 'red',
+      });
+      return;
+    }
+
     try {
       const result = await updateOrder({
         id: editingOrder.id,
         name: values.name,
         status: values.status,
+        type: values.type,
         details: values.details || undefined,
+        price: values.type === OrderTypeEnum.INCOMING && values.price !== '' ? Number(values.price) : undefined,
+        items: orderItems.map((oi) => ({
+          itemId: oi.itemId,
+          quantity: oi.quantity,
+        })),
         addToStock:
           values.status === OrderStatusEnum.COMPLETED ? addToStock : undefined,
       });
@@ -136,14 +345,20 @@ export function EditOrderModal({
       handleAction(result);
 
       let message = 'Commande modifiée avec succès';
-      if (values.status === OrderStatusEnum.COMPLETED && addToStock) {
-        message += '. Les objets ont été ajoutés au stock.';
-      } else if (
-        values.status === OrderStatusEnum.COMPLETED &&
-        !addToStock &&
-        stockCheckResult?.allHaveStockToday
-      ) {
-        message += ". Les objets n'ont pas été ajoutés au stock.";
+      const orderType = values.type || (editingOrder.type as OrderTypeEnum);
+      
+      if (values.status === OrderStatusEnum.COMPLETED) {
+        if (orderType === OrderTypeEnum.OUTGOING) {
+          if (stockCheckResult?.allHaveEnoughStock) {
+            message += '. Les objets ont été retirés du stock.';
+          } else {
+            message += ". Les objets n'ont pas pu être retirés du stock (stock insuffisant ou non fait).";
+          }
+        } else if (addToStock) {
+          message += '. Les objets ont été ajoutés au stock.';
+        } else if (stockCheckResult?.allHaveStockToday) {
+          message += ". Les objets n'ont pas été ajoutés au stock.";
+        }
       }
 
       notifications.show({
@@ -155,6 +370,7 @@ export function EditOrderModal({
       form.reset();
       setAddToStock(false);
       setStockCheckResult(null);
+      setOrderItems([]);
       onSuccess();
     } catch (error: any) {
       if (error instanceof ParsedZodError) {
@@ -179,8 +395,10 @@ export function EditOrderModal({
         form.reset();
         setAddToStock(false);
         setStockCheckResult(null);
+        setOrderItems([]);
       }}
       title={editingOrder ? 'Modifier la commande' : 'Créer une commande'}
+      size="xl"
     >
       <form onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
@@ -199,6 +417,14 @@ export function EditOrderModal({
             onChange={(value) => handleStatusChange(value as OrderStatusEnum)}
             disabled={isCompleted}
           />
+          <Select
+            label="Type"
+            data={typeOptions}
+            required
+            value={form.values.type}
+            onChange={(value) => form.setFieldValue('type', value as OrderTypeEnum)}
+            disabled={isCompleted}
+          />
           {form.values.status === OrderStatusEnum.COMPLETED && (
             <Stack gap="xs">
               {checkingStock ? (
@@ -207,20 +433,60 @@ export function EditOrderModal({
                 </Text>
               ) : stockCheckResult ? (
                 <>
-                  {!stockCheckResult.allHaveStockToday ? (
-                    <Text size="sm" c="orange" fw={500}>
-                      ⚠️ Le stock d'aujourd'hui n'est pas fait pour certains objets. Les
-                      objets ne peuvent pas être ajoutés automatiquement au stock.
-                    </Text>
-                  ) : (
-                    <Checkbox
-                      label="Ajouter automatiquement les objets au stock d'aujourd'hui"
-                      checked={addToStock}
-                      onChange={(event) =>
-                        setAddToStock(event.currentTarget.checked)
+                  {(() => {
+                    const orderType = form.values.type || (editingOrder?.type as OrderTypeEnum);
+                    
+                    // Pour les commandes sortantes
+                    if (orderType === OrderTypeEnum.OUTGOING) {
+                      if (!stockCheckResult.allHaveStockToday) {
+                        return (
+                          <Text size="sm" c="orange" fw={500}>
+                            ⚠️ Le stock d'aujourd'hui n'est pas fait pour certains objets. Les
+                            objets ne peuvent pas être retirés du stock.
+                          </Text>
+                        );
                       }
-                    />
-                  )}
+                      if (!stockCheckResult.allHaveEnoughStock) {
+                        const insufficientItems = stockCheckResult.items
+                          .filter((item) => !item.hasEnoughStock)
+                          .map((item) => `${item.itemName} (stock: ${item.currentStock}, requis: ${item.requiredQuantity})`);
+                        return (
+                          <>
+                            <Text size="sm" c="red" fw={500}>
+                              ⚠️ Stock insuffisant pour certains objets. Les objets ne peuvent pas être retirés du stock.
+                            </Text>
+                            <Text size="xs" c="dimmed" mt="xs">
+                              Objets avec stock insuffisant : {insufficientItems.join(', ')}
+                            </Text>
+                          </>
+                        );
+                      }
+                      return (
+                        <Text size="sm" c="green" fw={500}>
+                          ✓ Stock suffisant. Les objets seront automatiquement retirés du stock lors de la sauvegarde.
+                        </Text>
+                      );
+                    }
+                    
+                    // Pour les commandes entrantes
+                    if (!stockCheckResult.allHaveStockToday) {
+                      return (
+                        <Text size="sm" c="orange" fw={500}>
+                          ⚠️ Le stock d'aujourd'hui n'est pas fait pour certains objets. Les
+                          objets ne peuvent pas être ajoutés automatiquement au stock.
+                        </Text>
+                      );
+                    }
+                    return (
+                      <Checkbox
+                        label="Ajouter automatiquement les objets au stock d'aujourd'hui"
+                        checked={addToStock}
+                        onChange={(event) =>
+                          setAddToStock(event.currentTarget.checked)
+                        }
+                      />
+                    );
+                  })()}
                   {stockCheckResult.items.some((item) => !item.hasStockToday) && (
                     <Text size="xs" c="dimmed" mt="xs">
                       Objets sans stock d'aujourd'hui :{' '}
@@ -241,6 +507,101 @@ export function EditOrderModal({
             {...form.getInputProps('details')}
             disabled={isCompleted}
           />
+          {form.values.type === OrderTypeEnum.INCOMING && (
+            <NumberInput
+              label="Prix (optionnel)"
+              placeholder="Prix de la commande"
+              {...form.getInputProps('price')}
+              min={0}
+              decimalScale={2}
+              fixedDecimalScale
+              prefix="$ "
+              disabled={isCompleted}
+            />
+          )}
+          {form.values.type === OrderTypeEnum.OUTGOING && calculatedPrice !== null && (
+            <TextInput
+              label="Prix total"
+              value={`${calculatedPrice.toFixed(2)} $`}
+              readOnly
+              styles={{ input: { fontWeight: 500 } }}
+            />
+          )}
+          
+          <Text fw={500}>Objets de la commande</Text>
+          
+          {orderItems.length > 0 ? (
+            <Table striped highlightOnHover>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>Objet</Table.Th>
+                  <Table.Th>Quantité</Table.Th>
+                  {form.values.type === OrderTypeEnum.OUTGOING && <Table.Th>Prix unitaire</Table.Th>}
+                  {form.values.type === OrderTypeEnum.OUTGOING && <Table.Th>Total</Table.Th>}
+                  <Table.Th style={{ width: 50 }}></Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {orderItems.map((orderItem) => {
+                  const itemPrice = orderItem.item.price || 0;
+                  const itemTotal = itemPrice * orderItem.quantity;
+                  return (
+                    <Table.Tr key={orderItem.itemId}>
+                      <Table.Td>{orderItem.item.name}</Table.Td>
+                      <Table.Td>
+                        <NumberInput
+                          value={orderItem.quantity}
+                          onChange={(value) => handleQuantityChange(orderItem.itemId, value)}
+                          min={1}
+                          style={{ maxWidth: 120 }}
+                          disabled={isCompleted}
+                        />
+                      </Table.Td>
+                      {form.values.type === OrderTypeEnum.OUTGOING && (
+                        <>
+                          <Table.Td>{itemPrice > 0 ? `${itemPrice.toFixed(2)} $` : '-'}</Table.Td>
+                          <Table.Td>{itemTotal > 0 ? `${itemTotal.toFixed(2)} $` : '-'}</Table.Td>
+                        </>
+                      )}
+                      <Table.Td>
+                        <ActionIcon
+                          color="red"
+                          variant="light"
+                          onClick={() => handleRemoveItem(orderItem.itemId)}
+                          disabled={isCompleted}
+                        >
+                          <IconTrash size={16} />
+                        </ActionIcon>
+                      </Table.Td>
+                    </Table.Tr>
+                  );
+                })}
+              </Table.Tbody>
+            </Table>
+          ) : (
+            <Text c="dimmed" ta="center" py="md">
+              Aucun objet dans la commande. Utilisez le champ ci-dessous pour ajouter un objet.
+            </Text>
+          )}
+
+          {!isCompleted && (
+            <Select
+              label="Ajouter un objet"
+              placeholder="Sélectionner un objet à ajouter"
+              data={getAvailableItems()
+                .filter((item) => !orderItems.some((oi) => oi.itemId === item.id))
+                .map((item) => ({ value: item.id, label: item.name }))}
+              disabled={loadingItems || getAvailableItems().length === 0}
+              onChange={(value) => {
+                if (value) {
+                  handleAddItem(value);
+                }
+              }}
+              searchable
+              clearable
+            />
+          )}
+
           <Group justify="flex-end" mt="md">
             <Button
               variant="subtle"

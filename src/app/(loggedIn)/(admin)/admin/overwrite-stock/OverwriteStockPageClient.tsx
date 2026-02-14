@@ -99,13 +99,8 @@ export default function OverwriteStockPageClient({
       setSaving(true);
       const date = dayjs(selectedDate).toDate();
 
+      // Envoyer tous les stocks (modifiés et non modifiés) pour préserver les stocks non modifiés
       const stocks = Object.entries(stockValues)
-        .filter(([itemId, quantity]) => {
-          const initialValue = initialStockValues[itemId];
-          const hasChanged = quantity !== initialValue;
-          const isExplicitZero = quantity === 0 && initialValue === null;
-          return hasChanged || isExplicitZero;
-        })
         .map(([itemId, quantity]) => ({
           itemId,
           quantity: quantity ?? 0,

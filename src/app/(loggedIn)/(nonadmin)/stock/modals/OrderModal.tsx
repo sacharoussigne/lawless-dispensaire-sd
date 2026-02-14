@@ -23,6 +23,10 @@ import { getItems } from '@/app/_actions/items';
 import { getOrders, createOrder } from '@/app/_actions/orders';
 import { handleAction } from '@/lib/action';
 import type { ItemWithRelations } from '@/types/stock';
+import {
+  getOrderTypeLabel,
+  OrderTypeEnum,
+} from '@/types/enum/orderType';
 
 interface OrderModalProps {
   opened: boolean;
@@ -62,6 +66,14 @@ interface ExistingOrder {
   }>;
 }
 
+// Fonction utilitaire pour convertir le prix en nombre
+const normalizePrice = (price: unknown): number | null => {
+  if (price == null) return null;
+  if (typeof price === 'number') return price;
+  const numPrice = Number(price);
+  return isNaN(numPrice) ? null : numPrice;
+};
+
 export default function OrderModal({ 
   opened, 
   onClose, 
@@ -69,11 +81,13 @@ export default function OrderModal({
   onOrderCreated,
   prefillItemsNeedingRestock = true,
 }: OrderModalProps) {
-  const [companyGroups, setCompanyGroups] = useState<CompanyGroupWithCompanies[]>([]);
+  const [allCompanyGroups, setAllCompanyGroups] = useState<CompanyGroupWithCompanies[]>([]);
   const [allItems, setAllItems] = useState<ItemWithRelations[]>([]);
   const [selectedCompanyGroupId, setSelectedCompanyGroupId] = useState<string | null>(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
+  const [orderType, setOrderType] = useState<OrderTypeEnum>(OrderTypeEnum.INCOMING);
   const [orderDetails, setOrderDetails] = useState('');
+  const [orderPrice, setOrderPrice] = useState<number | ''>('');
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
@@ -103,52 +117,30 @@ export default function OrderModal({
         if (itemsData) {
           // Convertir les items en ItemWithRelations (sans stock)
           setAllItems(
-            itemsData.map((item) => ({
+            itemsData.map((item: any) => ({
               ...item,
               stockToday: null,
               stockYesterday: null,
+              price: normalizePrice(item.price),
+              canBeSold: item.canBeSold ?? false,
             }))
           );
         }
       } else {
-        setAllItems(items);
+        // Si les items sont fournis en props, s'assurer qu'ils ont les bonnes propriétés
+        setAllItems(
+          items.map((item: any) => ({
+            ...item,
+            price: normalizePrice(item.price),
+            canBeSold: item.canBeSold ?? false,
+          }))
+        );
       }
 
-      // Attendre que les items soient chargés avant de filtrer les groupes
-      const itemsToUseForFiltering = items.length > 0 ? items : allItems;
-      
       if (groupsData) {
-        let filteredGroups = groupsData;
-        
-        // Filtrer les groupes d'entreprises pour ne garder que ceux qui ont au moins un item non-craftable
-        if (itemsToUseForFiltering.length > 0) {
-          filteredGroups = groupsData.filter((group) => {
-            // Vérifier s'il y a au moins un item non-craftable lié à ce groupe
-            const hasItems = itemsToUseForFiltering.some(
-              (item) => !item.isCraftable && item.companyGroupId === group.id
-            );
-            
-            if (!hasItems) return false;
-            
-            // Si prefillItemsNeedingRestock est true, vérifier aussi qu'il y a des items nécessitant un réapprovisionnement
-            if (prefillItemsNeedingRestock) {
-              return itemsToUseForFiltering.some(
-                (item) =>
-                  !item.isCraftable &&
-                  item.companyGroupId === group.id &&
-                  item.stockToday !== null &&
-                  item.stockToday < item.idealQuantity
-              );
-            }
-            
-            return true;
-          });
-        } else {
-          filteredGroups = groupsData;
-        }
-
-        setCompanyGroups(
-          filteredGroups.map((g) => ({
+        // Stocker tous les groupes (sans filtrage)
+        setAllCompanyGroups(
+          groupsData.map((g) => ({
             id: g.id,
             name: g.name,
             companies: g.companies || [],
@@ -171,6 +163,43 @@ export default function OrderModal({
     return items.length > 0 ? items : allItems;
   }, [items, allItems]);
 
+  // Filtrer les groupes d'entreprises selon le type de commande
+  const companyGroups = useMemo(() => {
+    if (orderType === OrderTypeEnum.OUTGOING) {
+      // Pour les commandes sortantes, afficher tous les groupes
+      return allCompanyGroups;
+    }
+
+    // Pour les commandes entrantes, filtrer selon les items
+    const itemsToUseForFiltering = items.length > 0 ? items : allItems;
+    
+    if (itemsToUseForFiltering.length === 0) {
+      return allCompanyGroups;
+    }
+
+    return allCompanyGroups.filter((group) => {
+      // Vérifier s'il y a au moins un item non-craftable lié à ce groupe
+      const hasItems = itemsToUseForFiltering.some(
+        (item) => !item.isCraftable && item.companyGroupId === group.id
+      );
+      
+      if (!hasItems) return false;
+      
+      // Si prefillItemsNeedingRestock est true, vérifier aussi qu'il y a des items nécessitant un réapprovisionnement
+      if (prefillItemsNeedingRestock) {
+        return itemsToUseForFiltering.some(
+          (item) =>
+            !item.isCraftable &&
+            item.companyGroupId === group.id &&
+            item.stockToday !== null &&
+            item.stockToday < item.idealQuantity
+        );
+      }
+      
+      return true;
+    });
+  }, [allCompanyGroups, orderType, items, allItems, prefillItemsNeedingRestock]);
+
   // Charger les commandes existantes quand un groupe d'entreprise est sélectionné
   useEffect(() => {
     const loadExistingOrders = async () => {
@@ -185,7 +214,7 @@ export default function OrderModal({
         
         if (ordersData) {
           // Obtenir les IDs des entreprises du groupe sélectionné
-          const selectedGroup = companyGroups.find((g) => g.id === selectedCompanyGroupId);
+          const selectedGroup = allCompanyGroups.find((g) => g.id === selectedCompanyGroupId);
           const companyIds = selectedGroup?.companies.map((c) => c.company.id) || [];
           
           // Filtrer les commandes : non terminées/annulées et appartenant au groupe
@@ -199,12 +228,20 @@ export default function OrderModal({
         }
       } catch (error: any) {
         // Silently fail, ce n'est pas critique
-        console.error('Erreur lors du chargement des commandes existantes:', error);
+        // Les commandes existantes sont un bonus, pas une fonctionnalité critique
       }
     };
 
     loadExistingOrders();
-  }, [selectedCompanyGroupId, companyGroups]);
+  }, [selectedCompanyGroupId, allCompanyGroups]);
+
+  // Réinitialiser les sélections quand le type change
+  useEffect(() => {
+    setSelectedCompanyGroupId(null);
+    setSelectedCompanyId(null);
+    setOrderItems([]);
+    setOrderPrice('');
+  }, [orderType]);
 
   // Quand un groupe d'entreprise est sélectionné, initialiser les items qui ont besoin d'être restockés (si prefillItemsNeedingRestock est true)
   useEffect(() => {
@@ -214,7 +251,8 @@ export default function OrderModal({
       return;
     }
     
-    if (prefillItemsNeedingRestock && itemsToUse.length > 0) {
+    // Ne préremplir que pour les commandes entrantes (INCOMING)
+    if (orderType === OrderTypeEnum.INCOMING && prefillItemsNeedingRestock && itemsToUse.length > 0) {
       const itemsNeedingRestock = itemsToUse.filter(
         (item) =>
           !item.isCraftable &&
@@ -233,28 +271,62 @@ export default function OrderModal({
       });
 
       setOrderItems(initialOrderItems);
-    } else if (!prefillItemsNeedingRestock) {
-      // Si on ne préremplit pas, on laisse la liste vide pour que l'utilisateur ajoute manuellement
+    } else {
+      // Si on ne préremplit pas ou si c'est une commande sortante, on laisse la liste vide pour que l'utilisateur ajoute manuellement
       setOrderItems([]);
     }
     
     // Réinitialiser la sélection d'entreprise quand on change de groupe
     setSelectedCompanyId(null);
-  }, [selectedCompanyGroupId, prefillItemsNeedingRestock, itemsToUse]);
+  }, [selectedCompanyGroupId, prefillItemsNeedingRestock, itemsToUse, orderType]);
+
+  // Calculer le prix total pour les commandes sortantes
+  const calculatedPrice = useMemo(() => {
+    if (orderType !== OrderTypeEnum.OUTGOING) return null;
+    
+    const total = orderItems.reduce((sum, orderItem) => {
+      const item = itemsToUse.find((i) => i.id === orderItem.itemId) || orderItem.item;
+      const price = normalizePrice(item.price);
+      if (price != null && price > 0) {
+        return sum + price * orderItem.quantity;
+      }
+      return sum;
+    }, 0);
+    
+    return total > 0 ? total : null;
+  }, [orderItems, orderType, itemsToUse]);
 
   // Réinitialiser le formulaire quand la modal se ferme
   useEffect(() => {
     if (!opened) {
       setSelectedCompanyGroupId(null);
       setSelectedCompanyId(null);
+      setOrderType(OrderTypeEnum.INCOMING);
       setOrderDetails('');
+      setOrderPrice('');
       setOrderItems([]);
     }
   }, [opened]);
 
   // Obtenir les items disponibles pour le groupe sélectionné
   const getAvailableItemsForGroup = () => {
-    if (!selectedCompanyGroupId) return [];
+    if (!selectedCompanyGroupId && orderType === OrderTypeEnum.INCOMING) return [];
+    // Pour les commandes sortantes (OUTGOING), on ne peut choisir que les items qui peuvent être vendus
+    // Un item peut être vendu si canBeSold est true OU s'il n'est pas craftable et a un prix
+    if (orderType === OrderTypeEnum.OUTGOING) {
+      return itemsToUse.filter((item) => {
+        // Un item peut être vendu si :
+        // 1. canBeSold est explicitement true (peut être craftable ou non)
+        // 2. OU il n'est pas craftable ET il a un prix défini
+        const hasCanBeSold = item.canBeSold === true;
+        const price = normalizePrice(item.price);
+        const hasPrice = price != null && price > 0;
+        const isNotCraftableWithPrice = !item.isCraftable && hasPrice;
+        
+        return hasCanBeSold || isNotCraftableWithPrice;
+      });
+    }
+    // Pour les commandes entrantes (INCOMING), on filtre par groupe et non-craftable
     return itemsToUse.filter(
       (item) => !item.isCraftable && item.companyGroupId === selectedCompanyGroupId
     );
@@ -294,7 +366,9 @@ export default function OrderModal({
     try {
       setLoading(true);
       const result = await createOrder({
+        type: orderType,
         details: orderDetails || undefined,
+        price: orderType === OrderTypeEnum.INCOMING && orderPrice !== '' ? Number(orderPrice) : undefined,
         companyId: selectedCompanyId,
         items: orderItems.map((oi) => ({
           itemId: oi.itemId,
@@ -343,6 +417,11 @@ export default function OrderModal({
     });
   }, [orderItems, existingOrders]);
 
+  // Déterminer si on peut afficher la section des items
+  const canShowItems = 
+    (orderType === OrderTypeEnum.INCOMING && selectedCompanyGroupId) ||
+    (orderType === OrderTypeEnum.OUTGOING && selectedCompanyId);
+
   return (
     <Modal
       opened={opened}
@@ -351,6 +430,19 @@ export default function OrderModal({
       size="xl"
     >
       <Stack gap="md">
+        <Select
+          label="Type de commande"
+          placeholder="Sélectionner un type"
+          data={[
+            { value: OrderTypeEnum.INCOMING, label: getOrderTypeLabel(OrderTypeEnum.INCOMING) },
+            { value: OrderTypeEnum.OUTGOING, label: getOrderTypeLabel(OrderTypeEnum.OUTGOING) },
+          ]}
+          value={orderType}
+          onChange={(value) => setOrderType(value as OrderTypeEnum)}
+          required
+          disabled={loadingData}
+        />
+
         <Group grow>
           <Select
             label="Groupe d'entreprises"
@@ -384,7 +476,7 @@ export default function OrderModal({
           />
         </Group>
 
-        {selectedCompanyGroupId && (
+        {canShowItems && (
           <>
             {conflictingOrders.length > 0 && (
               <Alert
@@ -420,6 +512,28 @@ export default function OrderModal({
               onChange={(e) => setOrderDetails(e.currentTarget.value)}
               minRows={3}
             />
+
+            {orderType === OrderTypeEnum.INCOMING && (
+              <NumberInput
+                label="Prix (optionnel)"
+                placeholder="Prix de la commande"
+                value={orderPrice}
+                onChange={(value) => setOrderPrice(value === '' ? '' : Number(value))}
+                min={0}
+                decimalScale={2}
+                fixedDecimalScale
+                prefix="$ "
+              />
+            )}
+
+            {orderType === OrderTypeEnum.OUTGOING && calculatedPrice !== null && (
+              <TextInput
+                label="Prix total"
+                value={`${calculatedPrice.toFixed(2)} $`}
+                readOnly
+                styles={{ input: { fontWeight: 500 } }}
+              />
+            )}
 
             <Text fw={500}>Objets de la commande</Text>
 
@@ -491,13 +605,18 @@ export default function OrderModal({
               </Text>
             )}
 
-            {selectedCompanyGroupId && canAddMoreItems && (
+            {selectedCompanyId && (
               <Select
                 label="Ajouter un objet"
-                placeholder="Sélectionner un objet à ajouter"
+                placeholder={
+                  availableItems.length === 0
+                    ? "Aucun objet vendable disponible"
+                    : "Sélectionner un objet à ajouter"
+                }
                 data={availableItems
                   .filter((item) => !orderItemIds.has(item.id))
                   .map((item) => ({ value: item.id, label: item.name }))}
+                disabled={availableItems.length === 0 || !canAddMoreItems}
                 onChange={(value) => {
                   if (value) {
                     const itemToAdd = availableItems.find((item) => item.id === value);

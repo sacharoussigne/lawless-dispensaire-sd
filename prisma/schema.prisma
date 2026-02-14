@@ -94,6 +94,8 @@ model Item {
   idealQuantity  Int
   isCraftable    Boolean           @default(false)
   isEnabled      Boolean           @default(true)
+  canBeSold      Boolean           @default(false)
+  price          Decimal?           @db.Decimal(10, 2)
   categoryId     String
   category       CategoryItem      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   companyGroupId String?
@@ -213,11 +215,18 @@ enum OrderStatus {
   CANCELLED
 }
 
+enum OrderType {
+  INCOMING
+  OUTGOING
+}
+
 model Order {
   id        String       @id @default(uuid())
   name      String
   status    OrderStatus  @default(DRAFT)
+  type      OrderType    @default(INCOMING)
   details   String?
+  price     Decimal?     @db.Decimal(10, 2)
   companyId String
   company   Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdAt DateTime     @default(now())
@@ -226,6 +235,7 @@ model Order {
 
   @@index([companyId])
   @@index([status])
+  @@index([type])
   @@map("order")
 }
 

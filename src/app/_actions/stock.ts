@@ -40,6 +40,8 @@ export async function getItemsWithStock() {
         description: true,
         idealQuantity: true,
         isCraftable: true,
+        canBeSold: true,
+        price: true,
         categoryId: true,
         companyGroupId: true,
         order: true,
@@ -93,6 +95,7 @@ export async function getItemsWithStock() {
         ...item,
         stockToday: stockToday?.quantity ?? null,
         stockYesterday: stockYesterday?.quantity ?? null,
+        price: item.price ? Number(item.price) : null,
       };
     });
 
@@ -455,6 +458,8 @@ export async function getItemsWithStockForDate(date: Date) {
         description: true,
         idealQuantity: true,
         isCraftable: true,
+        canBeSold: true,
+        price: true,
         categoryId: true,
         companyGroupId: true,
         order: true,
@@ -498,6 +503,7 @@ export async function getItemsWithStockForDate(date: Date) {
         ...item,
         stockForDate: stockForDate?.quantity ?? null,
         stockHistoryId: stockForDate?.id ?? null,
+        price: item.price ? Number(item.price) : null,
       };
     });
 
@@ -643,3 +649,215 @@ export async function checkOrderItemsStockToday(orderId: string) {
   }
 }
 
+/**
+ * Vérifie qu'on a assez de stock pour retirer les items d'une commande sortante
+ * Retourne true si tous les items ont assez de stock, false sinon
+ */
+export async function checkOrderItemsStockSufficient(orderId: string) {
+  try {
+    const session = await getAuthSession();
+    if (!session) {
+      return {
+        status: 401,
+        error: 'Non autorisé',
+      };
+    }
+
+    // Récupérer la commande avec ses items
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: {
+          include: {
+            item: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      return {
+        status: 404,
+        error: 'Commande non trouvée',
+      };
+    }
+
+    const today = getTodayStart();
+    const tomorrow = getTomorrowStart();
+
+    // Vérifier le stock d'aujourd'hui pour chaque item et si on a assez
+    const stockChecks = await Promise.all(
+      order.items.map(async (orderItem) => {
+        const stockToday = await prisma.stockHistory.findFirst({
+          where: {
+            itemId: orderItem.itemId,
+            timestamp: {
+              gte: today,
+              lt: tomorrow,
+            },
+          },
+          orderBy: {
+            timestamp: 'desc',
+          },
+        });
+
+        const hasStockToday = stockToday !== null;
+        const currentStock = stockToday?.quantity ?? 0;
+        const hasEnoughStock = currentStock >= orderItem.quantity;
+
+        return {
+          itemId: orderItem.itemId,
+          itemName: orderItem.item.name,
+          hasStockToday,
+          currentStock,
+          requiredQuantity: orderItem.quantity,
+          hasEnoughStock,
+        };
+      })
+    );
+
+    const allHaveStockToday = stockChecks.every((check) => check.hasStockToday);
+    const allHaveEnoughStock = stockChecks.every((check) => check.hasEnoughStock);
+
+    return {
+      status: 200,
+      data: {
+        allHaveStockToday,
+        allHaveEnoughStock,
+        items: stockChecks,
+      },
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de la vérification du stock');
+  }
+}
+
+/**
+ * Retire les items d'une commande sortante du stock d'aujourd'hui
+ * Vérifie qu'on a assez de stock avant de retirer
+ */
+export async function removeOrderItemsFromStock(orderId: string) {
+  try {
+    const session = await getAuthSession();
+    if (!session) {
+      return {
+        status: 401,
+        error: 'Non autorisé',
+      };
+    }
+
+    // Récupérer la commande avec ses items
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: {
+          include: {
+            item: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      return {
+        status: 404,
+        error: 'Commande non trouvée',
+      };
+    }
+
+    const today = getTodayStart();
+    const tomorrow = getTomorrowStart();
+
+    // Vérifier qu'on a assez de stock pour tous les items
+    const stockChecks = await Promise.all(
+      order.items.map(async (orderItem) => {
+        const stockToday = await prisma.stockHistory.findFirst({
+          where: {
+            itemId: orderItem.itemId,
+            timestamp: {
+              gte: today,
+              lt: tomorrow,
+            },
+          },
+          orderBy: {
+            timestamp: 'desc',
+          },
+        });
+
+        return {
+          orderItem,
+          stockToday,
+          hasStockToday: stockToday !== null,
+          hasEnoughStock: stockToday ? stockToday.quantity >= orderItem.quantity : false,
+        };
+      })
+    );
+
+    // Vérifier que tous les items ont un stock d'aujourd'hui
+    const allHaveStockToday = stockChecks.every((check) => check.hasStockToday);
+    if (!allHaveStockToday) {
+      const missingItems = stockChecks
+        .filter((check) => !check.hasStockToday)
+        .map((check) => check.orderItem.item.name);
+      return {
+        status: 400,
+        error: `Le stock d'aujourd'hui n'est pas fait pour les objets suivants : ${missingItems.join(', ')}`,
+      };
+    }
+
+    // Vérifier qu'on a assez de stock pour tous les items
+    const allHaveEnoughStock = stockChecks.every((check) => check.hasEnoughStock);
+    if (!allHaveEnoughStock) {
+      const insufficientItems = stockChecks
+        .filter((check) => !check.hasEnoughStock)
+        .map((check) => {
+          const currentStock = check.stockToday?.quantity ?? 0;
+          return `${check.orderItem.item.name} (stock actuel: ${currentStock}, requis: ${check.orderItem.quantity})`;
+        });
+      return {
+        status: 400,
+        error: `Stock insuffisant pour les objets suivants : ${insufficientItems.join(', ')}`,
+      };
+    }
+
+    // Retirer les quantités du stock
+    await prisma.$transaction(async (tx) => {
+      for (const check of stockChecks) {
+        if (check.stockToday) {
+          const newQuantity = check.stockToday.quantity - check.orderItem.quantity;
+          if (newQuantity < 0) {
+            throw new Error(`Stock insuffisant pour ${check.orderItem.item.name}`);
+          }
+          await tx.stockHistory.update({
+            where: { id: check.stockToday.id },
+            data: {
+              quantity: newQuantity,
+            },
+          });
+        }
+      }
+    });
+
+    return {
+      status: 200,
+      data: { success: true },
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors du retrait des objets du stock');
+  }
+}
+
+/**
+ * Vérifie qu'on a assez de stock pour retirer les items d'une commande sortante
+ * Retourne true si tous les items ont assez de stock, false sinon
+ */

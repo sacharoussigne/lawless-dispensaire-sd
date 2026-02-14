@@ -12,6 +12,8 @@ const createItemSchema = z.object({
   idealQuantity: z.number().int().min(0, 'La quantité idéale doit être positive'),
   isCraftable: z.boolean().default(false),
   isEnabled: z.boolean().default(true),
+  canBeSold: z.boolean().default(false),
+  price: z.number().positive('Le prix doit être positif').optional().nullable(),
   categoryId: z.string().uuid('ID de catégorie invalide').min(1, 'La catégorie est requise'),
   companyGroupId: z.string().uuid('ID de groupe d\'entreprise invalide').optional(),
 });
@@ -24,6 +26,8 @@ const updateItemSchema = z.object({
   idealQuantity: z.number().int().min(0, 'La quantité idéale doit être positive'),
   isCraftable: z.boolean().default(false),
   isEnabled: z.boolean().default(true),
+  canBeSold: z.boolean().default(false),
+  price: z.number().positive('Le prix doit être positif').optional().nullable(),
   categoryId: z.string().uuid('ID de catégorie invalide').min(1, 'La catégorie est requise'),
   companyGroupId: z.string().uuid('ID de groupe d\'entreprise invalide').optional(),
 });
@@ -42,6 +46,8 @@ export async function createItem(data: {
   idealQuantity: number;
   isCraftable?: boolean;
   isEnabled?: boolean;
+  canBeSold?: boolean;
+  price?: number | null;
   categoryId: string;
   companyGroupId?: string;
 }) {
@@ -78,15 +84,21 @@ export async function createItem(data: {
         idealQuantity: validatedData.idealQuantity,
         isCraftable: validatedData.isCraftable ?? false,
         isEnabled: validatedData.isEnabled ?? true,
+        canBeSold: validatedData.canBeSold ?? false,
+        price: validatedData.price !== undefined && validatedData.price !== null ? validatedData.price : null,
         categoryId: validatedData.categoryId,
         companyGroupId: validatedData.companyGroupId,
         order: newOrder,
       },
     });
 
+    // Convertir le Decimal en number pour la sérialisation
     return {
       status: 201,
-      data: item,
+      data: {
+        ...item,
+        price: item.price ? Number(item.price) : null,
+      },
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la création de l\'objet');
@@ -138,9 +150,15 @@ export async function getItems() {
       },
     });
 
+    // Convertir les Decimal en number pour la sérialisation
+    const serializedItems = items.map((item) => ({
+      ...item,
+      price: item.price ? Number(item.price) : null,
+    }));
+
     return {
       status: 200,
-      data: items,
+      data: serializedItems,
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la récupération des objets');
@@ -157,6 +175,8 @@ export async function updateItem(data: {
   idealQuantity: number;
   isCraftable?: boolean;
   isEnabled?: boolean;
+  canBeSold?: boolean;
+  price?: number | null;
   categoryId: string;
   companyGroupId?: string;
 }) {
@@ -181,14 +201,20 @@ export async function updateItem(data: {
         idealQuantity: validatedData.idealQuantity,
         isCraftable: validatedData.isCraftable ?? false,
         isEnabled: validatedData.isEnabled ?? true,
+        canBeSold: validatedData.canBeSold ?? false,
+        price: validatedData.price !== undefined && validatedData.price !== null ? validatedData.price : null,
         categoryId: validatedData.categoryId,
         companyGroupId: validatedData.companyGroupId,
       },
     });
 
+    // Convertir le Decimal en number pour la sérialisation
     return {
       status: 200,
-      data: item,
+      data: {
+        ...item,
+        price: item.price ? Number(item.price) : null,
+      },
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la modification de l\'objet');

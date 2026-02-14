@@ -4,6 +4,8 @@ export interface ItemWithRelations {
   description: string | null;
   idealQuantity: number;
   isCraftable: boolean;
+  canBeSold?: boolean;
+  price?: number | string | null;
   categoryId: string;
   companyGroupId: string | null;
   order: number;

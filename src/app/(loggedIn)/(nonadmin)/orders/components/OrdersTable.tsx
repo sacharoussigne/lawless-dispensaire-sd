@@ -8,6 +8,10 @@ import {
   getOrderStatusColor,
   OrderStatusEnum,
 } from '@/types/enum/orderStatus';
+import {
+  getOrderTypeLabel,
+  getOrderTypeColor,
+} from '@/types/enum/orderType';
 import type { OrderWithRelations } from '@/types/orders';
 
 interface OrdersTableProps {
@@ -94,6 +98,15 @@ export function OrdersTable({
             ),
           },
           {
+            accessor: 'type',
+            title: 'Type',
+            render: (order: OrderWithRelations) => (
+              <Badge color={getOrderTypeColor(order.type || 'INCOMING')}>
+                {getOrderTypeLabel(order.type || 'INCOMING')}
+              </Badge>
+            ),
+          },
+          {
             accessor: 'name',
             title: 'Nom',
             sortable: true,
@@ -112,9 +125,11 @@ export function OrdersTable({
             sortable: true,
           },
           {
-            accessor: 'items',
-            title: "Nombre d'objets",
-            render: (order: OrderWithRelations) => order.items.length,
+            accessor: 'price',
+            title: 'Prix',
+            render: (order: OrderWithRelations) =>
+              order.price != null ? `${order.price.toFixed(2)} $` : '-',
+            sortable: true,
           },
           {
             accessor: 'createdAt',
