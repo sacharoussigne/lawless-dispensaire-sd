@@ -15,7 +15,7 @@ import { useState } from 'react';
 import { AuthSession } from '@/types/session';
 import { routes } from '@/types/routes';
 import Link from 'next/link';
-import { IconSettings, IconLogout, IconUser } from '@tabler/icons-react';
+import { IconLogout, IconUser } from '@tabler/icons-react';
 import { usePermissions } from '@/app/_contexts/PermissionsContext';
 
 export default function AdminHeader({
@@ -39,7 +39,7 @@ export default function AdminHeader({
 
   return (
     <header className={`${classes.header} mb-10`}>
-      <Container size={'lg'}>
+      <Container size={'xl'}>
         <div className={'flex justify-between items-center w-full h-[60px]'}>
           <h1 className="text-2xl font-bold">
             <Link href={routes.stock.index}>
