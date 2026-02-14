@@ -11,6 +11,7 @@ import type { OrderStatus } from '@prisma/client';
 const createOrderSchema = z.object({
   name: z.string().max(255, 'Le nom est trop long').optional(),
   status: z.enum(['DRAFT', 'LETTER_SENT', 'PROCESSING', 'READY', 'COMPLETED', 'CANCELLED']).default('DRAFT'),
+  type: z.enum(['INCOMING', 'OUTGOING']).default('INCOMING'),
   details: z.string().max(1000, 'Les détails sont trop longs').optional(),
   companyId: z.string().uuid('ID d\'entreprise invalide'),
   items: z.array(
@@ -27,6 +28,7 @@ const createOrderSchema = z.object({
 export async function createOrder(data: {
   name?: string;
   status?: 'DRAFT' | 'LETTER_SENT' | 'PROCESSING' | 'READY' | 'COMPLETED' | 'CANCELLED';
+  type?: 'INCOMING' | 'OUTGOING';
   details?: string;
   companyId: string;
   items: { itemId: string; quantity: number }[];
@@ -79,6 +81,7 @@ export async function createOrder(data: {
       data: {
         name: orderName,
         status: validatedData.status,
+        type: validatedData.type,
         details: validatedData.details,
         companyId: validatedData.companyId,
         items: {
@@ -122,6 +125,7 @@ const updateOrderSchema = z.object({
   id: z.string().uuid('ID invalide'),
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long').optional(),
   status: z.enum(['DRAFT', 'LETTER_SENT', 'PROCESSING', 'READY', 'COMPLETED', 'CANCELLED']).optional(),
+  type: z.enum(['INCOMING', 'OUTGOING']).optional(),
   details: z.string().max(1000, 'Les détails sont trop longs').optional(),
 });
 
@@ -183,6 +187,7 @@ export async function updateOrder(data: {
   id: string;
   name?: string;
   status?: 'DRAFT' | 'LETTER_SENT' | 'PROCESSING' | 'READY' | 'COMPLETED' | 'CANCELLED';
+  type?: 'INCOMING' | 'OUTGOING';
   details?: string;
   addToStock?: boolean;
 }) {
@@ -225,6 +230,7 @@ export async function updateOrder(data: {
       data: {
         name: validatedData.name,
         status: validatedData.status,
+        type: validatedData.type,
         details: validatedData.details,
       },
       include: {

@@ -8,6 +8,10 @@ import {
   getOrderStatusColor,
   OrderStatusEnum,
 } from '@/types/enum/orderStatus';
+import {
+  getOrderTypeLabel,
+  getOrderTypeColor,
+} from '@/types/enum/orderType';
 import type { OrderWithRelations } from '@/types/orders';
 
 interface OrdersTableProps {
@@ -91,6 +95,15 @@ export function OrdersTable({
                 clearable
                 style={{ minWidth: 200 }}
               />
+            ),
+          },
+          {
+            accessor: 'type',
+            title: 'Type',
+            render: (order: OrderWithRelations) => (
+              <Badge color={getOrderTypeColor(order.type || 'INCOMING')}>
+                {getOrderTypeLabel(order.type || 'INCOMING')}
+              </Badge>
             ),
           },
           {

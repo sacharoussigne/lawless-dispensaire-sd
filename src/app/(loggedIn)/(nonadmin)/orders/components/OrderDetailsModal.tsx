@@ -5,6 +5,10 @@ import {
   getOrderStatusLabel,
   getOrderStatusColor,
 } from '@/types/enum/orderStatus';
+import {
+  getOrderTypeLabel,
+  getOrderTypeColor,
+} from '@/types/enum/orderType';
 import type { OrderWithRelations } from '@/types/orders';
 
 interface OrderDetailsModalProps {
@@ -39,6 +43,12 @@ export function OrderDetailsModal({
             <Text fw={500}>Statut :</Text>
             <Badge color={getOrderStatusColor(viewingOrder.status)}>
               {getOrderStatusLabel(viewingOrder.status)}
+            </Badge>
+          </Group>
+          <Group>
+            <Text fw={500}>Type :</Text>
+            <Badge color={getOrderTypeColor(viewingOrder.type || 'INCOMING')}>
+              {getOrderTypeLabel(viewingOrder.type || 'INCOMING')}
             </Badge>
           </Group>
           {viewingOrder.details && (

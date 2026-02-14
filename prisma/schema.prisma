@@ -213,10 +213,16 @@ enum OrderStatus {
   CANCELLED
 }
 
+enum OrderType {
+  INCOMING
+  OUTGOING
+}
+
 model Order {
   id        String       @id @default(uuid())
   name      String
   status    OrderStatus  @default(DRAFT)
+  type      OrderType    @default(INCOMING)
   details   String?
   companyId String
   company   Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -226,6 +232,7 @@ model Order {
 
   @@index([companyId])
   @@index([status])
+  @@index([type])
   @@map("order")
 }
 

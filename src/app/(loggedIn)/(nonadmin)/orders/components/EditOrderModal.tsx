@@ -22,6 +22,10 @@ import {
   getOrderStatusLabel,
   OrderStatusEnum,
 } from '@/types/enum/orderStatus';
+import {
+  getOrderTypeLabel,
+  OrderTypeEnum,
+} from '@/types/enum/orderType';
 import { checkOrderItemsStockToday } from '@/app/_actions/stock';
 import type { OrderWithRelations } from '@/types/orders';
 
@@ -53,6 +57,11 @@ const statusOptions: { value: string; label: string }[] = [
   },
 ];
 
+const typeOptions: { value: string; label: string }[] = [
+  { value: OrderTypeEnum.INCOMING, label: getOrderTypeLabel(OrderTypeEnum.INCOMING) },
+  { value: OrderTypeEnum.OUTGOING, label: getOrderTypeLabel(OrderTypeEnum.OUTGOING) },
+];
+
 export function EditOrderModal({
   opened,
   onClose,
@@ -70,6 +79,7 @@ export function EditOrderModal({
     initialValues: {
       name: '',
       status: OrderStatusEnum.DRAFT,
+      type: OrderTypeEnum.INCOMING,
       details: '',
     },
     validate: {
@@ -82,6 +92,7 @@ export function EditOrderModal({
       form.setValues({
         name: editingOrder.name,
         status: editingOrder.status as OrderStatusEnum,
+        type: (editingOrder.type || OrderTypeEnum.INCOMING) as OrderTypeEnum,
         details: editingOrder.details || '',
       });
       setAddToStock(false);
@@ -128,6 +139,7 @@ export function EditOrderModal({
         id: editingOrder.id,
         name: values.name,
         status: values.status,
+        type: values.type,
         details: values.details || undefined,
         addToStock:
           values.status === OrderStatusEnum.COMPLETED ? addToStock : undefined,
@@ -197,6 +209,14 @@ export function EditOrderModal({
             required
             value={form.values.status}
             onChange={(value) => handleStatusChange(value as OrderStatusEnum)}
+            disabled={isCompleted}
+          />
+          <Select
+            label="Type"
+            data={typeOptions}
+            required
+            value={form.values.type}
+            onChange={(value) => form.setFieldValue('type', value as OrderTypeEnum)}
             disabled={isCompleted}
           />
           {form.values.status === OrderStatusEnum.COMPLETED && (
