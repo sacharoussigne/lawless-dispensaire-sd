@@ -13,6 +13,7 @@ export const routes = {
     items: '/admin/items',
     users: '/admin/users',
     overwriteStock: '/admin/overwrite-stock',
+    letterTemplates: '/admin/lettertemplates',
   },
   api: {},
   settings: {
