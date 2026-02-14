@@ -106,19 +106,19 @@ export function OrdersTable({
               </Badge>
             ),
           },
-          {
-            accessor: 'name',
-            title: 'Nom',
-            sortable: true,
-            filter: (
-              <TextInput
-                placeholder="Rechercher un nom..."
-                value={nameFilter}
-                onChange={(e) => onNameFilterChange(e.currentTarget.value)}
-                style={{ minWidth: 200 }}
-              />
-            ),
-          },
+          // {
+          //   accessor: 'name',
+          //   title: 'Nom',
+          //   sortable: true,
+          //   filter: (
+          //     <TextInput
+          //       placeholder="Rechercher un nom..."
+          //       value={nameFilter}
+          //       onChange={(e) => onNameFilterChange(e.currentTarget.value)}
+          //       style={{ minWidth: 200 }}
+          //     />
+          //   ),
+          // },
           {
             accessor: 'company.name',
             title: 'Entreprise',

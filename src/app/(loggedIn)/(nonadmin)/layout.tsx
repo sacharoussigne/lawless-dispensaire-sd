@@ -20,7 +20,7 @@ export default async function LanguageLayout({
     <PermissionsProvider initialPermissions={permissions} initialRole={role}>
       <Header session={session as any} />
 
-      <Container size={'lg'} className={'flex-1 pb-[72px] sm:pb-0'}>
+      <Container size={'xl'} className={'flex-1 pb-[72px] sm:pb-0'}>
         {children}
       </Container>
       <BottomBar session={session as any} />

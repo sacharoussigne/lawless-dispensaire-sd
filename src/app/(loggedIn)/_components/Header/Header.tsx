@@ -39,7 +39,7 @@ export default function Header({
 
   return (
       <header className={`${classes.header} mb-10`}>
-        <Container size={'lg'}>
+        <Container size={'xl'}>
           <div className={'flex justify-between items-center w-full h-[60px]'}>
             <h1 className="text-2xl font-bold">
               <Link href={routes.stock.index}>

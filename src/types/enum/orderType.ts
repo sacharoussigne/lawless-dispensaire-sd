@@ -10,8 +10,8 @@ export enum OrderTypeEnum {
  */
 export function getOrderTypeLabel(type: OrderType): string {
   const labels: Record<OrderType, string> = {
-    INCOMING: 'Commande entrante',
-    OUTGOING: 'Commande sortante',
+    INCOMING: 'Entrante',
+    OUTGOING: 'Sortante',
   };
   return labels[type];
 }
