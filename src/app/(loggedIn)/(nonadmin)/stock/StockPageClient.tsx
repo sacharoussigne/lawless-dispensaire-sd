@@ -15,12 +15,11 @@ import {
   ActionIcon,
   Tooltip,
 } from '@mantine/core';
-import { IconEdit, IconCheck, IconX, IconClipboardCheck, IconTools, IconShoppingCart } from '@tabler/icons-react';
+import { IconEdit, IconCheck, IconX, IconClipboardCheck, IconTools } from '@tabler/icons-react';
 import { getItemsWithStock, updateStock, craftItem } from '@/app/_actions/stock';
 import { handleAction } from '@/lib/action';
 import { notifications } from '@mantine/notifications';
 import CraftModal from './modals/CraftModal';
-import OrderModal from './modals/OrderModal';
 import type { ItemWithRelations, CategoryWithItems } from '@/types/stock';
 import { usePermissions } from '@/app/_contexts/PermissionsContext';
 
@@ -36,6 +35,9 @@ export default function StockPageClient({ initialItems }: StockPageClientProps) 
   const [stockValues, setStockValues] = useState<Record<string, number | ''>>({});
   const [saving, setSaving] = useState(false);
   const [craftModalOpened, setCraftModalOpened] = useState(false);
+
+  // État pour stocker les valeurs d'input brutes (avec expressions)
+  const [stockInputValues, setStockInputValues] = useState<Record<string, string>>({});
 
   const loadItems = async () => {
     try {
@@ -66,10 +68,6 @@ export default function StockPageClient({ initialItems }: StockPageClientProps) 
       setStockValues(initialValues);
     }
   }, [isEditing, items]);
-
-  // État pour stocker les valeurs d'input brutes (avec expressions)
-  const [stockInputValues, setStockInputValues] = useState<Record<string, string>>({});
-  const [orderModalOpened, setOrderModalOpened] = useState(false);
 
   const handleSaveStock = async () => {
     try {
@@ -257,20 +255,6 @@ export default function StockPageClient({ initialItems }: StockPageClientProps) 
   const itemsWithStockToday = items.filter((item) => item.stockToday !== null).length;
   const totalItems = items.length;
 
-  // Vérifier s'il y a des items non-craftables avec groupe d'entreprise qui ont besoin d'être restockés
-  const itemsNeedingRestock = items.filter((item) => {
-    if (!item.isCraftable && item.companyGroupId !== null) {
-      // Utiliser stockToday si disponible, sinon stockYesterday si disponible
-      const currentStock = item.stockToday !== null 
-        ? item.stockToday 
-        : (item.stockYesterday !== null ? item.stockYesterday : null);
-      
-      return currentStock !== null && currentStock < item.idealQuantity;
-    }
-    return false;
-  });
-  const hasItemsNeedingRestock = itemsNeedingRestock.length > 0;
-
   return (
     <Container size="xl" py="xl">
       <Group justify="space-between" mb="xl">
@@ -287,16 +271,6 @@ export default function StockPageClient({ initialItems }: StockPageClientProps) 
           )}
           {!isEditing ? (
             <Group>
-              {hasItemsNeedingRestock && permissions?.orders.create && (
-                <Button
-                  leftSection={<IconShoppingCart size={16} />}
-                  onClick={() => setOrderModalOpened(true)}
-                  variant="filled"
-                  color="orange"
-                >
-                  Créer une commande ({itemsNeedingRestock.length})
-                </Button>
-              )}
               {(permissions?.stock.craftRead || permissions?.stock.craftWrite) && (
                 <Button
                   leftSection={<IconTools size={16} />}
@@ -536,14 +510,6 @@ export default function StockPageClient({ initialItems }: StockPageClientProps) 
               color: 'red',
             });
           }
-        }}
-      />
-      <OrderModal
-        opened={orderModalOpened}
-        items={items}
-        onClose={() => setOrderModalOpened(false)}
-        onOrderCreated={async () => {
-          await loadItems(); // Recharger les items après création de la commande
         }}
       />
     </Container>
