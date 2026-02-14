@@ -216,6 +216,33 @@ export function ItemsTable({
               ),
           },
           {
+            accessor: 'canBeSold',
+            title: 'Peut être vendu',
+            render: (item: ItemWithRelations) =>
+              item.canBeSold ? (
+                <Badge color="blue" variant="light">
+                  Oui
+                </Badge>
+              ) : (
+                <Badge color="gray" variant="light">
+                  Non
+                </Badge>
+              ),
+          },
+          {
+            accessor: 'price',
+            title: 'Prix',
+            render: (item: ItemWithRelations) => {
+              // Le prix peut être affiché si canBeSold est activé OU si l'item n'est pas craftable
+              const canHavePrice = item.canBeSold || !item.isCraftable;
+              return canHavePrice && item.price ? (
+                `${Number(item.price).toFixed(2)} €`
+              ) : (
+                '-'
+              );
+            },
+          },
+          {
             accessor: 'companyGroup.name',
             title: "Groupe d'entreprises",
             render: (item: ItemWithRelations) => item.companyGroup?.name || '-',

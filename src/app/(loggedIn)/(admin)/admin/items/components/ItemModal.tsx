@@ -44,6 +44,8 @@ export function ItemModal({
       idealQuantity: 0,
       isCraftable: false,
       isEnabled: true,
+      canBeSold: false,
+      price: null as number | null,
       categoryId: '',
       companyGroupId: '',
     },
@@ -52,6 +54,14 @@ export function ItemModal({
       idealQuantity: (value) =>
         value < 0 ? 'La quantité idéale doit être positive' : null,
       categoryId: (value) => (!value ? 'La catégorie est requise' : null),
+      price: (value, values) => {
+        // Le prix peut être défini si canBeSold est activé OU si l'item n'est pas craftable
+        const canHavePrice = values.canBeSold || !values.isCraftable;
+        if (canHavePrice && (value === null || value === undefined || value <= 0)) {
+          return 'Le prix est requis et doit être positif';
+        }
+        return null;
+      },
     },
   });
 
@@ -62,6 +72,14 @@ export function ItemModal({
     }
   }, [form.values.isCraftable]);
 
+  // Réinitialiser le prix si ni canBeSold ni !isCraftable
+  useEffect(() => {
+    const canHavePrice = form.values.canBeSold || !form.values.isCraftable;
+    if (!canHavePrice && form.values.price !== null) {
+      form.setFieldValue('price', null);
+    }
+  }, [form.values.canBeSold, form.values.isCraftable]);
+
   // Initialiser le formulaire quand l'item change
   useEffect(() => {
     if (editingItem) {
@@ -71,6 +89,8 @@ export function ItemModal({
         idealQuantity: editingItem.idealQuantity,
         isCraftable: editingItem.isCraftable,
         isEnabled: editingItem.isEnabled ?? true,
+        canBeSold: editingItem.canBeSold ?? false,
+        price: editingItem.price ? Number(editingItem.price) : null,
         categoryId: editingItem.categoryId || '',
         companyGroupId: editingItem.companyGroupId || '',
       });
@@ -87,6 +107,10 @@ export function ItemModal({
         ? undefined
         : values.companyGroupId || undefined;
 
+      // Le prix peut être défini si canBeSold est activé OU si l'item n'est pas craftable
+      const canHavePrice = values.canBeSold || !values.isCraftable;
+      const priceToSave = canHavePrice ? values.price : null;
+
       if (editingItem) {
         result = await updateItem({
           id: editingItem.id,
@@ -95,6 +119,8 @@ export function ItemModal({
           idealQuantity: values.idealQuantity,
           isCraftable: values.isCraftable,
           isEnabled: values.isEnabled,
+          canBeSold: values.canBeSold,
+          price: priceToSave,
           categoryId: values.categoryId,
           companyGroupId,
         });
@@ -105,6 +131,8 @@ export function ItemModal({
           idealQuantity: values.idealQuantity,
           isCraftable: values.isCraftable,
           isEnabled: values.isEnabled,
+          canBeSold: values.canBeSold,
+          price: priceToSave,
           categoryId: values.categoryId,
           companyGroupId,
         });
@@ -213,6 +241,25 @@ export function ItemModal({
             description="Si désactivé, l'objet ne sera pas visible dans la page de stock"
             {...form.getInputProps('isEnabled', { type: 'checkbox' })}
           />
+          <Switch
+            label="Peut être vendu"
+            description="Si activé, cet objet peut être vendu dans les commandes"
+            {...form.getInputProps('canBeSold', { type: 'checkbox' })}
+          />
+          {(form.values.canBeSold || !form.values.isCraftable) && (
+            <NumberInput
+              label="Prix"
+              placeholder="Prix de vente"
+              required
+              min={0}
+              step={0.01}
+              decimalScale={2}
+              fixedDecimalScale
+              leftSection="€"
+              description={form.values.isCraftable ? "Prix de vente de l'objet" : "Prix de vente de l'objet (disponible car l'objet n'est pas craftable)"}
+              {...form.getInputProps('price')}
+            />
+          )}
           <Group justify="flex-end" mt="md">
             <Button
               variant="subtle"

@@ -94,6 +94,8 @@ model Item {
   idealQuantity  Int
   isCraftable    Boolean           @default(false)
   isEnabled      Boolean           @default(true)
+  canBeSold      Boolean           @default(false)
+  price          Decimal?           @db.Decimal(10, 2)
   categoryId     String
   category       CategoryItem      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   companyGroupId String?

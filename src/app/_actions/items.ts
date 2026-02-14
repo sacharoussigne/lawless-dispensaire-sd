@@ -12,6 +12,8 @@ const createItemSchema = z.object({
   idealQuantity: z.number().int().min(0, 'La quantité idéale doit être positive'),
   isCraftable: z.boolean().default(false),
   isEnabled: z.boolean().default(true),
+  canBeSold: z.boolean().default(false),
+  price: z.number().positive('Le prix doit être positif').optional().nullable(),
   categoryId: z.string().uuid('ID de catégorie invalide').min(1, 'La catégorie est requise'),
   companyGroupId: z.string().uuid('ID de groupe d\'entreprise invalide').optional(),
 });
@@ -24,6 +26,8 @@ const updateItemSchema = z.object({
   idealQuantity: z.number().int().min(0, 'La quantité idéale doit être positive'),
   isCraftable: z.boolean().default(false),
   isEnabled: z.boolean().default(true),
+  canBeSold: z.boolean().default(false),
+  price: z.number().positive('Le prix doit être positif').optional().nullable(),
   categoryId: z.string().uuid('ID de catégorie invalide').min(1, 'La catégorie est requise'),
   companyGroupId: z.string().uuid('ID de groupe d\'entreprise invalide').optional(),
 });
@@ -42,6 +46,8 @@ export async function createItem(data: {
   idealQuantity: number;
   isCraftable?: boolean;
   isEnabled?: boolean;
+  canBeSold?: boolean;
+  price?: number | null;
   categoryId: string;
   companyGroupId?: string;
 }) {
@@ -78,6 +84,8 @@ export async function createItem(data: {
         idealQuantity: validatedData.idealQuantity,
         isCraftable: validatedData.isCraftable ?? false,
         isEnabled: validatedData.isEnabled ?? true,
+        canBeSold: validatedData.canBeSold ?? false,
+        price: validatedData.price !== undefined && validatedData.price !== null ? validatedData.price : null,
         categoryId: validatedData.categoryId,
         companyGroupId: validatedData.companyGroupId,
         order: newOrder,
@@ -157,6 +165,8 @@ export async function updateItem(data: {
   idealQuantity: number;
   isCraftable?: boolean;
   isEnabled?: boolean;
+  canBeSold?: boolean;
+  price?: number | null;
   categoryId: string;
   companyGroupId?: string;
 }) {
@@ -181,6 +191,8 @@ export async function updateItem(data: {
         idealQuantity: validatedData.idealQuantity,
         isCraftable: validatedData.isCraftable ?? false,
         isEnabled: validatedData.isEnabled ?? true,
+        canBeSold: validatedData.canBeSold ?? false,
+        price: validatedData.price !== undefined && validatedData.price !== null ? validatedData.price : null,
         categoryId: validatedData.categoryId,
         companyGroupId: validatedData.companyGroupId,
       },
