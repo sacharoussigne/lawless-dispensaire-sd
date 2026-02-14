@@ -14,6 +14,7 @@ import { notifications } from '@mantine/notifications';
 import { EditOrderModal } from './components/EditOrderModal';
 import { DeleteOrderModal } from './components/DeleteOrderModal';
 import { OrderDetailsModal } from './components/OrderDetailsModal';
+import { OrderLetterPreviewModal } from './components/OrderLetterPreviewModal';
 import { ActiveFilters } from '@/app/_components/ActiveFilters/ActiveFilters';
 import { OrdersTable } from './components/OrdersTable';
 import OrderModal from '@/app/(loggedIn)/(nonadmin)/stock/modals/OrderModal';
@@ -47,6 +48,8 @@ export default function OrdersPageClient({
   const [deleteModalOpened, setDeleteModalOpened] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState<OrderWithRelations | null>(null);
   const [createModalOpened, setCreateModalOpened] = useState(false);
+  const [letterPreviewModalOpened, setLetterPreviewModalOpened] = useState(false);
+  const [orderForLetterPreview, setOrderForLetterPreview] = useState<OrderWithRelations | null>(null);
 
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [nameFilter, setNameFilter] = useState<string>('');
@@ -80,6 +83,11 @@ export default function OrdersPageClient({
   const handleViewDetails = (order: OrderWithRelations) => {
     setViewingOrder(order);
     setDetailsModalOpened(true);
+  };
+
+  const handlePreviewLetter = (order: OrderWithRelations) => {
+    setOrderForLetterPreview(order);
+    setLetterPreviewModalOpened(true);
   };
 
   // Filtrer les commandes par statut et nom
@@ -155,6 +163,7 @@ export default function OrdersPageClient({
           setOrderToDelete(order);
           setDeleteModalOpened(true);
         }}
+        onPreviewLetter={handlePreviewLetter}
       />
 
       <EditOrderModal
@@ -184,6 +193,15 @@ export default function OrdersPageClient({
         }}
         orderToDelete={orderToDelete}
         onSuccess={loadOrders}
+      />
+
+      <OrderLetterPreviewModal
+        opened={letterPreviewModalOpened}
+        onClose={() => {
+          setLetterPreviewModalOpened(false);
+          setOrderForLetterPreview(null);
+        }}
+        order={orderForLetterPreview}
       />
 
       <OrderModal
