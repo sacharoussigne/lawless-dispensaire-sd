@@ -108,6 +108,11 @@ export default function AdminHeader({
                         Lieux
                       </Menu.Item>
                     </Link>
+                    <Link href={routes.admin.letterTemplates}>
+                      <Menu.Item>
+                        Templates de lettres
+                      </Menu.Item>
+                    </Link>
                   </Menu.Dropdown>
                 </Menu>
                 <Menu

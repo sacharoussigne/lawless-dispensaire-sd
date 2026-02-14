@@ -2,7 +2,7 @@
 
 import { Paper, TextInput, Select, Group, ActionIcon, Badge } from '@mantine/core';
 import { DataTable } from 'mantine-datatable';
-import { IconEdit, IconTrash, IconEye } from '@tabler/icons-react';
+import { IconEdit, IconTrash, IconEye, IconMail } from '@tabler/icons-react';
 import {
   getOrderStatusLabel,
   getOrderStatusColor,
@@ -29,6 +29,7 @@ interface OrdersTableProps {
   onView: (order: OrderWithRelations) => void;
   onEdit: (order: OrderWithRelations) => void;
   onDelete: (order: OrderWithRelations) => void;
+  onPreviewLetter?: (order: OrderWithRelations) => void;
 }
 
 const statusOptions: { value: string; label: string }[] = [
@@ -72,6 +73,7 @@ export function OrdersTable({
   onView,
   onEdit,
   onDelete,
+  onPreviewLetter,
 }: OrdersTableProps) {
   return (
     <Paper shadow="sm" withBorder>
@@ -147,8 +149,19 @@ export function OrdersTable({
             title: 'Actions',
             render: (order: OrderWithRelations) => {
               const isCompleted = order.status === OrderStatusEnum.COMPLETED;
+              const isDraft = order.status === OrderStatusEnum.DRAFT;
               return (
                 <Group gap="xs" wrap="nowrap" justify="flex-end">
+                  {isDraft && onPreviewLetter && (
+                    <ActionIcon
+                      variant="light"
+                      color="violet"
+                      onClick={() => onPreviewLetter(order)}
+                      title="Aperçu de la lettre"
+                    >
+                      <IconMail size={16} />
+                    </ActionIcon>
+                  )}
                   {permissions?.orders.view && (
                     <ActionIcon
                       variant="light"
