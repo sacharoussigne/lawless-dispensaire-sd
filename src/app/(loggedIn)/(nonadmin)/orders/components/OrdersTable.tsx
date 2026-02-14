@@ -125,11 +125,6 @@ export function OrdersTable({
             sortable: true,
           },
           {
-            accessor: 'items',
-            title: "Nombre d'objets",
-            render: (order: OrderWithRelations) => order.items.length,
-          },
-          {
             accessor: 'price',
             title: 'Prix',
             render: (order: OrderWithRelations) =>

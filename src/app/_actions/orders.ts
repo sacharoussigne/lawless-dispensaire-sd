@@ -161,6 +161,12 @@ const updateOrderSchema = z.object({
   type: z.enum(['INCOMING', 'OUTGOING']).optional(),
   details: z.string().max(1000, 'Les détails sont trop longs').optional(),
   price: z.number().positive('Le prix doit être positif').optional(),
+  items: z.array(
+    z.object({
+      itemId: z.string().uuid('ID d\'item invalide'),
+      quantity: z.number().int().min(1, 'La quantité doit être au moins 1'),
+    })
+  ).min(1, 'Au moins un objet est requis').optional(),
 });
 
 // Schéma pour supprimer une commande
@@ -238,6 +244,7 @@ export async function updateOrder(data: {
   type?: 'INCOMING' | 'OUTGOING';
   details?: string;
   price?: number;
+  items?: { itemId: string; quantity: number }[];
   addToStock?: boolean;
 }) {
   try {
@@ -283,6 +290,12 @@ export async function updateOrder(data: {
 
     // Déterminer le type de commande (utiliser le nouveau type si fourni, sinon l'ancien)
     const orderType = validatedData.type || oldOrder.type;
+    
+    // Utiliser les nouveaux items si fournis, sinon les anciens
+    const itemsToUse = validatedData.items || oldOrder.items.map((item) => ({
+      itemId: item.itemId,
+      quantity: item.quantity,
+    }));
 
     // Calculer le prix selon le type de commande
     let orderPrice: number | null | undefined = undefined;
@@ -291,7 +304,7 @@ export async function updateOrder(data: {
       // Pour les commandes sortantes, calculer le prix à partir des items
       const itemsWithPrices = await prisma.item.findMany({
         where: {
-          id: { in: oldOrder.items.map((item) => item.itemId) },
+          id: { in: itemsToUse.map((item) => item.itemId) },
         },
         select: {
           id: true,
@@ -299,7 +312,7 @@ export async function updateOrder(data: {
         },
       });
 
-      const totalPrice = oldOrder.items.reduce((sum, orderItem) => {
+      const totalPrice = itemsToUse.reduce((sum, orderItem) => {
         const item = itemsWithPrices.find((i) => i.id === orderItem.itemId);
         if (item && item.price) {
           const itemPrice = Number(item.price);
@@ -327,6 +340,21 @@ export async function updateOrder(data: {
     // Ne mettre à jour le prix que s'il a été calculé ou fourni
     if (orderPrice !== undefined) {
       updateData.price = orderPrice !== null ? orderPrice : undefined;
+    }
+
+    // Mettre à jour les items si fournis
+    if (validatedData.items) {
+      // Supprimer tous les anciens items et créer les nouveaux
+      await prisma.orderItem.deleteMany({
+        where: { orderId: validatedData.id },
+      });
+      
+      updateData.items = {
+        create: itemsToUse.map((item) => ({
+          itemId: item.itemId,
+          quantity: item.quantity,
+        })),
+      };
     }
 
     const order = await prisma.order.update({
