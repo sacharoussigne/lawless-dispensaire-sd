@@ -356,14 +356,14 @@ export function EditOrderModal({
               min={0}
               decimalScale={2}
               fixedDecimalScale
-              prefix="€ "
+              prefix="$ "
               disabled={isCompleted}
             />
           )}
           {form.values.type === OrderTypeEnum.OUTGOING && calculatedPrice !== null && (
             <TextInput
               label="Prix total"
-              value={`${calculatedPrice.toFixed(2)} €`}
+              value={`${calculatedPrice.toFixed(2)} $`}
               readOnly
               styles={{ input: { fontWeight: 500 } }}
             />

@@ -51,6 +51,12 @@ export function OrderDetailsModal({
               {getOrderTypeLabel(viewingOrder.type || 'INCOMING')}
             </Badge>
           </Group>
+          {viewingOrder.price != null && (
+            <Group>
+              <Text fw={500}>Prix :</Text>
+              <Text>{viewingOrder.price.toFixed(2)} $</Text>
+            </Group>
+          )}
           {viewingOrder.details && (
             <Group>
               <Text fw={500}>Détails :</Text>

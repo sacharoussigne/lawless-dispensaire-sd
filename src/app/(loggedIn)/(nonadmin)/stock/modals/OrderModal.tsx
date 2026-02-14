@@ -522,14 +522,14 @@ export default function OrderModal({
                 min={0}
                 decimalScale={2}
                 fixedDecimalScale
-                prefix="€ "
+                prefix="$ "
               />
             )}
 
             {orderType === OrderTypeEnum.OUTGOING && calculatedPrice !== null && (
               <TextInput
                 label="Prix total"
-                value={`${calculatedPrice.toFixed(2)} €`}
+                value={`${calculatedPrice.toFixed(2)} $`}
                 readOnly
                 styles={{ input: { fontWeight: 500 } }}
               />

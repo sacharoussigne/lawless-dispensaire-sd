@@ -130,6 +130,13 @@ export function OrdersTable({
             render: (order: OrderWithRelations) => order.items.length,
           },
           {
+            accessor: 'price',
+            title: 'Prix',
+            render: (order: OrderWithRelations) =>
+              order.price != null ? `${order.price.toFixed(2)} $` : '-',
+            sortable: true,
+          },
+          {
             accessor: 'createdAt',
             title: 'Date de création',
             render: (order: OrderWithRelations) =>
