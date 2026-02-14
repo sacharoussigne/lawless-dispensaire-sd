@@ -236,7 +236,7 @@ export function ItemsTable({
               // Le prix peut être affiché si canBeSold est activé OU si l'item n'est pas craftable
               const canHavePrice = item.canBeSold || !item.isCraftable;
               return canHavePrice && item.price ? (
-                `${Number(item.price).toFixed(2)} €`
+                `$${Number(item.price).toFixed(2)}`
               ) : (
                 '-'
               );

@@ -108,10 +108,11 @@ export default function OrderModal({
         if (itemsData) {
           // Convertir les items en ItemWithRelations (sans stock)
           setAllItems(
-            itemsData.map((item) => ({
+            itemsData.map((item: any) => ({
               ...item,
               stockToday: null,
               stockYesterday: null,
+              price: item.price ? Number(item.price) : null,
             }))
           );
         }
@@ -274,11 +275,11 @@ export default function OrderModal({
 
   // Obtenir les items disponibles pour le groupe sélectionné
   const getAvailableItemsForGroup = () => {
-    if (!selectedCompanyGroupId) return [];
-    // Pour les commandes sortantes (OUTGOING), on peut afficher tous les items
+    if (!selectedCompanyGroupId && orderType === OrderTypeEnum.INCOMING) return [];
+    // Pour les commandes sortantes (OUTGOING), on ne peut choisir que les items qui peuvent être vendus
     // Pour les commandes entrantes (INCOMING), on filtre par groupe et non-craftable
     if (orderType === OrderTypeEnum.OUTGOING) {
-      return itemsToUse.filter((item) => !item.isCraftable);
+      return itemsToUse.filter((item) => !item.isCraftable && item.canBeSold === true);
     }
     return itemsToUse.filter(
       (item) => !item.isCraftable && item.companyGroupId === selectedCompanyGroupId

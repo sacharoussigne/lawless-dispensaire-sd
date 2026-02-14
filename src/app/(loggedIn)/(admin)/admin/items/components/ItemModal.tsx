@@ -150,6 +150,7 @@ export function ItemModal({
       form.reset();
       onSuccess();
     } catch (error: any) {
+      console.error(error);
       if (error instanceof ParsedZodError) {
         handleApiZodError(error.error, form);
       } else {
@@ -255,7 +256,7 @@ export function ItemModal({
               step={0.01}
               decimalScale={2}
               fixedDecimalScale
-              leftSection="€"
+              leftSection="$"
               description={form.values.isCraftable ? "Prix de vente de l'objet" : "Prix de vente de l'objet (disponible car l'objet n'est pas craftable)"}
               {...form.getInputProps('price')}
             />
@@ -267,7 +268,7 @@ export function ItemModal({
                 onClose();
                 form.reset();
               }}
-            >
+          >
               Annuler
             </Button>
             <Button type="submit">
