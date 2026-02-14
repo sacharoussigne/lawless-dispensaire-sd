@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
   Modal,
   Stack,
@@ -11,6 +11,7 @@ import {
   Group,
   Text,
   Checkbox,
+  NumberInput,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
@@ -89,11 +90,27 @@ export function EditOrderModal({
       status: OrderStatusEnum.DRAFT,
       type: OrderTypeEnum.INCOMING,
       details: '',
+      price: '' as number | '',
     },
     validate: {
       name: (value) => (value.length < 1 ? 'Le nom est requis' : null),
     },
   });
+
+  // Calculer le prix total pour les commandes sortantes
+  const calculatedPrice = useMemo(() => {
+    if (!editingOrder || editingOrder.type !== OrderTypeEnum.OUTGOING) return null;
+    
+    const total = editingOrder.items.reduce((sum, orderItem) => {
+      const itemPrice = orderItem.item.price;
+      if (itemPrice != null && itemPrice > 0) {
+        return sum + itemPrice * orderItem.quantity;
+      }
+      return sum;
+    }, 0);
+    
+    return total > 0 ? total : null;
+  }, [editingOrder]);
 
   useEffect(() => {
     if (editingOrder) {
@@ -102,6 +119,7 @@ export function EditOrderModal({
         status: editingOrder.status as OrderStatusEnum,
         type: (editingOrder.type || OrderTypeEnum.INCOMING) as OrderTypeEnum,
         details: editingOrder.details || '',
+        price: editingOrder.price != null ? editingOrder.price : '',
       });
       setAddToStock(false);
       setStockCheckResult(null);
@@ -163,6 +181,7 @@ export function EditOrderModal({
         status: values.status,
         type: values.type,
         details: values.details || undefined,
+        price: values.type === OrderTypeEnum.INCOMING && values.price !== '' ? Number(values.price) : undefined,
         addToStock:
           values.status === OrderStatusEnum.COMPLETED ? addToStock : undefined,
       });
@@ -329,6 +348,26 @@ export function EditOrderModal({
             {...form.getInputProps('details')}
             disabled={isCompleted}
           />
+          {form.values.type === OrderTypeEnum.INCOMING && (
+            <NumberInput
+              label="Prix (optionnel)"
+              placeholder="Prix de la commande"
+              {...form.getInputProps('price')}
+              min={0}
+              decimalScale={2}
+              fixedDecimalScale
+              prefix="€ "
+              disabled={isCompleted}
+            />
+          )}
+          {form.values.type === OrderTypeEnum.OUTGOING && calculatedPrice !== null && (
+            <TextInput
+              label="Prix total"
+              value={`${calculatedPrice.toFixed(2)} €`}
+              readOnly
+              styles={{ input: { fontWeight: 500 } }}
+            />
+          )}
           <Group justify="flex-end" mt="md">
             <Button
               variant="subtle"

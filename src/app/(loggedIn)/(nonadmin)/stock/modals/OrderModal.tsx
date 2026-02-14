@@ -87,6 +87,7 @@ export default function OrderModal({
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   const [orderType, setOrderType] = useState<OrderTypeEnum>(OrderTypeEnum.INCOMING);
   const [orderDetails, setOrderDetails] = useState('');
+  const [orderPrice, setOrderPrice] = useState<number | ''>('');
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
@@ -239,6 +240,7 @@ export default function OrderModal({
     setSelectedCompanyGroupId(null);
     setSelectedCompanyId(null);
     setOrderItems([]);
+    setOrderPrice('');
   }, [orderType]);
 
   // Quand un groupe d'entreprise est sélectionné, initialiser les items qui ont besoin d'être restockés (si prefillItemsNeedingRestock est true)
@@ -278,6 +280,22 @@ export default function OrderModal({
     setSelectedCompanyId(null);
   }, [selectedCompanyGroupId, prefillItemsNeedingRestock, itemsToUse, orderType]);
 
+  // Calculer le prix total pour les commandes sortantes
+  const calculatedPrice = useMemo(() => {
+    if (orderType !== OrderTypeEnum.OUTGOING) return null;
+    
+    const total = orderItems.reduce((sum, orderItem) => {
+      const item = itemsToUse.find((i) => i.id === orderItem.itemId) || orderItem.item;
+      const price = normalizePrice(item.price);
+      if (price != null && price > 0) {
+        return sum + price * orderItem.quantity;
+      }
+      return sum;
+    }, 0);
+    
+    return total > 0 ? total : null;
+  }, [orderItems, orderType, itemsToUse]);
+
   // Réinitialiser le formulaire quand la modal se ferme
   useEffect(() => {
     if (!opened) {
@@ -285,6 +303,7 @@ export default function OrderModal({
       setSelectedCompanyId(null);
       setOrderType(OrderTypeEnum.INCOMING);
       setOrderDetails('');
+      setOrderPrice('');
       setOrderItems([]);
     }
   }, [opened]);
@@ -349,6 +368,7 @@ export default function OrderModal({
       const result = await createOrder({
         type: orderType,
         details: orderDetails || undefined,
+        price: orderType === OrderTypeEnum.INCOMING && orderPrice !== '' ? Number(orderPrice) : undefined,
         companyId: selectedCompanyId,
         items: orderItems.map((oi) => ({
           itemId: oi.itemId,
@@ -492,6 +512,28 @@ export default function OrderModal({
               onChange={(e) => setOrderDetails(e.currentTarget.value)}
               minRows={3}
             />
+
+            {orderType === OrderTypeEnum.INCOMING && (
+              <NumberInput
+                label="Prix (optionnel)"
+                placeholder="Prix de la commande"
+                value={orderPrice}
+                onChange={(value) => setOrderPrice(value === '' ? '' : Number(value))}
+                min={0}
+                decimalScale={2}
+                fixedDecimalScale
+                prefix="€ "
+              />
+            )}
+
+            {orderType === OrderTypeEnum.OUTGOING && calculatedPrice !== null && (
+              <TextInput
+                label="Prix total"
+                value={`${calculatedPrice.toFixed(2)} €`}
+                readOnly
+                styles={{ input: { fontWeight: 500 } }}
+              />
+            )}
 
             <Text fw={500}>Objets de la commande</Text>
 

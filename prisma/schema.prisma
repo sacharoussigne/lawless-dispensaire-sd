@@ -226,6 +226,7 @@ model Order {
   status    OrderStatus  @default(DRAFT)
   type      OrderType    @default(INCOMING)
   details   String?
+  price     Decimal?     @db.Decimal(10, 2)
   companyId String
   company   Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdAt DateTime     @default(now())
