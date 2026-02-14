@@ -1,6 +1,7 @@
 import type { Item, CategoryItem, CompanyGroup, CraftRecipe, CraftRecipeItem } from '@prisma/client';
 
-export interface ItemWithRelations extends Item {
+export interface ItemWithRelations extends Omit<Item, 'price'> {
+  price: number | null;
   category: { id: string; name: string; color: string; order?: number } | null;
   companyGroup: { id: string; name: string } | null;
 }
