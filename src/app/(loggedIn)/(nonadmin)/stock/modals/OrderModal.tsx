@@ -23,6 +23,10 @@ import { getItems } from '@/app/_actions/items';
 import { getOrders, createOrder } from '@/app/_actions/orders';
 import { handleAction } from '@/lib/action';
 import type { ItemWithRelations } from '@/types/stock';
+import {
+  getOrderTypeLabel,
+  OrderTypeEnum,
+} from '@/types/enum/orderType';
 
 interface OrderModalProps {
   opened: boolean;
@@ -69,10 +73,11 @@ export default function OrderModal({
   onOrderCreated,
   prefillItemsNeedingRestock = true,
 }: OrderModalProps) {
-  const [companyGroups, setCompanyGroups] = useState<CompanyGroupWithCompanies[]>([]);
+  const [allCompanyGroups, setAllCompanyGroups] = useState<CompanyGroupWithCompanies[]>([]);
   const [allItems, setAllItems] = useState<ItemWithRelations[]>([]);
   const [selectedCompanyGroupId, setSelectedCompanyGroupId] = useState<string | null>(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
+  const [orderType, setOrderType] = useState<OrderTypeEnum>(OrderTypeEnum.INCOMING);
   const [orderDetails, setOrderDetails] = useState('');
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -114,41 +119,10 @@ export default function OrderModal({
         setAllItems(items);
       }
 
-      // Attendre que les items soient chargés avant de filtrer les groupes
-      const itemsToUseForFiltering = items.length > 0 ? items : allItems;
-      
       if (groupsData) {
-        let filteredGroups = groupsData;
-        
-        // Filtrer les groupes d'entreprises pour ne garder que ceux qui ont au moins un item non-craftable
-        if (itemsToUseForFiltering.length > 0) {
-          filteredGroups = groupsData.filter((group) => {
-            // Vérifier s'il y a au moins un item non-craftable lié à ce groupe
-            const hasItems = itemsToUseForFiltering.some(
-              (item) => !item.isCraftable && item.companyGroupId === group.id
-            );
-            
-            if (!hasItems) return false;
-            
-            // Si prefillItemsNeedingRestock est true, vérifier aussi qu'il y a des items nécessitant un réapprovisionnement
-            if (prefillItemsNeedingRestock) {
-              return itemsToUseForFiltering.some(
-                (item) =>
-                  !item.isCraftable &&
-                  item.companyGroupId === group.id &&
-                  item.stockToday !== null &&
-                  item.stockToday < item.idealQuantity
-              );
-            }
-            
-            return true;
-          });
-        } else {
-          filteredGroups = groupsData;
-        }
-
-        setCompanyGroups(
-          filteredGroups.map((g) => ({
+        // Stocker tous les groupes (sans filtrage)
+        setAllCompanyGroups(
+          groupsData.map((g) => ({
             id: g.id,
             name: g.name,
             companies: g.companies || [],
@@ -171,6 +145,43 @@ export default function OrderModal({
     return items.length > 0 ? items : allItems;
   }, [items, allItems]);
 
+  // Filtrer les groupes d'entreprises selon le type de commande
+  const companyGroups = useMemo(() => {
+    if (orderType === OrderTypeEnum.OUTGOING) {
+      // Pour les commandes sortantes, afficher tous les groupes
+      return allCompanyGroups;
+    }
+
+    // Pour les commandes entrantes, filtrer selon les items
+    const itemsToUseForFiltering = items.length > 0 ? items : allItems;
+    
+    if (itemsToUseForFiltering.length === 0) {
+      return allCompanyGroups;
+    }
+
+    return allCompanyGroups.filter((group) => {
+      // Vérifier s'il y a au moins un item non-craftable lié à ce groupe
+      const hasItems = itemsToUseForFiltering.some(
+        (item) => !item.isCraftable && item.companyGroupId === group.id
+      );
+      
+      if (!hasItems) return false;
+      
+      // Si prefillItemsNeedingRestock est true, vérifier aussi qu'il y a des items nécessitant un réapprovisionnement
+      if (prefillItemsNeedingRestock) {
+        return itemsToUseForFiltering.some(
+          (item) =>
+            !item.isCraftable &&
+            item.companyGroupId === group.id &&
+            item.stockToday !== null &&
+            item.stockToday < item.idealQuantity
+        );
+      }
+      
+      return true;
+    });
+  }, [allCompanyGroups, orderType, items, allItems, prefillItemsNeedingRestock]);
+
   // Charger les commandes existantes quand un groupe d'entreprise est sélectionné
   useEffect(() => {
     const loadExistingOrders = async () => {
@@ -185,7 +196,7 @@ export default function OrderModal({
         
         if (ordersData) {
           // Obtenir les IDs des entreprises du groupe sélectionné
-          const selectedGroup = companyGroups.find((g) => g.id === selectedCompanyGroupId);
+          const selectedGroup = allCompanyGroups.find((g) => g.id === selectedCompanyGroupId);
           const companyIds = selectedGroup?.companies.map((c) => c.company.id) || [];
           
           // Filtrer les commandes : non terminées/annulées et appartenant au groupe
@@ -204,7 +215,14 @@ export default function OrderModal({
     };
 
     loadExistingOrders();
-  }, [selectedCompanyGroupId, companyGroups]);
+  }, [selectedCompanyGroupId, allCompanyGroups]);
+
+  // Réinitialiser les sélections quand le type change
+  useEffect(() => {
+    setSelectedCompanyGroupId(null);
+    setSelectedCompanyId(null);
+    setOrderItems([]);
+  }, [orderType]);
 
   // Quand un groupe d'entreprise est sélectionné, initialiser les items qui ont besoin d'être restockés (si prefillItemsNeedingRestock est true)
   useEffect(() => {
@@ -214,7 +232,8 @@ export default function OrderModal({
       return;
     }
     
-    if (prefillItemsNeedingRestock && itemsToUse.length > 0) {
+    // Ne préremplir que pour les commandes entrantes (INCOMING)
+    if (orderType === OrderTypeEnum.INCOMING && prefillItemsNeedingRestock && itemsToUse.length > 0) {
       const itemsNeedingRestock = itemsToUse.filter(
         (item) =>
           !item.isCraftable &&
@@ -233,20 +252,21 @@ export default function OrderModal({
       });
 
       setOrderItems(initialOrderItems);
-    } else if (!prefillItemsNeedingRestock) {
-      // Si on ne préremplit pas, on laisse la liste vide pour que l'utilisateur ajoute manuellement
+    } else {
+      // Si on ne préremplit pas ou si c'est une commande sortante, on laisse la liste vide pour que l'utilisateur ajoute manuellement
       setOrderItems([]);
     }
     
     // Réinitialiser la sélection d'entreprise quand on change de groupe
     setSelectedCompanyId(null);
-  }, [selectedCompanyGroupId, prefillItemsNeedingRestock, itemsToUse]);
+  }, [selectedCompanyGroupId, prefillItemsNeedingRestock, itemsToUse, orderType]);
 
   // Réinitialiser le formulaire quand la modal se ferme
   useEffect(() => {
     if (!opened) {
       setSelectedCompanyGroupId(null);
       setSelectedCompanyId(null);
+      setOrderType(OrderTypeEnum.INCOMING);
       setOrderDetails('');
       setOrderItems([]);
     }
@@ -255,6 +275,11 @@ export default function OrderModal({
   // Obtenir les items disponibles pour le groupe sélectionné
   const getAvailableItemsForGroup = () => {
     if (!selectedCompanyGroupId) return [];
+    // Pour les commandes sortantes (OUTGOING), on peut afficher tous les items
+    // Pour les commandes entrantes (INCOMING), on filtre par groupe et non-craftable
+    if (orderType === OrderTypeEnum.OUTGOING) {
+      return itemsToUse.filter((item) => !item.isCraftable);
+    }
     return itemsToUse.filter(
       (item) => !item.isCraftable && item.companyGroupId === selectedCompanyGroupId
     );
@@ -294,6 +319,7 @@ export default function OrderModal({
     try {
       setLoading(true);
       const result = await createOrder({
+        type: orderType,
         details: orderDetails || undefined,
         companyId: selectedCompanyId,
         items: orderItems.map((oi) => ({
@@ -351,6 +377,19 @@ export default function OrderModal({
       size="xl"
     >
       <Stack gap="md">
+        <Select
+          label="Type de commande"
+          placeholder="Sélectionner un type"
+          data={[
+            { value: OrderTypeEnum.INCOMING, label: getOrderTypeLabel(OrderTypeEnum.INCOMING) },
+            { value: OrderTypeEnum.OUTGOING, label: getOrderTypeLabel(OrderTypeEnum.OUTGOING) },
+          ]}
+          value={orderType}
+          onChange={(value) => setOrderType(value as OrderTypeEnum)}
+          required
+          disabled={loadingData}
+        />
+
         <Group grow>
           <Select
             label="Groupe d'entreprises"
