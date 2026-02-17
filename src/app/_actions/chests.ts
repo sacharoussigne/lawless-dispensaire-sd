@@ -21,6 +21,7 @@ const updateChestSchema = z.object({
 // Schéma pour supprimer un coffre
 const deleteChestSchema = z.object({
   id: z.string().uuid('ID invalide'),
+  targetChestId: z.string().uuid('ID de coffre de destination invalide'),
 });
 
 /**
@@ -131,9 +132,9 @@ export async function updateChest(data: {
 }
 
 /**
- * Supprime un coffre
+ * Supprime un coffre et transfère les stocks vers un autre coffre
  */
-export async function deleteChest(data: { id: string }) {
+export async function deleteChest(data: { id: string; targetChestId: string }) {
   try {
     const session = await getAuthSession();
     if (!session) {
@@ -145,10 +146,52 @@ export async function deleteChest(data: { id: string }) {
 
     const validatedData = deleteChestSchema.parse(data);
 
-    await prisma.chest.delete({
-      where: {
-        id: validatedData.id,
-      },
+    // Vérifier qu'il y a au moins 2 coffres
+    const totalChests = await prisma.chest.count();
+    if (totalChests <= 1) {
+      return {
+        status: 400,
+        error: 'Impossible de supprimer le dernier coffre. Il doit y avoir au moins un coffre.',
+      };
+    }
+
+    // Vérifier que le coffre de destination existe et est différent du coffre à supprimer
+    if (validatedData.id === validatedData.targetChestId) {
+      return {
+        status: 400,
+        error: 'Le coffre de destination doit être différent du coffre à supprimer.',
+      };
+    }
+
+    const targetChest = await prisma.chest.findUnique({
+      where: { id: validatedData.targetChestId },
+    });
+
+    if (!targetChest) {
+      return {
+        status: 404,
+        error: 'Le coffre de destination n\'existe pas.',
+      };
+    }
+
+    // Transférer tous les stocks vers le coffre de destination dans une transaction
+    await prisma.$transaction(async (tx) => {
+      // Mettre à jour tous les stocks du coffre à supprimer
+      await tx.stockHistory.updateMany({
+        where: {
+          chestId: validatedData.id,
+        },
+        data: {
+          chestId: validatedData.targetChestId,
+        },
+      });
+
+      // Supprimer le coffre
+      await tx.chest.delete({
+        where: {
+          id: validatedData.id,
+        },
+      });
     });
 
     return {

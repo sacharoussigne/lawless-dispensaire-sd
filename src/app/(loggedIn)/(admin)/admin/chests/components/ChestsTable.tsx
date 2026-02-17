@@ -12,6 +12,7 @@ interface ChestsTableProps {
   page: number;
   pageSize: number;
   totalRecords: number;
+  totalChests: number;
   onNameFilterChange: (value: string) => void;
   onPageChange: (page: number) => void;
   onEdit: (chest: ChestWithStockHistory) => void;
@@ -25,11 +26,13 @@ export function ChestsTable({
   page,
   pageSize,
   totalRecords,
+  totalChests,
   onNameFilterChange,
   onPageChange,
   onEdit,
   onDelete,
 }: ChestsTableProps) {
+  const isLastChest = totalChests <= 1;
   return (
     <Paper shadow="sm" p="md" withBorder>
       <DataTable
@@ -77,6 +80,8 @@ export function ChestsTable({
                   variant="light"
                   color="red"
                   onClick={() => onDelete(chest)}
+                  disabled={isLastChest}
+                  title={isLastChest ? 'Impossible de supprimer le dernier coffre' : 'Supprimer'}
                 >
                   <IconTrash size={16} />
                 </ActionIcon>

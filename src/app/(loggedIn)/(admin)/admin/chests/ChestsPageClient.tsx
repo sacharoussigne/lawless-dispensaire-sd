@@ -125,6 +125,7 @@ export default function ChestsPageClient({
         page={page}
         pageSize={pageSize}
         totalRecords={totalRecords}
+        totalChests={chests.length}
         onNameFilterChange={(value: string) => setNameFilter(value)}
         onPageChange={(p: number) => setPage(p)}
         onEdit={handleEdit}
@@ -151,6 +152,7 @@ export default function ChestsPageClient({
           setChestToDelete(null);
         }}
         chestToDelete={chestToDelete}
+        allChests={chests}
         onSuccess={loadChests}
       />
     </Container>
