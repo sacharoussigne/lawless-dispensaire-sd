@@ -12,9 +12,25 @@ import {
 } from '@/lib/date';
 
 /**
- * Récupère tous les items avec leurs stocks d'aujourd'hui et d'hier
+ * Récupère le coffre par défaut "Foure tout"
  */
-export async function getItemsWithStock() {
+async function getDefaultChestId(): Promise<string> {
+  const defaultChest = await prisma.chest.findFirst({
+    where: {
+      name: 'Foure tout',
+    },
+  });
+  if (!defaultChest) {
+    throw new Error('Coffre par défaut "Foure tout" non trouvé');
+  }
+  return defaultChest.id;
+}
+
+/**
+ * Récupère tous les items avec leurs stocks d'aujourd'hui et d'hier
+ * @param chestId - ID du coffre à filtrer (optionnel, null pour tous les coffres)
+ */
+export async function getItemsWithStock(chestId?: string | null) {
   try {
     const session = await getAuthSession();
     if (!session) {
@@ -62,6 +78,18 @@ export async function getItemsWithStock() {
           },
         },
         stockHistory: {
+          where: chestId
+            ? {
+                chestId: chestId,
+              }
+            : undefined,
+          select: {
+            id: true,
+            itemId: true,
+            chestId: true,
+            quantity: true,
+            timestamp: true,
+          },
           orderBy: {
             timestamp: 'desc',
           },
@@ -71,32 +99,77 @@ export async function getItemsWithStock() {
 
     // Pour chaque item, trouver le stock d'aujourd'hui et d'hier
     const itemsWithStock = items.map((item) => {
-      // Stock aujourd'hui : dernier enregistrement d'aujourd'hui
-      const stockHistoryToday = item.stockHistory.filter((sh) => {
-        const shDateStr = formatDate(new Date(sh.timestamp));
-        const todayStr = formatDate(today);
-        return shDateStr === todayStr;
-      });
-      const stockToday = stockHistoryToday.length > 0 
-        ? stockHistoryToday.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0]
-        : null;
+      if (chestId) {
+        // Si un coffre spécifique est sélectionné, prendre le dernier enregistrement de ce coffre
+        const stockHistoryToday = item.stockHistory.filter((sh) => {
+          const shDateStr = formatDate(new Date(sh.timestamp));
+          const todayStr = formatDate(today);
+          return shDateStr === todayStr;
+        });
+        const stockToday = stockHistoryToday.length > 0 
+          ? stockHistoryToday.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0]
+          : null;
 
-      // Stock J-1 : dernier enregistrement d'hier
-      const stockHistoryYesterday = item.stockHistory.filter((sh) => {
-        const shDateStr = formatDate(new Date(sh.timestamp));
-        const yesterdayStr = formatDate(yesterday);
-        return shDateStr === yesterdayStr;
-      });
-      const stockYesterday = stockHistoryYesterday.length > 0
-        ? stockHistoryYesterday.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0]
-        : null;
+        const stockHistoryYesterday = item.stockHistory.filter((sh) => {
+          const shDateStr = formatDate(new Date(sh.timestamp));
+          const yesterdayStr = formatDate(yesterday);
+          return shDateStr === yesterdayStr;
+        });
+        const stockYesterday = stockHistoryYesterday.length > 0
+          ? stockHistoryYesterday.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0]
+          : null;
 
-      return {
-        ...item,
-        stockToday: stockToday?.quantity ?? null,
-        stockYesterday: stockYesterday?.quantity ?? null,
-        price: item.price ? Number(item.price) : null,
-      };
+        return {
+          ...item,
+          stockToday: stockToday?.quantity ?? null,
+          stockYesterday: stockYesterday?.quantity ?? null,
+          price: item.price ? Number(item.price) : null,
+        };
+      } else {
+        // Si "Tous les coffres" est sélectionné, faire la SOMME de tous les coffres
+        // Pour chaque coffre, prendre le dernier enregistrement d'aujourd'hui, puis sommer
+        const stockHistoryToday = item.stockHistory.filter((sh) => {
+          const shDateStr = formatDate(new Date(sh.timestamp));
+          const todayStr = formatDate(today);
+          return shDateStr === todayStr;
+        });
+
+        // Grouper par coffre et prendre le dernier enregistrement de chaque coffre
+        const stocksByChestToday = new Map<string, typeof stockHistoryToday[0]>();
+        stockHistoryToday.forEach((sh) => {
+          const existing = stocksByChestToday.get(sh.chestId);
+          if (!existing || new Date(sh.timestamp).getTime() > new Date(existing.timestamp).getTime()) {
+            stocksByChestToday.set(sh.chestId, sh);
+          }
+        });
+
+        // Faire la somme de tous les coffres
+        const totalStockToday = Array.from(stocksByChestToday.values()).reduce((sum, sh) => sum + sh.quantity, 0);
+
+        // Même chose pour hier
+        const stockHistoryYesterday = item.stockHistory.filter((sh) => {
+          const shDateStr = formatDate(new Date(sh.timestamp));
+          const yesterdayStr = formatDate(yesterday);
+          return shDateStr === yesterdayStr;
+        });
+
+        const stocksByChestYesterday = new Map<string, typeof stockHistoryYesterday[0]>();
+        stockHistoryYesterday.forEach((sh) => {
+          const existing = stocksByChestYesterday.get(sh.chestId);
+          if (!existing || new Date(sh.timestamp).getTime() > new Date(existing.timestamp).getTime()) {
+            stocksByChestYesterday.set(sh.chestId, sh);
+          }
+        });
+
+        const totalStockYesterday = Array.from(stocksByChestYesterday.values()).reduce((sum, sh) => sum + sh.quantity, 0);
+
+        return {
+          ...item,
+          stockToday: totalStockToday > 0 ? totalStockToday : null,
+          stockYesterday: totalStockYesterday > 0 ? totalStockYesterday : null,
+          price: item.price ? Number(item.price) : null,
+        };
+      }
     });
 
     return {
@@ -110,10 +183,12 @@ export async function getItemsWithStock() {
 
 /**
  * Met à jour le stock pour plusieurs items
- * Si un stock existe déjà aujourd'hui, il est mis à jour
- * Sinon, un nouveau stock est créé
+ * Si un stock existe déjà aujourd'hui pour le coffre spécifié, il est mis à jour
+ * Sinon, un nouveau stock est créé pour ce coffre
+ * @param data - Tableau d'items avec leurs quantités
+ * @param chestId - ID du coffre (optionnel, si null ou non fourni, utilise le coffre "foure tout")
  */
-export async function updateStock(data: { itemId: string; quantity: number }[]) {
+export async function updateStock(data: { itemId: string; quantity: number }[], chestId?: string | null) {
   try {
     const session = await getAuthSession();
     if (!session) {
@@ -126,13 +201,31 @@ export async function updateStock(data: { itemId: string; quantity: number }[]) 
     const today = getTodayStart();
     const tomorrow = getTomorrowStart();
 
-    // Pour chaque item, créer ou mettre à jour le stock
+    // Si aucun chestId n'est fourni, utiliser le coffre "foure tout" par défaut
+    let targetChestId = chestId;
+    if (!targetChestId) {
+      const defaultChest = await prisma.chest.findFirst({
+        where: {
+          name: 'Foure tout',
+        },
+      });
+      if (!defaultChest) {
+        return {
+          status: 404,
+          error: 'Coffre par défaut "Foure tout" non trouvé',
+        };
+      }
+      targetChestId = defaultChest.id;
+    }
+
+    // Pour chaque item, créer ou mettre à jour le stock UNIQUEMENT pour le coffre spécifié
     const results = await Promise.all(
       data.map(async ({ itemId, quantity }) => {
-        // Vérifier si un stock existe déjà aujourd'hui
+        // Vérifier si un stock existe déjà aujourd'hui pour ce coffre spécifique
         const existingStock = await prisma.stockHistory.findFirst({
           where: {
             itemId,
+            chestId: targetChestId,
             timestamp: {
               gte: today,
               lt: tomorrow,
@@ -144,7 +237,7 @@ export async function updateStock(data: { itemId: string; quantity: number }[]) 
         });
 
         if (existingStock) {
-          // Mettre à jour le stock existant
+          // Mettre à jour le stock existant de ce coffre uniquement
           return prisma.stockHistory.update({
             where: {
               id: existingStock.id,
@@ -154,10 +247,11 @@ export async function updateStock(data: { itemId: string; quantity: number }[]) 
             },
           });
         } else {
-          // Créer un nouveau stock
+          // Créer un nouveau stock pour ce coffre spécifique
           return prisma.stockHistory.create({
             data: {
               itemId,
+              chestId: targetChestId,
               quantity,
             },
           });
@@ -287,9 +381,11 @@ export async function craftItem(data: {
         });
       } else {
         // Créer un nouveau stock
+        const defaultChestId = await getDefaultChestId();
         await tx.stockHistory.create({
           data: {
             itemId: data.craftedItemId,
+            chestId: defaultChestId,
             quantity: totalQuantityProduced,
           },
         });
@@ -322,9 +418,11 @@ export async function craftItem(data: {
           });
         } else {
           // Si pas de stock, créer un stock négatif (ne devrait pas arriver normalement)
+          const defaultChestId = await getDefaultChestId();
           await tx.stockHistory.create({
             data: {
               itemId: ingredient.usedItemId,
+              chestId: defaultChestId,
               quantity: -requiredQuantity,
             },
           });
@@ -409,9 +507,11 @@ export async function addOrderItemsToStock(orderId: string) {
           });
         } else {
           // Créer un nouveau stock avec la quantité de la commande
+          const defaultChestId = await getDefaultChestId();
           await tx.stockHistory.create({
             data: {
               itemId: orderItem.itemId,
+              chestId: defaultChestId,
               quantity: orderItem.quantity,
             },
           });
@@ -548,6 +648,7 @@ export async function overwriteStockForDate(data: {
     });
 
     // Créer les nouveaux stocks
+    const defaultChestId = await getDefaultChestId();
     const results = await Promise.all(
       data.stocks
         .filter((stock) => stock.quantity !== null && stock.quantity !== undefined)
@@ -555,6 +656,7 @@ export async function overwriteStockForDate(data: {
           return prisma.stockHistory.create({
             data: {
               itemId,
+              chestId: defaultChestId,
               quantity,
               timestamp: dayStart,
             },
