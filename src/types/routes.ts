@@ -14,6 +14,7 @@ export const routes = {
     users: '/admin/users',
     overwriteStock: '/admin/overwrite-stock',
     letterTemplates: '/admin/lettertemplates',
+    chests: '/admin/chests',
   },
   api: {},
   settings: {

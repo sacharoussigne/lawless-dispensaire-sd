@@ -10,6 +10,7 @@ import {
   Group,
   Stack,
   Alert,
+  Select,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconAlertCircle } from '@tabler/icons-react';
@@ -18,20 +19,26 @@ import { handleAction } from '@/lib/action';
 import dayjs from '@/lib/dayjs';
 import { OverwriteStockTable } from './components/OverwriteStockTable';
 import type { ItemWithStock } from '@/types/overwriteStock';
+import type { ChestWithStockHistory } from '@/types/chests';
 
 interface OverwriteStockPageClientProps {
   initialItems: ItemWithStock[];
   initialDate: string;
+  initialChests: ChestWithStockHistory[];
 }
 
 export default function OverwriteStockPageClient({
   initialItems,
   initialDate,
+  initialChests,
 }: OverwriteStockPageClientProps) {
   const [items, setItems] = useState<ItemWithStock[]>(initialItems);
+  const [chests] = useState<ChestWithStockHistory[]>(initialChests);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>(initialDate);
+  // null = "Tous les coffres", une valeur = coffre spécifique
+  const [selectedChestId, setSelectedChestId] = useState<string | null>(null);
   const [stockValues, setStockValues] = useState<Record<string, number | null>>({});
   const [initialStockValues, setInitialStockValues] = useState<Record<string, number | null>>({});
   const [hasChanges, setHasChanges] = useState(false);
@@ -42,7 +49,7 @@ export default function OverwriteStockPageClient({
     try {
       setLoading(true);
       const date = dayjs(selectedDate).toDate();
-      const result = await getItemsWithStockForDate(date);
+      const result = await getItemsWithStockForDate(date, selectedChestId);
       const data = handleAction(result);
 
       if (data && Array.isArray(data)) {
@@ -82,9 +89,11 @@ export default function OverwriteStockPageClient({
     setHasChanges(false);
     loadItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate]);
+  }, [selectedDate, selectedChestId]);
 
   const handleStockChange = (itemId: string, value: number | null) => {
+    // Mode "Tous les coffres" = lecture seule
+    if (selectedChestId === null) return;
     setStockValues((prev) => ({
       ...prev,
       [itemId]: value,
@@ -93,7 +102,7 @@ export default function OverwriteStockPageClient({
   };
 
   const handleSave = async () => {
-    if (!selectedDate) return;
+    if (!selectedDate || selectedChestId === null) return;
 
     try {
       setSaving(true);
@@ -110,12 +119,14 @@ export default function OverwriteStockPageClient({
       const result = await overwriteStockForDate({
         date,
         stocks,
+        chestId: selectedChestId,
       });
 
       handleAction(result);
+      const chestName = chests.find(c => c.id === selectedChestId)?.name || 'le coffre sélectionné';
       notifications.show({
         title: 'Succès',
-        message: 'Stocks écrasés avec succès',
+        message: `Stocks écrasés avec succès pour ${chestName}`,
         color: 'green',
       });
       setHasChanges(false);
@@ -141,7 +152,7 @@ export default function OverwriteStockPageClient({
           title="Attention"
           color="orange"
         >
-          Cette action va supprimer tous les stocks existants pour la date sélectionnée et les remplacer par les nouvelles valeurs.
+          Cette action va supprimer tous les stocks existants pour la date sélectionnée et le coffre sélectionné (hors « Tous les coffres »), puis les remplacer par les nouvelles valeurs.
           Cette opération est irréversible.
         </Alert>
 
@@ -155,6 +166,22 @@ export default function OverwriteStockPageClient({
                 onChange={(e) => setSelectedDate(e.currentTarget.value)}
                 style={{ width: 200 }}
               />
+              <Select
+                label="Coffre"
+                placeholder="Sélectionner un coffre"
+                data={[
+                  { value: '', label: 'Tous les coffres' },
+                  ...chests.map((chest) => ({
+                    value: chest.id,
+                    label: chest.name,
+                  })),
+                ]}
+                value={selectedChestId ?? ''}
+                onChange={(value) => setSelectedChestId(value === '' ? null : value)}
+                required
+                clearable={false}
+                style={{ width: 200 }}
+              />
               <Button onClick={loadItems} loading={loading}>
                 Charger
               </Button>
@@ -165,6 +192,7 @@ export default function OverwriteStockPageClient({
               loading={loading}
               stockValues={stockValues}
               onStockChange={handleStockChange}
+              readOnly={selectedChestId === null}
             />
 
             <Group justify="flex-end" mt="md">
@@ -172,7 +200,7 @@ export default function OverwriteStockPageClient({
                 onClick={handleSave}
                 loading={saving}
                 color="red"
-                disabled={items.length === 0 || loading}
+                disabled={items.length === 0 || loading || selectedChestId === null}
               >
                 Écraser les stocks
               </Button>

@@ -14,6 +14,7 @@ import {
   TextInput,
   ActionIcon,
   Tooltip,
+  Select,
 } from '@mantine/core';
 import { IconEdit, IconCheck, IconX, IconClipboardCheck, IconTools } from '@tabler/icons-react';
 import { getItemsWithStock, updateStock, craftItem } from '@/app/_actions/stock';
@@ -22,14 +23,18 @@ import { notifications } from '@mantine/notifications';
 import CraftModal from './modals/CraftModal';
 import type { ItemWithRelations, CategoryWithItems } from '@/types/stock';
 import { usePermissions } from '@/app/_contexts/PermissionsContext';
+import type { ChestWithStockHistory } from '@/types/chests';
 
 interface StockPageClientProps {
   initialItems: ItemWithRelations[];
+  initialChests: ChestWithStockHistory[];
 }
 
-export default function StockPageClient({ initialItems }: StockPageClientProps) {
+export default function StockPageClient({ initialItems, initialChests }: StockPageClientProps) {
   const { permissions } = usePermissions();
   const [items, setItems] = useState<ItemWithRelations[]>(initialItems);
+  const [chests] = useState<ChestWithStockHistory[]>(initialChests);
+  const [selectedChestId, setSelectedChestId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [stockValues, setStockValues] = useState<Record<string, number | ''>>({});
@@ -42,7 +47,7 @@ export default function StockPageClient({ initialItems }: StockPageClientProps) 
   const loadItems = async () => {
     try {
       setLoading(true);
-      const result = await getItemsWithStock();
+      const result = await getItemsWithStock(selectedChestId);
       const data = handleAction(result);
       if (data) {
         setItems(data);
@@ -58,6 +63,12 @@ export default function StockPageClient({ initialItems }: StockPageClientProps) 
     }
   };
 
+  // Recharger les items quand le coffre sélectionné change
+  useEffect(() => {
+    loadItems();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedChestId]);
+
   // Initialiser les valeurs de stock avec les valeurs actuelles
   useEffect(() => {
     if (isEditing && items.length > 0) {
@@ -72,6 +83,11 @@ export default function StockPageClient({ initialItems }: StockPageClientProps) 
   const handleSaveStock = async () => {
     try {
       setSaving(true);
+      
+      // Si aucun coffre n'est sélectionné, utiliser le coffre "foure tout" par défaut
+      // Cela garantit qu'on modifie toujours un coffre spécifique
+      const targetChestId = selectedChestId || null;
+      
       const stockData = Object.entries(stockValues)
         .filter(([_, value]) => value !== '' && value !== null)
         .map(([itemId, quantity]) => ({
@@ -88,12 +104,17 @@ export default function StockPageClient({ initialItems }: StockPageClientProps) 
         return;
       }
 
-      const result = await updateStock(stockData);
+      const result = await updateStock(stockData, targetChestId);
       handleAction(result);
+
+      // Déterminer le nom du coffre modifié pour le message
+      const chestName = targetChestId 
+        ? chests.find(c => c.id === targetChestId)?.name || 'le coffre sélectionné'
+        : 'Foure tout';
 
       notifications.show({
         title: 'Succès',
-        message: 'Stock mis à jour avec succès',
+        message: `Stock mis à jour avec succès pour ${chestName}`,
         color: 'green',
       });
 
@@ -119,10 +140,10 @@ export default function StockPageClient({ initialItems }: StockPageClientProps) 
   // Fonction pour évaluer une expression mathématique simple de manière sécurisée
   const evaluateExpression = (expression: string): number | '' => {
     if (!expression || expression.trim() === '') return '';
-    
+
     // Nettoyer l'expression : enlever les espaces
     const cleaned = expression.replace(/\s/g, '');
-    
+
     // Vérifier que l'expression contient uniquement des caractères autorisés
     // Permettre les chiffres, +, -, *, /, (, ), et le point pour les décimales
     if (!/^[\d+\-*/().]+$/.test(cleaned)) {
@@ -209,7 +230,7 @@ export default function StockPageClient({ initialItems }: StockPageClientProps) 
   // Grouper les items par catégorie
   const itemsByCategory = items.reduce((acc, item) => {
     if (!item.category) return acc;
-    
+
     const categoryId = item.category.id;
     if (!acc[categoryId]) {
       acc[categoryId] = {
@@ -255,6 +276,15 @@ export default function StockPageClient({ initialItems }: StockPageClientProps) 
   const itemsWithStockToday = items.filter((item) => item.stockToday !== null).length;
   const totalItems = items.length;
 
+  // Options pour le sélecteur de coffre
+  const chestOptions = [
+    { value: '', label: 'Tous les coffres' },
+    ...chests.map((chest) => ({
+      value: chest.id,
+      label: chest.name,
+    })),
+  ];
+
   return (
     <Container size="xl" py="xl">
       <Group justify="space-between" mb="xl">
@@ -269,51 +299,66 @@ export default function StockPageClient({ initialItems }: StockPageClientProps) 
               {itemsWithStockToday}/{totalItems} objets stockés aujourd'hui
             </Badge>
           )}
-          {!isEditing ? (
-            <Group>
-              {(permissions?.stock.craftRead || permissions?.stock.craftWrite) && (
-                <Button
-                  leftSection={<IconTools size={16} />}
-                  onClick={() => setCraftModalOpened(true)}
-                  variant="light"
-                  color="blue"
-                >
-                  Craft
-                </Button>
-              )}
-              {permissions?.stock.update && (
-                <Button
-                  leftSection={<IconEdit size={16} />}
-                  onClick={() => setIsEditing(true)}
-                  variant="light"
-                >
-                  {itemsWithStockToday > 0 ? 'Mettre à jour le stock' : 'Faire le stock'}
-                </Button>
-              )}
-            </Group>
-          ) : (
-            <Group>
+          <Group>
+            {(permissions?.stock.craftRead || permissions?.stock.craftWrite) && (
               <Button
-                leftSection={<IconX size={16} />}
-                onClick={handleCancelEdit}
-                variant="subtle"
-                color="gray"
+                leftSection={<IconTools size={16} />}
+                onClick={() => setCraftModalOpened(true)}
+                variant="light"
+                color="blue"
               >
-                Annuler
+                Craft
               </Button>
-              <Button
-                leftSection={<IconCheck size={16} />}
-                onClick={handleSaveStock}
-                loading={saving}
-                variant="filled"
-                color="green"
-              >
-                Sauvegarder
-              </Button>
-            </Group>
-          )}
+            )}
+            {selectedChestId !== null && (
+              <>
+                {!isEditing ? (
+                  permissions?.stock.update && (
+                    <Button
+                      leftSection={<IconEdit size={16} />}
+                      onClick={() => setIsEditing(true)}
+                      variant="light"
+                    >
+                      {itemsWithStockToday > 0 ? 'Mettre à jour le stock' : 'Faire le stock'}
+                    </Button>
+                  )
+                ) : (
+                  <>
+                    <Button
+                      leftSection={<IconX size={16} />}
+                      onClick={handleCancelEdit}
+                      variant="subtle"
+                      color="gray"
+                    >
+                      Annuler
+                    </Button>
+                    <Button
+                      leftSection={<IconCheck size={16} />}
+                      onClick={handleSaveStock}
+                      loading={saving}
+                      variant="filled"
+                      color="green"
+                    >
+                      Sauvegarder
+                    </Button>
+                  </>
+                )}
+              </>
+            )}
+          </Group>
         </Group>
       </Group>
+
+      <div className='flex justify-start mb-2'>
+        <Select
+          placeholder="Sélectionner un coffre"
+          data={chestOptions}
+          value={selectedChestId || ''}
+          onChange={(value) => setSelectedChestId(value === '' ? null : value)}
+          clearable={false}
+          style={{ minWidth: 200 }}
+        />
+      </div>
 
       {loading ? (
         <Text>Chargement...</Text>
@@ -353,30 +398,31 @@ export default function StockPageClient({ initialItems }: StockPageClientProps) 
                   <Table.Tbody>
                     {categoryData.items.map((item) => {
                       const hasStockToday = item.stockToday !== null;
-                      
+
                       // Déterminer le stock à utiliser pour vérifier si c'est bas
                       // Utiliser stockToday si disponible, sinon stockYesterday si disponible
-                      const currentStock = item.stockToday !== null 
-                        ? item.stockToday 
+                      const currentStock = item.stockToday !== null
+                        ? item.stockToday
                         : (item.stockYesterday !== null ? item.stockYesterday : null);
-                      
-                      const isStockLow = currentStock !== null && currentStock < item.idealQuantity;
-                      
+
+                      // Vérifier si le stock est bas UNIQUEMENT quand "Tous les coffres" est sélectionné
+                      const isStockLow = selectedChestId === null && currentStock !== null && currentStock < item.idealQuantity;
+
                       // Déterminer la couleur selon le type d'item
                       let backgroundColor: string | undefined = undefined;
                       if (isStockLow) {
                         // Items craftables OU items non-craftables sans groupe d'entreprise
                         if (item.isCraftable || (item.companyGroupId === null)) {
                           backgroundColor = '#fff3cd'; // Jaune clair
-                        } 
+                        }
                         // Items non-craftables avec groupe d'entreprise
                         else if (!item.isCraftable && item.companyGroupId !== null) {
                           backgroundColor = '#f8d7da'; // Rouge clair
                         }
                       }
-                      
+
                       return (
-                        <Table.Tr 
+                        <Table.Tr
                           key={item.id}
                           style={{
                             backgroundColor,
@@ -469,7 +515,9 @@ export default function StockPageClient({ initialItems }: StockPageClientProps) 
         onClose={() => setCraftModalOpened(false)}
         items={items}
         canCraft={permissions?.stock.craftWrite ?? false}
-        onCraft={async (itemId, recipeId, times) => {
+        initialChestId={selectedChestId}
+        chests={chests}
+        onCraft={async (itemId, recipeId, times, chestId) => {
           if (!permissions?.stock.craftWrite) {
             notifications.show({
               title: 'Permission refusée',
@@ -483,8 +531,9 @@ export default function StockPageClient({ initialItems }: StockPageClientProps) 
               craftedItemId: itemId,
               recipeId,
               times,
+              chestId,
             });
-            
+
             if (result.status === 200 && 'data' in result && result.data && 'quantityProduced' in result.data) {
               notifications.show({
                 title: 'Succès',
@@ -494,7 +543,7 @@ export default function StockPageClient({ initialItems }: StockPageClientProps) 
               setCraftModalOpened(false);
               await loadItems(); // Recharger les items pour mettre à jour les stocks
             } else {
-              const errorMessage = 'error' in result 
+              const errorMessage = 'error' in result
                 ? (typeof result.error === 'string' ? result.error : 'Erreur lors du craft')
                 : 'Erreur lors du craft';
               notifications.show({
