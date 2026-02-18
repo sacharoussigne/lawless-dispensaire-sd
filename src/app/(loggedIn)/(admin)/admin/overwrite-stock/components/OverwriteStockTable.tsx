@@ -9,6 +9,7 @@ interface OverwriteStockTableProps {
   loading: boolean;
   stockValues: Record<string, number | null>;
   onStockChange: (itemId: string, value: number | null) => void;
+  readOnly?: boolean;
 }
 
 export function OverwriteStockTable({
@@ -16,6 +17,7 @@ export function OverwriteStockTable({
   loading,
   stockValues,
   onStockChange,
+  readOnly = false,
 }: OverwriteStockTableProps) {
   return (
     <DataTable
@@ -49,11 +51,12 @@ export function OverwriteStockTable({
                     : undefined
                 }
                 onChange={(value) =>
-                  onStockChange(item.id, typeof value === 'number' ? value : null)
+                  readOnly ? undefined : onStockChange(item.id, typeof value === 'number' ? value : null)
                 }
-                placeholder="0"
+                placeholder={readOnly ? '-' : '0'}
                 min={0}
                 style={{ width: 120 }}
+                disabled={readOnly}
               />
             );
           },

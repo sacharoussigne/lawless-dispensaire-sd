@@ -299,49 +299,53 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
               {itemsWithStockToday}/{totalItems} objets stockés aujourd'hui
             </Badge>
           )}
-          {!isEditing ? (
-            <Group>
-              {(permissions?.stock.craftRead || permissions?.stock.craftWrite) && (
-                <Button
-                  leftSection={<IconTools size={16} />}
-                  onClick={() => setCraftModalOpened(true)}
-                  variant="light"
-                  color="blue"
-                >
-                  Craft
-                </Button>
-              )}
-              {permissions?.stock.update && (
-                <Button
-                  leftSection={<IconEdit size={16} />}
-                  onClick={() => setIsEditing(true)}
-                  variant="light"
-                >
-                  {itemsWithStockToday > 0 ? 'Mettre à jour le stock' : 'Faire le stock'}
-                </Button>
-              )}
-            </Group>
-          ) : (
-            <Group>
+          <Group>
+            {(permissions?.stock.craftRead || permissions?.stock.craftWrite) && (
               <Button
-                leftSection={<IconX size={16} />}
-                onClick={handleCancelEdit}
-                variant="subtle"
-                color="gray"
+                leftSection={<IconTools size={16} />}
+                onClick={() => setCraftModalOpened(true)}
+                variant="light"
+                color="blue"
               >
-                Annuler
+                Craft
               </Button>
-              <Button
-                leftSection={<IconCheck size={16} />}
-                onClick={handleSaveStock}
-                loading={saving}
-                variant="filled"
-                color="green"
-              >
-                Sauvegarder
-              </Button>
-            </Group>
-          )}
+            )}
+            {selectedChestId !== null && (
+              <>
+                {!isEditing ? (
+                  permissions?.stock.update && (
+                    <Button
+                      leftSection={<IconEdit size={16} />}
+                      onClick={() => setIsEditing(true)}
+                      variant="light"
+                    >
+                      {itemsWithStockToday > 0 ? 'Mettre à jour le stock' : 'Faire le stock'}
+                    </Button>
+                  )
+                ) : (
+                  <>
+                    <Button
+                      leftSection={<IconX size={16} />}
+                      onClick={handleCancelEdit}
+                      variant="subtle"
+                      color="gray"
+                    >
+                      Annuler
+                    </Button>
+                    <Button
+                      leftSection={<IconCheck size={16} />}
+                      onClick={handleSaveStock}
+                      loading={saving}
+                      variant="filled"
+                      color="green"
+                    >
+                      Sauvegarder
+                    </Button>
+                  </>
+                )}
+              </>
+            )}
+          </Group>
         </Group>
       </Group>
 
@@ -511,7 +515,9 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
         onClose={() => setCraftModalOpened(false)}
         items={items}
         canCraft={permissions?.stock.craftWrite ?? false}
-        onCraft={async (itemId, recipeId, times) => {
+        initialChestId={selectedChestId}
+        chests={chests}
+        onCraft={async (itemId, recipeId, times, chestId) => {
           if (!permissions?.stock.craftWrite) {
             notifications.show({
               title: 'Permission refusée',
@@ -525,6 +531,7 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
               craftedItemId: itemId,
               recipeId,
               times,
+              chestId,
             });
 
             if (result.status === 200 && 'data' in result && result.data && 'quantityProduced' in result.data) {
