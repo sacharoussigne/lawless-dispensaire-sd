@@ -13,9 +13,11 @@ import {
   Badge,
 } from '@mantine/core';
 import { getCraftRecipesByItemId } from '@/app/_actions/craftRecipes';
+import { getItemsWithStock } from '@/app/_actions/stock';
 import { handleAction } from '@/lib/action';
 import { notifications } from '@mantine/notifications';
 import type { ItemWithRelations } from '@/types/stock';
+import type { ChestWithStockHistory } from '@/types/chests';
 
 interface CraftRecipeWithIngredients {
   id: string;
@@ -34,20 +36,65 @@ interface CraftRecipeWithIngredients {
   }[];
 }
 
+
 interface CraftModalProps {
   opened: boolean;
   onClose: () => void;
   items: ItemWithRelations[];
   canCraft?: boolean; // Si false, l'utilisateur peut seulement voir mais pas craft
-  onCraft: (itemId: string, recipeId: string, quantity: number) => void;
+  onCraft: (itemId: string, recipeId: string, quantity: number, chestId: string | null) => void;
+  initialChestId?: string | null; // Coffre pré-sélectionné depuis la vue stock
+  chests?: ChestWithStockHistory[]; // Liste des coffres disponibles
 }
 
-export default function CraftModal({ opened, onClose, items, canCraft = true, onCraft }: CraftModalProps) {
+export default function CraftModal({ opened, onClose, items, canCraft = true, onCraft, initialChestId = null, chests = [] }: CraftModalProps) {
   const [selectedCraftItem, setSelectedCraftItem] = useState<string | null>(null);
   const [craftQuantity, setCraftQuantity] = useState<number>(1);
   const [selectedRecipe, setSelectedRecipe] = useState<string | null>(null);
   const [craftRecipes, setCraftRecipes] = useState<CraftRecipeWithIngredients[]>([]);
   const [loadingRecipes, setLoadingRecipes] = useState(false);
+  const [selectedChestId, setSelectedChestId] = useState<string | null>(initialChestId || null);
+  const [itemsWithStock, setItemsWithStock] = useState<ItemWithRelations[]>(items);
+  const [loadingItems, setLoadingItems] = useState(false);
+
+  // Mettre à jour selectedChestId quand initialChestId change (quand on change de coffre dans la vue stock)
+  useEffect(() => {
+    if (opened && initialChestId !== null) {
+      setSelectedChestId(initialChestId);
+    } else if (opened && initialChestId === null) {
+      setSelectedChestId(null);
+    }
+  }, [opened, initialChestId]);
+
+  // Charger les items avec le stock du coffre sélectionné dans le modal
+  useEffect(() => {
+    if (opened) {
+      const loadItemsForChest = async () => {
+        setLoadingItems(true);
+        try {
+          const result = await getItemsWithStock(selectedChestId);
+          const data = handleAction(result);
+          if (data) {
+            setItemsWithStock(data);
+            // Réinitialiser la sélection de l'item crafté quand le coffre change
+            // pour éviter des incohérences avec les stocks
+            setSelectedCraftItem(null);
+            setSelectedRecipe(null);
+            setCraftRecipes([]);
+          }
+        } catch (error: any) {
+          notifications.show({
+            title: 'Erreur',
+            message: error.message || 'Erreur lors du chargement des stocks',
+            color: 'red',
+          });
+        } finally {
+          setLoadingItems(false);
+        }
+      };
+      loadItemsForChest();
+    }
+  }, [opened, selectedChestId]);
 
   // Réinitialiser les états quand la modal se ferme
   useEffect(() => {
@@ -56,6 +103,7 @@ export default function CraftModal({ opened, onClose, items, canCraft = true, on
       setCraftQuantity(1);
       setSelectedRecipe(null);
       setCraftRecipes([]);
+      // Ne pas réinitialiser selectedChestId, on garde la valeur initiale
     }
   }, [opened]);
 
@@ -97,7 +145,7 @@ export default function CraftModal({ opened, onClose, items, canCraft = true, on
 
   const handleCraft = async () => {
     if (!selectedCraftItem || !selectedRecipe) return;
-    await onCraft(selectedCraftItem, selectedRecipe, craftQuantity);
+    await onCraft(selectedCraftItem, selectedRecipe, craftQuantity, selectedChestId);
   };
 
   // Helper pour obtenir le stock disponible et savoir s'il vient d'aujourd'hui
@@ -116,7 +164,7 @@ export default function CraftModal({ opened, onClose, items, canCraft = true, on
     return { stock: null, isToday: false };
   };
 
-  const selectedCraftItemData = items.find((i) => i.id === selectedCraftItem);
+  const selectedCraftItemData = itemsWithStock.find((i) => i.id === selectedCraftItem);
   const craftItemStock = getAvailableStock(selectedCraftItemData);
   const hasCraftItemStockToday = selectedCraftItemData?.stockToday !== null && selectedCraftItemData?.stockToday !== undefined;
   const hasCraftItemStock = craftItemStock.stock !== null;
@@ -131,7 +179,7 @@ export default function CraftModal({ opened, onClose, items, canCraft = true, on
     if (!recipe) return false;
     
     return recipe.ingredients.some((ingredient) => {
-      const item = items.find((i) => i.id === ingredient.usedItemId);
+      const item = itemsWithStock.find((i) => i.id === ingredient.usedItemId);
       const stock = getAvailableStock(item);
       return stock.stock !== null && !stock.isToday;
     });
@@ -141,6 +189,11 @@ export default function CraftModal({ opened, onClose, items, canCraft = true, on
     // Si l'utilisateur n'a pas la permission de craft
     if (!canCraft) {
       return "Vous n'avez pas la permission d'effectuer un craft";
+    }
+    
+    // Si aucun coffre n'est sélectionné, désactiver le craft
+    if (selectedChestId === null) {
+      return "Veuillez sélectionner un coffre pour effectuer le craft";
     }
     
     if (!selectedCraftItem || (!selectedRecipe && craftRecipes.length > 1) || craftQuantity < 1) {
@@ -162,7 +215,7 @@ export default function CraftModal({ opened, onClose, items, canCraft = true, on
     // Vérifier que tous les ingrédients ont un stock d'aujourd'hui ET assez de stock
     const ingredientChecks = recipe.ingredients.map((ingredient) => {
       const requiredQuantity = ingredient.quantity * craftQuantity;
-      const item = items.find((i) => i.id === ingredient.usedItemId);
+      const item = itemsWithStock.find((i) => i.id === ingredient.usedItemId);
       // Vérifier que le stock d'aujourd'hui existe
       if (item?.stockToday === null || item?.stockToday === undefined) {
         return { hasStock: false, hasEnough: false, itemName: item?.name || ingredient.usedItem.name };
@@ -200,10 +253,24 @@ export default function CraftModal({ opened, onClose, items, canCraft = true, on
       size="lg"
     >
       <Stack>
+        {chests.length > 0 && (
+          <Select
+            label="Coffre"
+            placeholder="Sélectionner un coffre"
+            data={chests.map((chest) => ({
+              value: chest.id,
+              label: chest.name,
+            }))}
+            value={selectedChestId}
+            onChange={(value) => setSelectedChestId(value)}
+            required
+            clearable={false}
+          />
+        )}
         <Select
           label="Objet à craft"
           placeholder="Sélectionner un objet craftable"
-          data={items
+          data={itemsWithStock
             .filter((item) => item.isCraftable)
             .sort((a, b) => {
               if (a.order !== undefined && b.order !== undefined) {
@@ -221,6 +288,7 @@ export default function CraftModal({ opened, onClose, items, canCraft = true, on
           onChange={handleItemChange}
           searchable
           required
+          disabled={loadingItems}
         />
 
         {selectedCraftItem && craftRecipes.length > 0 && (
@@ -311,7 +379,7 @@ export default function CraftModal({ opened, onClose, items, canCraft = true, on
                     <Stack gap="xs">
                       {recipe.ingredients.map((ingredient) => {
                         const requiredQuantity = ingredient.quantity * craftQuantity;
-                        const item = items.find((i) => i.id === ingredient.usedItemId);
+                        const item = itemsWithStock.find((i) => i.id === ingredient.usedItemId);
                         const stockInfo = getAvailableStock(item);
                         const availableStock = stockInfo.stock ?? 0;
                         const hasEnough = stockInfo.isToday && availableStock >= requiredQuantity;
@@ -365,6 +433,12 @@ export default function CraftModal({ opened, onClose, items, canCraft = true, on
         {loadingRecipes && (
           <Text c="dimmed" size="sm">
             Chargement des recettes...
+          </Text>
+        )}
+
+        {loadingItems && (
+          <Text c="dimmed" size="sm">
+            Chargement des stocks...
           </Text>
         )}
 

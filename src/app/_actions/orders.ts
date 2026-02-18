@@ -167,6 +167,7 @@ const updateOrderSchema = z.object({
       quantity: z.number().int().min(1, 'La quantité doit être au moins 1'),
     })
   ).min(1, 'Au moins un objet est requis').optional(),
+  chestId: z.string().uuid('ID de coffre invalide').optional().nullable(),
 });
 
 // Schéma pour supprimer une commande
@@ -246,6 +247,7 @@ export async function updateOrder(data: {
   price?: number;
   items?: { itemId: string; quantity: number }[];
   addToStock?: boolean;
+  chestId?: string | null;
 }) {
   try {
     const session = await getAuthSession();
@@ -403,7 +405,7 @@ export async function updateOrder(data: {
     ) {
       // Pour les commandes entrantes (INCOMING), ajouter au stock si demandé
       if (orderType === 'INCOMING' && data.addToStock === true) {
-        const stockResult = await addOrderItemsToStock(validatedData.id);
+        const stockResult = await addOrderItemsToStock(validatedData.id, data.chestId);
         if (stockResult.status !== 200) {
           return {
             status: 200,
@@ -415,7 +417,7 @@ export async function updateOrder(data: {
       
       // Pour les commandes sortantes (OUTGOING), retirer du stock automatiquement
       if (orderType === 'OUTGOING') {
-        const stockResult = await removeOrderItemsFromStock(validatedData.id);
+        const stockResult = await removeOrderItemsFromStock(validatedData.id, data.chestId);
         if (stockResult.status !== 200) {
           const errorMessage = 'error' in stockResult ? stockResult.error : 'La commande a été mise à jour mais le retrait du stock a échoué';
           return {
