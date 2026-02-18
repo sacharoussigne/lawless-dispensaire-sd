@@ -26,6 +26,9 @@ export const routes = {
   orders: {
     index: '/orders',
   },
+  searchItems: {
+    index: '/search-items',
+  },
   auth: {
     index: '/auth',
     login: '/auth/login',
