@@ -692,6 +692,149 @@ export async function overwriteStockForDate(data: {
 }
 
 /**
+ * Récupère les items avec leurs stocks détaillés par coffre
+ * Utile pour la recherche d'items avec informations complètes
+ */
+export async function getItemsWithDetailedStock(itemIds?: string[]) {
+  try {
+    const session = await getAuthSession();
+    if (!session) {
+      return {
+        status: 401,
+        error: 'Non autorisé',
+      };
+    }
+
+    const today = getTodayStart();
+    const yesterday = getYesterdayStart();
+
+    const items = await prisma.item.findMany({
+      where: {
+        isEnabled: true,
+        ...(itemIds && itemIds.length > 0 ? { id: { in: itemIds } } : {}),
+      },
+      orderBy: {
+        name: 'asc',
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        idealQuantity: true,
+        isCraftable: true,
+        canBeSold: true,
+        price: true,
+        categoryId: true,
+        companyGroupId: true,
+        order: true,
+        category: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+          },
+        },
+        companyGroup: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        stockHistory: {
+          where: {
+            timestamp: {
+              gte: yesterday,
+            },
+          },
+          select: {
+            id: true,
+            chestId: true,
+            quantity: true,
+            timestamp: true,
+            chest: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+          orderBy: {
+            timestamp: 'desc',
+          },
+        },
+      },
+    });
+
+    // Récupérer tous les coffres pour avoir la liste complète
+    const allChests = await prisma.chest.findMany({
+      orderBy: {
+        name: 'asc',
+      },
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+
+    const itemsWithDetailedStock = items.map((item) => {
+      // Grouper les stocks par coffre pour aujourd'hui
+      const stocksByChestToday = new Map<string, { quantity: number; timestamp: Date }>();
+      const stocksByChestYesterday = new Map<string, { quantity: number; timestamp: Date }>();
+
+      item.stockHistory.forEach((sh) => {
+        const shDateStr = formatDate(new Date(sh.timestamp));
+        const todayStr = formatDate(today);
+        const yesterdayStr = formatDate(yesterday);
+
+        if (shDateStr === todayStr) {
+          const existing = stocksByChestToday.get(sh.chestId);
+          if (!existing || new Date(sh.timestamp).getTime() > new Date(existing.timestamp).getTime()) {
+            stocksByChestToday.set(sh.chestId, { quantity: sh.quantity, timestamp: sh.timestamp });
+          }
+        } else if (shDateStr === yesterdayStr) {
+          const existing = stocksByChestYesterday.get(sh.chestId);
+          if (!existing || new Date(sh.timestamp).getTime() > new Date(existing.timestamp).getTime()) {
+            stocksByChestYesterday.set(sh.chestId, { quantity: sh.quantity, timestamp: sh.timestamp });
+          }
+        }
+      });
+
+      // Calculer le stock total aujourd'hui et hier
+      const totalStockToday = Array.from(stocksByChestToday.values()).reduce((sum, sh) => sum + sh.quantity, 0);
+      const totalStockYesterday = Array.from(stocksByChestYesterday.values()).reduce((sum, sh) => sum + sh.quantity, 0);
+
+      // Créer un objet avec le stock par coffre (aujourd'hui et hier)
+      const stockByChest = allChests.map((chest) => {
+        const stockToday = stocksByChestToday.get(chest.id);
+        const stockYesterday = stocksByChestYesterday.get(chest.id);
+
+        return {
+          chestId: chest.id,
+          chestName: chest.name,
+          stockToday: stockToday?.quantity ?? null,
+          stockYesterday: stockYesterday?.quantity ?? null,
+        };
+      });
+
+      return {
+        ...item,
+        price: item.price ? Number(item.price) : null,
+        totalStockToday: stocksByChestToday.size > 0 ? totalStockToday : null,
+        totalStockYesterday: stocksByChestYesterday.size > 0 ? totalStockYesterday : null,
+        stockByChest,
+      };
+    });
+
+    return {
+      status: 200,
+      data: itemsWithDetailedStock,
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de la récupération des items avec stocks détaillés');
+  }
+}
+
+/**
  * Vérifie si tous les items d'une commande ont un stock d'aujourd'hui
  */
 export async function checkOrderItemsStockToday(orderId: string, chestId?: string | null) {

@@ -66,6 +66,12 @@ export default function Header({
                   >
                     Commandes
                   </Link>
+                  <Link
+                    href={routes.searchItems.index}
+                    className={classes.link}
+                  >
+                    Recherche
+                  </Link>
                   {/* <Link
                     href={routes.test.index}
                     className={classes.link}
