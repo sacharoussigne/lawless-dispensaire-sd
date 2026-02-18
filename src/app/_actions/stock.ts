@@ -442,8 +442,10 @@ export async function craftItem(data: {
 /**
  * Ajoute les items d'une commande au stock d'aujourd'hui
  * Additionne les quantités aux stocks existants
+ * @param orderId - ID de la commande
+ * @param chestId - ID du coffre où ajouter les stocks (optionnel, utilise "foure tout" par défaut)
  */
-export async function addOrderItemsToStock(orderId: string) {
+export async function addOrderItemsToStock(orderId: string, chestId?: string | null) {
   try {
     const session = await getAuthSession();
     if (!session) {
@@ -480,13 +482,20 @@ export async function addOrderItemsToStock(orderId: string) {
     const today = getTodayStart();
     const tomorrow = getTomorrowStart();
 
-    // Pour chaque item de la commande, ajouter la quantité au stock
+    // Si aucun chestId n'est fourni, utiliser le coffre "foure tout" par défaut
+    let targetChestId = chestId;
+    if (!targetChestId) {
+      targetChestId = await getDefaultChestId();
+    }
+
+    // Pour chaque item de la commande, ajouter la quantité au stock du coffre spécifié
     await prisma.$transaction(async (tx) => {
       for (const orderItem of order.items) {
-        // Récupérer le stock d'aujourd'hui
+        // Récupérer le stock d'aujourd'hui pour ce coffre spécifique
         const existingStock = await tx.stockHistory.findFirst({
           where: {
             itemId: orderItem.itemId,
+            chestId: targetChestId,
             timestamp: {
               gte: today,
               lt: tomorrow,
@@ -498,7 +507,7 @@ export async function addOrderItemsToStock(orderId: string) {
         });
 
         if (existingStock) {
-          // Additionner la quantité au stock existant
+          // Additionner la quantité au stock existant de ce coffre
           await tx.stockHistory.update({
             where: { id: existingStock.id },
             data: {
@@ -506,12 +515,11 @@ export async function addOrderItemsToStock(orderId: string) {
             },
           });
         } else {
-          // Créer un nouveau stock avec la quantité de la commande
-          const defaultChestId = await getDefaultChestId();
+          // Créer un nouveau stock avec la quantité de la commande pour ce coffre
           await tx.stockHistory.create({
             data: {
               itemId: orderItem.itemId,
-              chestId: defaultChestId,
+              chestId: targetChestId,
               quantity: orderItem.quantity,
             },
           });
@@ -676,7 +684,7 @@ export async function overwriteStockForDate(data: {
 /**
  * Vérifie si tous les items d'une commande ont un stock d'aujourd'hui
  */
-export async function checkOrderItemsStockToday(orderId: string) {
+export async function checkOrderItemsStockToday(orderId: string, chestId?: string | null) {
   try {
     const session = await getAuthSession();
     if (!session) {
@@ -719,6 +727,7 @@ export async function checkOrderItemsStockToday(orderId: string) {
         const stockToday = await prisma.stockHistory.findFirst({
           where: {
             itemId: orderItem.itemId,
+            ...(chestId ? { chestId } : {}),
             timestamp: {
               gte: today,
               lt: tomorrow,
@@ -755,7 +764,7 @@ export async function checkOrderItemsStockToday(orderId: string) {
  * Vérifie qu'on a assez de stock pour retirer les items d'une commande sortante
  * Retourne true si tous les items ont assez de stock, false sinon
  */
-export async function checkOrderItemsStockSufficient(orderId: string) {
+export async function checkOrderItemsStockSufficient(orderId: string, chestId?: string | null) {
   try {
     const session = await getAuthSession();
     if (!session) {
@@ -798,6 +807,7 @@ export async function checkOrderItemsStockSufficient(orderId: string) {
         const stockToday = await prisma.stockHistory.findFirst({
           where: {
             itemId: orderItem.itemId,
+            ...(chestId ? { chestId } : {}),
             timestamp: {
               gte: today,
               lt: tomorrow,
@@ -842,8 +852,10 @@ export async function checkOrderItemsStockSufficient(orderId: string) {
 /**
  * Retire les items d'une commande sortante du stock d'aujourd'hui
  * Vérifie qu'on a assez de stock avant de retirer
+ * @param orderId - ID de la commande
+ * @param chestId - ID du coffre d'où retirer les stocks (optionnel, utilise "foure tout" par défaut)
  */
-export async function removeOrderItemsFromStock(orderId: string) {
+export async function removeOrderItemsFromStock(orderId: string, chestId?: string | null) {
   try {
     const session = await getAuthSession();
     if (!session) {
@@ -880,12 +892,19 @@ export async function removeOrderItemsFromStock(orderId: string) {
     const today = getTodayStart();
     const tomorrow = getTomorrowStart();
 
-    // Vérifier qu'on a assez de stock pour tous les items
+    // Si aucun chestId n'est fourni, utiliser le coffre "foure tout" par défaut
+    let targetChestId = chestId;
+    if (!targetChestId) {
+      targetChestId = await getDefaultChestId();
+    }
+
+    // Vérifier qu'on a assez de stock pour tous les items dans le coffre spécifié
     const stockChecks = await Promise.all(
       order.items.map(async (orderItem) => {
         const stockToday = await prisma.stockHistory.findFirst({
           where: {
             itemId: orderItem.itemId,
+            chestId: targetChestId,
             timestamp: {
               gte: today,
               lt: tomorrow,
@@ -932,10 +951,15 @@ export async function removeOrderItemsFromStock(orderId: string) {
       };
     }
 
-    // Retirer les quantités du stock
+    // Retirer les quantités du stock du coffre spécifié
     await prisma.$transaction(async (tx) => {
       for (const check of stockChecks) {
         if (check.stockToday) {
+          // Vérification de sécurité : s'assurer que le stock appartient au bon coffre
+          if (check.stockToday.chestId !== targetChestId) {
+            throw new Error(`Le stock trouvé n'appartient pas au coffre attendu pour ${check.orderItem.item.name}`);
+          }
+          
           const newQuantity = check.stockToday.quantity - check.orderItem.quantity;
           if (newQuantity < 0) {
             throw new Error(`Stock insuffisant pour ${check.orderItem.item.name}`);
