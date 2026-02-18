@@ -165,8 +165,8 @@ export async function getItemsWithStock(chestId?: string | null) {
 
         return {
           ...item,
-          stockToday: totalStockToday > 0 ? totalStockToday : null,
-          stockYesterday: totalStockYesterday > 0 ? totalStockYesterday : null,
+          stockToday: stocksByChestToday.size > 0 ? totalStockToday : null,
+          stockYesterday: stocksByChestYesterday.size > 0 ? totalStockYesterday : null,
           price: item.price ? Number(item.price) : null,
         };
       }
