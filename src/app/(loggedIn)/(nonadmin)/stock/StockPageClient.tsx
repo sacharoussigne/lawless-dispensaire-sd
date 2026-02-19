@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   Container,
   Title,
@@ -208,8 +208,7 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
     }
   }, [isEditing, items]);
 
-  // Fonction pour calculer la luminosité d'une couleur hexadécimale
-  const getLuminance = (hex: string): number => {
+  const getLuminance = useCallback((hex: string): number => {
     const r = parseInt(hex.slice(1, 3), 16) / 255;
     const g = parseInt(hex.slice(3, 5), 16) / 255;
     const b = parseInt(hex.slice(5, 7), 16) / 255;
@@ -221,71 +220,68 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
     });
 
     return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
-  };
+  }, []);
 
-  // Fonction pour déterminer si le texte doit être blanc ou noir selon la couleur de fond
-  const getTextColor = (backgroundColor: string): string => {
+  const getTextColor = useCallback((backgroundColor: string): string => {
     const luminance = getLuminance(backgroundColor);
     return luminance > 0.5 ? '#000000' : '#ffffff';
-  };
+  }, [getLuminance]);
 
-  // Grouper les items par catégorie
-  const itemsByCategory = items.reduce((acc, item) => {
-    if (!item.category) return acc;
+  const itemsByCategory = useMemo(() => {
+    return items.reduce((acc, item) => {
+      if (!item.category) return acc;
 
-    const categoryId = item.category.id;
-    if (!acc[categoryId]) {
-      acc[categoryId] = {
-        category: item.category,
-        items: [],
-      };
-    }
-    acc[categoryId].items.push(item);
-    return acc;
-  }, {} as Record<string, CategoryWithItems>);
-
-  // Trier les catégories par ordre puis par nom
-  const sortedCategories = Object.values(itemsByCategory).sort((a, b) => {
-    // Si les deux ont un ordre, trier par ordre
-    if (a.category.order !== undefined && b.category.order !== undefined) {
-      return a.category.order - b.category.order;
-    }
-    // Si seulement a a un ordre, a vient en premier
-    if (a.category.order !== undefined) return -1;
-    // Si seulement b a un ordre, b vient en premier
-    if (b.category.order !== undefined) return 1;
-    // Sinon, trier par nom
-    return a.category.name.localeCompare(b.category.name, 'fr', { sensitivity: 'base' });
-  });
-
-  // Trier les items dans chaque catégorie par ordre puis par nom
-  sortedCategories.forEach((cat) => {
-    cat.items.sort((a, b) => {
-      // Si les deux ont un ordre, trier par ordre
-      if (a.order !== undefined && b.order !== undefined) {
-        return a.order - b.order;
+      const categoryId = item.category.id;
+      if (!acc[categoryId]) {
+        acc[categoryId] = {
+          category: item.category,
+          items: [],
+        };
       }
-      // Si seulement a a un ordre, a vient en premier
-      if (a.order !== undefined) return -1;
-      // Si seulement b a un ordre, b vient en premier
-      if (b.order !== undefined) return 1;
-      // Sinon, trier par nom
-      return a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' });
+      acc[categoryId].items.push(item);
+      return acc;
+    }, {} as Record<string, CategoryWithItems>);
+  }, [items]);
+
+  const sortedCategories = useMemo(() => {
+    const categories = Object.values(itemsByCategory).sort((a, b) => {
+      if (a.category.order !== undefined && b.category.order !== undefined) {
+        return a.category.order - b.category.order;
+      }
+      if (a.category.order !== undefined) return -1;
+      if (b.category.order !== undefined) return 1;
+      return a.category.name.localeCompare(b.category.name, 'fr', { sensitivity: 'base' });
     });
-  });
 
-  // Compter les items avec stock fait aujourd'hui
-  const itemsWithStockToday = items.filter((item) => item.stockToday !== null).length;
-  const totalItems = items.length;
+    categories.forEach((cat) => {
+      cat.items.sort((a, b) => {
+        if (a.order !== undefined && b.order !== undefined) {
+          return a.order - b.order;
+        }
+        if (a.order !== undefined) return -1;
+        if (b.order !== undefined) return 1;
+        return a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' });
+      });
+    });
 
-  // Options pour le sélecteur de coffre
-  const chestOptions = [
+    return categories;
+  }, [itemsByCategory]);
+
+  const { itemsWithStockToday, totalItems } = useMemo(() => {
+    const withStock = items.filter((item) => item.stockToday !== null).length;
+    return {
+      itemsWithStockToday: withStock,
+      totalItems: items.length,
+    };
+  }, [items]);
+
+  const chestOptions = useMemo(() => [
     { value: '', label: 'Tous les coffres' },
     ...chests.map((chest) => ({
       value: chest.id,
       label: chest.name,
     })),
-  ];
+  ], [chests]);
 
   return (
     <Container size="xl" py="xl">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Modal,
   Stack,
@@ -76,51 +76,67 @@ export default function CraftModal({
   const [ingredientChests, setIngredientChests] = useState<Record<string, string>>({});
   const [itemsWithStockByChest, setItemsWithStockByChest] = useState<Record<string, ItemWithRelations[]>>({});
   const [loadingItems, setLoadingItems] = useState(false);
+  const cacheRef = useRef<Record<string, ItemWithRelations[]>>({});
+  const loadingChestsRef = useRef<Set<string>>(new Set());
 
-  // Mettre à jour sourceChestId et destinationChestId quand initialChestId change
+  const loadChestItemsIfNeeded = useCallback(async (chestId: string | null) => {
+    if (!chestId) {
+      return;
+    }
+
+    if (cacheRef.current[chestId]) {
+      return;
+    }
+
+    if (loadingChestsRef.current.has(chestId)) {
+      return;
+    }
+
+    loadingChestsRef.current.add(chestId);
+    setLoadingItems(true);
+    
+    try {
+      const result = await getItemsWithStock(chestId);
+      const data = handleAction(result);
+      if (data) {
+        cacheRef.current[chestId] = data;
+        setItemsWithStockByChest((prev) => ({
+          ...prev,
+          [chestId]: data,
+        }));
+      }
+    } catch (error: any) {
+      notifications.show({
+        title: 'Erreur',
+        message: error.message || 'Erreur lors du chargement des stocks',
+        color: 'red',
+      });
+    } finally {
+      loadingChestsRef.current.delete(chestId);
+      setLoadingItems(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    cacheRef.current = itemsWithStockByChest;
+  }, [itemsWithStockByChest]);
+
   useEffect(() => {
     if (opened && initialChestId !== null) {
       setSourceChestId(initialChestId);
-      setDestinationChestId(initialChestId); // Par défaut, le coffre de destination est le même que le coffre source
+      setDestinationChestId(initialChestId);
     } else if (opened && initialChestId === null) {
       setSourceChestId(null);
       setDestinationChestId(null);
     }
   }, [opened, initialChestId]);
 
-  // Charger les items avec le stock pour tous les coffres quand la modal s'ouvre
   useEffect(() => {
-    if (opened && chests.length > 0) {
-      const loadItemsForAllChests = async () => {
-        setLoadingItems(true);
-        try {
-          const allItems: Record<string, ItemWithRelations[]> = {};
-          
-          // Charger les items pour chaque coffre
-          await Promise.all(
-            chests.map(async (chest) => {
-              const result = await getItemsWithStock(chest.id);
-              const data = handleAction(result);
-              if (data) {
-                allItems[chest.id] = data;
-              }
-            })
-          );
-          
-          setItemsWithStockByChest(allItems);
-        } catch (error: any) {
-          notifications.show({
-            title: 'Erreur',
-            message: error.message || 'Erreur lors du chargement des stocks',
-            color: 'red',
-          });
-        } finally {
-          setLoadingItems(false);
-        }
-      };
-      loadItemsForAllChests();
+    if (opened && sourceChestId) {
+      loadChestItemsIfNeeded(sourceChestId);
     }
-  }, [opened, chests]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opened, sourceChestId]);
 
   // Réinitialiser les états quand la modal se ferme
   useEffect(() => {
@@ -134,12 +150,12 @@ export default function CraftModal({
     }
   }, [opened]);
 
-  // Synchroniser le coffre de destination avec le coffre source de base par défaut
-  // (seulement si le coffre de destination n'est pas défini ou est égal au coffre source)
   useEffect(() => {
     if (sourceChestId && (!destinationChestId || destinationChestId === sourceChestId)) {
       setDestinationChestId(sourceChestId);
+      loadChestItemsIfNeeded(sourceChestId);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourceChestId]);
 
   // Réinitialiser les coffres des ingrédients quand le coffre source de base change
@@ -201,8 +217,10 @@ export default function CraftModal({
     onClose();
   };
 
-  const handleIngredientChestChange = (ingredientId: string, chestId: string | null) => {
+  const handleIngredientChestChange = useCallback(async (ingredientId: string, chestId: string | null) => {
     if (chestId) {
+      await loadChestItemsIfNeeded(chestId);
+      
       setIngredientChests((prev) => ({
         ...prev,
         [ingredientId]: chestId,
@@ -214,7 +232,7 @@ export default function CraftModal({
         return updated;
       });
     }
-  };
+  }, [loadChestItemsIfNeeded]);
 
   const handleCraft = async () => {
     if (!selectedCraftItem || !selectedRecipe || !sourceChestId || !destinationChestId) return;

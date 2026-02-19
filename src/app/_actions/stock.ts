@@ -42,6 +42,7 @@ export async function getItemsWithStock(chestId?: string | null) {
 
     const today = getTodayStart();
     const yesterday = getYesterdayStart();
+    const tomorrow = getTomorrowStart();
 
     const items = await prisma.item.findMany({
       where: {
@@ -78,11 +79,13 @@ export async function getItemsWithStock(chestId?: string | null) {
           },
         },
         stockHistory: {
-          where: chestId
-            ? {
-                chestId: chestId,
-              }
-            : undefined,
+          where: {
+            ...(chestId ? { chestId: chestId } : {}),
+            timestamp: {
+              gte: yesterday,
+              lt: tomorrow,
+            },
+          },
           select: {
             id: true,
             itemId: true,
@@ -93,6 +96,7 @@ export async function getItemsWithStock(chestId?: string | null) {
           orderBy: {
             timestamp: 'desc',
           },
+          take: 100,
         },
       },
     });
