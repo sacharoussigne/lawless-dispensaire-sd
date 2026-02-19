@@ -1137,7 +1137,7 @@ export async function removeOrderItemsFromStock(orderId: string, chestId?: strin
 }
 
 /**
- * Transfère des items d'un coffre source vers un coffre destination
+ * Transfère un item d'un coffre source vers un coffre destination
  * Vérifie que le coffre source a assez de stock avant de transférer
  * @param itemId - ID de l'item à transférer
  * @param quantity - Quantité à transférer
@@ -1250,6 +1250,131 @@ export async function transferStock(data: {
             quantity: data.quantity,
           },
         });
+      }
+    });
+
+    return {
+      status: 200,
+      data: { success: true },
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors du transfert des items');
+  }
+}
+
+/**
+ * Transfère plusieurs items d'un coffre source vers un coffre destination
+ * Vérifie que le coffre source a assez de stock pour chaque item avant de transférer
+ * L'opération est transactionnelle : soit tous les transferts réussissent, soit aucun n'est appliqué
+ */
+export async function transferMultipleStock(data: {
+  sourceChestId: string;
+  destinationChestId: string;
+  items: { itemId: string; quantity: number }[];
+}) {
+  try {
+    const session = await getAuthSession();
+    if (!session) {
+      return {
+        status: 401,
+        error: 'Non autorisé',
+      };
+    }
+
+    const { sourceChestId, destinationChestId, items } = data;
+
+    // Vérifier que les coffres sont différents
+    if (sourceChestId === destinationChestId) {
+      return {
+        status: 400,
+        error: 'Le coffre source et le coffre destination doivent être différents',
+      };
+    }
+
+    // Vérifier qu'il y a au moins un item à transférer
+    const validItems = items.filter((i) => i.quantity > 0);
+    if (validItems.length === 0) {
+      return {
+        status: 400,
+        error: 'Aucun item à transférer',
+      };
+    }
+
+    const today = getTodayStart();
+    const tomorrow = getTomorrowStart();
+
+    // Effectuer tous les transferts dans une seule transaction
+    await prisma.$transaction(async (tx) => {
+      for (const { itemId, quantity } of validItems) {
+        if (quantity <= 0) {
+          throw new Error(`La quantité à transférer doit être positive pour l'item ${itemId}`);
+        }
+
+        // 1. Vérifier le stock dans le coffre source
+        const sourceStock = await tx.stockHistory.findFirst({
+          where: {
+            itemId,
+            chestId: sourceChestId,
+            timestamp: {
+              gte: today,
+              lt: tomorrow,
+            },
+          },
+          orderBy: {
+            timestamp: 'desc',
+          },
+        });
+
+        if (!sourceStock) {
+          throw new Error(`Aucun stock trouvé dans le coffre source pour l'item ${itemId} aujourd'hui`);
+        }
+
+        if (sourceStock.quantity < quantity) {
+          throw new Error(
+            `Stock insuffisant dans le coffre source pour l'item ${itemId}. Stock disponible: ${sourceStock.quantity}, quantité demandée: ${quantity}`
+          );
+        }
+
+        // 2. Retirer la quantité du coffre source
+        const newSourceQuantity = sourceStock.quantity - quantity;
+        await tx.stockHistory.update({
+          where: { id: sourceStock.id },
+          data: {
+            quantity: newSourceQuantity,
+          },
+        });
+
+        // 3. Ajouter la quantité au coffre destination
+        const destinationStock = await tx.stockHistory.findFirst({
+          where: {
+            itemId,
+            chestId: destinationChestId,
+            timestamp: {
+              gte: today,
+              lt: tomorrow,
+            },
+          },
+          orderBy: {
+            timestamp: 'desc',
+          },
+        });
+
+        if (destinationStock) {
+          await tx.stockHistory.update({
+            where: { id: destinationStock.id },
+            data: {
+              quantity: destinationStock.quantity + quantity,
+            },
+          });
+        } else {
+          await tx.stockHistory.create({
+            data: {
+              itemId,
+              chestId: destinationChestId,
+              quantity,
+            },
+          });
+        }
       }
     });
 

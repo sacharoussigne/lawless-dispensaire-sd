@@ -12,9 +12,10 @@ import {
   Paper,
   Alert,
   Badge,
+  Table,
 } from '@mantine/core';
-import { IconAlertCircle, IconArrowRight } from '@tabler/icons-react';
-import { transferStock } from '@/app/_actions/stock';
+import { IconAlertCircle } from '@tabler/icons-react';
+import { transferMultipleStock } from '@/app/_actions/stock';
 import { getItemsWithStock } from '@/app/_actions/stock';
 import { handleAction } from '@/lib/action';
 import { notifications } from '@mantine/notifications';
@@ -38,13 +39,12 @@ export default function TransferModal({
   initialSourceChestId = null,
   onTransfer,
 }: TransferModalProps) {
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [sourceChestId, setSourceChestId] = useState<string | null>(initialSourceChestId);
   const [destinationChestId, setDestinationChestId] = useState<string | null>(null);
-  const [quantity, setQuantity] = useState<number | ''>(1);
   const [loading, setLoading] = useState(false);
   const [itemsWithStock, setItemsWithStock] = useState<ItemWithRelations[]>(items);
   const [loadingItems, setLoadingItems] = useState(false);
+  const [quantitiesByItem, setQuantitiesByItem] = useState<Record<string, number | ''>>({});
 
   // Mettre à jour sourceChestId quand initialSourceChestId change
   useEffect(() => {
@@ -65,9 +65,14 @@ export default function TransferModal({
           const data = handleAction(result);
           if (data) {
             setItemsWithStock(data);
-            // Réinitialiser la sélection de l'item quand le coffre source change
-            setSelectedItemId(null);
-            setQuantity(1);
+            // Réinitialiser les quantités quand le coffre source change
+            const initialQuantities: Record<string, number | ''> = {};
+            data
+              .filter((item: ItemWithRelations) => item.stockToday !== null && item.stockToday > 0)
+              .forEach((item: ItemWithRelations) => {
+                initialQuantities[item.id] = '';
+              });
+            setQuantitiesByItem(initialQuantities);
           }
         } catch (error: any) {
           notifications.show({
@@ -81,36 +86,27 @@ export default function TransferModal({
       };
       loadItemsForChest();
     } else if (opened && !sourceChestId) {
-      // Si aucun coffre source n'est sélectionné, réinitialiser les items
+      // Si aucun coffre source n'est sélectionné, réinitialiser les items et les quantités
       setItemsWithStock([]);
-      setSelectedItemId(null);
-      setQuantity(1);
+      setQuantitiesByItem({});
     }
   }, [opened, sourceChestId]);
 
   // Réinitialiser les états quand la modal se ferme
   useEffect(() => {
     if (!opened) {
-      setSelectedItemId(null);
       setDestinationChestId(null);
-      setQuantity(1);
+      setQuantitiesByItem({});
     }
   }, [opened]);
-
-  // Obtenir le stock disponible de l'item sélectionné dans le coffre source
-  const selectedItem = itemsWithStock.find((item) => item.id === selectedItemId);
-  const availableStock = selectedItem?.stockToday ?? null;
 
   // Filtrer les coffres pour exclure le coffre source de la liste des destinations
   const availableDestinationChests = chests.filter((chest) => chest.id !== sourceChestId);
 
-  // Options pour les items (seulement ceux qui ont du stock dans le coffre source)
-  const itemOptions = itemsWithStock
-    .filter((item) => item.stockToday !== null && item.stockToday > 0)
-    .map((item) => ({
-      value: item.id,
-      label: `${item.name} (Stock: ${item.stockToday})`,
-    }));
+  // Items éligibles au transfert (avec stock disponible)
+  const transferableItems = itemsWithStock.filter(
+    (item) => item.stockToday !== null && item.stockToday > 0
+  );
 
   // Options pour les coffres
   const sourceChestOptions = chests.map((chest) => ({
@@ -123,20 +119,49 @@ export default function TransferModal({
     label: chest.name,
   }));
 
+  // Construire la liste des transferts à partir des quantités saisies
+  const transferItems = transferableItems
+    .map((item) => {
+      const quantity = quantitiesByItem[item.id];
+      return {
+        item,
+        quantity,
+      };
+    })
+    .filter(({ quantity }) => typeof quantity === 'number' && quantity > 0);
+
+  const hasInvalidQuantity = transferableItems.some((item) => {
+    const quantity = quantitiesByItem[item.id];
+    if (quantity === '' || quantity === undefined) return false;
+    if (typeof quantity !== 'number') return true;
+    if (quantity <= 0) return true;
+    if (item.stockToday === null) return true;
+    return quantity > item.stockToday;
+  });
+
   const handleTransfer = async () => {
-    if (!selectedItemId || !sourceChestId || !destinationChestId || quantity === '' || quantity <= 0) {
+    if (!sourceChestId || !destinationChestId) {
       notifications.show({
         title: 'Erreur',
-        message: 'Veuillez remplir tous les champs correctement',
+        message: 'Veuillez sélectionner un coffre source et un coffre destination',
         color: 'red',
       });
       return;
     }
 
-    if (availableStock === null || quantity > availableStock) {
+    if (transferItems.length === 0) {
       notifications.show({
         title: 'Erreur',
-        message: `Stock insuffisant. Stock disponible: ${availableStock ?? 0}`,
+        message: 'Veuillez saisir au moins une quantité à transférer',
+        color: 'red',
+      });
+      return;
+    }
+
+    if (hasInvalidQuantity) {
+      notifications.show({
+        title: 'Erreur',
+        message: 'Certaines quantités saisies ne sont pas valides ou dépassent le stock disponible',
         color: 'red',
       });
       return;
@@ -144,22 +169,27 @@ export default function TransferModal({
 
     try {
       setLoading(true);
-      const result = await transferStock({
-        itemId: selectedItemId,
-        quantity: typeof quantity === 'number' ? quantity : 0,
+      const result = await transferMultipleStock({
         sourceChestId,
         destinationChestId,
+        items: transferItems.map(({ item, quantity }) => ({
+          itemId: item.id,
+          quantity: typeof quantity === 'number' ? quantity : 0,
+        })),
       });
 
       handleAction(result);
 
-      const itemName = selectedItem?.name || 'l\'item';
       const sourceChestName = chests.find((c) => c.id === sourceChestId)?.name || 'le coffre source';
       const destinationChestName = chests.find((c) => c.id === destinationChestId)?.name || 'le coffre destination';
+      const totalQuantity = transferItems.reduce(
+        (sum, { quantity }) => (typeof quantity === 'number' ? sum + quantity : sum),
+        0
+      );
 
       notifications.show({
         title: 'Succès',
-        message: `${quantity} ${itemName}(s) transféré(s) de ${sourceChestName} vers ${destinationChestName}`,
+        message: `${totalQuantity} objet(s) transféré(s) de ${sourceChestName} vers ${destinationChestName}`,
         color: 'green',
       });
 
@@ -177,13 +207,10 @@ export default function TransferModal({
   };
 
   const canTransfer =
-    selectedItemId !== null &&
     sourceChestId !== null &&
     destinationChestId !== null &&
-    quantity !== '' &&
-    quantity > 0 &&
-    availableStock !== null &&
-    quantity <= availableStock;
+    transferItems.length > 0 &&
+    !hasInvalidQuantity;
 
   return (
     <Modal
@@ -201,92 +228,103 @@ export default function TransferModal({
           Transférez des items d'un coffre source vers un coffre destination. Le stock sera automatiquement mis à jour dans les deux coffres.
         </Alert>
 
-        <Select
-          label="Coffre source"
-          placeholder="Sélectionner le coffre source"
-          data={sourceChestOptions}
-          value={sourceChestId}
-          onChange={(value) => setSourceChestId(value)}
-          required
-          clearable={false}
-        />
+        <Group grow align="flex-end">
+          <Select
+            label="Coffre source"
+            placeholder="Sélectionner le coffre source"
+            data={sourceChestOptions}
+            value={sourceChestId}
+            onChange={(value) => setSourceChestId(value)}
+            required
+            clearable={false}
+          />
+
+          <Select
+            label="Coffre destination"
+            placeholder="Sélectionner le coffre destination"
+            data={destinationChestOptions}
+            value={destinationChestId}
+            onChange={(value) => setDestinationChestId(value)}
+            required
+            clearable={false}
+            disabled={!sourceChestId}
+          />
+        </Group>
 
         {sourceChestId && (
           <>
-            <Select
-              label="Item à transférer"
-              placeholder="Sélectionner un item"
-              data={itemOptions}
-              value={selectedItemId}
-              onChange={(value) => {
-                setSelectedItemId(value);
-                // Réinitialiser la quantité quand on change d'item
-                setQuantity(1);
-              }}
-              required
-              disabled={loadingItems}
-              searchable
-            />
-
-            {selectedItem && availableStock !== null && (
-              <Paper p="sm" withBorder>
-                <Group justify="space-between">
+            {transferableItems.length === 0 ? (
+              <Text c="dimmed" size="sm">
+                Aucun item avec du stock disponible dans ce coffre.
+              </Text>
+            ) : (
+              <Paper withBorder shadow="xs" p="sm">
+                <Stack gap="xs">
                   <Text size="sm" fw={500}>
-                    Stock disponible dans le coffre source:
+                    Items transférables depuis ce coffre
                   </Text>
-                  <Badge color="blue" size="lg">
-                    {availableStock}
-                  </Badge>
-                </Group>
+                  <Table striped highlightOnHover>
+                    <Table.Thead>
+                      <Table.Tr>
+                        <Table.Th>Item</Table.Th>
+                        <Table.Th style={{ width: 140 }}>Stock disponible</Table.Th>
+                        <Table.Th style={{ width: 180 }}>Quantité à transférer</Table.Th>
+                      </Table.Tr>
+                    </Table.Thead>
+                    <Table.Tbody>
+                      {transferableItems.map((item) => {
+                        const availableStock = item.stockToday ?? 0;
+                        const quantity = quantitiesByItem[item.id] ?? '';
+                        const isQuantityInvalid =
+                          quantity !== '' &&
+                          (typeof quantity !== 'number' ||
+                            quantity <= 0 ||
+                            quantity > availableStock);
+
+                        return (
+                          <Table.Tr key={item.id}>
+                            <Table.Td>
+                              <Text fw={500}>{item.name}</Text>
+                            </Table.Td>
+                            <Table.Td>
+                              <Badge color="blue" variant="light">
+                                {availableStock}
+                              </Badge>
+                            </Table.Td>
+                            <Table.Td>
+                              <NumberInput
+                                value={quantity}
+                                onChange={(value) =>
+                                  setQuantitiesByItem((prev) => ({
+                                    ...prev,
+                                    [item.id]: typeof value === 'number' ? value : '',
+                                  }))
+                                }
+                                min={0}
+                                max={availableStock}
+                                placeholder="0"
+                                error={isQuantityInvalid}
+                              />
+                            </Table.Td>
+                          </Table.Tr>
+                        );
+                      })}
+                    </Table.Tbody>
+                  </Table>
+
+                  <Group justify="space-between">
+                    <Text size="sm" c="dimmed">
+                      {transferItems.length} item(s) sélectionné(s) pour le transfert
+                    </Text>
+                    {hasInvalidQuantity && (
+                      <Text size="sm" c="red">
+                        Certaines quantités sont invalides ou dépassent le stock disponible
+                      </Text>
+                    )}
+                  </Group>
+                </Stack>
               </Paper>
             )}
-
-            <NumberInput
-              label="Quantité à transférer"
-              placeholder="Entrer la quantité"
-              value={quantity}
-              onChange={(value) => setQuantity(typeof value === 'number' ? value : '')}
-              min={1}
-              max={availableStock ?? undefined}
-              required
-              disabled={!selectedItemId}
-            />
-
-            {selectedItemId && quantity !== '' && quantity > 0 && availableStock !== null && (
-              <>
-                {quantity > availableStock ? (
-                  <Alert color="red" icon={<IconAlertCircle size={16} />}>
-                    Quantité supérieure au stock disponible ({availableStock})
-                  </Alert>
-                ) : (
-                  <Paper p="sm" withBorder>
-                    <Group gap="xs" justify="center">
-                      <Badge color="blue" size="lg">
-                        {sourceChestId ? chests.find((c) => c.id === sourceChestId)?.name : 'Source'}
-                      </Badge>
-                      <IconArrowRight size={20} />
-                      <Badge color="green" size="lg">
-                        {quantity} {selectedItem?.name}
-                      </Badge>
-                      <IconArrowRight size={20} />
-                      <Badge color="orange" size="lg">
-                        {destinationChestId ? chests.find((c) => c.id === destinationChestId)?.name : 'Destination'}
-                      </Badge>
-                    </Group>
-                  </Paper>
-                )}
-              </>
-            )}
-
-            <Select
-              label="Coffre destination"
-              placeholder="Sélectionner le coffre destination"
-              data={destinationChestOptions}
-              value={destinationChestId}
-              onChange={(value) => setDestinationChestId(value)}
-              required
-              clearable={false}
-            />
           </>
         )}
 
