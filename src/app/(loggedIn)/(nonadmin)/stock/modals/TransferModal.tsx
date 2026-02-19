@@ -13,6 +13,7 @@ import {
   Alert,
   Badge,
   Table,
+  ScrollArea,
 } from '@mantine/core';
 import { IconAlertCircle } from '@tabler/icons-react';
 import { transferMultipleStock } from '@/app/_actions/stock';
@@ -218,6 +219,8 @@ export default function TransferModal({
       onClose={onClose}
       title="Transférer des items entre coffres"
       size="lg"
+      yOffset={60}
+      scrollAreaComponent={ScrollArea.Autosize}
     >
       <Stack gap="md">
         <Alert
