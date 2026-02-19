@@ -30,6 +30,7 @@ interface OrdersTableProps {
   onEdit: (order: OrderWithRelations) => void;
   onDelete: (order: OrderWithRelations) => void;
   onPreviewLetter?: (order: OrderWithRelations) => void;
+  hasLetterTemplateForOrder?: (order: OrderWithRelations) => boolean;
 }
 
 const statusOptions: { value: string; label: string }[] = [
@@ -74,6 +75,7 @@ export function OrdersTable({
   onEdit,
   onDelete,
   onPreviewLetter,
+  hasLetterTemplateForOrder,
 }: OrdersTableProps) {
   return (
     <Paper shadow="sm" withBorder>
@@ -149,10 +151,11 @@ export function OrdersTable({
             title: 'Actions',
             render: (order: OrderWithRelations) => {
               const isCompleted = order.status === OrderStatusEnum.COMPLETED;
-              const isDraft = order.status === OrderStatusEnum.DRAFT;
+              const hasLetterTemplate =
+                hasLetterTemplateForOrder ? hasLetterTemplateForOrder(order) : false;
               return (
                 <Group gap="xs" wrap="nowrap" justify="flex-end">
-                  {isDraft && onPreviewLetter && (
+                  {onPreviewLetter && hasLetterTemplate && (
                     <ActionIcon
                       variant="light"
                       color="violet"
