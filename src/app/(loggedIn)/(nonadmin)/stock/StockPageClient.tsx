@@ -16,11 +16,12 @@ import {
   Tooltip,
   Select,
 } from '@mantine/core';
-import { IconEdit, IconCheck, IconX, IconClipboardCheck, IconTools } from '@tabler/icons-react';
+import { IconEdit, IconCheck, IconX, IconClipboardCheck, IconTools, IconArrowsExchange } from '@tabler/icons-react';
 import { getItemsWithStock, updateStock, craftItem } from '@/app/_actions/stock';
 import { handleAction } from '@/lib/action';
 import { notifications } from '@mantine/notifications';
 import CraftModal from './modals/CraftModal';
+import TransferModal from './modals/TransferModal';
 import type { ItemWithRelations, CategoryWithItems } from '@/types/stock';
 import { usePermissions } from '@/app/_contexts/PermissionsContext';
 import type { ChestWithStockHistory } from '@/types/chests';
@@ -40,6 +41,7 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
   const [stockValues, setStockValues] = useState<Record<string, number | ''>>({});
   const [saving, setSaving] = useState(false);
   const [craftModalOpened, setCraftModalOpened] = useState(false);
+  const [transferModalOpened, setTransferModalOpened] = useState(false);
 
   // État pour stocker les valeurs d'input brutes (avec expressions)
   const [stockInputValues, setStockInputValues] = useState<Record<string, string>>({});
@@ -310,6 +312,16 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
                 Craft
               </Button>
             )}
+            {permissions?.stock.update && (
+              <Button
+                leftSection={<IconArrowsExchange size={16} />}
+                onClick={() => setTransferModalOpened(true)}
+                variant="light"
+                color="violet"
+              >
+                Transférer
+              </Button>
+            )}
             {selectedChestId !== null && (
               <>
                 {!isEditing ? (
@@ -559,6 +571,17 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
               color: 'red',
             });
           }
+        }}
+      />
+
+      <TransferModal
+        opened={transferModalOpened}
+        onClose={() => setTransferModalOpened(false)}
+        items={items}
+        chests={chests}
+        initialSourceChestId={selectedChestId}
+        onTransfer={async () => {
+          await loadItems(); // Recharger les items pour mettre à jour les stocks
         }}
       />
     </Container>
