@@ -270,11 +270,27 @@ model OrderItem {
 }
 
 model LetterTemplate {
-  id        String   @id @default(uuid())
+  id        String                          @id @default(uuid())
   name      String
   content   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime                        @default(now())
+  updatedAt DateTime                        @updatedAt
+  assignments OrderLetterTemplateAssignment[]
 
   @@map("letter_template")
+}
+
+model OrderLetterTemplateAssignment {
+  id              String         @id @default(uuid())
+  orderType       OrderType
+  orderStatus     OrderStatus
+  letterTemplateId String
+  letterTemplate  LetterTemplate @relation(fields: [letterTemplateId], references: [id], onDelete: Cascade)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@unique([orderType, orderStatus])
+  @@index([letterTemplateId])
+  @@index([orderType, orderStatus])
+  @@map("order_letter_template_assignment")
 }

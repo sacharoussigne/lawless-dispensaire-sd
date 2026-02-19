@@ -198,20 +198,27 @@ export async function generateOrderLetterPreview(data: {
       };
     }
 
-    // Déterminer le nom du template selon le type de commande
-    const templateName = order.type === 'INCOMING' ? 'order-incoming' : 'order-outgoing';
-
-    // Récupérer le template
-    const template = await prisma.letterTemplate.findFirst({
-      where: { name: templateName },
+    // Récupérer l'assignation pour ce type et statut de commande
+    const assignment = await prisma.orderLetterTemplateAssignment.findUnique({
+      where: {
+        orderType_orderStatus: {
+          orderType: order.type,
+          orderStatus: order.status,
+        },
+      },
+      include: {
+        letterTemplate: true,
+      },
     });
 
-    if (!template) {
+    if (!assignment) {
       return {
         status: 404,
-        error: `Template "${templateName}" introuvable`,
+        error: `Aucun template de lettre assigné pour le type "${order.type}" et le statut "${order.status}"`,
       };
     }
+
+    const template = assignment.letterTemplate;
 
     // Formater les items
     const itemsText = order.items

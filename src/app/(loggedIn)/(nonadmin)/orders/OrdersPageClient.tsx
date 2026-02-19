@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   Container,
   Title,
@@ -20,6 +20,8 @@ import { OrdersTable } from './components/OrdersTable';
 import OrderModal from '@/app/(loggedIn)/(nonadmin)/stock/modals/OrderModal';
 import { usePermissions } from '@/app/_contexts/PermissionsContext';
 import type { OrderWithRelations } from '@/types/orders';
+import { getOrderLetterTemplateAssignments } from '@/app/_actions/orderLetterTemplateAssignments';
+import type { OrderLetterTemplateAssignment } from '@prisma/client';
 
 interface OrdersPageClientProps {
   initialOrders: OrderWithRelations[];
@@ -40,7 +42,9 @@ export default function OrdersPageClient({
 }: OrdersPageClientProps) {
   const { permissions } = usePermissions();
   const [orders, setOrders] = useState<OrderWithRelations[]>(initialOrders);
+  const [assignments, setAssignments] = useState<OrderLetterTemplateAssignment[]>([]);
   const [loading, setLoading] = useState(false);
+  const [assignmentsLoading, setAssignmentsLoading] = useState(false);
   const [modalOpened, setModalOpened] = useState(false);
   const [detailsModalOpened, setDetailsModalOpened] = useState(false);
   const [editingOrder, setEditingOrder] = useState<OrderWithRelations | null>(null);
@@ -75,6 +79,25 @@ export default function OrdersPageClient({
     }
   };
 
+  const loadAssignments = async () => {
+    try {
+      setAssignmentsLoading(true);
+      const result = await getOrderLetterTemplateAssignments();
+      const data = handleAction(result);
+      if (data) {
+        setAssignments(data);
+      }
+    } catch (error: any) {
+      notifications.show({
+        title: 'Erreur',
+        message: error.message || 'Erreur lors du chargement des assignations de lettres',
+        color: 'red',
+      });
+    } finally {
+      setAssignmentsLoading(false);
+    }
+  };
+
   const handleEdit = (order: OrderWithRelations) => {
     setEditingOrder(order);
     setModalOpened(true);
@@ -89,6 +112,23 @@ export default function OrdersPageClient({
     setOrderForLetterPreview(order);
     setLetterPreviewModalOpened(true);
   };
+
+  // Pré-calculer les couples (type, statut) qui ont un template de lettre
+  const assignmentKeys = useMemo(() => {
+    const keys = new Set<string>();
+    assignments.forEach((assignment) => {
+      keys.add(`${assignment.orderType}-${assignment.orderStatus}`);
+    });
+    return keys;
+  }, [assignments]);
+
+  const hasLetterTemplateForOrder = useCallback(
+    (order: OrderWithRelations) => {
+      const key = `${order.type || 'INCOMING'}-${order.status}`;
+      return assignmentKeys.has(key);
+    },
+    [assignmentKeys]
+  );
 
   // Filtrer les commandes par statut et nom
   const filteredOrders = orders.filter((order) => {
@@ -115,6 +155,12 @@ export default function OrdersPageClient({
   useEffect(() => {
     setPage(1);
   }, [statusFilter, nameFilter]);
+
+  // Charger les assignations au montage
+  useEffect(() => {
+    loadAssignments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <Container size="xl" py="xl">
@@ -164,6 +210,7 @@ export default function OrdersPageClient({
           setDeleteModalOpened(true);
         }}
         onPreviewLetter={handlePreviewLetter}
+        hasLetterTemplateForOrder={hasLetterTemplateForOrder}
       />
 
       <EditOrderModal
