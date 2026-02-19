@@ -49,7 +49,6 @@ export async function createOrder(data: {
     // Générer le nom automatiquement si non fourni
     let orderName = validatedData.name;
     if (!orderName) {
-      // Récupérer l'entreprise
       const company = await prisma.company.findUnique({
         where: { id: validatedData.companyId },
         select: { name: true },
@@ -71,9 +70,9 @@ export async function createOrder(data: {
       const companyNameSlug = company.name
         .toLowerCase()
         .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '') // Supprimer les accents
-        .replace(/[^a-z0-9]+/g, '-') // Remplacer tout ce qui n'est pas alphanumérique par un tiret
-        .replace(/^-+|-+$/g, ''); // Supprimer les tirets en début et fin
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
 
       const sequentialNumber = String(orderCount + 1).padStart(4, '0');
       orderName = `${companyNameSlug}-${sequentialNumber}`;
@@ -260,7 +259,6 @@ export async function updateOrder(data: {
 
     const validatedData = updateOrderSchema.parse(data);
 
-    // Récupérer l'ancien statut, le type et les items pour vérifier si on passe à COMPLETED
     const oldOrder = await prisma.order.findUnique({
       where: { id: validatedData.id },
       select: { 
@@ -344,9 +342,7 @@ export async function updateOrder(data: {
       updateData.price = orderPrice !== null ? orderPrice : undefined;
     }
 
-    // Mettre à jour les items si fournis
     if (validatedData.items) {
-      // Supprimer tous les anciens items et créer les nouveaux
       await prisma.orderItem.deleteMany({
         where: { orderId: validatedData.id },
       });
@@ -453,7 +449,6 @@ export async function deleteOrder(data: { id: string }) {
 
     const validatedData = deleteOrderSchema.parse(data);
 
-    // Vérifier le statut de la commande avant de la supprimer
     const order = await prisma.order.findUnique({
       where: { id: validatedData.id },
       select: { status: true },

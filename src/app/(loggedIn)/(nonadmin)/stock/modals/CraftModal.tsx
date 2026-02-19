@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Modal,
   Stack,
@@ -10,8 +10,12 @@ import {
   Button,
   Group,
   Paper,
+  Alert,
   Badge,
+  Table,
+  ScrollArea,
 } from '@mantine/core';
+import { IconAlertCircle } from '@tabler/icons-react';
 import { getCraftRecipesByItemId } from '@/app/_actions/craftRecipes';
 import { getItemsWithStock } from '@/app/_actions/stock';
 import { handleAction } from '@/lib/action';
@@ -36,65 +40,103 @@ interface CraftRecipeWithIngredients {
   }[];
 }
 
-
 interface CraftModalProps {
   opened: boolean;
   onClose: () => void;
   items: ItemWithRelations[];
-  canCraft?: boolean; // Si false, l'utilisateur peut seulement voir mais pas craft
-  onCraft: (itemId: string, recipeId: string, quantity: number, chestId: string | null) => void;
-  initialChestId?: string | null; // Coffre pré-sélectionné depuis la vue stock
-  chests?: ChestWithStockHistory[]; // Liste des coffres disponibles
+  canCraft?: boolean;
+  onCraft: (
+    itemId: string,
+    recipeId: string,
+    times: number,
+    sourceChestId: string | null,
+    ingredientChests: { ingredientId: string; chestId: string }[],
+    destinationChestId: string | null
+  ) => void;
+  initialChestId?: string | null;
+  chests?: ChestWithStockHistory[];
 }
 
-export default function CraftModal({ opened, onClose, items, canCraft = true, onCraft, initialChestId = null, chests = [] }: CraftModalProps) {
+export default function CraftModal({
+  opened,
+  onClose,
+  items,
+  canCraft = true,
+  onCraft,
+  initialChestId = null,
+  chests = [],
+}: CraftModalProps) {
   const [selectedCraftItem, setSelectedCraftItem] = useState<string | null>(null);
   const [craftQuantity, setCraftQuantity] = useState<number>(1);
   const [selectedRecipe, setSelectedRecipe] = useState<string | null>(null);
   const [craftRecipes, setCraftRecipes] = useState<CraftRecipeWithIngredients[]>([]);
   const [loadingRecipes, setLoadingRecipes] = useState(false);
-  const [selectedChestId, setSelectedChestId] = useState<string | null>(initialChestId || null);
-  const [itemsWithStock, setItemsWithStock] = useState<ItemWithRelations[]>(items);
+  const [sourceChestId, setSourceChestId] = useState<string | null>(initialChestId);
+  const [destinationChestId, setDestinationChestId] = useState<string | null>(initialChestId);
+  const [ingredientChests, setIngredientChests] = useState<Record<string, string>>({});
+  const [itemsWithStockByChest, setItemsWithStockByChest] = useState<Record<string, ItemWithRelations[]>>({});
   const [loadingItems, setLoadingItems] = useState(false);
+  const cacheRef = useRef<Record<string, ItemWithRelations[]>>({});
+  const loadingChestsRef = useRef<Set<string>>(new Set());
 
-  // Mettre à jour selectedChestId quand initialChestId change (quand on change de coffre dans la vue stock)
+  const loadChestItemsIfNeeded = useCallback(async (chestId: string | null) => {
+    if (!chestId) {
+      return;
+    }
+
+    if (cacheRef.current[chestId]) {
+      return;
+    }
+
+    if (loadingChestsRef.current.has(chestId)) {
+      return;
+    }
+
+    loadingChestsRef.current.add(chestId);
+    setLoadingItems(true);
+    
+    try {
+      const result = await getItemsWithStock(chestId);
+      const data = handleAction(result);
+      if (data) {
+        cacheRef.current[chestId] = data;
+        setItemsWithStockByChest((prev) => ({
+          ...prev,
+          [chestId]: data,
+        }));
+      }
+    } catch (error: any) {
+      notifications.show({
+        title: 'Erreur',
+        message: error.message || 'Erreur lors du chargement des stocks',
+        color: 'red',
+      });
+    } finally {
+      loadingChestsRef.current.delete(chestId);
+      setLoadingItems(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    cacheRef.current = itemsWithStockByChest;
+  }, [itemsWithStockByChest]);
+
   useEffect(() => {
     if (opened && initialChestId !== null) {
-      setSelectedChestId(initialChestId);
+      setSourceChestId(initialChestId);
+      setDestinationChestId(initialChestId);
     } else if (opened && initialChestId === null) {
-      setSelectedChestId(null);
+      setSourceChestId(null);
+      setDestinationChestId(null);
     }
   }, [opened, initialChestId]);
 
-  // Charger les items avec le stock du coffre sélectionné dans le modal
   useEffect(() => {
-    if (opened) {
-      const loadItemsForChest = async () => {
-        setLoadingItems(true);
-        try {
-          const result = await getItemsWithStock(selectedChestId);
-          const data = handleAction(result);
-          if (data) {
-            setItemsWithStock(data);
-            // Réinitialiser la sélection de l'item crafté quand le coffre change
-            // pour éviter des incohérences avec les stocks
-            setSelectedCraftItem(null);
-            setSelectedRecipe(null);
-            setCraftRecipes([]);
-          }
-        } catch (error: any) {
-          notifications.show({
-            title: 'Erreur',
-            message: error.message || 'Erreur lors du chargement des stocks',
-            color: 'red',
-          });
-        } finally {
-          setLoadingItems(false);
-        }
-      };
-      loadItemsForChest();
+    if (opened && sourceChestId) {
+      loadChestItemsIfNeeded(sourceChestId);
     }
-  }, [opened, selectedChestId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opened, sourceChestId]);
 
   // Réinitialiser les états quand la modal se ferme
   useEffect(() => {
@@ -103,9 +145,39 @@ export default function CraftModal({ opened, onClose, items, canCraft = true, on
       setCraftQuantity(1);
       setSelectedRecipe(null);
       setCraftRecipes([]);
-      // Ne pas réinitialiser selectedChestId, on garde la valeur initiale
+      setDestinationChestId(null);
+      setIngredientChests({});
     }
   }, [opened]);
+
+  useEffect(() => {
+    if (sourceChestId && (!destinationChestId || destinationChestId === sourceChestId)) {
+      setDestinationChestId(sourceChestId);
+      loadChestItemsIfNeeded(sourceChestId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceChestId]);
+
+  // Réinitialiser les coffres des ingrédients quand le coffre source de base change
+  useEffect(() => {
+    if (sourceChestId) {
+      setIngredientChests((prev) => {
+        const updated: Record<string, string> = {};
+        // Garder les valeurs existantes mais réinitialiser celles qui n'ont pas été modifiées
+        Object.keys(prev).forEach((ingredientId) => {
+          updated[ingredientId] = prev[ingredientId];
+        });
+        return updated;
+      });
+    }
+  }, [sourceChestId]);
+
+  // Réinitialiser les coffres des ingrédients quand la recette change
+  useEffect(() => {
+    if (selectedRecipe) {
+      setIngredientChests({});
+    }
+  }, [selectedRecipe]);
 
   const handleItemChange = async (value: string | null) => {
     setSelectedCraftItem(value);
@@ -113,7 +185,7 @@ export default function CraftModal({ opened, onClose, items, canCraft = true, on
     if (value) {
       setLoadingRecipes(true);
       try {
-        const result = await getCraftRecipesByItemId(value, true); // onlyEnabled = true pour la modal de craft
+        const result = await getCraftRecipesByItemId(value, true);
         const data = handleAction(result);
         if (data) {
           setCraftRecipes(data);
@@ -140,23 +212,63 @@ export default function CraftModal({ opened, onClose, items, canCraft = true, on
     setCraftQuantity(1);
     setSelectedRecipe(null);
     setCraftRecipes([]);
+    setDestinationChestId(null);
+    setIngredientChests({});
     onClose();
   };
 
+  const handleIngredientChestChange = useCallback(async (ingredientId: string, chestId: string | null) => {
+    if (chestId) {
+      await loadChestItemsIfNeeded(chestId);
+      
+      setIngredientChests((prev) => ({
+        ...prev,
+        [ingredientId]: chestId,
+      }));
+    } else {
+      setIngredientChests((prev) => {
+        const updated = { ...prev };
+        delete updated[ingredientId];
+        return updated;
+      });
+    }
+  }, [loadChestItemsIfNeeded]);
+
   const handleCraft = async () => {
-    if (!selectedCraftItem || !selectedRecipe) return;
-    await onCraft(selectedCraftItem, selectedRecipe, craftQuantity, selectedChestId);
+    if (!selectedCraftItem || !selectedRecipe || !sourceChestId || !destinationChestId) return;
+    
+    const recipe = craftRecipes.find((r) => r.id === selectedRecipe);
+    if (!recipe) return;
+
+    // Construire le tableau des coffres sources par ingrédient
+    const ingredientChestsArray = recipe.ingredients.map((ingredient) => ({
+      ingredientId: ingredient.id,
+      chestId: ingredientChests[ingredient.id] || sourceChestId,
+    }));
+
+    await onCraft(
+      selectedCraftItem,
+      selectedRecipe,
+      craftQuantity,
+      sourceChestId,
+      ingredientChestsArray,
+      destinationChestId
+    );
   };
 
-  // Helper pour obtenir le stock disponible et savoir s'il vient d'aujourd'hui
-  const getAvailableStock = (item: ItemWithRelations | undefined) => {
+  // Helper pour obtenir le stock disponible d'un item dans un coffre spécifique
+  const getItemStockInChest = (itemId: string, chestId: string | null): { stock: number | null; isToday: boolean } => {
+    if (!chestId) return { stock: null, isToday: false };
+    
+    const itemsInChest = itemsWithStockByChest[chestId] || [];
+    const item = itemsInChest.find((i) => i.id === itemId);
+    
     if (!item) return { stock: null, isToday: false };
     
     if (item.stockToday !== null && item.stockToday !== undefined) {
       return { stock: item.stockToday, isToday: true };
     }
     
-    // Si pas de stock aujourd'hui, utiliser le stock d'hier (ou le dernier disponible)
     if (item.stockYesterday !== null && item.stockYesterday !== undefined) {
       return { stock: item.stockYesterday, isToday: false };
     }
@@ -164,86 +276,79 @@ export default function CraftModal({ opened, onClose, items, canCraft = true, on
     return { stock: null, isToday: false };
   };
 
-  const selectedCraftItemData = itemsWithStock.find((i) => i.id === selectedCraftItem);
-  const craftItemStock = getAvailableStock(selectedCraftItemData);
-  const hasCraftItemStockToday = selectedCraftItemData?.stockToday !== null && selectedCraftItemData?.stockToday !== undefined;
-  const hasCraftItemStock = craftItemStock.stock !== null;
+  // Options pour les coffres
+  const chestOptions = chests.map((chest) => ({
+    value: chest.id,
+    label: chest.name,
+  }));
 
-  // Vérifier si au moins un ingrédient ou l'item crafté utilise un stock d'un jour précédent
-  const usesOldStock = (() => {
-    if (!selectedCraftItem || !hasCraftItemStock) return false;
-    
-    if (!craftItemStock.isToday) return true;
-    
-    const recipe = craftRecipes.find((r) => r.id === selectedRecipe) || craftRecipes[0];
-    if (!recipe) return false;
-    
-    return recipe.ingredients.some((ingredient) => {
-      const item = itemsWithStock.find((i) => i.id === ingredient.usedItemId);
-      const stock = getAvailableStock(item);
-      return stock.stock !== null && !stock.isToday;
-    });
-  })();
+  const destinationChestOptions = chests.map((chest) => ({
+    value: chest.id,
+    label: chest.name,
+  }));
 
-  const craftButtonDisabledReason = (() => {
-    // Si l'utilisateur n'a pas la permission de craft
+  // Vérifications pour le bouton de craft
+  const getCraftValidation = () => {
     if (!canCraft) {
-      return "Vous n'avez pas la permission d'effectuer un craft";
+      return { canCraft: false, reason: "Vous n'avez pas la permission d'effectuer un craft" };
     }
-    
-    // Si aucun coffre n'est sélectionné, désactiver le craft
-    if (selectedChestId === null) {
-      return "Veuillez sélectionner un coffre pour effectuer le craft";
+
+    if (!sourceChestId) {
+      return { canCraft: false, reason: 'Veuillez sélectionner un coffre source de base' };
     }
-    
-    if (!selectedCraftItem || (!selectedRecipe && craftRecipes.length > 1) || craftQuantity < 1) {
-      return null; // Pas de message spécifique pour ces cas
+
+    if (!destinationChestId) {
+      return { canCraft: false, reason: 'Veuillez sélectionner un coffre de destination' };
     }
-    
-    // Vérifier que l'item à craft a un stock d'aujourd'hui (obligatoire pour craft)
-    if (!hasCraftItemStockToday) {
-      if (!hasCraftItemStock) {
-        return "Aucun stock disponible pour cet objet";
-      }
-      return "Le stock d'aujourd'hui est requis pour effectuer un craft";
+
+    if (!selectedCraftItem || !selectedRecipe || craftQuantity < 1) {
+      return { canCraft: false, reason: null };
     }
-    
-    const recipe = craftRecipes.find((r) => r.id === selectedRecipe) || craftRecipes[0];
-    if (!recipe) return null;
-    
-    // craftQuantity représente maintenant le nombre de fois qu'on craft la recette
-    // Vérifier que tous les ingrédients ont un stock d'aujourd'hui ET assez de stock
+
+    const recipe = craftRecipes.find((r) => r.id === selectedRecipe);
+    if (!recipe) {
+      return { canCraft: false, reason: null };
+    }
+
     const ingredientChecks = recipe.ingredients.map((ingredient) => {
       const requiredQuantity = ingredient.quantity * craftQuantity;
-      const item = itemsWithStock.find((i) => i.id === ingredient.usedItemId);
-      // Vérifier que le stock d'aujourd'hui existe
-      if (item?.stockToday === null || item?.stockToday === undefined) {
-        return { hasStock: false, hasEnough: false, itemName: item?.name || ingredient.usedItem.name };
-      }
-      const availableStock = item.stockToday;
-      return { 
-        hasStock: true, 
-        hasEnough: availableStock >= requiredQuantity,
-        itemName: item.name,
-        required: requiredQuantity,
-        available: availableStock
+      const ingredientChestId = ingredientChests[ingredient.id] || sourceChestId;
+      const stockInfo = getItemStockInChest(ingredient.usedItemId, ingredientChestId);
+
+      return {
+        ingredient,
+        requiredQuantity,
+        stockInfo,
+        hasEnough: stockInfo.isToday && stockInfo.stock !== null && stockInfo.stock >= requiredQuantity,
       };
     });
-    
-    const missingStockItems = ingredientChecks.filter(check => !check.hasStock);
-    if (missingStockItems.length > 0) {
-      return `Stock d'aujourd'hui manquant pour : ${missingStockItems.map(c => c.itemName).join(', ')}`;
-    }
-    
-    const insufficientStockItems = ingredientChecks.filter(check => !check.hasEnough);
-    if (insufficientStockItems.length > 0) {
-      return `Stock insuffisant pour : ${insufficientStockItems.map(c => `${c.itemName} (${c.required} requis, ${c.available} disponible)`).join(', ')}`;
-    }
-    
-    return null; // Tout est OK
-  })();
 
-  const isCraftButtonDisabled = craftButtonDisabledReason !== null;
+    const missingStockItems = ingredientChecks.filter((check) => !check.stockInfo.isToday || check.stockInfo.stock === null);
+    if (missingStockItems.length > 0) {
+      return {
+        canCraft: false,
+        reason: `Stock d'aujourd'hui manquant pour : ${missingStockItems.map((c) => c.ingredient.usedItem.name).join(', ')}`,
+      };
+    }
+
+    const insufficientStockItems = ingredientChecks.filter((check) => !check.hasEnough);
+    if (insufficientStockItems.length > 0) {
+      return {
+        canCraft: false,
+        reason: `Stock insuffisant pour : ${insufficientStockItems
+          .map((c) => `${c.ingredient.usedItem.name} (${c.requiredQuantity} requis, ${c.stockInfo.stock} disponible)`)
+          .join(', ')}`,
+      };
+    }
+
+    return { canCraft: true, reason: null };
+  };
+
+  const validation = getCraftValidation();
+  const isCraftButtonDisabled = !validation.canCraft;
+
+  const selectedRecipeData = craftRecipes.find((r) => r.id === selectedRecipe) || craftRecipes[0];
+  const totalQuantityProduced = selectedRecipeData ? selectedRecipeData.quantity * craftQuantity : 0;
 
   return (
     <Modal
@@ -251,26 +356,40 @@ export default function CraftModal({ opened, onClose, items, canCraft = true, on
       onClose={handleClose}
       title="Craft d'objet"
       size="lg"
+      yOffset={60}
+      scrollAreaComponent={ScrollArea.Autosize}
     >
-      <Stack>
-        {chests.length > 0 && (
+      <Stack gap="md">
+        <Alert icon={<IconAlertCircle size={16} />} title="Information" color="blue">
+          Sélectionnez un coffre source de base, puis choisissez individuellement le coffre source pour chaque ingrédient. Le résultat du craft sera déposé dans le coffre de destination.
+        </Alert>
+
+        <Group grow align="flex-end">
           <Select
-            label="Coffre"
-            placeholder="Sélectionner un coffre"
-            data={chests.map((chest) => ({
-              value: chest.id,
-              label: chest.name,
-            }))}
-            value={selectedChestId}
-            onChange={(value) => setSelectedChestId(value)}
+            label="Coffre source de base"
+            placeholder="Sélectionner le coffre source"
+            data={chestOptions}
+            value={sourceChestId}
+            onChange={(value) => setSourceChestId(value)}
             required
             clearable={false}
           />
-        )}
+
+          <Select
+            label="Coffre de destination"
+            placeholder="Sélectionner le coffre destination"
+            data={destinationChestOptions}
+            value={destinationChestId}
+            onChange={(value) => setDestinationChestId(value)}
+            required
+            clearable={false}
+          />
+        </Group>
+
         <Select
           label="Objet à craft"
           placeholder="Sélectionner un objet craftable"
-          data={itemsWithStock
+          data={items
             .filter((item) => item.isCraftable)
             .sort((a, b) => {
               if (a.order !== undefined && b.order !== undefined) {
@@ -293,21 +412,6 @@ export default function CraftModal({ opened, onClose, items, canCraft = true, on
 
         {selectedCraftItem && craftRecipes.length > 0 && (
           <>
-            {!hasCraftItemStock && (
-              <Text c="orange" size="sm" mt="md" fw={500}>
-                ⚠️ Aucun stock disponible pour cet objet. Le craft n'est pas possible sans stock.
-              </Text>
-            )}
-            {hasCraftItemStock && usesOldStock && (
-              <Text c="orange" size="sm" mt="md" fw={500}>
-                ⚠️ Certains stocks affichés proviennent d'un jour précédent. Le craft n'est pas possible sans le stock d'aujourd'hui.
-              </Text>
-            )}
-            {selectedCraftItemData && craftItemStock.stock !== null && (
-              <Text size="sm" c={craftItemStock.isToday ? 'dimmed' : 'orange'} mt="xs">
-                Stock disponible : {craftItemStock.stock} {craftItemStock.isToday ? '' : '(jour précédent)'}
-              </Text>
-            )}
             {craftRecipes.length > 1 ? (
               <Select
                 label="Recette"
@@ -346,81 +450,99 @@ export default function CraftModal({ opened, onClose, items, canCraft = true, on
               </Stack>
             )}
 
-            {(() => {
-              const recipe = craftRecipes.find((r) => r.id === selectedRecipe) || craftRecipes[0];
-              if (!recipe) return null;
-              
-              const totalQuantity = craftQuantity * recipe.quantity;
-              
-              return (
-                <>
-                  <NumberInput
-                    label="Nombre de fois à craft"
-                    placeholder="Nombre de fois"
-                    value={craftQuantity}
-                    onChange={(value) => setCraftQuantity(typeof value === 'number' ? value : 1)}
-                    min={1}
-                    required
-                    description={`Quantité totale produite : ${totalQuantity}`}
-                  />
-                </>
-              );
-            })()}
+            {selectedRecipeData && (
+              <>
+                <NumberInput
+                  label="Nombre de fois à craft"
+                  placeholder="Nombre de fois"
+                  value={craftQuantity}
+                  onChange={(value) => setCraftQuantity(typeof value === 'number' ? value : 1)}
+                  min={1}
+                  required
+                  description={`Quantité totale produite : ${totalQuantityProduced}`}
+                />
 
-            {(selectedRecipe || (craftRecipes.length === 1 && craftRecipes[0])) && (() => {
-              const recipe = craftRecipes.find((r) => r.id === selectedRecipe) || craftRecipes[0];
-              if (!recipe) return null;
+                <Paper withBorder shadow="xs" p="sm">
+                  <Stack gap="xs">
+                    <Text size="sm" fw={500}>
+                      Ingrédients nécessaires
+                    </Text>
+                    <Table striped highlightOnHover>
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th>Ingrédient</Table.Th>
+                          <Table.Th style={{ width: 180 }}>Coffre source</Table.Th>
+                          <Table.Th style={{ width: 120 }}>Stock</Table.Th>
+                          <Table.Th style={{ width: 100 }}>Requis</Table.Th>
+                          <Table.Th style={{ width: 60 }}>Statut</Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {selectedRecipeData.ingredients.map((ingredient) => {
+                          const requiredQuantity = ingredient.quantity * craftQuantity;
+                          const ingredientChestId = ingredientChests[ingredient.id] || sourceChestId;
+                          const stockInfo = getItemStockInChest(ingredient.usedItemId, ingredientChestId);
+                          const hasEnough = stockInfo.isToday && stockInfo.stock !== null && stockInfo.stock >= requiredQuantity;
 
-              // craftQuantity représente maintenant le nombre de fois qu'on craft la recette
-              return (
-                <Stack gap="sm" mt="md">
-                  <Text fw={500}>Ingrédients nécessaires :</Text>
-                  <Paper p="md" withBorder>
-                    <Stack gap="xs">
-                      {recipe.ingredients.map((ingredient) => {
-                        const requiredQuantity = ingredient.quantity * craftQuantity;
-                        const item = itemsWithStock.find((i) => i.id === ingredient.usedItemId);
-                        const stockInfo = getAvailableStock(item);
-                        const availableStock = stockInfo.stock ?? 0;
-                        const hasEnough = stockInfo.isToday && availableStock >= requiredQuantity;
-
-                        return (
-                          <Group key={ingredient.id} justify="space-between" wrap="nowrap">
-                            <Text size="sm" style={{ flex: 1 }}>
-                              {ingredient.usedItem.name}
-                            </Text>
-                            <Group gap="xs" wrap="nowrap">
-                              <Text size="sm" c={hasEnough ? 'green' : 'red'}>
-                                {requiredQuantity} requis
-                              </Text>
-                              {stockInfo.stock !== null ? (
-                                <>
-                                  <Text size="sm" c={stockInfo.isToday ? 'dimmed' : 'orange'}>
-                                    / {availableStock} disponible{stockInfo.isToday ? '' : ' (jour précédent)'}
+                          return (
+                            <Table.Tr key={ingredient.id}>
+                              <Table.Td>
+                                <Text fw={500}>{ingredient.usedItem.name}</Text>
+                              </Table.Td>
+                              <Table.Td>
+                                <Select
+                                  data={chestOptions}
+                                  value={ingredientChestId}
+                                  onChange={(value) => handleIngredientChestChange(ingredient.id, value)}
+                                  size="xs"
+                                  disabled={!sourceChestId}
+                                />
+                              </Table.Td>
+                              <Table.Td>
+                                {stockInfo.stock !== null ? (
+                                  <Badge
+                                    color={stockInfo.isToday ? 'blue' : 'orange'}
+                                    variant="light"
+                                  >
+                                    {stockInfo.stock} {stockInfo.isToday ? '' : '(hier)'}
+                                  </Badge>
+                                ) : (
+                                  <Text size="xs" c="red">
+                                    Aucun stock
                                   </Text>
-                                  {hasEnough ? (
-                                    <Badge color="green" size="sm">✓</Badge>
+                                )}
+                              </Table.Td>
+                              <Table.Td>
+                                <Text size="sm" fw={500}>
+                                  {requiredQuantity}
+                                </Text>
+                              </Table.Td>
+                              <Table.Td>
+                                {stockInfo.stock !== null ? (
+                                  hasEnough ? (
+                                    <Badge color="green" size="sm">
+                                      ✓
+                                    </Badge>
                                   ) : (
-                                    <Badge color={stockInfo.isToday ? 'red' : 'orange'} size="sm">✗</Badge>
-                                  )}
-                                </>
-                              ) : (
-                                <>
-                                  <Text size="sm" c="red">
-                                    Aucun stock disponible
-                                  </Text>
-                                  <Badge color="red" size="sm">✗</Badge>
-                                </>
-                              )}
-                            </Group>
-                          </Group>
-                        );
-                      })}
-                    </Stack>
-                  </Paper>
-                </Stack>
-              );
-            })()}
+                                    <Badge color={stockInfo.isToday ? 'red' : 'orange'} size="sm">
+                                      ✗
+                                    </Badge>
+                                  )
+                                ) : (
+                                  <Badge color="red" size="sm">
+                                    ✗
+                                  </Badge>
+                                )}
+                              </Table.Td>
+                            </Table.Tr>
+                          );
+                        })}
+                      </Table.Tbody>
+                    </Table>
+                  </Stack>
+                </Paper>
+              </>
+            )}
           </>
         )}
 
@@ -442,25 +564,21 @@ export default function CraftModal({ opened, onClose, items, canCraft = true, on
           </Text>
         )}
 
+        {validation.reason && (
+          <Alert icon={<IconAlertCircle size={16} />} title="Attention" color="orange">
+            {validation.reason}
+          </Alert>
+        )}
+
         <Group justify="flex-end" mt="md">
           <Button variant="subtle" onClick={handleClose}>
             Annuler
           </Button>
-          <Button 
-            onClick={handleCraft} 
-            disabled={isCraftButtonDisabled}
-            title={craftButtonDisabledReason || undefined}
-          >
+          <Button onClick={handleCraft} disabled={isCraftButtonDisabled} color="blue">
             Craft
           </Button>
         </Group>
-        {craftButtonDisabledReason && (
-          <Text c="orange" size="sm" mt="md">
-            ⚠️ {craftButtonDisabledReason}
-          </Text>
-        )}
       </Stack>
     </Modal>
   );
 }
-

@@ -1,4 +1,3 @@
-import BottomBar from '@/app/(loggedIn)/_components/BottomBar/BottomBar';
 import { getAuthSession } from '@/lib/auth';
 import { Container } from '@mantine/core';
 import AdminHeader from '../_components/AdminHeader/AdminHeader';
@@ -23,7 +22,6 @@ export default async function LanguageLayout({
       <Container size={'xl'} className={'flex-1 pb-[72px] sm:pb-0'}>
         {children}
       </Container>
-      <BottomBar session={session as any} />
     </PermissionsProvider>
   );
 }

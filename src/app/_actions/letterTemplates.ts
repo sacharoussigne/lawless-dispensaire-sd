@@ -168,7 +168,6 @@ export async function generateOrderLetterPreview(data: {
       };
     }
 
-    // Récupérer la commande avec toutes les relations nécessaires
     const order = await prisma.order.findUnique({
       where: { id: data.orderId },
       include: {
