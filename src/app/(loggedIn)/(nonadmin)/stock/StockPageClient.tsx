@@ -529,7 +529,7 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
         canCraft={permissions?.stock.craftWrite ?? false}
         initialChestId={selectedChestId}
         chests={chests}
-        onCraft={async (itemId, recipeId, times, chestId) => {
+        onCraft={async (itemId, recipeId, times, sourceChestId, ingredientChests, destinationChestId) => {
           if (!permissions?.stock.craftWrite) {
             notifications.show({
               title: 'Permission refusée',
@@ -543,7 +543,9 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
               craftedItemId: itemId,
               recipeId,
               times,
-              chestId,
+              sourceChestId,
+              ingredientChests,
+              destinationChestId,
             });
 
             if (result.status === 200 && 'data' in result && result.data && 'quantityProduced' in result.data) {

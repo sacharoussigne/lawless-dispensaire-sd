@@ -275,7 +275,9 @@ export async function craftItem(data: {
   craftedItemId: string;
   recipeId: string;
   times: number; // Nombre de fois qu'on craft la recette
-  chestId?: string | null; // ID du coffre où effectuer le craft (optionnel, utilise "foure tout" par défaut)
+  sourceChestId: string | null; // ID du coffre source de base
+  ingredientChests: { ingredientId: string; chestId: string }[]; // Mapping ingrédient -> coffre source
+  destinationChestId: string | null; // ID du coffre de destination pour l'item crafté
 }) {
   try {
     const session = await getAuthSession();
@@ -286,8 +288,8 @@ export async function craftItem(data: {
       };
     }
 
-    // Déterminer le coffre à utiliser
-    const targetChestId = data.chestId || await getDefaultChestId();
+    // Déterminer le coffre de destination
+    const destinationChestId = data.destinationChestId || await getDefaultChestId();
 
     // Récupérer la recette avec ses ingrédients
     const recipe = await prisma.craftRecipe.findUnique({
@@ -310,16 +312,36 @@ export async function craftItem(data: {
     // Calculer la quantité totale produite
     const totalQuantityProduced = recipe.quantity * data.times;
 
-    // Vérifier que tous les ingrédients ont assez de stock dans le coffre sélectionné
+    // Créer un map pour accéder rapidement au coffre source de chaque ingrédient
+    const ingredientChestMap = new Map<string, string>();
+    data.ingredientChests.forEach(({ ingredientId, chestId }) => {
+      ingredientChestMap.set(ingredientId, chestId);
+    });
+
+    // Vérifier que tous les ingrédients ont assez de stock dans leur coffre source respectif
     const ingredientChecks = await Promise.all(
       recipe.ingredients.map(async (ingredient) => {
         const requiredQuantity = ingredient.quantity * data.times;
         
-        // Récupérer le stock d'aujourd'hui pour le coffre sélectionné
+        // Récupérer le coffre source pour cet ingrédient (par défaut le coffre source de base)
+        const sourceChestId = ingredientChestMap.get(ingredient.id) || data.sourceChestId;
+        
+        if (!sourceChestId) {
+          return {
+            itemId: ingredient.usedItemId,
+            ingredientId: ingredient.id,
+            available: 0,
+            required: requiredQuantity,
+            hasEnough: false,
+            error: 'Aucun coffre source sélectionné',
+          };
+        }
+        
+        // Récupérer le stock d'aujourd'hui pour le coffre source de cet ingrédient
         const stockToday = await prisma.stockHistory.findFirst({
           where: {
             itemId: ingredient.usedItemId,
-            chestId: targetChestId,
+            chestId: sourceChestId,
             timestamp: {
               gte: today,
               lt: tomorrow,
@@ -335,6 +357,7 @@ export async function craftItem(data: {
         if (availableStock < requiredQuantity) {
           return {
             itemId: ingredient.usedItemId,
+            ingredientId: ingredient.id,
             available: availableStock,
             required: requiredQuantity,
             hasEnough: false,
@@ -343,6 +366,7 @@ export async function craftItem(data: {
 
         return {
           itemId: ingredient.usedItemId,
+          ingredientId: ingredient.id,
           available: availableStock,
           required: requiredQuantity,
           hasEnough: true,
@@ -362,11 +386,11 @@ export async function craftItem(data: {
 
     // Effectuer le craft dans une transaction
     await prisma.$transaction(async (tx) => {
-      // 1. Ajouter l'item crafté au stock du coffre sélectionné
+      // 1. Ajouter l'item crafté au stock du coffre de destination
       const existingCraftedStock = await tx.stockHistory.findFirst({
         where: {
           itemId: data.craftedItemId,
-          chestId: targetChestId,
+          chestId: destinationChestId,
           timestamp: {
             gte: today,
             lt: tomorrow,
@@ -386,24 +410,31 @@ export async function craftItem(data: {
           },
         });
       } else {
-        // Créer un nouveau stock dans le coffre sélectionné
+        // Créer un nouveau stock dans le coffre de destination
         await tx.stockHistory.create({
           data: {
             itemId: data.craftedItemId,
-            chestId: targetChestId,
+            chestId: destinationChestId,
             quantity: totalQuantityProduced,
           },
         });
       }
 
-      // 2. Enlever les ingrédients du stock du coffre sélectionné
+      // 2. Enlever les ingrédients du stock de leur coffre source respectif
       for (const ingredient of recipe.ingredients) {
         const requiredQuantity = ingredient.quantity * data.times;
+        
+        // Récupérer le coffre source pour cet ingrédient
+        const sourceChestId = ingredientChestMap.get(ingredient.id) || data.sourceChestId;
+        
+        if (!sourceChestId) {
+          throw new Error(`Aucun coffre source pour l'ingrédient ${ingredient.id}`);
+        }
         
         const existingIngredientStock = await tx.stockHistory.findFirst({
           where: {
             itemId: ingredient.usedItemId,
-            chestId: targetChestId,
+            chestId: sourceChestId,
             timestamp: {
               gte: today,
               lt: tomorrow,
@@ -427,7 +458,7 @@ export async function craftItem(data: {
           await tx.stockHistory.create({
             data: {
               itemId: ingredient.usedItemId,
-              chestId: targetChestId,
+              chestId: sourceChestId,
               quantity: -requiredQuantity,
             },
           });
