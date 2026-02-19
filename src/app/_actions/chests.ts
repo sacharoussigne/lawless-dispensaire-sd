@@ -146,7 +146,6 @@ export async function deleteChest(data: { id: string; targetChestId: string }) {
 
     const validatedData = deleteChestSchema.parse(data);
 
-    // Vérifier qu'il y a au moins 2 coffres
     const totalChests = await prisma.chest.count();
     if (totalChests <= 1) {
       return {
@@ -155,7 +154,6 @@ export async function deleteChest(data: { id: string; targetChestId: string }) {
       };
     }
 
-    // Vérifier que le coffre de destination existe et est différent du coffre à supprimer
     if (validatedData.id === validatedData.targetChestId) {
       return {
         status: 400,
@@ -174,9 +172,7 @@ export async function deleteChest(data: { id: string; targetChestId: string }) {
       };
     }
 
-    // Transférer tous les stocks vers le coffre de destination dans une transaction
     await prisma.$transaction(async (tx) => {
-      // Mettre à jour tous les stocks du coffre à supprimer
       await tx.stockHistory.updateMany({
         where: {
           chestId: validatedData.id,
@@ -186,7 +182,6 @@ export async function deleteChest(data: { id: string; targetChestId: string }) {
         },
       });
 
-      // Supprimer le coffre
       await tx.chest.delete({
         where: {
           id: validatedData.id,

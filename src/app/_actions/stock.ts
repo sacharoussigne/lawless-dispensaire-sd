@@ -101,10 +101,8 @@ export async function getItemsWithStock(chestId?: string | null) {
       },
     });
 
-    // Pour chaque item, trouver le stock d'aujourd'hui et d'hier
     const itemsWithStock = items.map((item) => {
       if (chestId) {
-        // Si un coffre spécifique est sélectionné, prendre le dernier enregistrement de ce coffre
         const stockHistoryToday = item.stockHistory.filter((sh) => {
           const shDateStr = formatDate(new Date(sh.timestamp));
           const todayStr = formatDate(today);
@@ -130,15 +128,12 @@ export async function getItemsWithStock(chestId?: string | null) {
           price: item.price ? Number(item.price) : null,
         };
       } else {
-        // Si "Tous les coffres" est sélectionné, faire la SOMME de tous les coffres
-        // Pour chaque coffre, prendre le dernier enregistrement d'aujourd'hui, puis sommer
         const stockHistoryToday = item.stockHistory.filter((sh) => {
           const shDateStr = formatDate(new Date(sh.timestamp));
           const todayStr = formatDate(today);
           return shDateStr === todayStr;
         });
 
-        // Grouper par coffre et prendre le dernier enregistrement de chaque coffre
         const stocksByChestToday = new Map<string, typeof stockHistoryToday[0]>();
         stockHistoryToday.forEach((sh) => {
           const existing = stocksByChestToday.get(sh.chestId);
@@ -147,10 +142,8 @@ export async function getItemsWithStock(chestId?: string | null) {
           }
         });
 
-        // Faire la somme de tous les coffres
         const totalStockToday = Array.from(stocksByChestToday.values()).reduce((sum, sh) => sum + sh.quantity, 0);
 
-        // Même chose pour hier
         const stockHistoryYesterday = item.stockHistory.filter((sh) => {
           const shDateStr = formatDate(new Date(sh.timestamp));
           const yesterdayStr = formatDate(yesterday);
@@ -205,7 +198,6 @@ export async function updateStock(data: { itemId: string; quantity: number }[], 
     const today = getTodayStart();
     const tomorrow = getTomorrowStart();
 
-    // Si aucun chestId n'est fourni, utiliser le coffre "foure tout" par défaut
     let targetChestId = chestId;
     if (!targetChestId) {
       const defaultChest = await prisma.chest.findFirst({
@@ -222,10 +214,8 @@ export async function updateStock(data: { itemId: string; quantity: number }[], 
       targetChestId = defaultChest.id;
     }
 
-    // Pour chaque item, créer ou mettre à jour le stock UNIQUEMENT pour le coffre spécifié
     const results = await Promise.all(
       data.map(async ({ itemId, quantity }) => {
-        // Vérifier si un stock existe déjà aujourd'hui pour ce coffre spécifique
         const existingStock = await prisma.stockHistory.findFirst({
           where: {
             itemId,
@@ -241,7 +231,6 @@ export async function updateStock(data: { itemId: string; quantity: number }[], 
         });
 
         if (existingStock) {
-          // Mettre à jour le stock existant de ce coffre uniquement
           return prisma.stockHistory.update({
             where: {
               id: existingStock.id,
@@ -251,7 +240,6 @@ export async function updateStock(data: { itemId: string; quantity: number }[], 
             },
           });
         } else {
-          // Créer un nouveau stock pour ce coffre spécifique
           return prisma.stockHistory.create({
             data: {
               itemId,
@@ -295,7 +283,6 @@ export async function craftItem(data: {
     // Déterminer le coffre de destination
     const destinationChestId = data.destinationChestId || await getDefaultChestId();
 
-    // Récupérer la recette avec ses ingrédients
     const recipe = await prisma.craftRecipe.findUnique({
       where: { id: data.recipeId },
       include: {
@@ -313,21 +300,17 @@ export async function craftItem(data: {
     const today = getTodayStart();
     const tomorrow = getTomorrowStart();
 
-    // Calculer la quantité totale produite
     const totalQuantityProduced = recipe.quantity * data.times;
 
-    // Créer un map pour accéder rapidement au coffre source de chaque ingrédient
     const ingredientChestMap = new Map<string, string>();
     data.ingredientChests.forEach(({ ingredientId, chestId }) => {
       ingredientChestMap.set(ingredientId, chestId);
     });
 
-    // Vérifier que tous les ingrédients ont assez de stock dans leur coffre source respectif
     const ingredientChecks = await Promise.all(
       recipe.ingredients.map(async (ingredient) => {
         const requiredQuantity = ingredient.quantity * data.times;
         
-        // Récupérer le coffre source pour cet ingrédient (par défaut le coffre source de base)
         const sourceChestId = ingredientChestMap.get(ingredient.id) || data.sourceChestId;
         
         if (!sourceChestId) {
@@ -341,7 +324,6 @@ export async function craftItem(data: {
           };
         }
         
-        // Récupérer le stock d'aujourd'hui pour le coffre source de cet ingrédient
         const stockToday = await prisma.stockHistory.findFirst({
           where: {
             itemId: ingredient.usedItemId,
@@ -378,7 +360,6 @@ export async function craftItem(data: {
       })
     );
 
-    // Vérifier si tous les ingrédients ont assez de stock
     const allHaveEnough = ingredientChecks.every((check) => check.hasEnough);
     if (!allHaveEnough) {
       return {
@@ -388,9 +369,7 @@ export async function craftItem(data: {
       };
     }
 
-    // Effectuer le craft dans une transaction
     await prisma.$transaction(async (tx) => {
-      // 1. Ajouter l'item crafté au stock du coffre de destination
       const existingCraftedStock = await tx.stockHistory.findFirst({
         where: {
           itemId: data.craftedItemId,
@@ -403,32 +382,28 @@ export async function craftItem(data: {
         orderBy: {
           timestamp: 'desc',
         },
-      });
+        });
 
-      if (existingCraftedStock) {
-        // Mettre à jour le stock existant
-        await tx.stockHistory.update({
+        if (existingCraftedStock) {
+          await tx.stockHistory.update({
           where: { id: existingCraftedStock.id },
           data: {
             quantity: existingCraftedStock.quantity + totalQuantityProduced,
-          },
-        });
-      } else {
-        // Créer un nouveau stock dans le coffre de destination
-        await tx.stockHistory.create({
+            },
+          });
+        } else {
+          await tx.stockHistory.create({
           data: {
             itemId: data.craftedItemId,
             chestId: destinationChestId,
             quantity: totalQuantityProduced,
           },
-        });
-      }
+          });
+        }
 
-      // 2. Enlever les ingrédients du stock de leur coffre source respectif
       for (const ingredient of recipe.ingredients) {
         const requiredQuantity = ingredient.quantity * data.times;
         
-        // Récupérer le coffre source pour cet ingrédient
         const sourceChestId = ingredientChestMap.get(ingredient.id) || data.sourceChestId;
         
         if (!sourceChestId) {
@@ -458,7 +433,6 @@ export async function craftItem(data: {
             },
           });
         } else {
-          // Si pas de stock, créer un stock négatif (ne devrait pas arriver normalement)
           await tx.stockHistory.create({
             data: {
               itemId: ingredient.usedItemId,
@@ -495,7 +469,6 @@ export async function addOrderItemsToStock(orderId: string, chestId?: string | n
       };
     }
 
-    // Récupérer la commande avec ses items
     const order = await prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -522,16 +495,13 @@ export async function addOrderItemsToStock(orderId: string, chestId?: string | n
     const today = getTodayStart();
     const tomorrow = getTomorrowStart();
 
-    // Si aucun chestId n'est fourni, utiliser le coffre "foure tout" par défaut
     let targetChestId = chestId;
     if (!targetChestId) {
       targetChestId = await getDefaultChestId();
     }
 
-    // Pour chaque item de la commande, ajouter la quantité au stock du coffre spécifié
     await prisma.$transaction(async (tx) => {
       for (const orderItem of order.items) {
-        // Récupérer le stock d'aujourd'hui pour ce coffre spécifique
         const existingStock = await tx.stockHistory.findFirst({
           where: {
             itemId: orderItem.itemId,
@@ -547,7 +517,6 @@ export async function addOrderItemsToStock(orderId: string, chestId?: string | n
         });
 
         if (existingStock) {
-          // Additionner la quantité au stock existant de ce coffre
           await tx.stockHistory.update({
             where: { id: existingStock.id },
             data: {
@@ -555,7 +524,6 @@ export async function addOrderItemsToStock(orderId: string, chestId?: string | n
             },
           });
         } else {
-          // Créer un nouveau stock avec la quantité de la commande pour ce coffre
           await tx.stockHistory.create({
             data: {
               itemId: orderItem.itemId,
@@ -642,7 +610,6 @@ export async function getItemsWithStockForDate(date: Date, chestId?: string | nu
       },
     });
 
-    // Pour chaque item, trouver le dernier stock du jour sélectionné pour le coffre spécifié
     const itemsWithStock = items.map((item) => {
       const stockForDate = item.stockHistory.length > 0 
         ? item.stockHistory[0] // Le plus récent du jour pour ce coffre
@@ -687,10 +654,8 @@ export async function overwriteStockForDate(data: {
     const dayEnd = new Date(dayStart);
     dayEnd.setDate(dayEnd.getDate() + 1);
 
-    // Déterminer le coffre à utiliser
     const targetChestId = data.chestId || await getDefaultChestId();
 
-    // Supprimer tous les stocks existants pour cette date et ce coffre uniquement
     await prisma.stockHistory.deleteMany({
       where: {
         timestamp: {
@@ -701,7 +666,6 @@ export async function overwriteStockForDate(data: {
       },
     });
 
-    // Créer les nouveaux stocks dans le coffre spécifié
     const results = await Promise.all(
       data.stocks
         .filter((stock) => stock.quantity !== null && stock.quantity !== undefined)
@@ -800,7 +764,6 @@ export async function getItemsWithDetailedStock(itemIds?: string[]) {
       },
     });
 
-    // Récupérer tous les coffres pour avoir la liste complète
     const allChests = await prisma.chest.findMany({
       orderBy: {
         name: 'asc',
@@ -838,7 +801,6 @@ export async function getItemsWithDetailedStock(itemIds?: string[]) {
       const totalStockToday = Array.from(stocksByChestToday.values()).reduce((sum, sh) => sum + sh.quantity, 0);
       const totalStockYesterday = Array.from(stocksByChestYesterday.values()).reduce((sum, sh) => sum + sh.quantity, 0);
 
-      // Créer un objet avec le stock par coffre (aujourd'hui et hier)
       const stockByChest = allChests.map((chest) => {
         const stockToday = stocksByChestToday.get(chest.id);
         const stockYesterday = stocksByChestYesterday.get(chest.id);
@@ -882,7 +844,6 @@ export async function checkOrderItemsStockToday(orderId: string, chestId?: strin
       };
     }
 
-    // Récupérer la commande avec ses items
     const order = await prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -909,7 +870,6 @@ export async function checkOrderItemsStockToday(orderId: string, chestId?: strin
     const today = getTodayStart();
     const tomorrow = getTomorrowStart();
 
-    // Vérifier le stock d'aujourd'hui pour chaque item
     const stockChecks = await Promise.all(
       order.items.map(async (orderItem) => {
         const stockToday = await prisma.stockHistory.findFirst({
@@ -962,7 +922,6 @@ export async function checkOrderItemsStockSufficient(orderId: string, chestId?: 
       };
     }
 
-    // Récupérer la commande avec ses items
     const order = await prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -989,7 +948,6 @@ export async function checkOrderItemsStockSufficient(orderId: string, chestId?: 
     const today = getTodayStart();
     const tomorrow = getTomorrowStart();
 
-    // Vérifier le stock d'aujourd'hui pour chaque item et si on a assez
     const stockChecks = await Promise.all(
       order.items.map(async (orderItem) => {
         const stockToday = await prisma.stockHistory.findFirst({
@@ -1053,7 +1011,6 @@ export async function removeOrderItemsFromStock(orderId: string, chestId?: strin
       };
     }
 
-    // Récupérer la commande avec ses items
     const order = await prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -1080,13 +1037,11 @@ export async function removeOrderItemsFromStock(orderId: string, chestId?: strin
     const today = getTodayStart();
     const tomorrow = getTomorrowStart();
 
-    // Si aucun chestId n'est fourni, utiliser le coffre "foure tout" par défaut
     let targetChestId = chestId;
     if (!targetChestId) {
       targetChestId = await getDefaultChestId();
     }
 
-    // Vérifier qu'on a assez de stock pour tous les items dans le coffre spécifié
     const stockChecks = await Promise.all(
       order.items.map(async (orderItem) => {
         const stockToday = await prisma.stockHistory.findFirst({
@@ -1112,7 +1067,6 @@ export async function removeOrderItemsFromStock(orderId: string, chestId?: strin
       })
     );
 
-    // Vérifier que tous les items ont un stock d'aujourd'hui
     const allHaveStockToday = stockChecks.every((check) => check.hasStockToday);
     if (!allHaveStockToday) {
       const missingItems = stockChecks
@@ -1124,7 +1078,6 @@ export async function removeOrderItemsFromStock(orderId: string, chestId?: strin
       };
     }
 
-    // Vérifier qu'on a assez de stock pour tous les items
     const allHaveEnoughStock = stockChecks.every((check) => check.hasEnoughStock);
     if (!allHaveEnoughStock) {
       const insufficientItems = stockChecks
@@ -1194,7 +1147,6 @@ export async function transferStock(data: {
       };
     }
 
-    // Vérifier que les coffres sont différents
     if (data.sourceChestId === data.destinationChestId) {
       return {
         status: 400,
@@ -1202,7 +1154,6 @@ export async function transferStock(data: {
       };
     }
 
-    // Vérifier que la quantité est positive
     if (data.quantity <= 0) {
       return {
         status: 400,
@@ -1213,7 +1164,6 @@ export async function transferStock(data: {
     const today = getTodayStart();
     const tomorrow = getTomorrowStart();
 
-    // Vérifier que le coffre source a assez de stock
     const sourceStock = await prisma.stockHistory.findFirst({
       where: {
         itemId: data.itemId,
@@ -1242,9 +1192,7 @@ export async function transferStock(data: {
       };
     }
 
-    // Effectuer le transfert dans une transaction
     await prisma.$transaction(async (tx) => {
-      // 1. Retirer la quantité du coffre source
       const newSourceQuantity = sourceStock.quantity - data.quantity;
       await tx.stockHistory.update({
         where: { id: sourceStock.id },
@@ -1253,7 +1201,6 @@ export async function transferStock(data: {
         },
       });
 
-      // 2. Ajouter la quantité au coffre destination
       const destinationStock = await tx.stockHistory.findFirst({
         where: {
           itemId: data.itemId,
@@ -1266,19 +1213,17 @@ export async function transferStock(data: {
         orderBy: {
           timestamp: 'desc',
         },
-      });
+        });
 
-      if (destinationStock) {
-        // Mettre à jour le stock existant du coffre destination
-        await tx.stockHistory.update({
+        if (destinationStock) {
+          await tx.stockHistory.update({
           where: { id: destinationStock.id },
           data: {
             quantity: destinationStock.quantity + data.quantity,
-          },
-        });
-      } else {
-        // Créer un nouveau stock pour le coffre destination
-        await tx.stockHistory.create({
+            },
+          });
+        } else {
+          await tx.stockHistory.create({
           data: {
             itemId: data.itemId,
             chestId: data.destinationChestId,
@@ -1318,7 +1263,6 @@ export async function transferMultipleStock(data: {
 
     const { sourceChestId, destinationChestId, items } = data;
 
-    // Vérifier que les coffres sont différents
     if (sourceChestId === destinationChestId) {
       return {
         status: 400,
@@ -1326,7 +1270,6 @@ export async function transferMultipleStock(data: {
       };
     }
 
-    // Vérifier qu'il y a au moins un item à transférer
     const validItems = items.filter((i) => i.quantity > 0);
     if (validItems.length === 0) {
       return {
@@ -1338,14 +1281,12 @@ export async function transferMultipleStock(data: {
     const today = getTodayStart();
     const tomorrow = getTomorrowStart();
 
-    // Effectuer tous les transferts dans une seule transaction
     await prisma.$transaction(async (tx) => {
       for (const { itemId, quantity } of validItems) {
         if (quantity <= 0) {
           throw new Error(`La quantité à transférer doit être positive pour l'item ${itemId}`);
         }
 
-        // 1. Vérifier le stock dans le coffre source
         const sourceStock = await tx.stockHistory.findFirst({
           where: {
             itemId,
@@ -1370,7 +1311,6 @@ export async function transferMultipleStock(data: {
           );
         }
 
-        // 2. Retirer la quantité du coffre source
         const newSourceQuantity = sourceStock.quantity - quantity;
         await tx.stockHistory.update({
           where: { id: sourceStock.id },
@@ -1379,7 +1319,6 @@ export async function transferMultipleStock(data: {
           },
         });
 
-        // 3. Ajouter la quantité au coffre destination
         const destinationStock = await tx.stockHistory.findFirst({
           where: {
             itemId,

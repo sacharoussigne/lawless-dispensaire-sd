@@ -310,7 +310,6 @@ export default function CraftModal({
       return { canCraft: false, reason: null };
     }
 
-    // Vérifier chaque ingrédient
     const ingredientChecks = recipe.ingredients.map((ingredient) => {
       const requiredQuantity = ingredient.quantity * craftQuantity;
       const ingredientChestId = ingredientChests[ingredient.id] || sourceChestId;
