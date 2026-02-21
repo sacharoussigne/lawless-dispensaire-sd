@@ -16,10 +16,21 @@ import {
   Badge,
   Stack,
   Autocomplete,
+  Popover,
 } from '@mantine/core';
 import { DatePickerInput, DateInput, DatesProvider } from '@mantine/dates';
 import 'dayjs/locale/fr';
-import { IconPlus, IconTrash, IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
+import { 
+  IconPlus, 
+  IconTrash, 
+  IconChevronLeft, 
+  IconChevronRight,
+  IconArrowDown,
+  IconArrowUp,
+  IconTransfer,
+  IconWallet,
+  IconEdit,
+} from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import {
   getOrCreateWeek,
@@ -48,11 +59,15 @@ interface BankAccountPageClientProps {
 }
 
 const transactionTypeOptions = [
-  { value: 'DEPOSIT', label: 'Dépôt' },
-  { value: 'WITHDRAWAL', label: 'Retrait' },
-  { value: 'TRANSFER_IN', label: 'Transfert entrant' },
-  { value: 'TRANSFER_OUT', label: 'Transfert sortant' },
+  { value: 'DEPOSIT', label: 'Dépôt', icon: IconArrowUp, color: 'green' },
+  { value: 'WITHDRAWAL', label: 'Retrait', icon: IconArrowDown, color: 'red' },
+  { value: 'TRANSFER_IN', label: 'Transfert entrant', icon: IconTransfer, color: 'blue' },
+  { value: 'TRANSFER_OUT', label: 'Transfert sortant', icon: IconTransfer, color: 'orange' },
 ];
+
+const getTransactionTypeInfo = (type: string) => {
+  return transactionTypeOptions.find(opt => opt.value === type) || transactionTypeOptions[0];
+};
 
 export default function BankAccountPageClient({
   account,
@@ -82,6 +97,7 @@ export default function BankAccountPageClient({
     amount?: number;
     order?: number;
   } | null>(null);
+  const [deletePopoverOpened, setDeletePopoverOpened] = useState<string | null>(null);
 
   useEffect(() => {
     loadSuggestions();
@@ -384,69 +400,124 @@ export default function BankAccountPageClient({
 
   return (
     <Container size="xl" py="xl">
-      <Group justify="space-between" mb="xl">
-        <Title order={1}>{account.name}</Title>
-        <Button variant="default" onClick={() => router.push(routes.bank.index)}>
-          Retour
-        </Button>
-      </Group>
-
-      <Paper shadow="sm" p="md" withBorder mb="md">
-        <Stack gap="md">
-          <DatesProvider settings={{ locale: 'fr' }}>
-            <Group align="flex-end" wrap="nowrap">
-              <ActionIcon variant="light" onClick={handlePreviousWeek} disabled={loading} size="lg">
-                <IconChevronLeft size={20} />
-              </ActionIcon>
-              <DatePickerInput
-                value={weekDateValue}
-                onChange={(date) => {
-                  const dateValue = date as unknown as Date | null;
-                  setWeekDateValue(dateValue);
-                  if (dateValue) {
-                    handleWeekChange(dateValue);
-                  }
-                }}
-                label="Semaine"
-                placeholder="Sélectionner le lundi de la semaine"
-                style={{ flex: 1, minWidth: 200 }}
-                clearable={false}
-              />
-              <ActionIcon variant="light" onClick={handleNextWeek} disabled={loading} size="lg">
-                <IconChevronRight size={20} />
-              </ActionIcon>
-              <Text size="sm" c="dimmed" fw={500} style={{ minWidth: 150 }}>
-                {weekRange}
-              </Text>
-            </Group>
-          </DatesProvider>
-
-          <Group>
-            <Text size="sm">
-              <strong>Solde semaine précédente:</strong> {previousBalance.toFixed(2)} $
-            </Text>
-            <Text size="sm">
-              <strong>Solde actuel:</strong> {currentBalance.toFixed(2)} $
-            </Text>
-            <Badge color={balanceDifference >= 0 ? 'green' : 'red'}>
-              {balanceDifference >= 0 ? '+' : ''}{balanceDifference.toFixed(2)} $
-            </Badge>
+      <Stack gap="lg">
+        {/* Header */}
+        <Group justify="space-between" align="center">
+          <Group gap="md" align="center">
+            <ActionIcon
+              variant="subtle"
+              size="lg"
+              onClick={() => router.push(routes.bank.index)}
+            >
+              <IconChevronLeft size={20} />
+            </ActionIcon>
+            <div>
+              <Title order={2} mb={4}>{account.name}</Title>
+              <Text size="sm" c="dimmed">Gestion des transactions</Text>
+            </div>
           </Group>
-        </Stack>
-      </Paper>
+        </Group>
+
+        {/* Week Selector & Summary Cards */}
+        <Paper shadow="sm" p="lg" withBorder radius="md">
+          <Stack gap="lg">
+            <DatesProvider settings={{ locale: 'fr' }}>
+              <Group align="flex-end" wrap="nowrap" gap="sm">
+                <ActionIcon 
+                  variant="light" 
+                  onClick={handlePreviousWeek} 
+                  disabled={loading} 
+                  size="lg"
+                  radius="md"
+                >
+                  <IconChevronLeft size={20} />
+                </ActionIcon>
+                <DatePickerInput
+                  value={weekDateValue}
+                  onChange={(date) => {
+                    const dateValue = date as unknown as Date | null;
+                    setWeekDateValue(dateValue);
+                    if (dateValue) {
+                      handleWeekChange(dateValue);
+                    }
+                  }}
+                  label="Semaine"
+                  placeholder="Sélectionner le lundi de la semaine"
+                  style={{ flex: 1, minWidth: 200 }}
+                  clearable={false}
+                  radius="md"
+                />
+                <ActionIcon 
+                  variant="light" 
+                  onClick={handleNextWeek} 
+                  disabled={loading} 
+                  size="lg"
+                  radius="md"
+                >
+                  <IconChevronRight size={20} />
+                </ActionIcon>
+                <div style={{ minWidth: 180 }}>
+                  <Text size="xs" c="dimmed" mb={4}>Période</Text>
+                  <Text size="sm" fw={500}>{weekRange}</Text>
+                </div>
+              </Group>
+            </DatesProvider>
+
+            {/* Balance Cards */}
+            <Group gap="md" grow>
+              <Paper p="md" withBorder radius="md" style={{ background: 'var(--mantine-color-gray-0)' }}>
+                <Stack gap={4}>
+                  <Text size="xs" c="dimmed" fw={500}>Solde précédent</Text>
+                  <Text size="xl" fw={700} c="dimmed">
+                    {previousBalance.toFixed(2)} $
+                  </Text>
+                </Stack>
+              </Paper>
+              <Paper p="md" withBorder radius="md" style={{ background: 'var(--mantine-color-gray-0)' }}>
+                <Stack gap={4}>
+                  <Text size="xs" c="dimmed" fw={500}>Solde actuel</Text>
+                  <Text size="xl" fw={700}>
+                    {currentBalance.toFixed(2)} $
+                  </Text>
+                </Stack>
+              </Paper>
+              <Paper 
+                p="md" 
+                withBorder 
+                radius="md" 
+                style={{ 
+                  background: balanceDifference >= 0 
+                    ? 'var(--mantine-color-green-0)' 
+                    : 'var(--mantine-color-red-0)' 
+                }}
+              >
+                <Stack gap={4}>
+                  <Text size="xs" c="dimmed" fw={500}>Variation</Text>
+                  <Text 
+                    size="xl" 
+                    fw={700} 
+                    c={balanceDifference >= 0 ? 'green' : 'red'}
+                  >
+                    {balanceDifference >= 0 ? '+' : ''}{balanceDifference.toFixed(2)} $
+                  </Text>
+                </Stack>
+              </Paper>
+            </Group>
+          </Stack>
+        </Paper>
 
       <DatesProvider settings={{ locale: 'fr' }}>
-        <Paper shadow="sm" withBorder>
+        <Paper shadow="sm" withBorder radius="md" p={0}>
           <Table striped highlightOnHover>
             <Table.Thead>
             <Table.Tr>
-              <Table.Th style={{ width: 120 }}>Date</Table.Th>
-              <Table.Th style={{ width: 150 }}>Type</Table.Th>
-              <Table.Th style={{ width: 200 }}>Nom</Table.Th>
-              <Table.Th style={{ width: 200 }}>Description</Table.Th>
-              <Table.Th style={{ width: 120 }}>Montant</Table.Th>
-              <Table.Th style={{ width: 120 }}>Solde restant</Table.Th>
-              <Table.Th style={{ width: 80 }}>Actions</Table.Th>
+              <Table.Th style={{ padding: '16px' }}>Date</Table.Th>
+              <Table.Th style={{ padding: '16px' }}>Type</Table.Th>
+              <Table.Th style={{ padding: '16px' }}>Nom</Table.Th>
+              <Table.Th style={{ padding: '16px' }}>Description</Table.Th>
+              <Table.Th style={{ padding: '16px', textAlign: 'right' }}>Montant</Table.Th>
+              <Table.Th style={{ padding: '16px', textAlign: 'right' }}>Solde</Table.Th>
+              <Table.Th style={{ padding: '16px', textAlign: 'center' }}>Actions</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
@@ -454,7 +525,7 @@ export default function BankAccountPageClient({
               const isEditing = editingTransaction === transaction.id;
               return (
                 <Table.Tr key={transaction.id}>
-                  <Table.Td>
+                  <Table.Td style={{ padding: '16px' }}>
                     {isEditing ? (
                       <DateInput
                         value={editingTransactionData?.date ? new Date(editingTransactionData.date) : new Date(transaction.date)}
@@ -467,13 +538,13 @@ export default function BankAccountPageClient({
                         valueFormat="DD/MM/YYYY"
                       />
                     ) : (
-                      format(new Date(transaction.date), 'dd/MM/yyyy', { locale: fr })
+                      <Text size="sm">{format(new Date(transaction.date), 'dd/MM/yyyy', { locale: fr })}</Text>
                     )}
                   </Table.Td>
-                  <Table.Td>
+                  <Table.Td style={{ padding: '16px' }}>
                     {isEditing ? (
                       <Select
-                        data={transactionTypeOptions}
+                        data={transactionTypeOptions.map(opt => ({ value: opt.value, label: opt.label }))}
                         value={editingTransactionData?.type || transaction.type}
                         onChange={(value) => {
                           if (value && editingTransactionData) {
@@ -483,10 +554,23 @@ export default function BankAccountPageClient({
                         size="xs"
                       />
                     ) : (
-                      transactionTypeOptions.find((opt) => opt.value === transaction.type)?.label
+                      (() => {
+                        const typeInfo = getTransactionTypeInfo(transaction.type);
+                        const IconComponent = typeInfo.icon;
+                        return (
+                          <Badge
+                            leftSection={<IconComponent size={14} />}
+                            color={typeInfo.color}
+                            variant="light"
+                            size="sm"
+                          >
+                            {typeInfo.label}
+                          </Badge>
+                        );
+                      })()
                     )}
                   </Table.Td>
-                  <Table.Td>
+                  <Table.Td style={{ padding: '16px' }}>
                     {isEditing ? (
                       <Autocomplete
                         data={nameSuggestions}
@@ -500,14 +584,52 @@ export default function BankAccountPageClient({
                         renderOption={({ option }) => (
                           <Group justify="space-between" style={{ flex: 1 }}>
                             <Text size="xs" style={{ flex: 1 }}>{option.value}</Text>
-                            <ActionIcon
-                              size="xs"
-                              variant="subtle"
-                              color="red"
-                              onClick={(e) => handleDeleteNameSuggestion(option.value, e)}
+                            <Popover
+                              position="top"
+                              withArrow
+                              shadow="md"
+                              withinPortal
                             >
-                              <IconTrash size={12} />
-                            </ActionIcon>
+                              <Popover.Target>
+                                <ActionIcon
+                                  size="xs"
+                                  variant="subtle"
+                                  color="red"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <IconTrash size={12} />
+                                </ActionIcon>
+                              </Popover.Target>
+                              <Popover.Dropdown>
+                                <Stack gap="xs" p="xs">
+                                  <Text size="sm" fw={500}>Supprimer la suggestion</Text>
+                                  <Text size="xs" c="dimmed">
+                                    Supprimer "{option.value}" des suggestions ?
+                                  </Text>
+                                  <Group gap="xs" justify="flex-end" mt="xs">
+                                    <Button
+                                      size="xs"
+                                      variant="subtle"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                      }}
+                                    >
+                                      Annuler
+                                    </Button>
+                                    <Button
+                                      size="xs"
+                                      color="red"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteNameSuggestion(option.value, e);
+                                      }}
+                                    >
+                                      Supprimer
+                                    </Button>
+                                  </Group>
+                                </Stack>
+                              </Popover.Dropdown>
+                            </Popover>
                           </Group>
                         )}
                         rightSection={
@@ -545,14 +667,52 @@ export default function BankAccountPageClient({
                         renderOption={({ option }) => (
                           <Group justify="space-between" style={{ flex: 1 }}>
                             <Text size="xs" style={{ flex: 1 }}>{option.value}</Text>
-                            <ActionIcon
-                              size="xs"
-                              variant="subtle"
-                              color="red"
-                              onClick={(e) => handleDeleteDescriptionSuggestion(option.value, e)}
+                            <Popover
+                              position="top"
+                              withArrow
+                              shadow="md"
+                              withinPortal
                             >
-                              <IconTrash size={12} />
-                            </ActionIcon>
+                              <Popover.Target>
+                                <ActionIcon
+                                  size="xs"
+                                  variant="subtle"
+                                  color="red"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <IconTrash size={12} />
+                                </ActionIcon>
+                              </Popover.Target>
+                              <Popover.Dropdown>
+                                <Stack gap="xs" p="xs">
+                                  <Text size="sm" fw={500}>Supprimer la suggestion</Text>
+                                  <Text size="xs" c="dimmed">
+                                    Supprimer "{option.value}" des suggestions ?
+                                  </Text>
+                                  <Group gap="xs" justify="flex-end" mt="xs">
+                                    <Button
+                                      size="xs"
+                                      variant="subtle"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                      }}
+                                    >
+                                      Annuler
+                                    </Button>
+                                    <Button
+                                      size="xs"
+                                      color="red"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteDescriptionSuggestion(option.value, e);
+                                      }}
+                                    >
+                                      Supprimer
+                                    </Button>
+                                  </Group>
+                                </Stack>
+                              </Popover.Dropdown>
+                            </Popover>
                           </Group>
                         )}
                         rightSection={
@@ -576,7 +736,7 @@ export default function BankAccountPageClient({
                       transaction.description || '-'
                     )}
                   </Table.Td>
-                  <Table.Td>
+                  <Table.Td style={{ padding: '16px', textAlign: 'right' }}>
                     {isEditing ? (
                       <NumberInput
                         value={editingTransactionData?.amount !== undefined ? Number(editingTransactionData.amount) : Number(transaction.amount)}
@@ -591,43 +751,48 @@ export default function BankAccountPageClient({
                         size="xs"
                         min={0}
                         decimalScale={2}
+                        style={{ width: '100%' }}
                       />
                     ) : (
-                      <Text size="sm" c={transaction.type === 'DEPOSIT' || transaction.type === 'TRANSFER_IN' ? 'green' : 'red'}>
+                      <Text 
+                        size="sm" 
+                        fw={600}
+                        c={transaction.type === 'DEPOSIT' || transaction.type === 'TRANSFER_IN' ? 'green' : 'red'}
+                      >
                         {(transaction.type === 'DEPOSIT' || transaction.type === 'TRANSFER_IN' ? '+' : '-') + Number(transaction.amount).toFixed(2)} $
                       </Text>
                     )}
                   </Table.Td>
-                  <Table.Td>
-                    <Text size="sm" fw={500}>
+                  <Table.Td style={{ padding: '16px', textAlign: 'right' }}>
+                    <Text size="sm" fw={600} c="dimmed">
                       {transaction.runningBalance.toFixed(2)} $
                     </Text>
                   </Table.Td>
-                  <Table.Td>
-                    <Group gap="xs">
+                  <Table.Td style={{ padding: '16px', textAlign: 'center' }}>
+                    <Group gap="xs" justify="center">
                       {isEditing ? (
                         <>
                           <Button
                             size="xs"
-                        onClick={() => {
-                          if (editingTransactionData) {
-                            handleSaveTransaction({ 
-                              id: transaction.id,
-                              date: editingTransactionData.date || transaction.date,
-                              type: editingTransactionData.type || transaction.type,
-                              name: editingTransactionData.name || transaction.name,
-                              description: editingTransactionData.description !== undefined ? editingTransactionData.description : (transaction.description || null),
-                              amount: editingTransactionData.amount !== undefined ? editingTransactionData.amount : Number(transaction.amount),
-                              order: editingTransactionData.order !== undefined ? editingTransactionData.order : transaction.order,
-                            });
-                          }
-                        }}
+                            onClick={() => {
+                              if (editingTransactionData) {
+                                handleSaveTransaction({ 
+                                  id: transaction.id,
+                                  date: editingTransactionData.date || transaction.date,
+                                  type: editingTransactionData.type || transaction.type,
+                                  name: editingTransactionData.name || transaction.name,
+                                  description: editingTransactionData.description !== undefined ? editingTransactionData.description : (transaction.description || null),
+                                  amount: editingTransactionData.amount !== undefined ? editingTransactionData.amount : Number(transaction.amount),
+                                  order: editingTransactionData.order !== undefined ? editingTransactionData.order : transaction.order,
+                                });
+                              }
+                            }}
                           >
                             Enregistrer
                           </Button>
                           <Button
                             size="xs"
-                            variant="default"
+                            variant="subtle"
                             onClick={() => {
                               setEditingTransaction(null);
                               setEditingTransactionData(null);
@@ -637,33 +802,73 @@ export default function BankAccountPageClient({
                           </Button>
                         </>
                       ) : (
-                        <Button
-                          size="xs"
-                          variant="light"
-                          onClick={() => {
-                            setEditingTransaction(transaction.id);
-        setEditingTransactionData({
-          date: transaction.date,
-          type: transaction.type,
-          name: transaction.name,
-          description: transaction.description ? transaction.description : undefined,
-          amount: Number(transaction.amount),
-          order: transaction.order,
-        });
-                          }}
-                        >
-                          Modifier
-                        </Button>
+                        <>
+                          <ActionIcon
+                            variant="subtle"
+                            size="sm"
+                            color="blue"
+                            onClick={() => {
+                              setEditingTransaction(transaction.id);
+                              setEditingTransactionData({
+                                date: transaction.date,
+                                type: transaction.type,
+                                name: transaction.name,
+                                description: transaction.description ? transaction.description : undefined,
+                                amount: Number(transaction.amount),
+                                order: transaction.order,
+                              });
+                            }}
+                          >
+                            <IconEdit size={16} />
+                          </ActionIcon>
+                          <Popover
+                            position="top"
+                            withArrow
+                            shadow="md"
+                            opened={deletePopoverOpened === transaction.id}
+                            onChange={(opened) => setDeletePopoverOpened(opened ? transaction.id : null)}
+                          >
+                            <Popover.Target>
+                              <ActionIcon
+                                color="red"
+                                variant="subtle"
+                                size="sm"
+                                onClick={() => setDeletePopoverOpened(transaction.id)}
+                                disabled={loading || isEditing}
+                              >
+                                <IconTrash size={16} />
+                              </ActionIcon>
+                            </Popover.Target>
+                            <Popover.Dropdown>
+                              <Stack gap="xs" p="xs">
+                                <Text size="sm" fw={500}>Confirmer la suppression</Text>
+                                <Text size="xs" c="dimmed">
+                                  Êtes-vous sûr de vouloir supprimer cette transaction ?
+                                </Text>
+                                <Group gap="xs" justify="flex-end" mt="xs">
+                                  <Button
+                                    size="xs"
+                                    variant="subtle"
+                                    onClick={() => setDeletePopoverOpened(null)}
+                                  >
+                                    Annuler
+                                  </Button>
+                                  <Button
+                                    size="xs"
+                                    color="red"
+                                    onClick={() => {
+                                      handleDeleteTransaction(transaction.id);
+                                      setDeletePopoverOpened(null);
+                                    }}
+                                  >
+                                    Supprimer
+                                  </Button>
+                                </Group>
+                              </Stack>
+                            </Popover.Dropdown>
+                          </Popover>
+                        </>
                       )}
-                      <ActionIcon
-                        color="red"
-                        variant="light"
-                        size="sm"
-                        onClick={() => handleDeleteTransaction(transaction.id)}
-                        disabled={loading || isEditing}
-                      >
-                        <IconTrash size={16} />
-                      </ActionIcon>
                     </Group>
                   </Table.Td>
                 </Table.Tr>
@@ -817,9 +1022,9 @@ export default function BankAccountPageClient({
         </Table>
 
         {!newTransaction && (
-          <Group p="md">
+          <Group p="lg" justify="center">
             <Button
-              leftSection={<IconPlus size={16} />}
+              leftSection={<IconPlus size={18} />}
               onClick={() => {
                 setNewTransaction({
                   date: new Date(),
@@ -830,6 +1035,8 @@ export default function BankAccountPageClient({
                   order: week.transactions.length,
                 });
               }}
+              size="md"
+              radius="md"
             >
               Ajouter une transaction
             </Button>
@@ -837,6 +1044,7 @@ export default function BankAccountPageClient({
         )}
         </Paper>
       </DatesProvider>
+      </Stack>
     </Container>
   );
 }
