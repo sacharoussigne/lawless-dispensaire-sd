@@ -17,7 +17,8 @@ import {
   Stack,
   Autocomplete,
 } from '@mantine/core';
-import { DatePickerInput, DateInput } from '@mantine/dates';
+import { DatePickerInput, DateInput, DatesProvider } from '@mantine/dates';
+import 'dayjs/locale/fr';
 import { IconPlus, IconTrash, IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import {
@@ -31,6 +32,7 @@ import {
 } from '@/app/_actions/bankAccounts';
 import { handleAction } from '@/lib/action';
 import { format, addWeeks, subWeeks } from 'date-fns';
+import { fr } from 'date-fns/locale';
 import type { BankAccountWithRelations } from '@/types/bankAccounts';
 import type { BankAccountWeek, BankTransaction } from '@prisma/client';
 import { useRouter } from 'next/navigation';
@@ -284,7 +286,7 @@ export default function BankAccountPageClient({
     }
   };
 
-  const weekRange = `${format(week.weekStart, 'd MMM')} - ${format(week.weekEnd, 'd MMM yyyy')}`;
+  const weekRange = `${format(week.weekStart, 'd MMM', { locale: fr })} - ${format(week.weekEnd, 'd MMM yyyy', { locale: fr })}`;
 
   return (
     <Container size="xl" py="xl">
@@ -297,31 +299,33 @@ export default function BankAccountPageClient({
 
       <Paper shadow="sm" p="md" withBorder mb="md">
         <Stack gap="md">
-          <Group align="flex-end" wrap="nowrap">
-            <ActionIcon variant="light" onClick={handlePreviousWeek} disabled={loading} size="lg">
-              <IconChevronLeft size={20} />
-            </ActionIcon>
-            <DatePickerInput
-              value={weekDateValue}
-              onChange={(date) => {
-                const dateValue = date as unknown as Date | null;
-                setWeekDateValue(dateValue);
-                if (dateValue) {
-                  handleWeekChange(dateValue);
-                }
-              }}
-              label="Semaine"
-              placeholder="Sélectionner le lundi de la semaine"
-              style={{ flex: 1, minWidth: 200 }}
-              clearable={false}
-            />
-            <ActionIcon variant="light" onClick={handleNextWeek} disabled={loading} size="lg">
-              <IconChevronRight size={20} />
-            </ActionIcon>
-            <Text size="sm" c="dimmed" fw={500} style={{ minWidth: 150 }}>
-              {weekRange}
-            </Text>
-          </Group>
+          <DatesProvider settings={{ locale: 'fr' }}>
+            <Group align="flex-end" wrap="nowrap">
+              <ActionIcon variant="light" onClick={handlePreviousWeek} disabled={loading} size="lg">
+                <IconChevronLeft size={20} />
+              </ActionIcon>
+              <DatePickerInput
+                value={weekDateValue}
+                onChange={(date) => {
+                  const dateValue = date as unknown as Date | null;
+                  setWeekDateValue(dateValue);
+                  if (dateValue) {
+                    handleWeekChange(dateValue);
+                  }
+                }}
+                label="Semaine"
+                placeholder="Sélectionner le lundi de la semaine"
+                style={{ flex: 1, minWidth: 200 }}
+                clearable={false}
+              />
+              <ActionIcon variant="light" onClick={handleNextWeek} disabled={loading} size="lg">
+                <IconChevronRight size={20} />
+              </ActionIcon>
+              <Text size="sm" c="dimmed" fw={500} style={{ minWidth: 150 }}>
+                {weekRange}
+              </Text>
+            </Group>
+          </DatesProvider>
 
           <Group>
             <Text size="sm">
@@ -337,9 +341,10 @@ export default function BankAccountPageClient({
         </Stack>
       </Paper>
 
-      <Paper shadow="sm" withBorder>
-        <Table striped highlightOnHover>
-          <Table.Thead>
+      <DatesProvider settings={{ locale: 'fr' }}>
+        <Paper shadow="sm" withBorder>
+          <Table striped highlightOnHover>
+            <Table.Thead>
             <Table.Tr>
               <Table.Th style={{ width: 120 }}>Date</Table.Th>
               <Table.Th style={{ width: 150 }}>Type</Table.Th>
@@ -366,10 +371,10 @@ export default function BankAccountPageClient({
                           }
                         }}
                         size="xs"
-                        valueFormat="dd/MM/yyyy"
+                        valueFormat="DD/MM/YYYY"
                       />
                     ) : (
-                      format(new Date(transaction.date), 'dd/MM/yyyy')
+                      format(new Date(transaction.date), 'dd/MM/yyyy', { locale: fr })
                     )}
                   </Table.Td>
                   <Table.Td>
@@ -547,7 +552,7 @@ export default function BankAccountPageClient({
                       }
                     }}
                     size="xs"
-                    valueFormat="dd/MM/yyyy"
+                    valueFormat="MM/DD/YYYY"
                   />
                 </Table.Td>
                 <Table.Td>
@@ -661,7 +666,8 @@ export default function BankAccountPageClient({
             </Button>
           </Group>
         )}
-      </Paper>
+        </Paper>
+      </DatesProvider>
     </Container>
   );
 }
