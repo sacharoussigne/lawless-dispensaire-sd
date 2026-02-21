@@ -688,23 +688,6 @@ export async function createTransaction(data: {
       },
     });
 
-    // Sauvegarder les suggestions
-    if (validatedData.name) {
-      await prisma.transactionNameSuggestion.upsert({
-        where: { value: validatedData.name },
-        update: {},
-        create: { value: validatedData.name },
-      });
-    }
-
-    if (validatedData.description) {
-      await prisma.transactionDescriptionSuggestion.upsert({
-        where: { value: validatedData.description },
-        update: {},
-        create: { value: validatedData.description },
-      });
-    }
-
     // Recalculer le solde de la semaine
     await recalculateWeekBalance(validatedData.weekId);
 
@@ -780,23 +763,6 @@ export async function updateTransaction(data: {
       where: { id: validatedData.id },
       data: updateData,
     });
-
-    // Sauvegarder les suggestions
-    if (validatedData.name) {
-      await prisma.transactionNameSuggestion.upsert({
-        where: { value: validatedData.name },
-        update: {},
-        create: { value: validatedData.name },
-      });
-    }
-
-    if (validatedData.description) {
-      await prisma.transactionDescriptionSuggestion.upsert({
-        where: { value: validatedData.description },
-        update: {},
-        create: { value: validatedData.description },
-      });
-    }
 
     // Recalculer le solde de la semaine
     await recalculateWeekBalance(transaction.weekId);
@@ -959,5 +925,75 @@ export async function getDescriptionSuggestions() {
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la récupération des suggestions de descriptions');
+  }
+}
+
+/**
+ * Ajoute une suggestion de nom
+ */
+export async function addNameSuggestion(data: { value: string }) {
+  try {
+    const session = await getAuthSession();
+    if (!session) {
+      return {
+        status: 401,
+        error: 'Non autorisé',
+      };
+    }
+
+    if (!data.value || data.value.trim().length === 0) {
+      return {
+        status: 400,
+        error: 'Le nom ne peut pas être vide',
+      };
+    }
+
+    const suggestion = await prisma.transactionNameSuggestion.upsert({
+      where: { value: data.value.trim() },
+      update: {},
+      create: { value: data.value.trim() },
+    });
+
+    return {
+      status: 201,
+      data: suggestion.value,
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de l\'ajout de la suggestion de nom');
+  }
+}
+
+/**
+ * Ajoute une suggestion de description
+ */
+export async function addDescriptionSuggestion(data: { value: string }) {
+  try {
+    const session = await getAuthSession();
+    if (!session) {
+      return {
+        status: 401,
+        error: 'Non autorisé',
+      };
+    }
+
+    if (!data.value || data.value.trim().length === 0) {
+      return {
+        status: 400,
+        error: 'La description ne peut pas être vide',
+      };
+    }
+
+    const suggestion = await prisma.transactionDescriptionSuggestion.upsert({
+      where: { value: data.value.trim() },
+      update: {},
+      create: { value: data.value.trim() },
+    });
+
+    return {
+      status: 201,
+      data: suggestion.value,
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de l\'ajout de la suggestion de description');
   }
 }

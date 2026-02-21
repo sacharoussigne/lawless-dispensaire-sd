@@ -29,6 +29,8 @@ import {
   deleteTransaction,
   getNameSuggestions,
   getDescriptionSuggestions,
+  addNameSuggestion,
+  addDescriptionSuggestion,
 } from '@/app/_actions/bankAccounts';
 import { handleAction } from '@/lib/action';
 import { format, addWeeks, subWeeks } from 'date-fns';
@@ -96,6 +98,52 @@ export default function BankAccountPageClient({
       if (descData) setDescriptionSuggestions(descData);
     } catch (error) {
       // Ignore errors
+    }
+  };
+
+  const handleAddNameSuggestion = async (value: string) => {
+    if (!value || value.trim().length === 0) return;
+    
+    try {
+      const result = await addNameSuggestion({ value });
+      const data = handleAction(result);
+      if (data) {
+        setNameSuggestions([...nameSuggestions, data]);
+        notifications.show({
+          title: 'Succès',
+          message: 'Suggestion ajoutée',
+          color: 'green',
+        });
+      }
+    } catch (error: any) {
+      notifications.show({
+        title: 'Erreur',
+        message: error.message || 'Erreur lors de l\'ajout de la suggestion',
+        color: 'red',
+      });
+    }
+  };
+
+  const handleAddDescriptionSuggestion = async (value: string) => {
+    if (!value || value.trim().length === 0) return;
+    
+    try {
+      const result = await addDescriptionSuggestion({ value });
+      const data = handleAction(result);
+      if (data) {
+        setDescriptionSuggestions([...descriptionSuggestions, data]);
+        notifications.show({
+          title: 'Succès',
+          message: 'Suggestion ajoutée',
+          color: 'green',
+        });
+      }
+    } catch (error: any) {
+      notifications.show({
+        title: 'Erreur',
+        message: error.message || 'Erreur lors de l\'ajout de la suggestion',
+        color: 'red',
+      });
     }
   };
 
@@ -399,6 +447,22 @@ export default function BankAccountPageClient({
                           }
                         }}
                         size="xs"
+                        rightSection={
+                          editingTransactionData?.name &&
+                          editingTransactionData.name.trim().length > 0 &&
+                          !nameSuggestions.some(s => s.toLowerCase() === editingTransactionData.name?.toLowerCase().trim()) ? (
+                            <ActionIcon
+                              size="sm"
+                              variant="subtle"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAddNameSuggestion(editingTransactionData.name!);
+                              }}
+                            >
+                              <IconPlus size={14} />
+                            </ActionIcon>
+                          ) : null
+                        }
                       />
                     ) : (
                       transaction.name
@@ -415,6 +479,22 @@ export default function BankAccountPageClient({
                           }
                         }}
                         size="xs"
+                        rightSection={
+                          editingTransactionData?.description &&
+                          editingTransactionData.description.trim().length > 0 &&
+                          !descriptionSuggestions.some(s => s.toLowerCase() === editingTransactionData.description?.toLowerCase().trim()) ? (
+                            <ActionIcon
+                              size="sm"
+                              variant="subtle"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAddDescriptionSuggestion(editingTransactionData.description!);
+                              }}
+                            >
+                              <IconPlus size={14} />
+                            </ActionIcon>
+                          ) : null
+                        }
                       />
                     ) : (
                       transaction.description || '-'
@@ -548,6 +628,22 @@ export default function BankAccountPageClient({
                     }}
                     size="xs"
                     placeholder="Nom"
+                    rightSection={
+                      newTransaction.name &&
+                      newTransaction.name.trim().length > 0 &&
+                      !nameSuggestions.some(s => s.toLowerCase() === newTransaction.name?.toLowerCase().trim()) ? (
+                        <ActionIcon
+                          size="sm"
+                          variant="subtle"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAddNameSuggestion(newTransaction.name!);
+                          }}
+                        >
+                          <IconPlus size={14} />
+                        </ActionIcon>
+                      ) : null
+                    }
                   />
                 </Table.Td>
                 <Table.Td>
@@ -559,6 +655,22 @@ export default function BankAccountPageClient({
                     }}
                     size="xs"
                     placeholder="Description"
+                    rightSection={
+                      newTransaction.description &&
+                      newTransaction.description.trim().length > 0 &&
+                      !descriptionSuggestions.some(s => s.toLowerCase() === newTransaction.description?.toLowerCase().trim()) ? (
+                        <ActionIcon
+                          size="sm"
+                          variant="subtle"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAddDescriptionSuggestion(newTransaction.description!);
+                          }}
+                        >
+                          <IconPlus size={14} />
+                        </ActionIcon>
+                      ) : null
+                    }
                   />
                 </Table.Td>
                 <Table.Td>
