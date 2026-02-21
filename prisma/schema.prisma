@@ -21,6 +21,8 @@ model User {
   banExpires    DateTime?
   sessions      Session[]
   accounts      Account[]
+  bankAccounts  BankAccount[]
+  bankAccountAccesses BankAccountAccess[]
 
   @@unique([email])
   @@map("user")
@@ -293,4 +295,101 @@ model OrderLetterTemplateAssignment {
   @@index([letterTemplateId])
   @@index([orderType, orderStatus])
   @@map("order_letter_template_assignment")
+}
+
+enum BankAccountAccessType {
+  READ
+  WRITE
+}
+
+model BankAccount {
+  id        String   @id @default(uuid())
+  name      String
+  ownerId   String
+  owner     User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  accesses  BankAccountAccess[]
+  weeks     BankAccountWeek[]
+
+  @@index([ownerId])
+  @@map("bank_account")
+}
+
+model BankAccountAccess {
+  id        String   @id @default(uuid())
+  accountId String
+  account   BankAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessType BankAccountAccessType
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([accountId, userId])
+  @@index([accountId])
+  @@index([userId])
+  @@map("bank_account_access")
+}
+
+model BankAccountWeek {
+  id        String   @id @default(uuid())
+  accountId String
+  account   BankAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  weekStart DateTime // Lundi de la semaine
+  weekEnd   DateTime // Dimanche de la semaine
+  balance   Decimal  @default(0) @db.Decimal(10, 2) // Solde de fin de semaine
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  transactions BankTransaction[]
+
+  @@unique([accountId, weekStart])
+  @@index([accountId])
+  @@index([weekStart])
+  @@map("bank_account_week")
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  TRANSFER_IN
+  TRANSFER_OUT
+}
+
+model BankTransaction {
+  id          String   @id @default(uuid())
+  weekId      String
+  week        BankAccountWeek @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  date        DateTime
+  type        TransactionType
+  name        String
+  description String?
+  amount      Decimal  @db.Decimal(10, 2)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([weekId])
+  @@index([date])
+  @@map("bank_transaction")
+}
+
+model TransactionNameSuggestion {
+  id        String   @id @default(uuid())
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([value])
+  @@map("transaction_name_suggestion")
+}
+
+model TransactionDescriptionSuggestion {
+  id        String   @id @default(uuid())
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([value])
+  @@map("transaction_description_suggestion")
 }

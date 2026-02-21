@@ -52,6 +52,7 @@ export const config = {
     '/inventory/:path*',
     '/orders/:path*',
     '/stock/:path*',
+    '/bank/:path*',
     '/management/:path*',
   ],
 };
