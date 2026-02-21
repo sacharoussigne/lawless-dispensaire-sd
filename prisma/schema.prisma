@@ -364,8 +364,7 @@ model BankTransaction {
   type        TransactionType
   name        String
   description String?
-  credit      Decimal? @db.Decimal(10, 2)
-  debit       Decimal? @db.Decimal(10, 2)
+  amount      Decimal  @db.Decimal(10, 2)
   order       Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

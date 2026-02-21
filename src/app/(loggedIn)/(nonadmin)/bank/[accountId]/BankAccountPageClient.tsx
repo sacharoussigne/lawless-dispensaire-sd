@@ -67,8 +67,7 @@ export default function BankAccountPageClient({
     type?: string;
     name?: string;
     description?: string;
-    credit?: number;
-    debit?: number;
+    amount?: number;
     order?: number;
   } | null>(null);
   const [newTransaction, setNewTransaction] = useState<{
@@ -76,8 +75,7 @@ export default function BankAccountPageClient({
     type?: string;
     name?: string;
     description?: string;
-    credit?: number;
-    debit?: number;
+    amount?: number;
     order?: number;
   } | null>(null);
 
@@ -162,11 +160,12 @@ export default function BankAccountPageClient({
   const transactionsWithBalance = useMemo(() => {
     let runningBalance = previousBalance;
     return week.transactions.map((transaction) => {
-      if (transaction.credit) {
-        runningBalance += Number(transaction.credit);
-      }
-      if (transaction.debit) {
-        runningBalance -= Number(transaction.debit);
+      const amount = Number(transaction.amount);
+      if (transaction.type === 'DEPOSIT' || transaction.type === 'TRANSFER_IN') {
+        runningBalance += amount;
+      } else {
+        // WITHDRAWAL ou TRANSFER_OUT
+        runningBalance -= amount;
       }
       return {
         ...transaction,
@@ -187,8 +186,7 @@ export default function BankAccountPageClient({
     type?: string;
     name?: string;
     description?: string | null;
-    credit?: number;
-    debit?: number;
+    amount?: number;
     order?: number;
   }) => {
     try {
@@ -201,8 +199,7 @@ export default function BankAccountPageClient({
           type: transaction.type as any,
           name: transaction.name,
           description: transaction.description || undefined,
-          credit: transaction.credit,
-          debit: transaction.debit,
+          amount: transaction.amount,
           order: transaction.order,
         });
         const data = handleAction(result);
@@ -233,8 +230,7 @@ export default function BankAccountPageClient({
           type: transaction.type as any,
           name: transaction.name!,
           description: transaction.description || undefined,
-          credit: transaction.credit,
-          debit: transaction.debit,
+          amount: transaction.amount!,
           order: transaction.order || 0,
         });
         const data = handleAction(result);
@@ -350,8 +346,7 @@ export default function BankAccountPageClient({
               <Table.Th style={{ width: 150 }}>Type</Table.Th>
               <Table.Th style={{ width: 200 }}>Nom</Table.Th>
               <Table.Th style={{ width: 200 }}>Description</Table.Th>
-              <Table.Th style={{ width: 100 }}>Crédit</Table.Th>
-              <Table.Th style={{ width: 100 }}>Débit</Table.Th>
+              <Table.Th style={{ width: 120 }}>Montant</Table.Th>
               <Table.Th style={{ width: 120 }}>Solde restant</Table.Th>
               <Table.Th style={{ width: 80 }}>Actions</Table.Th>
             </Table.Tr>
@@ -428,13 +423,12 @@ export default function BankAccountPageClient({
                   <Table.Td>
                     {isEditing ? (
                       <NumberInput
-                        value={editingTransactionData?.credit ? Number(editingTransactionData.credit) : (transaction.credit ? Number(transaction.credit) : undefined)}
+                        value={editingTransactionData?.amount !== undefined ? Number(editingTransactionData.amount) : Number(transaction.amount)}
                         onChange={(value) => {
                           if (editingTransactionData) {
                             setEditingTransactionData({
                               ...editingTransactionData,
-                              credit: value ? Number(value) : undefined,
-                              debit: undefined,
+                              amount: value ? Number(value) : undefined,
                             });
                           }
                         }}
@@ -443,28 +437,9 @@ export default function BankAccountPageClient({
                         decimalScale={2}
                       />
                     ) : (
-                      transaction.credit ? Number(transaction.credit).toFixed(2) : '-'
-                    )}
-                  </Table.Td>
-                  <Table.Td>
-                    {isEditing ? (
-                      <NumberInput
-                        value={editingTransactionData?.debit ? Number(editingTransactionData.debit) : (transaction.debit ? Number(transaction.debit) : undefined)}
-                        onChange={(value) => {
-                          if (editingTransactionData) {
-                            setEditingTransactionData({
-                              ...editingTransactionData,
-                              debit: value ? Number(value) : undefined,
-                              credit: undefined,
-                            });
-                          }
-                        }}
-                        size="xs"
-                        min={0}
-                        decimalScale={2}
-                      />
-                    ) : (
-                      transaction.debit ? Number(transaction.debit).toFixed(2) : '-'
+                      <Text size="sm" c={transaction.type === 'DEPOSIT' || transaction.type === 'TRANSFER_IN' ? 'green' : 'red'}>
+                        {(transaction.type === 'DEPOSIT' || transaction.type === 'TRANSFER_IN' ? '+' : '-') + Number(transaction.amount).toFixed(2)} $
+                      </Text>
                     )}
                   </Table.Td>
                   <Table.Td>
@@ -486,8 +461,7 @@ export default function BankAccountPageClient({
                               type: editingTransactionData.type || transaction.type,
                               name: editingTransactionData.name || transaction.name,
                               description: editingTransactionData.description !== undefined ? editingTransactionData.description : (transaction.description || null),
-                              credit: editingTransactionData.credit !== undefined ? editingTransactionData.credit : (transaction.credit ? Number(transaction.credit) : undefined),
-                              debit: editingTransactionData.debit !== undefined ? editingTransactionData.debit : (transaction.debit ? Number(transaction.debit) : undefined),
+                              amount: editingTransactionData.amount !== undefined ? editingTransactionData.amount : Number(transaction.amount),
                               order: editingTransactionData.order !== undefined ? editingTransactionData.order : transaction.order,
                             });
                           }
@@ -517,8 +491,7 @@ export default function BankAccountPageClient({
           type: transaction.type,
           name: transaction.name,
           description: transaction.description ? transaction.description : undefined,
-          credit: transaction.credit ? Number(transaction.credit) : undefined,
-          debit: transaction.debit ? Number(transaction.debit) : undefined,
+          amount: Number(transaction.amount),
           order: transaction.order,
         });
                           }}
@@ -590,28 +563,11 @@ export default function BankAccountPageClient({
                 </Table.Td>
                 <Table.Td>
                   <NumberInput
-                    value={newTransaction.credit ? Number(newTransaction.credit) : undefined}
+                    value={newTransaction.amount ? Number(newTransaction.amount) : undefined}
                     onChange={(value) => {
                       setNewTransaction({
                         ...newTransaction,
-                        credit: value ? Number(value) : undefined,
-                        debit: undefined,
-                      });
-                    }}
-                    size="xs"
-                    min={0}
-                    decimalScale={2}
-                    placeholder="0.00"
-                  />
-                </Table.Td>
-                <Table.Td>
-                  <NumberInput
-                    value={newTransaction.debit ? Number(newTransaction.debit) : undefined}
-                    onChange={(value) => {
-                      setNewTransaction({
-                        ...newTransaction,
-                        debit: value ? Number(value) : undefined,
-                        credit: undefined,
+                        amount: value ? Number(value) : undefined,
                       });
                     }}
                     size="xs"
@@ -628,7 +584,7 @@ export default function BankAccountPageClient({
                       onClick={() => {
                         handleSaveTransaction(newTransaction);
                       }}
-                      disabled={!newTransaction.date || !newTransaction.type || !newTransaction.name}
+                      disabled={!newTransaction.date || !newTransaction.type || !newTransaction.name || !newTransaction.amount}
                     >
                       Enregistrer
                     </Button>
@@ -656,8 +612,7 @@ export default function BankAccountPageClient({
                   type: 'DEPOSIT',
                   name: '',
                   description: '',
-                  credit: undefined,
-                  debit: undefined,
+                  amount: undefined,
                   order: week.transactions.length,
                 });
               }}

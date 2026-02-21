@@ -36,8 +36,7 @@ const createTransactionSchema = z.object({
   type: z.enum(['DEPOSIT', 'WITHDRAWAL', 'TRANSFER_IN', 'TRANSFER_OUT']),
   name: z.string().min(1, 'Le nom est requis'),
   description: z.string().optional(),
-  credit: z.number().nonnegative('Le crédit doit être positif ou nul').optional(),
-  debit: z.number().nonnegative('Le débit doit être positif ou nul').optional(),
+  amount: z.number().positive('Le montant doit être positif'),
   order: z.number().int().default(0),
 });
 
@@ -47,8 +46,7 @@ const updateTransactionSchema = z.object({
   type: z.enum(['DEPOSIT', 'WITHDRAWAL', 'TRANSFER_IN', 'TRANSFER_OUT']).optional(),
   name: z.string().min(1, 'Le nom est requis').optional(),
   description: z.string().optional(),
-  credit: z.number().nonnegative('Le crédit doit être positif ou nul').optional(),
-  debit: z.number().nonnegative('Le débit doit être positif ou nul').optional(),
+  amount: z.number().positive('Le montant doit être positif').optional(),
   order: z.number().int().optional(),
 });
 
@@ -639,8 +637,7 @@ export async function createTransaction(data: {
   type: 'DEPOSIT' | 'WITHDRAWAL' | 'TRANSFER_IN' | 'TRANSFER_OUT';
   name: string;
   description?: string;
-  credit?: number;
-  debit?: number;
+  amount: number;
   order?: number;
 }) {
   try {
@@ -677,25 +674,6 @@ export async function createTransaction(data: {
       };
     }
 
-    // Valider que credit ou debit est fourni selon le type
-    if (validatedData.type === 'DEPOSIT' || validatedData.type === 'TRANSFER_IN') {
-      if (!validatedData.credit || validatedData.credit <= 0) {
-        return {
-          status: 400,
-          error: 'Un crédit est requis pour ce type de transaction',
-        };
-      }
-      validatedData.debit = undefined;
-    } else {
-      if (!validatedData.debit || validatedData.debit <= 0) {
-        return {
-          status: 400,
-          error: 'Un débit est requis pour ce type de transaction',
-        };
-      }
-      validatedData.credit = undefined;
-    }
-
     const date = typeof validatedData.date === 'string' ? parseISO(validatedData.date) : validatedData.date;
 
     const transaction = await prisma.bankTransaction.create({
@@ -705,8 +683,7 @@ export async function createTransaction(data: {
         type: validatedData.type,
         name: validatedData.name,
         description: validatedData.description,
-        credit: validatedData.credit,
-        debit: validatedData.debit,
+        amount: validatedData.amount,
         order: validatedData.order || 0,
       },
     });
@@ -749,8 +726,7 @@ export async function updateTransaction(data: {
   type?: 'DEPOSIT' | 'WITHDRAWAL' | 'TRANSFER_IN' | 'TRANSFER_OUT';
   name?: string;
   description?: string;
-  credit?: number;
-  debit?: number;
+  amount?: number;
   order?: number;
 }) {
   try {
@@ -790,24 +766,6 @@ export async function updateTransaction(data: {
       };
     }
 
-    // Valider credit/debit selon le type
-    const type = validatedData.type || transaction.type;
-    if (type === 'DEPOSIT' || type === 'TRANSFER_IN') {
-      if (validatedData.debit !== undefined && validatedData.debit > 0) {
-        return {
-          status: 400,
-          error: 'Un crédit est requis pour ce type de transaction',
-        };
-      }
-    } else {
-      if (validatedData.credit !== undefined && validatedData.credit > 0) {
-        return {
-          status: 400,
-          error: 'Un débit est requis pour ce type de transaction',
-        };
-      }
-    }
-
     const updateData: any = {};
     if (validatedData.date !== undefined) {
       updateData.date = typeof validatedData.date === 'string' ? parseISO(validatedData.date) : validatedData.date;
@@ -815,8 +773,7 @@ export async function updateTransaction(data: {
     if (validatedData.type !== undefined) updateData.type = validatedData.type;
     if (validatedData.name !== undefined) updateData.name = validatedData.name;
     if (validatedData.description !== undefined) updateData.description = validatedData.description;
-    if (validatedData.credit !== undefined) updateData.credit = validatedData.credit;
-    if (validatedData.debit !== undefined) updateData.debit = validatedData.debit;
+    if (validatedData.amount !== undefined) updateData.amount = validatedData.amount;
     if (validatedData.order !== undefined) updateData.order = validatedData.order;
 
     const updatedTransaction = await prisma.bankTransaction.update({
@@ -943,13 +900,14 @@ async function recalculateWeekBalance(weekId: string) {
 
   let balance = previousWeek ? Number(previousWeek.balance) : 0;
 
-  // Calculer le solde en additionnant/soustrayant les transactions
+  // Calculer le solde en additionnant/soustrayant les transactions selon le type
   for (const transaction of week.transactions) {
-    if (transaction.credit) {
-      balance += Number(transaction.credit);
-    }
-    if (transaction.debit) {
-      balance -= Number(transaction.debit);
+    const amount = Number(transaction.amount);
+    if (transaction.type === 'DEPOSIT' || transaction.type === 'TRANSFER_IN') {
+      balance += amount;
+    } else {
+      // WITHDRAWAL ou TRANSFER_OUT
+      balance -= amount;
     }
   }
 
