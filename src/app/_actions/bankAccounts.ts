@@ -574,9 +574,18 @@ export async function getOrCreateWeek(accountId: string, date: Date) {
       });
     }
 
+    const serializedWeek = {
+      ...week,
+      balance: Number(week.balance),
+      transactions: week.transactions.map((transaction) => ({
+        ...transaction,
+        amount: Number(transaction.amount),
+      })),
+    };
+
     return {
       status: 200,
-      data: week,
+      data: serializedWeek,
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la récupération de la semaine');
@@ -619,9 +628,18 @@ export async function getAccountWeeks(accountId: string) {
       },
     });
 
+    const serializedWeeks = weeks.map((week) => ({
+      ...week,
+      balance: Number(week.balance),
+      transactions: week.transactions.map((transaction) => ({
+        ...transaction,
+        amount: Number(transaction.amount),
+      })),
+    }));
+
     return {
       status: 200,
-      data: weeks,
+      data: serializedWeeks,
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la récupération des semaines');

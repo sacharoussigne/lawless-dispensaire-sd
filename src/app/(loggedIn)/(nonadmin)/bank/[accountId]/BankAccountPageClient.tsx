@@ -8,7 +8,6 @@ import {
   Button,
   Paper,
   Table,
-  TextInput,
   NumberInput,
   Select,
   ActionIcon,
@@ -28,7 +27,6 @@ import {
   IconArrowDown,
   IconArrowUp,
   IconTransfer,
-  IconWallet,
   IconEdit,
 } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
@@ -422,42 +420,48 @@ export default function BankAccountPageClient({
         <Paper shadow="sm" p="lg" withBorder radius="md">
           <Stack gap="lg">
             <DatesProvider settings={{ locale: 'fr' }}>
-              <Group align="flex-end" wrap="nowrap" gap="sm">
+              <Group align="center" wrap="nowrap" gap="md">
                 <ActionIcon 
                   variant="light" 
                   onClick={handlePreviousWeek} 
                   disabled={loading} 
-                  size="lg"
+                  size="md"
                   radius="md"
                 >
-                  <IconChevronLeft size={20} />
+                  <IconChevronLeft size={18} />
                 </ActionIcon>
-                <DatePickerInput
-                  value={weekDateValue}
-                  onChange={(date) => {
-                    const dateValue = date as unknown as Date | null;
-                    setWeekDateValue(dateValue);
-                    if (dateValue) {
-                      handleWeekChange(dateValue);
-                    }
-                  }}
-                  label="Semaine"
-                  placeholder="Sélectionner le lundi de la semaine"
-                  style={{ flex: 1, minWidth: 200 }}
-                  clearable={false}
-                  radius="md"
-                />
+                <Group gap="xs" align="center">
+                  <Text size="sm" fw={500} c="dimmed" style={{ whiteSpace: 'nowrap' }}>
+                    Semaine du
+                  </Text>
+                  <DatePickerInput
+                    value={weekDateValue}
+                    onChange={(date) => {
+                      const dateValue = date as unknown as Date | null;
+                      setWeekDateValue(dateValue);
+                      if (dateValue) {
+                        handleWeekChange(dateValue);
+                      }
+                    }}
+                    placeholder="Sélectionner le lundi"
+                    valueFormat="D MMMM YYYY"
+                    style={{ width: 180 }}
+                    clearable={false}
+                    radius="md"
+                    size="sm"
+                  />
+                </Group>
                 <ActionIcon 
                   variant="light" 
                   onClick={handleNextWeek} 
                   disabled={loading} 
-                  size="lg"
+                  size="md"
                   radius="md"
                 >
-                  <IconChevronRight size={20} />
+                  <IconChevronRight size={18} />
                 </ActionIcon>
-                <div style={{ minWidth: 180 }}>
-                  <Text size="xs" c="dimmed" mb={4}>Période</Text>
+                <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
+                  <Text size="xs" c="dimmed" mb={2}>Période</Text>
                   <Text size="sm" fw={500}>{weekRange}</Text>
                 </div>
               </Group>
@@ -530,6 +534,7 @@ export default function BankAccountPageClient({
                       <DateInput
                         value={editingTransactionData?.date ? new Date(editingTransactionData.date) : new Date(transaction.date)}
                         onChange={(date) => {
+                            console.log(date)
                           if (date && editingTransactionData) {
                             setEditingTransactionData({ ...editingTransactionData, date: date as any });
                           }
