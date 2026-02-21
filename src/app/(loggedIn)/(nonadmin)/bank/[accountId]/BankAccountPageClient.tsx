@@ -31,6 +31,8 @@ import {
   getDescriptionSuggestions,
   addNameSuggestion,
   addDescriptionSuggestion,
+  deleteNameSuggestion,
+  deleteDescriptionSuggestion,
 } from '@/app/_actions/bankAccounts';
 import { handleAction } from '@/lib/action';
 import { format, addWeeks, subWeeks } from 'date-fns';
@@ -142,6 +144,54 @@ export default function BankAccountPageClient({
       notifications.show({
         title: 'Erreur',
         message: error.message || 'Erreur lors de l\'ajout de la suggestion',
+        color: 'red',
+      });
+    }
+  };
+
+  const handleDeleteNameSuggestion = async (value: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!value || value.trim().length === 0) return;
+    
+    try {
+      const result = await deleteNameSuggestion({ value });
+      const data = handleAction(result);
+      if (data) {
+        setNameSuggestions(nameSuggestions.filter(s => s.toLowerCase() !== value.toLowerCase().trim()));
+        notifications.show({
+          title: 'Succès',
+          message: 'Suggestion supprimée',
+          color: 'green',
+        });
+      }
+    } catch (error: any) {
+      notifications.show({
+        title: 'Erreur',
+        message: error.message || 'Erreur lors de la suppression de la suggestion',
+        color: 'red',
+      });
+    }
+  };
+
+  const handleDeleteDescriptionSuggestion = async (value: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!value || value.trim().length === 0) return;
+    
+    try {
+      const result = await deleteDescriptionSuggestion({ value });
+      const data = handleAction(result);
+      if (data) {
+        setDescriptionSuggestions(descriptionSuggestions.filter(s => s.toLowerCase() !== value.toLowerCase().trim()));
+        notifications.show({
+          title: 'Succès',
+          message: 'Suggestion supprimée',
+          color: 'green',
+        });
+      }
+    } catch (error: any) {
+      notifications.show({
+        title: 'Erreur',
+        message: error.message || 'Erreur lors de la suppression de la suggestion',
         color: 'red',
       });
     }
@@ -447,6 +497,19 @@ export default function BankAccountPageClient({
                           }
                         }}
                         size="xs"
+                        renderOption={({ option }) => (
+                          <Group justify="space-between" style={{ flex: 1 }}>
+                            <Text size="xs" style={{ flex: 1 }}>{option.value}</Text>
+                            <ActionIcon
+                              size="xs"
+                              variant="subtle"
+                              color="red"
+                              onClick={(e) => handleDeleteNameSuggestion(option.value, e)}
+                            >
+                              <IconTrash size={12} />
+                            </ActionIcon>
+                          </Group>
+                        )}
                         rightSection={
                           editingTransactionData?.name &&
                           editingTransactionData.name.trim().length > 0 &&
@@ -479,6 +542,19 @@ export default function BankAccountPageClient({
                           }
                         }}
                         size="xs"
+                        renderOption={({ option }) => (
+                          <Group justify="space-between" style={{ flex: 1 }}>
+                            <Text size="xs" style={{ flex: 1 }}>{option.value}</Text>
+                            <ActionIcon
+                              size="xs"
+                              variant="subtle"
+                              color="red"
+                              onClick={(e) => handleDeleteDescriptionSuggestion(option.value, e)}
+                            >
+                              <IconTrash size={12} />
+                            </ActionIcon>
+                          </Group>
+                        )}
                         rightSection={
                           editingTransactionData?.description &&
                           editingTransactionData.description.trim().length > 0 &&
@@ -628,6 +704,19 @@ export default function BankAccountPageClient({
                     }}
                     size="xs"
                     placeholder="Nom"
+                    renderOption={({ option }) => (
+                      <Group justify="space-between" style={{ flex: 1 }}>
+                        <Text size="xs" style={{ flex: 1 }}>{option.value}</Text>
+                        <ActionIcon
+                          size="xs"
+                          variant="subtle"
+                          color="red"
+                          onClick={(e) => handleDeleteNameSuggestion(option.value, e)}
+                        >
+                          <IconTrash size={12} />
+                        </ActionIcon>
+                      </Group>
+                    )}
                     rightSection={
                       newTransaction.name &&
                       newTransaction.name.trim().length > 0 &&
@@ -655,6 +744,19 @@ export default function BankAccountPageClient({
                     }}
                     size="xs"
                     placeholder="Description"
+                    renderOption={({ option }) => (
+                      <Group justify="space-between" style={{ flex: 1 }}>
+                        <Text size="xs" style={{ flex: 1 }}>{option.value}</Text>
+                        <ActionIcon
+                          size="xs"
+                          variant="subtle"
+                          color="red"
+                          onClick={(e) => handleDeleteDescriptionSuggestion(option.value, e)}
+                        >
+                          <IconTrash size={12} />
+                        </ActionIcon>
+                      </Group>
+                    )}
                     rightSection={
                       newTransaction.description &&
                       newTransaction.description.trim().length > 0 &&

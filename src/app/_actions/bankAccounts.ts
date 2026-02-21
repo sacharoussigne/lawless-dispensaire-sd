@@ -997,3 +997,69 @@ export async function addDescriptionSuggestion(data: { value: string }) {
     return actionErrorParser(error, 'Erreur lors de l\'ajout de la suggestion de description');
   }
 }
+
+/**
+ * Supprime une suggestion de nom
+ */
+export async function deleteNameSuggestion(data: { value: string }) {
+  try {
+    const session = await getAuthSession();
+    if (!session) {
+      return {
+        status: 401,
+        error: 'Non autorisé',
+      };
+    }
+
+    if (!data.value || data.value.trim().length === 0) {
+      return {
+        status: 400,
+        error: 'Le nom ne peut pas être vide',
+      };
+    }
+
+    await prisma.transactionNameSuggestion.delete({
+      where: { value: data.value.trim() },
+    });
+
+    return {
+      status: 200,
+      data: { success: true },
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de la suppression de la suggestion de nom');
+  }
+}
+
+/**
+ * Supprime une suggestion de description
+ */
+export async function deleteDescriptionSuggestion(data: { value: string }) {
+  try {
+    const session = await getAuthSession();
+    if (!session) {
+      return {
+        status: 401,
+        error: 'Non autorisé',
+      };
+    }
+
+    if (!data.value || data.value.trim().length === 0) {
+      return {
+        status: 400,
+        error: 'La description ne peut pas être vide',
+      };
+    }
+
+    await prisma.transactionDescriptionSuggestion.delete({
+      where: { value: data.value.trim() },
+    });
+
+    return {
+      status: 200,
+      data: { success: true },
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de la suppression de la suggestion de description');
+  }
+}
