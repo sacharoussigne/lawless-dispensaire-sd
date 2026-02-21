@@ -877,7 +877,7 @@ export default function BankAccountPageClient({
 
             {newTransaction && (
               <Table.Tr>
-                <Table.Td>
+                <Table.Td style={{ padding: '16px' }}>
                   <DateInput
                     value={newTransaction.date ? new Date(newTransaction.date) : new Date()}
                     onChange={(date) => {
@@ -889,9 +889,9 @@ export default function BankAccountPageClient({
                     valueFormat="MM/DD/YYYY"
                   />
                 </Table.Td>
-                <Table.Td>
+                <Table.Td style={{ padding: '16px' }}>
                   <Select
-                    data={transactionTypeOptions}
+                    data={transactionTypeOptions.map(opt => ({ value: opt.value, label: opt.label }))}
                     value={newTransaction.type}
                     onChange={(value) => {
                       setNewTransaction({ ...newTransaction, type: value as any });
@@ -900,7 +900,7 @@ export default function BankAccountPageClient({
                     placeholder="Type"
                   />
                 </Table.Td>
-                <Table.Td>
+                <Table.Td style={{ padding: '16px' }}>
                   <Autocomplete
                     data={nameSuggestions}
                     value={newTransaction.name || ''}
@@ -940,7 +940,7 @@ export default function BankAccountPageClient({
                     }
                   />
                 </Table.Td>
-                <Table.Td>
+                <Table.Td style={{ padding: '16px' }}>
                   <Autocomplete
                     data={descriptionSuggestions}
                     value={newTransaction.description || ''}
@@ -980,7 +980,7 @@ export default function BankAccountPageClient({
                     }
                   />
                 </Table.Td>
-                <Table.Td>
+                <Table.Td style={{ padding: '16px', textAlign: 'right' }}>
                   <NumberInput
                     value={newTransaction.amount ? Number(newTransaction.amount) : undefined}
                     onChange={(value) => {
@@ -993,11 +993,14 @@ export default function BankAccountPageClient({
                     min={0}
                     decimalScale={2}
                     placeholder="0.00"
+                    style={{ width: '100%' }}
                   />
                 </Table.Td>
-                <Table.Td>-</Table.Td>
-                <Table.Td>
-                  <Group gap="xs">
+                <Table.Td style={{ padding: '16px', textAlign: 'right' }}>
+                  <Text size="sm" c="dimmed">-</Text>
+                </Table.Td>
+                <Table.Td style={{ padding: '16px', textAlign: 'center' }}>
+                  <Group gap="xs" justify="center" wrap="nowrap">
                     <Button
                       size="xs"
                       onClick={() => {
@@ -1009,7 +1012,7 @@ export default function BankAccountPageClient({
                     </Button>
                     <Button
                       size="xs"
-                      variant="default"
+                      variant="subtle"
                       onClick={() => setNewTransaction(null)}
                     >
                       Annuler

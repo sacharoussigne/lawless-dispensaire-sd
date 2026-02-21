@@ -17,6 +17,7 @@ import { notifications } from '@mantine/notifications';
 import {
   createBankAccountAccess,
   deleteBankAccountAccess,
+  getBankAccount,
 } from '@/app/_actions/bankAccounts';
 import { listUsers } from '@/app/_actions/users';
 import { handleAction } from '@/lib/action';
@@ -36,6 +37,7 @@ export function ManageAccessModal({
   account,
   onSuccess,
 }: ManageAccessModalProps) {
+  const [localAccount, setLocalAccount] = useState<BankAccountWithRelations | null>(account);
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [accessType, setAccessType] = useState<'READ' | 'WRITE'>('READ');
@@ -43,22 +45,36 @@ export function ManageAccessModal({
 
   useEffect(() => {
     if (opened && account) {
-      loadUsers();
+      setLocalAccount(account);
+      loadUsers(account);
     }
   }, [opened, account]);
 
-  const loadUsers = async () => {
+  const reloadAccount = async () => {
+    if (!localAccount) return;
+    try {
+      const result = await getBankAccount(localAccount.id);
+      const data = handleAction(result);
+      if (data) {
+        setLocalAccount(data);
+        loadUsers(data);
+      }
+    } catch (error) {
+      // Ignore
+    }
+  };
+
+  const loadUsers = async (accountToUse: BankAccountWithRelations) => {
     try {
       const result = await listUsers();
       const data = handleAction(result);
-      if (data) {
-        // Filtrer les utilisateurs qui n'ont pas déjà accès et qui ne sont pas le propriétaire
-        const filteredUsers = data.users.filter(
-          (user: User) =>
-            user.id !== account?.ownerId &&
-            !account?.accesses.some((access) => access.userId === user.id)
+      if (data && accountToUse) {
+        const filteredUsers = (data.users || []).filter(
+          (user: any) =>
+            user.id !== accountToUse.ownerId &&
+            !accountToUse.accesses.some((access) => access.userId === user.id)
         );
-        setUsers(filteredUsers);
+        setUsers(filteredUsers as User[]);
       }
     } catch (error: any) {
       notifications.show({
@@ -70,12 +86,12 @@ export function ManageAccessModal({
   };
 
   const handleAddAccess = async () => {
-    if (!account || !selectedUserId) return;
+    if (!localAccount || !selectedUserId) return;
 
     try {
       setLoading(true);
       const result = await createBankAccountAccess({
-        accountId: account.id,
+        accountId: localAccount.id,
         userId: selectedUserId,
         accessType,
       });
@@ -89,6 +105,7 @@ export function ManageAccessModal({
         });
         setSelectedUserId(null);
         setAccessType('READ');
+        await reloadAccount();
         onSuccess();
       }
     } catch (error: any) {
@@ -103,7 +120,7 @@ export function ManageAccessModal({
   };
 
   const handleDeleteAccess = async (accessId: string) => {
-    if (!account) return;
+    if (!localAccount) return;
 
     try {
       setLoading(true);
@@ -118,6 +135,7 @@ export function ManageAccessModal({
           message: 'Accès supprimé avec succès',
           color: 'green',
         });
+        await reloadAccount();
         onSuccess();
       }
     } catch (error: any) {
@@ -131,7 +149,7 @@ export function ManageAccessModal({
     }
   };
 
-  if (!account) return null;
+  if (!localAccount) return null;
 
   const userOptions = users.map((user) => ({
     value: user.id,
@@ -177,7 +195,7 @@ export function ManageAccessModal({
           </Button>
         </Group>
 
-        {account.accesses.length > 0 && (
+        {localAccount.accesses.length > 0 && (
           <>
             <Text size="sm" fw={500} mt="md">
               Accès existants
@@ -191,7 +209,7 @@ export function ManageAccessModal({
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {account.accesses.map((access) => (
+                {localAccount.accesses.map((access) => (
                   <Table.Tr key={access.id}>
                     <Table.Td>
                       {access.user.name} ({access.user.email})
@@ -220,7 +238,7 @@ export function ManageAccessModal({
           </>
         )}
 
-        {account.accesses.length === 0 && (
+        {localAccount.accesses.length === 0 && (
           <Text size="sm" c="dimmed" ta="center" py="md">
             Aucun accès partagé
           </Text>

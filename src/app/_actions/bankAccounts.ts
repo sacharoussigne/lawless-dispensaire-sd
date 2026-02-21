@@ -22,7 +22,7 @@ const deleteBankAccountSchema = z.object({
 
 const createBankAccountAccessSchema = z.object({
   accountId: z.string().uuid('ID de compte invalide'),
-  userId: z.string().uuid('ID d\'utilisateur invalide'),
+  userId: z.string().min(1, 'ID d\'utilisateur requis'),
   accessType: z.enum(['READ', 'WRITE']),
 });
 
