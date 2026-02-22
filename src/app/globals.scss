@@ -1,8 +1,14 @@
 @import "tailwindcss";
+@import '@mantine/dates/styles.css';
 
 .modal-title {
   h2 {
     font-size: 1.5rem;
     margin-bottom: 1rem;
   }
+}
+
+.mantine-DatePickerInput-day:where([data-selected]), .mantine-DateInput-day:where([data-selected])  {
+  background-color: var(--mantine-primary-color-filled-hover) !important;
+  color: #fff !important;
 }

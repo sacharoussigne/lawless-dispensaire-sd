@@ -72,12 +72,12 @@ export default function Header({
                   >
                     Recherche
                   </Link>
-                  {/* <Link
-                    href={routes.test.index}
+                  <Link
+                    href={routes.bank.index}
                     className={classes.link}
                   >
-                    Compte
-                  </Link> */}
+                    Banque
+                  </Link>
                   <Menu
                     width={260}
                     position="bottom-end"
