@@ -53,9 +53,14 @@ import type { BankAccountWeek, BankTransaction } from '@prisma/client';
 import { useRouter } from 'next/navigation';
 import { routes } from '@/types/routes';
 
+type SerializedBankAccountWeek = Omit<BankAccountWeek, 'balance'> & {
+  balance: number;
+  transactions: Array<Omit<BankTransaction, 'amount'> & { amount: number }>;
+};
+
 interface BankAccountPageClientProps {
   account: BankAccountWithRelations;
-  initialWeek: BankAccountWeek & { transactions: BankTransaction[] };
+  initialWeek: SerializedBankAccountWeek;
 }
 
 const transactionTypeOptions = [
@@ -74,8 +79,8 @@ export default function BankAccountPageClient({
   initialWeek,
 }: BankAccountPageClientProps) {
   const router = useRouter();
-  const [week, setWeek] = useState(initialWeek);
-  const [weeks, setWeeks] = useState<Array<BankAccountWeek & { transactions: BankTransaction[] }>>([]);
+  const [week, setWeek] = useState<SerializedBankAccountWeek>(initialWeek);
+  const [weeks, setWeeks] = useState<SerializedBankAccountWeek[]>([]);
   const [loading, setLoading] = useState(false);
   const [nameSuggestions, setNameSuggestions] = useState<string[]>([]);
   const [descriptionSuggestions, setDescriptionSuggestions] = useState<string[]>([]);
