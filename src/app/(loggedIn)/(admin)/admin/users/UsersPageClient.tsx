@@ -8,7 +8,7 @@ import {
   Button,
 } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
-import { listUsers } from '@/app/_actions/users';
+import { listUsers, impersonateUser } from '@/app/_actions/users';
 import { handleAction } from '@/lib/action';
 import { notifications } from '@mantine/notifications';
 import { UserModal } from './components/UserModal';
@@ -18,7 +18,6 @@ import { UsersTable } from './components/UsersTable';
 import { ActiveFilters } from '@/app/_components/ActiveFilters/ActiveFilters';
 import { authClient } from '@/lib/client';
 import { useRouter } from 'next/navigation';
-import { impersonateUser } from '@/app/_actions/users';
 import type { User } from '@/types/users';
 
 interface UsersPageClientProps {
@@ -110,12 +109,19 @@ export default function UsersPageClient({
   const handleImpersonate = async (userId: string) => {
     try {
       const result = await impersonateUser(userId);
-      handleAction(result);
+      const data = handleAction(result);
+      
+      if (!data) {
+        throw new Error('Erreur lors de l\'impersonation');
+      }
+
       notifications.show({
         title: 'Succès',
         message: 'Connexion en tant qu\'utilisateur réussie',
         color: 'green',
       });
+      
+      // Recharger la page pour mettre à jour la session
       router.refresh();
       window.location.href = '/';
     } catch (error: any) {
