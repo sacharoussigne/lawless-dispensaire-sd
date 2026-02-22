@@ -103,6 +103,7 @@ export default function BankAccountPageClient({
     order?: number;
   } | null>(null);
   const [deletePopoverOpened, setDeletePopoverOpened] = useState<string | null>(null);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
     loadSuggestions();
@@ -275,10 +276,18 @@ export default function BankAccountPageClient({
 
   const previousBalance = previousWeek ? Number(previousWeek.balance) : 0;
 
-  // Calculer les soldes cumulés pour chaque transaction
+  // Calculer les soldes cumulés pour chaque transaction et trier par date
   const transactionsWithBalance = useMemo(() => {
     let runningBalance = previousBalance;
-    return week.transactions.map((transaction) => {
+    
+    // Créer une copie triée des transactions
+    const sortedTransactions = [...week.transactions].sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+    });
+    
+    return sortedTransactions.map((transaction) => {
       const amount = Number(transaction.amount);
       if (transaction.type === 'DEPOSIT' || transaction.type === 'TRANSFER_IN') {
         runningBalance += amount;
@@ -291,7 +300,7 @@ export default function BankAccountPageClient({
         runningBalance,
       };
     });
-  }, [week.transactions, previousBalance]);
+  }, [week.transactions, previousBalance, sortOrder]);
 
   const currentBalance = transactionsWithBalance.length > 0
     ? transactionsWithBalance[transactionsWithBalance.length - 1].runningBalance
@@ -519,10 +528,40 @@ export default function BankAccountPageClient({
 
       <DatesProvider settings={{ locale: 'fr' }}>
         <Paper shadow="sm" withBorder radius="md" p={0}>
+          {!newTransaction && (
+            <Group p="md" justify="flex-end">
+              <ActionIcon
+                size="lg"
+                variant="light"
+                color="blue"
+                onClick={() => {
+                  setNewTransaction({
+                    date: new Date(),
+                    type: 'DEPOSIT',
+                    name: '',
+                    description: '',
+                    amount: undefined,
+                    order: week.transactions.length,
+                  });
+                }}
+              >
+                <IconPlus size={20} />
+              </ActionIcon>
+            </Group>
+          )}
           <Table striped highlightOnHover>
             <Table.Thead>
             <Table.Tr>
-              <Table.Th style={{ padding: '16px' }}>Date</Table.Th>
+              <Table.Th style={{ padding: '16px' }}>
+                <Group gap="xs" style={{ cursor: 'pointer' }} onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}>
+                  <Text size="sm" fw={600}>Date</Text>
+                  {sortOrder === 'asc' ? (
+                    <IconArrowUp size={16} />
+                  ) : (
+                    <IconArrowDown size={16} />
+                  )}
+                </Group>
+              </Table.Th>
               <Table.Th style={{ padding: '16px' }}>Type</Table.Th>
               <Table.Th style={{ padding: '16px' }}>Nom</Table.Th>
               <Table.Th style={{ padding: '16px' }}>Description</Table.Th>
@@ -532,6 +571,234 @@ export default function BankAccountPageClient({
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
+            {sortOrder === 'desc' && newTransaction && (
+              <Table.Tr>
+                <Table.Td style={{ padding: '16px' }}>
+                  <DateInput
+                    value={newTransaction.date ? new Date(newTransaction.date) : new Date()}
+                    onChange={(date) => {
+                      if (date) {
+                        setNewTransaction({ ...newTransaction, date: date as any });
+                      }
+                    }}
+                    size="xs"
+                    valueFormat="MM/DD/YYYY"
+                    key={newTransaction.date ? new Date(newTransaction.date).getTime() : Date.now()}
+                  />
+                </Table.Td>
+                <Table.Td style={{ padding: '16px' }}>
+                  <Select
+                    data={transactionTypeOptions.map(opt => ({ value: opt.value, label: opt.label }))}
+                    value={newTransaction.type}
+                    onChange={(value) => {
+                      setNewTransaction({ ...newTransaction, type: value as any });
+                    }}
+                    size="xs"
+                    placeholder="Type"
+                  />
+                </Table.Td>
+                <Table.Td style={{ padding: '16px' }}>
+                  <Autocomplete
+                    data={nameSuggestions}
+                    value={newTransaction.name || ''}
+                    onChange={(value) => {
+                      setNewTransaction({ ...newTransaction, name: value });
+                    }}
+                    size="xs"
+                    placeholder="Nom"
+                    renderOption={({ option }) => (
+                      <Group justify="space-between" style={{ flex: 1 }}>
+                        <Text size="xs" style={{ flex: 1 }}>{option.value}</Text>
+                        <Popover
+                          position="top"
+                          withArrow
+                          shadow="md"
+                          withinPortal
+                        >
+                          <Popover.Target>
+                            <ActionIcon
+                              size="xs"
+                              variant="subtle"
+                              color="red"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <IconTrash size={12} />
+                            </ActionIcon>
+                          </Popover.Target>
+                          <Popover.Dropdown>
+                            <Stack gap="xs" p="xs">
+                              <Text size="sm" fw={500}>Supprimer la suggestion</Text>
+                              <Text size="xs" c="dimmed">
+                                Supprimer "{option.value}" des suggestions ?
+                              </Text>
+                              <Group gap="xs" justify="flex-end" mt="xs">
+                                <Button
+                                  size="xs"
+                                  variant="subtle"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                  }}
+                                >
+                                  Annuler
+                                </Button>
+                                <Button
+                                  size="xs"
+                                  color="red"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteNameSuggestion(option.value, e);
+                                  }}
+                                >
+                                  Supprimer
+                                </Button>
+                              </Group>
+                            </Stack>
+                          </Popover.Dropdown>
+                        </Popover>
+                      </Group>
+                    )}
+                    comboboxProps={{ withinPortal: true }}
+                    rightSection={
+                      newTransaction.name &&
+                      newTransaction.name.trim().length > 0 &&
+                      !nameSuggestions.some(s => s.toLowerCase() === newTransaction.name?.toLowerCase().trim()) ? (
+                        <ActionIcon
+                          size="sm"
+                          variant="subtle"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAddNameSuggestion(newTransaction.name!);
+                          }}
+                        >
+                          <IconPlus size={14} />
+                        </ActionIcon>
+                      ) : null
+                    }
+                  />
+                </Table.Td>
+                <Table.Td style={{ padding: '16px' }}>
+                  <Autocomplete
+                    data={descriptionSuggestions}
+                    value={newTransaction.description || ''}
+                    onChange={(value) => {
+                      setNewTransaction({ ...newTransaction, description: value || undefined });
+                    }}
+                    size="xs"
+                    placeholder="Description"
+                    renderOption={({ option }) => (
+                      <Group justify="space-between" style={{ flex: 1 }}>
+                        <Text size="xs" style={{ flex: 1 }}>{option.value}</Text>
+                        <Popover
+                          position="top"
+                          withArrow
+                          shadow="md"
+                          withinPortal
+                        >
+                          <Popover.Target>
+                            <ActionIcon
+                              size="xs"
+                              variant="subtle"
+                              color="red"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <IconTrash size={12} />
+                            </ActionIcon>
+                          </Popover.Target>
+                          <Popover.Dropdown>
+                            <Stack gap="xs" p="xs">
+                              <Text size="sm" fw={500}>Supprimer la suggestion</Text>
+                              <Text size="xs" c="dimmed">
+                                Supprimer "{option.value}" des suggestions ?
+                              </Text>
+                              <Group gap="xs" justify="flex-end" mt="xs">
+                                <Button
+                                  size="xs"
+                                  variant="subtle"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                  }}
+                                >
+                                  Annuler
+                                </Button>
+                                <Button
+                                  size="xs"
+                                  color="red"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteDescriptionSuggestion(option.value, e);
+                                  }}
+                                >
+                                  Supprimer
+                                </Button>
+                              </Group>
+                            </Stack>
+                          </Popover.Dropdown>
+                        </Popover>
+                      </Group>
+                    )}
+                    comboboxProps={{ withinPortal: true }}
+                    rightSection={
+                      newTransaction.description &&
+                      newTransaction.description.trim().length > 0 &&
+                      !descriptionSuggestions.some(s => s.toLowerCase() === newTransaction.description?.toLowerCase().trim()) ? (
+                        <ActionIcon
+                          size="sm"
+                          variant="subtle"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAddDescriptionSuggestion(newTransaction.description!);
+                          }}
+                        >
+                          <IconPlus size={14} />
+                        </ActionIcon>
+                      ) : null
+                    }
+                  />
+                </Table.Td>
+                <Table.Td style={{ padding: '16px', textAlign: 'right' }}>
+                  <NumberInput
+                    value={newTransaction.amount ? Number(newTransaction.amount) : undefined}
+                    onChange={(value) => {
+                      setNewTransaction({
+                        ...newTransaction,
+                        amount: value ? Number(value) : undefined,
+                      });
+                    }}
+                    size="xs"
+                    min={0}
+                    decimalScale={2}
+                    placeholder="0.00"
+                    style={{ width: '100%' }}
+                  />
+                </Table.Td>
+                <Table.Td style={{ padding: '16px', textAlign: 'right' }}>
+                  <Text size="sm" c="dimmed">-</Text>
+                </Table.Td>
+                <Table.Td style={{ padding: '16px', textAlign: 'center' }}>
+                  <Group gap="xs" justify="center" wrap="nowrap">
+                    <ActionIcon
+                      size="sm"
+                      variant="subtle"
+                      color="green"
+                      onClick={() => {
+                        handleSaveTransaction(newTransaction);
+                      }}
+                      disabled={!newTransaction.date || !newTransaction.type || !newTransaction.name || !newTransaction.amount}
+                    >
+                      <IconCheck size={18} />
+                    </ActionIcon>
+                    <ActionIcon
+                      size="sm"
+                      variant="subtle"
+                      color="gray"
+                      onClick={() => setNewTransaction(null)}
+                    >
+                      <IconX size={18} />
+                    </ActionIcon>
+                  </Group>
+                </Table.Td>
+              </Table.Tr>
+            )}
             {transactionsWithBalance.map((transaction) => {
               const isEditing = editingTransaction === transaction.id;
               return (
@@ -888,7 +1155,7 @@ export default function BankAccountPageClient({
               );
             })}
 
-            {newTransaction && (
+            {sortOrder === 'asc' && newTransaction && (
               <Table.Tr>
                 <Table.Td style={{ padding: '16px' }}>
                   <DateInput
@@ -900,6 +1167,7 @@ export default function BankAccountPageClient({
                     }}
                     size="xs"
                     valueFormat="MM/DD/YYYY"
+                    key={newTransaction.date ? new Date(newTransaction.date).getTime() : Date.now()}
                   />
                 </Table.Td>
                 <Table.Td style={{ padding: '16px' }}>
@@ -925,16 +1193,55 @@ export default function BankAccountPageClient({
                     renderOption={({ option }) => (
                       <Group justify="space-between" style={{ flex: 1 }}>
                         <Text size="xs" style={{ flex: 1 }}>{option.value}</Text>
-                        <ActionIcon
-                          size="xs"
-                          variant="subtle"
-                          color="red"
-                          onClick={(e) => handleDeleteNameSuggestion(option.value, e)}
+                        <Popover
+                          position="top"
+                          withArrow
+                          shadow="md"
+                          withinPortal
                         >
-                          <IconTrash size={12} />
-                        </ActionIcon>
+                          <Popover.Target>
+                            <ActionIcon
+                              size="xs"
+                              variant="subtle"
+                              color="red"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <IconTrash size={12} />
+                            </ActionIcon>
+                          </Popover.Target>
+                          <Popover.Dropdown>
+                            <Stack gap="xs" p="xs">
+                              <Text size="sm" fw={500}>Supprimer la suggestion</Text>
+                              <Text size="xs" c="dimmed">
+                                Supprimer "{option.value}" des suggestions ?
+                              </Text>
+                              <Group gap="xs" justify="flex-end" mt="xs">
+                                <Button
+                                  size="xs"
+                                  variant="subtle"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                  }}
+                                >
+                                  Annuler
+                                </Button>
+                                <Button
+                                  size="xs"
+                                  color="red"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteNameSuggestion(option.value, e);
+                                  }}
+                                >
+                                  Supprimer
+                                </Button>
+                              </Group>
+                            </Stack>
+                          </Popover.Dropdown>
+                        </Popover>
                       </Group>
                     )}
+                    comboboxProps={{ withinPortal: true }}
                     rightSection={
                       newTransaction.name &&
                       newTransaction.name.trim().length > 0 &&
@@ -965,16 +1272,55 @@ export default function BankAccountPageClient({
                     renderOption={({ option }) => (
                       <Group justify="space-between" style={{ flex: 1 }}>
                         <Text size="xs" style={{ flex: 1 }}>{option.value}</Text>
-                        <ActionIcon
-                          size="xs"
-                          variant="subtle"
-                          color="red"
-                          onClick={(e) => handleDeleteDescriptionSuggestion(option.value, e)}
+                        <Popover
+                          position="top"
+                          withArrow
+                          shadow="md"
+                          withinPortal
                         >
-                          <IconTrash size={12} />
-                        </ActionIcon>
+                          <Popover.Target>
+                            <ActionIcon
+                              size="xs"
+                              variant="subtle"
+                              color="red"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <IconTrash size={12} />
+                            </ActionIcon>
+                          </Popover.Target>
+                          <Popover.Dropdown>
+                            <Stack gap="xs" p="xs">
+                              <Text size="sm" fw={500}>Supprimer la suggestion</Text>
+                              <Text size="xs" c="dimmed">
+                                Supprimer "{option.value}" des suggestions ?
+                              </Text>
+                              <Group gap="xs" justify="flex-end" mt="xs">
+                                <Button
+                                  size="xs"
+                                  variant="subtle"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                  }}
+                                >
+                                  Annuler
+                                </Button>
+                                <Button
+                                  size="xs"
+                                  color="red"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteDescriptionSuggestion(option.value, e);
+                                  }}
+                                >
+                                  Supprimer
+                                </Button>
+                              </Group>
+                            </Stack>
+                          </Popover.Dropdown>
+                        </Popover>
                       </Group>
                     )}
+                    comboboxProps={{ withinPortal: true }}
                     rightSection={
                       newTransaction.description &&
                       newTransaction.description.trim().length > 0 &&
@@ -1015,21 +1361,23 @@ export default function BankAccountPageClient({
                 <Table.Td style={{ padding: '16px', textAlign: 'center' }}>
                   <Group gap="xs" justify="center" wrap="nowrap">
                     <ActionIcon
+                      size="sm"
+                      variant="subtle"
                       color="green"
-                      variant="light"
                       onClick={() => {
                         handleSaveTransaction(newTransaction);
                       }}
                       disabled={!newTransaction.date || !newTransaction.type || !newTransaction.name || !newTransaction.amount}
                     >
-                      <IconCheck size={16} />
+                      <IconCheck size={18} />
                     </ActionIcon>
                     <ActionIcon
+                      size="sm"
+                      variant="subtle"
                       color="gray"
-                      variant="light"
                       onClick={() => setNewTransaction(null)}
                     >
-                      <IconX size={16} />
+                      <IconX size={18} />
                     </ActionIcon>
                   </Group>
                 </Table.Td>

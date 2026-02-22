@@ -187,7 +187,9 @@ export async function deleteUser(data: z.infer<typeof deleteUserSchema>) {
 
 export async function impersonateUser(userId: string) {
   try {
-    const result = await auth.api.impersonateUser({
+    // Utiliser l'API admin pour l'impersonation
+    // Note: better-auth expose l'impersonation via l'API admin
+    const result = await (auth.api as any).admin.impersonateUser({
       body: {
         userId,
       },
@@ -199,10 +201,25 @@ export async function impersonateUser(userId: string) {
       data: result,
     };
   } catch (error: any) {
-    return {
-      status: 500,
-      error: error.message || 'Erreur lors de l\'impersonation',
-    };
+    // Si admin.impersonateUser ne fonctionne pas, essayer impersonateUser directement
+    try {
+      const result = await auth.api.impersonateUser({
+        body: {
+          userId,
+        },
+        headers: await headers(),
+      });
+
+      return {
+        status: 200,
+        data: result,
+      };
+    } catch (fallbackError: any) {
+      return {
+        status: 500,
+        error: error.message || fallbackError.message || 'Erreur lors de l\'impersonation',
+      };
+    }
   }
 }
 
