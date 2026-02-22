@@ -28,6 +28,8 @@ import {
   IconArrowUp,
   IconTransfer,
   IconEdit,
+  IconCheck,
+  IconX,
 } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import {
@@ -774,11 +776,12 @@ export default function BankAccountPageClient({
                     </Text>
                   </Table.Td>
                   <Table.Td style={{ padding: '16px', textAlign: 'center' }}>
-                    <Group gap="xs" justify="center">
+                    <Group gap="xs" justify="center" wrap="nowrap">
                       {isEditing ? (
                         <>
-                          <Button
-                            size="xs"
+                          <ActionIcon
+                            color="green"
+                            variant="light"
                             onClick={() => {
                               if (editingTransactionData) {
                                 handleSaveTransaction({ 
@@ -793,18 +796,18 @@ export default function BankAccountPageClient({
                               }
                             }}
                           >
-                            Enregistrer
-                          </Button>
-                          <Button
-                            size="xs"
-                            variant="subtle"
+                            <IconCheck size={16} />
+                          </ActionIcon>
+                          <ActionIcon
+                            color="gray"
+                            variant="light"
                             onClick={() => {
                               setEditingTransaction(null);
                               setEditingTransactionData(null);
                             }}
                           >
-                            Annuler
-                          </Button>
+                            <IconX size={16} />
+                          </ActionIcon>
                         </>
                       ) : (
                         <>
@@ -1006,22 +1009,23 @@ export default function BankAccountPageClient({
                 </Table.Td>
                 <Table.Td style={{ padding: '16px', textAlign: 'center' }}>
                   <Group gap="xs" justify="center" wrap="nowrap">
-                    <Button
-                      size="xs"
+                    <ActionIcon
+                      color="green"
+                      variant="light"
                       onClick={() => {
                         handleSaveTransaction(newTransaction);
                       }}
                       disabled={!newTransaction.date || !newTransaction.type || !newTransaction.name || !newTransaction.amount}
                     >
-                      Enregistrer
-                    </Button>
-                    <Button
-                      size="xs"
-                      variant="subtle"
+                      <IconCheck size={16} />
+                    </ActionIcon>
+                    <ActionIcon
+                      color="gray"
+                      variant="light"
                       onClick={() => setNewTransaction(null)}
                     >
-                      Annuler
-                    </Button>
+                      <IconX size={16} />
+                    </ActionIcon>
                   </Group>
                 </Table.Td>
               </Table.Tr>

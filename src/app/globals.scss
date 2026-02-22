@@ -8,7 +8,7 @@
   }
 }
 
-.mantine-DatePickerInput-day:where([data-selected]) {
+.mantine-DatePickerInput-day:where([data-selected]), .mantine-DateInput-day:where([data-selected])  {
   background-color: var(--mantine-primary-color-filled-hover) !important;
   color: #fff !important;
 }
