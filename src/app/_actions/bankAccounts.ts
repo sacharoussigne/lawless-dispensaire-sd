@@ -852,7 +852,8 @@ export async function deleteTransaction(data: { id: string }) {
 }
 
 /**
- * Recalcule le solde d'une semaine
+ * Recalcule le solde d'une semaine et de toutes les semaines suivantes
+ * (car le balance d'une semaine dépend du balance de la semaine précédente)
  */
 async function recalculateWeekBalance(weekId: string) {
   const week = await prisma.bankAccountWeek.findUnique({
@@ -902,6 +903,56 @@ async function recalculateWeekBalance(weekId: string) {
       balance,
     },
   });
+
+  // Recalculer toutes les semaines suivantes car elles dépendent de ce balance
+  const followingWeeks = await prisma.bankAccountWeek.findMany({
+    where: {
+      accountId: week.accountId,
+      weekStart: {
+        gt: week.weekStart,
+      },
+    },
+    orderBy: {
+      weekStart: 'asc',
+    },
+    include: {
+      transactions: {
+        orderBy: [
+          { order: 'asc' },
+          { date: 'asc' },
+        ],
+      },
+    },
+  });
+
+  // Recalculer chaque semaine suivante en utilisant le balance de la semaine précédente
+  let currentBalance = balance;
+  for (const followingWeek of followingWeeks) {
+    // Le solde initial de cette semaine est le solde final de la semaine précédente
+    let weekBalance = currentBalance;
+
+    // Calculer le solde en additionnant/soustrayant les transactions selon le type
+    for (const transaction of followingWeek.transactions) {
+      const amount = Number(transaction.amount);
+      if (transaction.type === 'DEPOSIT' || transaction.type === 'TRANSFER_IN') {
+        weekBalance += amount;
+      } else {
+        // WITHDRAWAL ou TRANSFER_OUT
+        weekBalance -= amount;
+      }
+    }
+
+    // Mettre à jour le solde de la semaine
+    await prisma.bankAccountWeek.update({
+      where: { id: followingWeek.id },
+      data: {
+        balance: weekBalance,
+      },
+    });
+
+    // Le solde final de cette semaine devient le solde initial de la semaine suivante
+    currentBalance = weekBalance;
+  }
 }
 
 /**
