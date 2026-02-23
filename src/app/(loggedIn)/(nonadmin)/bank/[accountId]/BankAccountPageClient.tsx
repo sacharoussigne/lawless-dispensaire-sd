@@ -276,15 +276,28 @@ export default function BankAccountPageClient({
 
   const previousBalance = previousWeek ? Number(previousWeek.balance) : 0;
 
-  // Calculer les soldes cumulés pour chaque transaction et trier par date
+  // Calculer les soldes cumulés pour chaque transaction et trier par date puis par order
   const transactionsWithBalance = useMemo(() => {
     let runningBalance = previousBalance;
     
     // Créer une copie triée des transactions
     const sortedTransactions = [...week.transactions].sort((a, b) => {
-      const dateA = new Date(a.date).getTime();
-      const dateB = new Date(b.date).getTime();
-      return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+      // Normaliser les dates pour comparer seulement la date (sans l'heure)
+      const dateA = new Date(a.date);
+      dateA.setHours(0, 0, 0, 0);
+      const dateATime = dateA.getTime();
+      
+      const dateB = new Date(b.date);
+      dateB.setHours(0, 0, 0, 0);
+      const dateBTime = dateB.getTime();
+      
+      // Comparer d'abord par date
+      if (dateATime !== dateBTime) {
+        return sortOrder === 'asc' ? dateATime - dateBTime : dateBTime - dateATime;
+      }
+      
+      // Si les dates sont identiques, comparer par order
+      return sortOrder === 'asc' ? a.order - b.order : b.order - a.order;
     });
     
     return sortedTransactions.map((transaction) => {
