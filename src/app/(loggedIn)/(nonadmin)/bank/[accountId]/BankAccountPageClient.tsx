@@ -276,15 +276,28 @@ export default function BankAccountPageClient({
 
   const previousBalance = previousWeek ? Number(previousWeek.balance) : 0;
 
-  // Calculer les soldes cumulés pour chaque transaction et trier par date
+  // Calculer les soldes cumulés pour chaque transaction et trier par date puis par order
   const transactionsWithBalance = useMemo(() => {
     let runningBalance = previousBalance;
     
     // Créer une copie triée des transactions
     const sortedTransactions = [...week.transactions].sort((a, b) => {
-      const dateA = new Date(a.date).getTime();
-      const dateB = new Date(b.date).getTime();
-      return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+      // Normaliser les dates pour comparer seulement la date (sans l'heure)
+      const dateA = new Date(a.date);
+      dateA.setHours(0, 0, 0, 0);
+      const dateATime = dateA.getTime();
+      
+      const dateB = new Date(b.date);
+      dateB.setHours(0, 0, 0, 0);
+      const dateBTime = dateB.getTime();
+      
+      // Comparer d'abord par date
+      if (dateATime !== dateBTime) {
+        return sortOrder === 'asc' ? dateATime - dateBTime : dateBTime - dateATime;
+      }
+      
+      // Si les dates sont identiques, comparer par order
+      return sortOrder === 'asc' ? a.order - b.order : b.order - a.order;
     });
     
     return sortedTransactions.map((transaction) => {
@@ -403,6 +416,81 @@ export default function BankAccountPageClient({
       notifications.show({
         title: 'Erreur',
         message: error.message || 'Erreur lors de la suppression',
+        color: 'red',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleReorderTransaction = async (transactionId: string, direction: 'up' | 'down') => {
+    try {
+      setLoading(true);
+      
+      // Trouver la transaction à réordonner
+      const transaction = week.transactions.find((t) => t.id === transactionId);
+      if (!transaction) return;
+
+      // Normaliser la date de la transaction
+      const transactionDate = new Date(transaction.date);
+      transactionDate.setHours(0, 0, 0, 0);
+
+      // Trouver toutes les transactions de la même date
+      const sameDateTransactions = week.transactions.filter((t) => {
+        const tDate = new Date(t.date);
+        tDate.setHours(0, 0, 0, 0);
+        return tDate.getTime() === transactionDate.getTime();
+      });
+
+      // Ne pas réordonner s'il n'y a qu'une seule transaction de cette date
+      if (sameDateTransactions.length < 2) {
+        return;
+      }
+
+      // Trier par ordre pour déterminer la position
+      const sortedSameDate = [...sameDateTransactions].sort((a, b) => a.order - b.order);
+      const currentIndex = sortedSameDate.findIndex((t) => t.id === transactionId);
+
+      // Inverser la direction selon l'ordre du tableau
+      // En mode desc, "up" dans le tableau = "down" dans l'ordre réel, et vice versa
+      const actualDirection = sortOrder === 'desc' 
+        ? (direction === 'up' ? 'down' : 'up')
+        : direction;
+
+      if (actualDirection === 'up' && currentIndex === 0) {
+        // Déjà en première position, ne rien faire
+        return;
+      }
+
+      if (actualDirection === 'down' && currentIndex === sortedSameDate.length - 1) {
+        // Déjà en dernière position, ne rien faire
+        return;
+      }
+
+      // Calculer le nouvel ordre
+      const targetIndex = actualDirection === 'up' ? currentIndex - 1 : currentIndex + 1;
+      const targetTransaction = sortedSameDate[targetIndex];
+      const newOrder = targetTransaction.order;
+
+      // Mettre à jour l'ordre de la transaction
+      const result = await updateTransaction({
+        id: transactionId,
+        order: newOrder,
+      });
+      const data = handleAction(result);
+      if (data) {
+        notifications.show({
+          title: 'Succès',
+          message: 'Ordre mis à jour',
+          color: 'green',
+        });
+        await loadWeek(week.weekStart);
+        await loadWeeks();
+      }
+    } catch (error: any) {
+      notifications.show({
+        title: 'Erreur',
+        message: error.message || 'Erreur lors du réordonnancement',
         color: 'red',
       });
     } finally {
@@ -1083,6 +1171,58 @@ export default function BankAccountPageClient({
                         </>
                       ) : (
                         <>
+                          {(() => {
+                            // Calculer si la transaction peut être montée ou descendue
+                            const transactionDate = new Date(transaction.date);
+                            transactionDate.setHours(0, 0, 0, 0);
+                            
+                            const sameDateTransactions = week.transactions.filter((t) => {
+                              const tDate = new Date(t.date);
+                              tDate.setHours(0, 0, 0, 0);
+                              return tDate.getTime() === transactionDate.getTime();
+                            });
+                            
+                            // Ne pas afficher les boutons de réordonnancement s'il n'y a qu'une seule transaction de cette date
+                            if (sameDateTransactions.length < 2) {
+                              return null;
+                            }
+                            
+                            const sortedSameDate = [...sameDateTransactions].sort((a, b) => a.order - b.order);
+                            const currentIndex = sortedSameDate.findIndex((t) => t.id === transaction.id);
+                            
+                            // Calculer si on peut monter/descendre dans l'ordre réel
+                            const canMoveUpInOrder = currentIndex > 0;
+                            const canMoveDownInOrder = currentIndex < sortedSameDate.length - 1;
+                            
+                            // En mode desc, inverser les conditions car "up" dans le tableau = "down" dans l'ordre réel
+                            const canMoveUp = sortOrder === 'desc' ? canMoveDownInOrder : canMoveUpInOrder;
+                            const canMoveDown = sortOrder === 'desc' ? canMoveUpInOrder : canMoveDownInOrder;
+                            
+                            return (
+                              <>
+                                <ActionIcon
+                                  variant="subtle"
+                                  size="sm"
+                                  color="gray"
+                                  onClick={() => handleReorderTransaction(transaction.id, 'up')}
+                                  disabled={!canMoveUp || loading || isEditing}
+                                  title={sortOrder === 'desc' ? 'Descendre' : 'Monter'}
+                                >
+                                  <IconArrowUp size={16} />
+                                </ActionIcon>
+                                <ActionIcon
+                                  variant="subtle"
+                                  size="sm"
+                                  color="gray"
+                                  onClick={() => handleReorderTransaction(transaction.id, 'down')}
+                                  disabled={!canMoveDown || loading || isEditing}
+                                  title={sortOrder === 'desc' ? 'Monter' : 'Descendre'}
+                                >
+                                  <IconArrowDown size={16} />
+                                </ActionIcon>
+                              </>
+                            );
+                          })()}
                           <ActionIcon
                             variant="subtle"
                             size="sm"
