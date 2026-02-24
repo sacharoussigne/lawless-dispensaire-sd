@@ -16,6 +16,7 @@ import {
   Stack,
   Autocomplete,
   Popover,
+  MultiSelect,
 } from '@mantine/core';
 import { DatePickerInput, DateInput, DatesProvider } from '@mantine/dates';
 import 'dayjs/locale/fr';
@@ -104,6 +105,7 @@ export default function BankAccountPageClient({
   } | null>(null);
   const [deletePopoverOpened, setDeletePopoverOpened] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [typeFilter, setTypeFilter] = useState<string[]>([]);
 
   useEffect(() => {
     loadSuggestions();
@@ -276,12 +278,50 @@ export default function BankAccountPageClient({
 
   const previousBalance = previousWeek ? Number(previousWeek.balance) : 0;
 
-  // Calculer les soldes cumulés pour chaque transaction et trier par date puis par order
-  const transactionsWithBalance = useMemo(() => {
+  // Calculer le solde actuel basé sur TOUTES les transactions (pour les cartes en haut)
+  const currentBalance = useMemo(() => {
     let runningBalance = previousBalance;
     
-    // Créer une copie triée des transactions
-    const sortedTransactions = [...week.transactions].sort((a, b) => {
+    // Trier toutes les transactions par date puis par order
+    const sortedAllTransactions = [...week.transactions].sort((a, b) => {
+      const dateA = new Date(a.date);
+      dateA.setHours(0, 0, 0, 0);
+      const dateATime = dateA.getTime();
+      
+      const dateB = new Date(b.date);
+      dateB.setHours(0, 0, 0, 0);
+      const dateBTime = dateB.getTime();
+      
+      if (dateATime !== dateBTime) {
+        return dateATime - dateBTime;
+      }
+      
+      return a.order - b.order;
+    });
+    
+    // Calculer le solde final
+    for (const transaction of sortedAllTransactions) {
+      const amount = Number(transaction.amount);
+      if (transaction.type === 'DEPOSIT' || transaction.type === 'TRANSFER_IN') {
+        runningBalance += amount;
+      } else {
+        runningBalance -= amount;
+      }
+    }
+    
+    return runningBalance;
+  }, [week.transactions, previousBalance]);
+
+  // Filtrer et trier les transactions selon les filtres et l'ordre de tri
+  const filteredTransactions = useMemo(() => {
+    // Filtrer par type si un filtre est actif
+    let transactions = week.transactions;
+    if (typeFilter.length > 0) {
+      transactions = week.transactions.filter((t) => typeFilter.includes(t.type));
+    }
+    
+    // Créer une copie triée des transactions filtrées selon l'ordre d'affichage
+    return [...transactions].sort((a, b) => {
       // Normaliser les dates pour comparer seulement la date (sans l'heure)
       const dateA = new Date(a.date);
       dateA.setHours(0, 0, 0, 0);
@@ -299,25 +339,7 @@ export default function BankAccountPageClient({
       // Si les dates sont identiques, comparer par order
       return sortOrder === 'asc' ? a.order - b.order : b.order - a.order;
     });
-    
-    return sortedTransactions.map((transaction) => {
-      const amount = Number(transaction.amount);
-      if (transaction.type === 'DEPOSIT' || transaction.type === 'TRANSFER_IN') {
-        runningBalance += amount;
-      } else {
-        // WITHDRAWAL ou TRANSFER_OUT
-        runningBalance -= amount;
-      }
-      return {
-        ...transaction,
-        runningBalance,
-      };
-    });
-  }, [week.transactions, previousBalance, sortOrder]);
-
-  const currentBalance = transactionsWithBalance.length > 0
-    ? transactionsWithBalance[transactionsWithBalance.length - 1].runningBalance
-    : previousBalance;
+  }, [week.transactions, sortOrder, typeFilter]);
 
   const balanceDifference = currentBalance - previousBalance;
 
@@ -616,8 +638,18 @@ export default function BankAccountPageClient({
 
       <DatesProvider settings={{ locale: 'fr' }}>
         <Paper shadow="sm" withBorder radius="md" p={0}>
-          {!newTransaction && (
-            <Group p="md" justify="flex-end">
+          <Group p="md" justify="space-between" align="flex-end">
+            <MultiSelect
+              label="Filtrer par type"
+              placeholder="Sélectionner les types de transactions"
+              data={transactionTypeOptions.map(opt => ({ value: opt.value, label: opt.label }))}
+              value={typeFilter}
+              onChange={setTypeFilter}
+              clearable
+              style={{ minWidth: 250 }}
+              size="sm"
+            />
+            {!newTransaction && (
               <ActionIcon
                 size="lg"
                 variant="light"
@@ -635,8 +667,8 @@ export default function BankAccountPageClient({
               >
                 <IconPlus size={20} />
               </ActionIcon>
-            </Group>
-          )}
+            )}
+          </Group>
           <Table striped highlightOnHover>
             <Table.Thead>
             <Table.Tr>
@@ -654,7 +686,6 @@ export default function BankAccountPageClient({
               <Table.Th style={{ padding: '16px' }}>Nom</Table.Th>
               <Table.Th style={{ padding: '16px' }}>Description</Table.Th>
               <Table.Th style={{ padding: '16px', textAlign: 'right' }}>Montant</Table.Th>
-              <Table.Th style={{ padding: '16px', textAlign: 'right' }}>Solde</Table.Th>
               <Table.Th style={{ padding: '16px', textAlign: 'center' }}>Actions</Table.Th>
             </Table.Tr>
           </Table.Thead>
@@ -859,9 +890,6 @@ export default function BankAccountPageClient({
                     style={{ width: '100%' }}
                   />
                 </Table.Td>
-                <Table.Td style={{ padding: '16px', textAlign: 'right' }}>
-                  <Text size="sm" c="dimmed">-</Text>
-                </Table.Td>
                 <Table.Td style={{ padding: '16px', textAlign: 'center' }}>
                   <Group gap="xs" justify="center" wrap="nowrap">
                     <ActionIcon
@@ -887,7 +915,7 @@ export default function BankAccountPageClient({
                 </Table.Td>
               </Table.Tr>
             )}
-            {transactionsWithBalance.map((transaction) => {
+            {filteredTransactions.map((transaction) => {
               const isEditing = editingTransaction === transaction.id;
               return (
                 <Table.Tr key={transaction.id}>
@@ -1129,11 +1157,6 @@ export default function BankAccountPageClient({
                         {(transaction.type === 'DEPOSIT' || transaction.type === 'TRANSFER_IN' ? '+' : '-') + Number(transaction.amount).toFixed(2)} $
                       </Text>
                     )}
-                  </Table.Td>
-                  <Table.Td style={{ padding: '16px', textAlign: 'right' }}>
-                    <Text size="sm" fw={600} c="dimmed">
-                      {transaction.runningBalance.toFixed(2)} $
-                    </Text>
                   </Table.Td>
                   <Table.Td style={{ padding: '16px', textAlign: 'center' }}>
                     <Group gap="xs" justify="center" wrap="nowrap">
@@ -1494,9 +1517,6 @@ export default function BankAccountPageClient({
                     placeholder="0.00"
                     style={{ width: '100%' }}
                   />
-                </Table.Td>
-                <Table.Td style={{ padding: '16px', textAlign: 'right' }}>
-                  <Text size="sm" c="dimmed">-</Text>
                 </Table.Td>
                 <Table.Td style={{ padding: '16px', textAlign: 'center' }}>
                   <Group gap="xs" justify="center" wrap="nowrap">
