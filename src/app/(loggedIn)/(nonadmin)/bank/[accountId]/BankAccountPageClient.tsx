@@ -103,7 +103,7 @@ export default function BankAccountPageClient({
     order?: number;
   } | null>(null);
   const [deletePopoverOpened, setDeletePopoverOpened] = useState<string | null>(null);
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
     loadSuggestions();
