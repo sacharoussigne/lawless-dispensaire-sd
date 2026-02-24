@@ -85,11 +85,11 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
   const handleSaveStock = async () => {
     try {
       setSaving(true);
-      
+
       // Si aucun coffre n'est sélectionné, utiliser le coffre "foure tout" par défaut
       // Cela garantit qu'on modifie toujours un coffre spécifique
       const targetChestId = selectedChestId || null;
-      
+
       const stockData = Object.entries(stockValues)
         .filter(([_, value]) => value !== '' && value !== null)
         .map(([itemId, quantity]) => ({
@@ -110,7 +110,7 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
       handleAction(result);
 
       // Déterminer le nom du coffre modifié pour le message
-      const chestName = targetChestId 
+      const chestName = targetChestId
         ? chests.find(c => c.id === targetChestId)?.name || 'le coffre sélectionné'
         : 'Foure tout';
 
@@ -518,70 +518,74 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
         </Stack>
       )}
 
-      <CraftModal
-        opened={craftModalOpened}
-        onClose={() => setCraftModalOpened(false)}
-        items={items}
-        canCraft={permissions?.stock.craftWrite ?? false}
-        initialChestId={selectedChestId}
-        chests={chests}
-        onCraft={async (itemId, recipeId, times, sourceChestId, ingredientChests, destinationChestId) => {
-          if (!permissions?.stock.craftWrite) {
-            notifications.show({
-              title: 'Permission refusée',
-              message: 'Vous n\'avez pas la permission d\'effectuer un craft.',
-              color: 'red',
-            });
-            return;
-          }
-          try {
-            const result = await craftItem({
-              craftedItemId: itemId,
-              recipeId,
-              times,
-              sourceChestId,
-              ingredientChests,
-              destinationChestId,
-            });
-
-            if (result.status === 200 && 'data' in result && result.data && 'quantityProduced' in result.data) {
+      {craftModalOpened && (
+        <CraftModal
+          opened={craftModalOpened}
+          onClose={() => setCraftModalOpened(false)}
+          items={items}
+          canCraft={permissions?.stock.craftWrite ?? false}
+          initialChestId={selectedChestId}
+          chests={chests}
+          onCraft={async (itemId, recipeId, times, sourceChestId, ingredientChests, destinationChestId) => {
+            if (!permissions?.stock.craftWrite) {
               notifications.show({
-                title: 'Succès',
-                message: `Craft effectué avec succès ! ${result.data.quantityProduced} objet(s) produit(s).`,
-                color: 'green',
+                title: 'Permission refusée',
+                message: 'Vous n\'avez pas la permission d\'effectuer un craft.',
+                color: 'red',
               });
-              setCraftModalOpened(false);
-              await loadItems(); // Recharger les items pour mettre à jour les stocks
-            } else {
-              const errorMessage = 'error' in result
-                ? (typeof result.error === 'string' ? result.error : 'Erreur lors du craft')
-                : 'Erreur lors du craft';
+              return;
+            }
+            try {
+              const result = await craftItem({
+                craftedItemId: itemId,
+                recipeId,
+                times,
+                sourceChestId,
+                ingredientChests,
+                destinationChestId,
+              });
+
+              if (result.status === 200 && 'data' in result && result.data && 'quantityProduced' in result.data) {
+                notifications.show({
+                  title: 'Succès',
+                  message: `Craft effectué avec succès ! ${result.data.quantityProduced} objet(s) produit(s).`,
+                  color: 'green',
+                });
+                setCraftModalOpened(false);
+                await loadItems(); // Recharger les items pour mettre à jour les stocks
+              } else {
+                const errorMessage = 'error' in result
+                  ? (typeof result.error === 'string' ? result.error : 'Erreur lors du craft')
+                  : 'Erreur lors du craft';
+                notifications.show({
+                  title: 'Erreur',
+                  message: errorMessage,
+                  color: 'red',
+                });
+              }
+            } catch (error: any) {
               notifications.show({
                 title: 'Erreur',
-                message: errorMessage,
+                message: error.message || 'Erreur lors du craft',
                 color: 'red',
               });
             }
-          } catch (error: any) {
-            notifications.show({
-              title: 'Erreur',
-              message: error.message || 'Erreur lors du craft',
-              color: 'red',
-            });
-          }
-        }}
-      />
+          }}
+        />
+      )}
 
-      <TransferModal
-        opened={transferModalOpened}
-        onClose={() => setTransferModalOpened(false)}
-        items={items}
-        chests={chests}
-        initialSourceChestId={selectedChestId}
-        onTransfer={async () => {
-          await loadItems(); // Recharger les items pour mettre à jour les stocks
-        }}
-      />
+      {transferModalOpened && (
+        <TransferModal
+          opened={transferModalOpened}
+          onClose={() => setTransferModalOpened(false)}
+          items={items}
+          chests={chests}
+          initialSourceChestId={selectedChestId}
+          onTransfer={async () => {
+            await loadItems(); // Recharger les items pour mettre à jour les stocks
+          }}
+        />
+      )}
     </Container>
   );
 }
