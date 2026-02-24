@@ -701,16 +701,7 @@ export default function BankAccountPageClient({
             columns={[
               {
                 accessor: 'date',
-                title: (
-                  <Group gap="xs" style={{ cursor: 'pointer' }} onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}>
-                    <Text size="sm" fw={600}>Date</Text>
-                    {sortOrder === 'asc' ? (
-                      <IconArrowUp size={16} />
-                    ) : (
-                      <IconArrowDown size={16} />
-                    )}
-                  </Group>
-                ),
+                title: 'Date',
                 sortable: true,
                 render: (transaction: any) => {
                   const isNew = transaction.isNew;
