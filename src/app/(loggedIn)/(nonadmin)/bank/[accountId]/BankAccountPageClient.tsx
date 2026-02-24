@@ -7,7 +7,6 @@ import {
   Group,
   Button,
   Paper,
-  Table,
   NumberInput,
   Select,
   ActionIcon,
@@ -18,6 +17,7 @@ import {
   Popover,
   MultiSelect,
 } from '@mantine/core';
+import { DataTable } from 'mantine-datatable';
 import { DatePickerInput, DateInput, DatesProvider } from '@mantine/dates';
 import 'dayjs/locale/fr';
 import { 
@@ -340,6 +340,33 @@ export default function BankAccountPageClient({
       return sortOrder === 'asc' ? a.order - b.order : b.order - a.order;
     });
   }, [week.transactions, sortOrder, typeFilter]);
+
+  // Préparer les records pour DataTable (inclure la nouvelle transaction si elle existe)
+  const dataTableRecords = useMemo(() => {
+    const records = [...filteredTransactions];
+    
+    if (newTransaction) {
+      const newRecord = {
+        id: 'new-transaction',
+        isNew: true,
+        date: newTransaction.date || new Date(),
+        type: newTransaction.type || 'DEPOSIT',
+        name: newTransaction.name || '',
+        description: newTransaction.description || null,
+        amount: newTransaction.amount || 0,
+        order: newTransaction.order || 0,
+      };
+      
+      // Ajouter en haut si sortOrder === 'desc', en bas si sortOrder === 'asc'
+      if (sortOrder === 'desc') {
+        records.unshift(newRecord as any);
+      } else {
+        records.push(newRecord as any);
+      }
+    }
+    
+    return records;
+  }, [filteredTransactions, newTransaction, sortOrder]);
 
   const balanceDifference = currentBalance - previousBalance;
 
@@ -669,262 +696,46 @@ export default function BankAccountPageClient({
               </ActionIcon>
             )}
           </Group>
-          <Table striped highlightOnHover>
-            <Table.Thead>
-            <Table.Tr>
-              <Table.Th style={{ padding: '16px' }}>
-                <Group gap="xs" style={{ cursor: 'pointer' }} onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}>
-                  <Text size="sm" fw={600}>Date</Text>
-                  {sortOrder === 'asc' ? (
-                    <IconArrowUp size={16} />
-                  ) : (
-                    <IconArrowDown size={16} />
-                  )}
-                </Group>
-              </Table.Th>
-              <Table.Th style={{ padding: '16px' }}>Type</Table.Th>
-              <Table.Th style={{ padding: '16px' }}>Nom</Table.Th>
-              <Table.Th style={{ padding: '16px' }}>Description</Table.Th>
-              <Table.Th style={{ padding: '16px', textAlign: 'right' }}>Montant</Table.Th>
-              <Table.Th style={{ padding: '16px', textAlign: 'center' }}>Actions</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {sortOrder === 'desc' && newTransaction && (
-              <Table.Tr>
-                <Table.Td style={{ padding: '16px' }}>
-                  <DateInput
-                    value={newTransaction.date ? new Date(newTransaction.date) : new Date()}
-                    onChange={(date) => {
-                      if (date) {
-                        setNewTransaction({ ...newTransaction, date: date as any });
-                      }
-                    }}
-                    size="xs"
-                    valueFormat="MM/DD/YYYY"
-                    key={newTransaction.date ? new Date(newTransaction.date).getTime() : Date.now()}
-                  />
-                </Table.Td>
-                <Table.Td style={{ padding: '16px' }}>
-                  <Select
-                    data={transactionTypeOptions.map(opt => ({ value: opt.value, label: opt.label }))}
-                    value={newTransaction.type}
-                    onChange={(value) => {
-                      setNewTransaction({ ...newTransaction, type: value as any });
-                    }}
-                    size="xs"
-                    placeholder="Type"
-                  />
-                </Table.Td>
-                <Table.Td style={{ padding: '16px' }}>
-                  <Autocomplete
-                    data={nameSuggestions}
-                    value={newTransaction.name || ''}
-                    onChange={(value) => {
-                      setNewTransaction({ ...newTransaction, name: value });
-                    }}
-                    size="xs"
-                    placeholder="Nom"
-                    renderOption={({ option }) => (
-                      <Group justify="space-between" style={{ flex: 1 }}>
-                        <Text size="xs" style={{ flex: 1 }}>{option.value}</Text>
-                        <Popover
-                          position="top"
-                          withArrow
-                          shadow="md"
-                          withinPortal
-                        >
-                          <Popover.Target>
-                            <ActionIcon
-                              size="xs"
-                              variant="subtle"
-                              color="red"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <IconTrash size={12} />
-                            </ActionIcon>
-                          </Popover.Target>
-                          <Popover.Dropdown>
-                            <Stack gap="xs" p="xs">
-                              <Text size="sm" fw={500}>Supprimer la suggestion</Text>
-                              <Text size="xs" c="dimmed">
-                                Supprimer "{option.value}" des suggestions ?
-                              </Text>
-                              <Group gap="xs" justify="flex-end" mt="xs">
-                                <Button
-                                  size="xs"
-                                  variant="subtle"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                  }}
-                                >
-                                  Annuler
-                                </Button>
-                                <Button
-                                  size="xs"
-                                  color="red"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteNameSuggestion(option.value, e);
-                                  }}
-                                >
-                                  Supprimer
-                                </Button>
-                              </Group>
-                            </Stack>
-                          </Popover.Dropdown>
-                        </Popover>
-                      </Group>
+          <DataTable
+            records={dataTableRecords}
+            columns={[
+              {
+                accessor: 'date',
+                title: (
+                  <Group gap="xs" style={{ cursor: 'pointer' }} onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}>
+                    <Text size="sm" fw={600}>Date</Text>
+                    {sortOrder === 'asc' ? (
+                      <IconArrowUp size={16} />
+                    ) : (
+                      <IconArrowDown size={16} />
                     )}
-                    comboboxProps={{ withinPortal: true }}
-                    rightSection={
-                      newTransaction.name &&
-                      newTransaction.name.trim().length > 0 &&
-                      !nameSuggestions.some(s => s.toLowerCase() === newTransaction.name?.toLowerCase().trim()) ? (
-                        <ActionIcon
-                          size="sm"
-                          variant="subtle"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleAddNameSuggestion(newTransaction.name!);
-                          }}
-                        >
-                          <IconPlus size={14} />
-                        </ActionIcon>
-                      ) : null
-                    }
-                  />
-                </Table.Td>
-                <Table.Td style={{ padding: '16px' }}>
-                  <Autocomplete
-                    data={descriptionSuggestions}
-                    value={newTransaction.description || ''}
-                    onChange={(value) => {
-                      setNewTransaction({ ...newTransaction, description: value || undefined });
-                    }}
-                    size="xs"
-                    placeholder="Description"
-                    renderOption={({ option }) => (
-                      <Group justify="space-between" style={{ flex: 1 }}>
-                        <Text size="xs" style={{ flex: 1 }}>{option.value}</Text>
-                        <Popover
-                          position="top"
-                          withArrow
-                          shadow="md"
-                          withinPortal
-                        >
-                          <Popover.Target>
-                            <ActionIcon
-                              size="xs"
-                              variant="subtle"
-                              color="red"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <IconTrash size={12} />
-                            </ActionIcon>
-                          </Popover.Target>
-                          <Popover.Dropdown>
-                            <Stack gap="xs" p="xs">
-                              <Text size="sm" fw={500}>Supprimer la suggestion</Text>
-                              <Text size="xs" c="dimmed">
-                                Supprimer "{option.value}" des suggestions ?
-                              </Text>
-                              <Group gap="xs" justify="flex-end" mt="xs">
-                                <Button
-                                  size="xs"
-                                  variant="subtle"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                  }}
-                                >
-                                  Annuler
-                                </Button>
-                                <Button
-                                  size="xs"
-                                  color="red"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteDescriptionSuggestion(option.value, e);
-                                  }}
-                                >
-                                  Supprimer
-                                </Button>
-                              </Group>
-                            </Stack>
-                          </Popover.Dropdown>
-                        </Popover>
-                      </Group>
-                    )}
-                    comboboxProps={{ withinPortal: true }}
-                    rightSection={
-                      newTransaction.description &&
-                      newTransaction.description.trim().length > 0 &&
-                      !descriptionSuggestions.some(s => s.toLowerCase() === newTransaction.description?.toLowerCase().trim()) ? (
-                        <ActionIcon
-                          size="sm"
-                          variant="subtle"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleAddDescriptionSuggestion(newTransaction.description!);
-                          }}
-                        >
-                          <IconPlus size={14} />
-                        </ActionIcon>
-                      ) : null
-                    }
-                  />
-                </Table.Td>
-                <Table.Td style={{ padding: '16px', textAlign: 'right' }}>
-                  <NumberInput
-                    value={newTransaction.amount ? Number(newTransaction.amount) : undefined}
-                    onChange={(value) => {
-                      setNewTransaction({
-                        ...newTransaction,
-                        amount: value ? Number(value) : undefined,
-                      });
-                    }}
-                    size="xs"
-                    min={0}
-                    decimalScale={2}
-                    placeholder="0.00"
-                    style={{ width: '100%' }}
-                  />
-                </Table.Td>
-                <Table.Td style={{ padding: '16px', textAlign: 'center' }}>
-                  <Group gap="xs" justify="center" wrap="nowrap">
-                    <ActionIcon
-                      size="sm"
-                      variant="subtle"
-                      color="green"
-                      onClick={() => {
-                        handleSaveTransaction(newTransaction);
-                      }}
-                      disabled={!newTransaction.date || !newTransaction.type || !newTransaction.name || !newTransaction.amount}
-                    >
-                      <IconCheck size={18} />
-                    </ActionIcon>
-                    <ActionIcon
-                      size="sm"
-                      variant="subtle"
-                      color="gray"
-                      onClick={() => setNewTransaction(null)}
-                    >
-                      <IconX size={18} />
-                    </ActionIcon>
                   </Group>
-                </Table.Td>
-              </Table.Tr>
-            )}
-            {filteredTransactions.map((transaction) => {
-              const isEditing = editingTransaction === transaction.id;
-              return (
-                <Table.Tr key={transaction.id}>
-                  <Table.Td style={{ padding: '16px' }}>
-                    {isEditing ? (
+                ),
+                sortable: true,
+                render: (transaction: any) => {
+                  const isNew = transaction.isNew;
+                  const isEditing = !isNew && editingTransaction === transaction.id;
+                  
+                  if (isNew) {
+                    return (
+                      <DateInput
+                        value={newTransaction?.date ? new Date(newTransaction.date) : new Date()}
+                        onChange={(date) => {
+                          if (date && newTransaction) {
+                            setNewTransaction({ ...newTransaction, date: date as any });
+                          }
+                        }}
+                        size="xs"
+                        valueFormat="DD/MM/YYYY"
+                      />
+                    );
+                  }
+                  
+                  if (isEditing) {
+                    return (
                       <DateInput
                         value={editingTransactionData?.date ? new Date(editingTransactionData.date) : new Date(transaction.date)}
                         onChange={(date) => {
-                            console.log(date)
                           if (date && editingTransactionData) {
                             setEditingTransactionData({ ...editingTransactionData, date: date as any });
                           }
@@ -932,12 +743,38 @@ export default function BankAccountPageClient({
                         size="xs"
                         valueFormat="DD/MM/YYYY"
                       />
-                    ) : (
-                      <Text size="sm">{format(new Date(transaction.date), 'dd/MM/yyyy', { locale: fr })}</Text>
-                    )}
-                  </Table.Td>
-                  <Table.Td style={{ padding: '16px' }}>
-                    {isEditing ? (
+                    );
+                  }
+                  
+                  return <Text size="sm">{format(new Date(transaction.date), 'dd/MM/yyyy', { locale: fr })}</Text>;
+                },
+              },
+              {
+                accessor: 'type',
+                title: 'Type',
+                sortable: false,
+                render: (transaction: any) => {
+                  const isNew = transaction.isNew;
+                  const isEditing = !isNew && editingTransaction === transaction.id;
+                  
+                  if (isNew) {
+                    return (
+                      <Select
+                        data={transactionTypeOptions.map(opt => ({ value: opt.value, label: opt.label }))}
+                        value={newTransaction?.type}
+                        onChange={(value) => {
+                          if (value && newTransaction) {
+                            setNewTransaction({ ...newTransaction, type: value as any });
+                          }
+                        }}
+                        size="xs"
+                        placeholder="Type"
+                      />
+                    );
+                  }
+                  
+                  if (isEditing) {
+                    return (
                       <Select
                         data={transactionTypeOptions.map(opt => ({ value: opt.value, label: opt.label }))}
                         value={editingTransactionData?.type || transaction.type}
@@ -948,25 +785,117 @@ export default function BankAccountPageClient({
                         }}
                         size="xs"
                       />
-                    ) : (
-                      (() => {
-                        const typeInfo = getTransactionTypeInfo(transaction.type);
-                        const IconComponent = typeInfo.icon;
-                        return (
-                          <Badge
-                            leftSection={<IconComponent size={14} />}
-                            color={typeInfo.color}
-                            variant="light"
-                            size="sm"
-                          >
-                            {typeInfo.label}
-                          </Badge>
-                        );
-                      })()
-                    )}
-                  </Table.Td>
-                  <Table.Td style={{ padding: '16px' }}>
-                    {isEditing ? (
+                    );
+                  }
+                  
+                  const typeInfo = getTransactionTypeInfo(transaction.type);
+                  const IconComponent = typeInfo.icon;
+                  return (
+                    <Badge
+                      leftSection={<IconComponent size={14} />}
+                      color={typeInfo.color}
+                      variant="light"
+                      size="sm"
+                    >
+                      {typeInfo.label}
+                    </Badge>
+                  );
+                },
+              },
+              {
+                accessor: 'name',
+                title: 'Nom',
+                sortable: false,
+                render: (transaction: any) => {
+                  const isNew = transaction.isNew;
+                  const isEditing = !isNew && editingTransaction === transaction.id;
+                  
+                  if (isNew) {
+                    return (
+                      <Autocomplete
+                        data={nameSuggestions}
+                        value={newTransaction?.name || ''}
+                        onChange={(value) => {
+                          if (newTransaction) {
+                            setNewTransaction({ ...newTransaction, name: value });
+                          }
+                        }}
+                        size="xs"
+                        placeholder="Nom"
+                        renderOption={({ option }) => (
+                          <Group justify="space-between" style={{ flex: 1 }}>
+                            <Text size="xs" style={{ flex: 1 }}>{option.value}</Text>
+                            <Popover
+                              position="top"
+                              withArrow
+                              shadow="md"
+                              withinPortal
+                            >
+                              <Popover.Target>
+                                <ActionIcon
+                                  size="xs"
+                                  variant="subtle"
+                                  color="red"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <IconTrash size={12} />
+                                </ActionIcon>
+                              </Popover.Target>
+                              <Popover.Dropdown>
+                                <Stack gap="xs" p="xs">
+                                  <Text size="sm" fw={500}>Supprimer la suggestion</Text>
+                                  <Text size="xs" c="dimmed">
+                                    Supprimer "{option.value}" des suggestions ?
+                                  </Text>
+                                  <Group gap="xs" justify="flex-end" mt="xs">
+                                    <Button
+                                      size="xs"
+                                      variant="subtle"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                      }}
+                                    >
+                                      Annuler
+                                    </Button>
+                                    <Button
+                                      size="xs"
+                                      color="red"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteNameSuggestion(option.value, e);
+                                      }}
+                                    >
+                                      Supprimer
+                                    </Button>
+                                  </Group>
+                                </Stack>
+                              </Popover.Dropdown>
+                            </Popover>
+                          </Group>
+                        )}
+                        comboboxProps={{ withinPortal: true }}
+                        rightSection={
+                          newTransaction?.name &&
+                          newTransaction.name.trim().length > 0 &&
+                          !nameSuggestions.some(s => s.toLowerCase() === newTransaction.name?.toLowerCase().trim()) ? (
+                            <ActionIcon
+                              size="sm"
+                              variant="subtle"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAddNameSuggestion(newTransaction.name!);
+                              }}
+                            >
+                              <IconPlus size={14} />
+                            </ActionIcon>
+                          ) : null
+                        }
+                      />
+                    );
+                  }
+                  
+                  if (isEditing) {
+                    return (
                       <Autocomplete
                         data={nameSuggestions}
                         value={editingTransactionData?.name || transaction.name}
@@ -1044,12 +973,106 @@ export default function BankAccountPageClient({
                           ) : null
                         }
                       />
-                    ) : (
-                      transaction.name
-                    )}
-                  </Table.Td>
-                  <Table.Td>
-                    {isEditing ? (
+                    );
+                  }
+                  
+                  return <Text size="sm">{transaction.name}</Text>;
+                },
+              },
+              {
+                accessor: 'description',
+                title: 'Description',
+                sortable: false,
+                render: (transaction: any) => {
+                  const isNew = transaction.isNew;
+                  const isEditing = !isNew && editingTransaction === transaction.id;
+                  
+                  if (isNew) {
+                    return (
+                      <Autocomplete
+                        data={descriptionSuggestions}
+                        value={newTransaction?.description || ''}
+                        onChange={(value) => {
+                          if (newTransaction) {
+                            setNewTransaction({ ...newTransaction, description: value || undefined });
+                          }
+                        }}
+                        size="xs"
+                        placeholder="Description"
+                        renderOption={({ option }) => (
+                          <Group justify="space-between" style={{ flex: 1 }}>
+                            <Text size="xs" style={{ flex: 1 }}>{option.value}</Text>
+                            <Popover
+                              position="top"
+                              withArrow
+                              shadow="md"
+                              withinPortal
+                            >
+                              <Popover.Target>
+                                <ActionIcon
+                                  size="xs"
+                                  variant="subtle"
+                                  color="red"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <IconTrash size={12} />
+                                </ActionIcon>
+                              </Popover.Target>
+                              <Popover.Dropdown>
+                                <Stack gap="xs" p="xs">
+                                  <Text size="sm" fw={500}>Supprimer la suggestion</Text>
+                                  <Text size="xs" c="dimmed">
+                                    Supprimer "{option.value}" des suggestions ?
+                                  </Text>
+                                  <Group gap="xs" justify="flex-end" mt="xs">
+                                    <Button
+                                      size="xs"
+                                      variant="subtle"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                      }}
+                                    >
+                                      Annuler
+                                    </Button>
+                                    <Button
+                                      size="xs"
+                                      color="red"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteDescriptionSuggestion(option.value, e);
+                                      }}
+                                    >
+                                      Supprimer
+                                    </Button>
+                                  </Group>
+                                </Stack>
+                              </Popover.Dropdown>
+                            </Popover>
+                          </Group>
+                        )}
+                        comboboxProps={{ withinPortal: true }}
+                        rightSection={
+                          newTransaction?.description &&
+                          newTransaction.description.trim().length > 0 &&
+                          !descriptionSuggestions.some(s => s.toLowerCase() === newTransaction.description?.toLowerCase().trim()) ? (
+                            <ActionIcon
+                              size="sm"
+                              variant="subtle"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAddDescriptionSuggestion(newTransaction.description!);
+                              }}
+                            >
+                              <IconPlus size={14} />
+                            </ActionIcon>
+                          ) : null
+                        }
+                      />
+                    );
+                  }
+                  
+                  if (isEditing) {
+                    return (
                       <Autocomplete
                         data={descriptionSuggestions}
                         value={editingTransactionData?.description || transaction.description || ''}
@@ -1127,12 +1150,44 @@ export default function BankAccountPageClient({
                           ) : null
                         }
                       />
-                    ) : (
-                      transaction.description || '-'
-                    )}
-                  </Table.Td>
-                  <Table.Td style={{ padding: '16px', textAlign: 'right' }}>
-                    {isEditing ? (
+                    );
+                  }
+                  
+                  return <Text size="sm">{transaction.description || '-'}</Text>;
+                },
+              },
+              {
+                accessor: 'amount',
+                title: 'Montant',
+                textAlign: 'right',
+                sortable: false,
+                render: (transaction: any) => {
+                  const isNew = transaction.isNew;
+                  const isEditing = !isNew && editingTransaction === transaction.id;
+                  
+                  if (isNew) {
+                    return (
+                      <NumberInput
+                        value={newTransaction?.amount ? Number(newTransaction.amount) : undefined}
+                        onChange={(value) => {
+                          if (newTransaction) {
+                            setNewTransaction({
+                              ...newTransaction,
+                              amount: value ? Number(value) : undefined,
+                            });
+                          }
+                        }}
+                        size="xs"
+                        min={0}
+                        decimalScale={2}
+                        placeholder="0.00"
+                        style={{ width: '100%' }}
+                      />
+                    );
+                  }
+                  
+                  if (isEditing) {
+                    return (
                       <NumberInput
                         value={editingTransactionData?.amount !== undefined ? Number(editingTransactionData.amount) : Number(transaction.amount)}
                         onChange={(value) => {
@@ -1148,425 +1203,244 @@ export default function BankAccountPageClient({
                         decimalScale={2}
                         style={{ width: '100%' }}
                       />
-                    ) : (
-                      <Text 
-                        size="sm" 
-                        fw={600}
-                        c={transaction.type === 'DEPOSIT' || transaction.type === 'TRANSFER_IN' ? 'green' : 'red'}
-                      >
-                        {(transaction.type === 'DEPOSIT' || transaction.type === 'TRANSFER_IN' ? '+' : '-') + Number(transaction.amount).toFixed(2)} $
-                      </Text>
-                    )}
-                  </Table.Td>
-                  <Table.Td style={{ padding: '16px', textAlign: 'center' }}>
-                    <Group gap="xs" justify="center" wrap="nowrap">
-                      {isEditing ? (
-                        <>
-                          <ActionIcon
-                            color="green"
-                            variant="light"
-                            onClick={() => {
-                              if (editingTransactionData) {
-                                handleSaveTransaction({ 
-                                  id: transaction.id,
-                                  date: editingTransactionData.date || transaction.date,
-                                  type: editingTransactionData.type || transaction.type,
-                                  name: editingTransactionData.name || transaction.name,
-                                  description: editingTransactionData.description !== undefined ? editingTransactionData.description : (transaction.description || null),
-                                  amount: editingTransactionData.amount !== undefined ? editingTransactionData.amount : Number(transaction.amount),
-                                  order: editingTransactionData.order !== undefined ? editingTransactionData.order : transaction.order,
-                                });
-                              }
-                            }}
-                          >
-                            <IconCheck size={16} />
-                          </ActionIcon>
-                          <ActionIcon
-                            color="gray"
-                            variant="light"
-                            onClick={() => {
-                              setEditingTransaction(null);
-                              setEditingTransactionData(null);
-                            }}
-                          >
-                            <IconX size={16} />
-                          </ActionIcon>
-                        </>
-                      ) : (
-                        <>
-                          {(() => {
-                            // Calculer si la transaction peut être montée ou descendue
-                            const transactionDate = new Date(transaction.date);
-                            transactionDate.setHours(0, 0, 0, 0);
-                            
-                            const sameDateTransactions = week.transactions.filter((t) => {
-                              const tDate = new Date(t.date);
-                              tDate.setHours(0, 0, 0, 0);
-                              return tDate.getTime() === transactionDate.getTime();
-                            });
-                            
-                            // Ne pas afficher les boutons de réordonnancement s'il n'y a qu'une seule transaction de cette date
-                            if (sameDateTransactions.length < 2) {
-                              return null;
+                    );
+                  }
+                  
+                  return (
+                    <Text 
+                      size="sm" 
+                      fw={600}
+                      c={transaction.type === 'DEPOSIT' || transaction.type === 'TRANSFER_IN' ? 'green' : 'red'}
+                    >
+                      {(transaction.type === 'DEPOSIT' || transaction.type === 'TRANSFER_IN' ? '+' : '-') + Number(transaction.amount).toFixed(2)} $
+                    </Text>
+                  );
+                },
+              },
+              {
+                accessor: 'actions',
+                title: 'Actions',
+                textAlign: 'center',
+                sortable: false,
+                render: (transaction: any) => {
+                  const isNew = transaction.isNew;
+                  const isEditing = !isNew && editingTransaction === transaction.id;
+                  
+                  if (isNew) {
+                    return (
+                      <Group gap="xs" justify="center" wrap="nowrap">
+                        <ActionIcon
+                          size="sm"
+                          variant="subtle"
+                          color="green"
+                          onClick={() => {
+                            if (newTransaction) {
+                              handleSaveTransaction(newTransaction);
                             }
-                            
-                            const sortedSameDate = [...sameDateTransactions].sort((a, b) => a.order - b.order);
-                            const currentIndex = sortedSameDate.findIndex((t) => t.id === transaction.id);
-                            
-                            // Calculer si on peut monter/descendre dans l'ordre réel
-                            const canMoveUpInOrder = currentIndex > 0;
-                            const canMoveDownInOrder = currentIndex < sortedSameDate.length - 1;
-                            
-                            // En mode desc, inverser les conditions car "up" dans le tableau = "down" dans l'ordre réel
-                            const canMoveUp = sortOrder === 'desc' ? canMoveDownInOrder : canMoveUpInOrder;
-                            const canMoveDown = sortOrder === 'desc' ? canMoveUpInOrder : canMoveDownInOrder;
-                            
-                            return (
-                              <>
-                                <ActionIcon
-                                  variant="subtle"
-                                  size="sm"
-                                  color="gray"
-                                  onClick={() => handleReorderTransaction(transaction.id, 'up')}
-                                  disabled={!canMoveUp || loading || isEditing}
-                                  title={sortOrder === 'desc' ? 'Descendre' : 'Monter'}
-                                >
-                                  <IconArrowUp size={16} />
-                                </ActionIcon>
-                                <ActionIcon
-                                  variant="subtle"
-                                  size="sm"
-                                  color="gray"
-                                  onClick={() => handleReorderTransaction(transaction.id, 'down')}
-                                  disabled={!canMoveDown || loading || isEditing}
-                                  title={sortOrder === 'desc' ? 'Monter' : 'Descendre'}
-                                >
-                                  <IconArrowDown size={16} />
-                                </ActionIcon>
-                              </>
-                            );
-                          })()}
+                          }}
+                          disabled={!newTransaction?.date || !newTransaction?.type || !newTransaction?.name || !newTransaction?.amount}
+                        >
+                          <IconCheck size={18} />
+                        </ActionIcon>
+                        <ActionIcon
+                          size="sm"
+                          variant="subtle"
+                          color="gray"
+                          onClick={() => setNewTransaction(null)}
+                        >
+                          <IconX size={18} />
+                        </ActionIcon>
+                      </Group>
+                    );
+                  }
+                  
+                  if (isEditing) {
+                    return (
+                      <Group gap="xs" justify="center" wrap="nowrap">
+                        <ActionIcon
+                          color="green"
+                          variant="light"
+                          onClick={() => {
+                            if (editingTransactionData) {
+                              handleSaveTransaction({ 
+                                id: transaction.id,
+                                date: editingTransactionData.date || transaction.date,
+                                type: editingTransactionData.type || transaction.type,
+                                name: editingTransactionData.name || transaction.name,
+                                description: editingTransactionData.description !== undefined ? editingTransactionData.description : (transaction.description || null),
+                                amount: editingTransactionData.amount !== undefined ? editingTransactionData.amount : Number(transaction.amount),
+                                order: editingTransactionData.order !== undefined ? editingTransactionData.order : transaction.order,
+                              });
+                            }
+                          }}
+                        >
+                          <IconCheck size={16} />
+                        </ActionIcon>
+                        <ActionIcon
+                          color="gray"
+                          variant="light"
+                          onClick={() => {
+                            setEditingTransaction(null);
+                            setEditingTransactionData(null);
+                          }}
+                        >
+                          <IconX size={16} />
+                        </ActionIcon>
+                      </Group>
+                    );
+                  }
+                  
+                  // Calculer si la transaction peut être montée ou descendue
+                  const transactionDate = new Date(transaction.date);
+                  transactionDate.setHours(0, 0, 0, 0);
+                  
+                  const sameDateTransactions = week.transactions.filter((t) => {
+                    const tDate = new Date(t.date);
+                    tDate.setHours(0, 0, 0, 0);
+                    return tDate.getTime() === transactionDate.getTime();
+                  });
+                  
+                  const sortedSameDate = [...sameDateTransactions].sort((a, b) => a.order - b.order);
+                  const currentIndex = sortedSameDate.findIndex((t) => t.id === transaction.id);
+                  
+                  const canMoveUpInOrder = currentIndex > 0;
+                  const canMoveDownInOrder = currentIndex < sortedSameDate.length - 1;
+                  
+                  const canMoveUp = sortOrder === 'desc' ? canMoveDownInOrder : canMoveUpInOrder;
+                  const canMoveDown = sortOrder === 'desc' ? canMoveUpInOrder : canMoveDownInOrder;
+                  
+                  return (
+                    <Group gap="xs" justify="center" wrap="nowrap">
+                      {sameDateTransactions.length >= 2 && (
+                        <>
                           <ActionIcon
                             variant="subtle"
                             size="sm"
-                            color="blue"
-                            onClick={() => {
-                              setEditingTransaction(transaction.id);
-                              setEditingTransactionData({
-                                date: transaction.date,
-                                type: transaction.type,
-                                name: transaction.name,
-                                description: transaction.description ? transaction.description : undefined,
-                                amount: Number(transaction.amount),
-                                order: transaction.order,
-                              });
-                            }}
+                            color="gray"
+                            onClick={() => handleReorderTransaction(transaction.id, 'up')}
+                            disabled={!canMoveUp || loading || isEditing}
+                            title={sortOrder === 'desc' ? 'Descendre' : 'Monter'}
                           >
-                            <IconEdit size={16} />
+                            <IconArrowUp size={16} />
                           </ActionIcon>
-                          <Popover
-                            position="top"
-                            withArrow
-                            shadow="md"
-                            opened={deletePopoverOpened === transaction.id}
-                            onChange={(opened) => setDeletePopoverOpened(opened ? transaction.id : null)}
+                          <ActionIcon
+                            variant="subtle"
+                            size="sm"
+                            color="gray"
+                            onClick={() => handleReorderTransaction(transaction.id, 'down')}
+                            disabled={!canMoveDown || loading || isEditing}
+                            title={sortOrder === 'desc' ? 'Monter' : 'Descendre'}
                           >
-                            <Popover.Target>
-                              <ActionIcon
-                                color="red"
-                                variant="subtle"
-                                size="sm"
-                                onClick={() => setDeletePopoverOpened(transaction.id)}
-                                disabled={loading || isEditing}
-                              >
-                                <IconTrash size={16} />
-                              </ActionIcon>
-                            </Popover.Target>
-                            <Popover.Dropdown>
-                              <Stack gap="xs" p="xs">
-                                <Text size="sm" fw={500}>Confirmer la suppression</Text>
-                                <Text size="xs" c="dimmed">
-                                  Êtes-vous sûr de vouloir supprimer cette transaction ?
-                                </Text>
-                                <Group gap="xs" justify="flex-end" mt="xs">
-                                  <Button
-                                    size="xs"
-                                    variant="subtle"
-                                    onClick={() => setDeletePopoverOpened(null)}
-                                  >
-                                    Annuler
-                                  </Button>
-                                  <Button
-                                    size="xs"
-                                    color="red"
-                                    onClick={() => {
-                                      handleDeleteTransaction(transaction.id);
-                                      setDeletePopoverOpened(null);
-                                    }}
-                                  >
-                                    Supprimer
-                                  </Button>
-                                </Group>
-                              </Stack>
-                            </Popover.Dropdown>
-                          </Popover>
+                            <IconArrowDown size={16} />
+                          </ActionIcon>
                         </>
                       )}
+                      <ActionIcon
+                        variant="subtle"
+                        size="sm"
+                        color="blue"
+                        onClick={() => {
+                          setEditingTransaction(transaction.id);
+                          setEditingTransactionData({
+                            date: transaction.date,
+                            type: transaction.type,
+                            name: transaction.name,
+                            description: transaction.description ? transaction.description : undefined,
+                            amount: Number(transaction.amount),
+                            order: transaction.order,
+                          });
+                        }}
+                      >
+                        <IconEdit size={16} />
+                      </ActionIcon>
+                      <Popover
+                        position="top"
+                        withArrow
+                        shadow="md"
+                        opened={deletePopoverOpened === transaction.id}
+                        onChange={(opened) => setDeletePopoverOpened(opened ? transaction.id : null)}
+                      >
+                        <Popover.Target>
+                          <ActionIcon
+                            color="red"
+                            variant="subtle"
+                            size="sm"
+                            onClick={() => setDeletePopoverOpened(transaction.id)}
+                            disabled={loading || isEditing}
+                          >
+                            <IconTrash size={16} />
+                          </ActionIcon>
+                        </Popover.Target>
+                        <Popover.Dropdown>
+                          <Stack gap="xs" p="xs">
+                            <Text size="sm" fw={500}>Confirmer la suppression</Text>
+                            <Text size="xs" c="dimmed">
+                              Êtes-vous sûr de vouloir supprimer cette transaction ?
+                            </Text>
+                            <Group gap="xs" justify="flex-end" mt="xs">
+                              <Button
+                                size="xs"
+                                variant="subtle"
+                                onClick={() => setDeletePopoverOpened(null)}
+                              >
+                                Annuler
+                              </Button>
+                              <Button
+                                size="xs"
+                                color="red"
+                                onClick={() => {
+                                  handleDeleteTransaction(transaction.id);
+                                  setDeletePopoverOpened(null);
+                                }}
+                              >
+                                Supprimer
+                              </Button>
+                            </Group>
+                          </Stack>
+                        </Popover.Dropdown>
+                      </Popover>
                     </Group>
-                  </Table.Td>
-                </Table.Tr>
-              );
-            })}
+                  );
+                },
+              },
+            ]}
+            striped
+            highlightOnHover
+            fetching={loading}
+            noRecordsText="Aucune transaction trouvée"
+            sortStatus={{
+              columnAccessor: 'date',
+              direction: sortOrder,
+            }}
+            onSortStatusChange={(status) => {
+              // Utiliser notre propre logique de tri
+              if (status) {
+                setSortOrder(status.direction === 'asc' ? 'asc' : 'desc');
+              }
+            }}
+          />
 
-            {sortOrder === 'asc' && newTransaction && (
-              <Table.Tr>
-                <Table.Td style={{ padding: '16px' }}>
-                  <DateInput
-                    value={newTransaction.date ? new Date(newTransaction.date) : new Date()}
-                    onChange={(date) => {
-                      if (date) {
-                        setNewTransaction({ ...newTransaction, date: date as any });
-                      }
-                    }}
-                    size="xs"
-                    valueFormat="MM/DD/YYYY"
-                    key={newTransaction.date ? new Date(newTransaction.date).getTime() : Date.now()}
-                  />
-                </Table.Td>
-                <Table.Td style={{ padding: '16px' }}>
-                  <Select
-                    data={transactionTypeOptions.map(opt => ({ value: opt.value, label: opt.label }))}
-                    value={newTransaction.type}
-                    onChange={(value) => {
-                      setNewTransaction({ ...newTransaction, type: value as any });
-                    }}
-                    size="xs"
-                    placeholder="Type"
-                  />
-                </Table.Td>
-                <Table.Td style={{ padding: '16px' }}>
-                  <Autocomplete
-                    data={nameSuggestions}
-                    value={newTransaction.name || ''}
-                    onChange={(value) => {
-                      setNewTransaction({ ...newTransaction, name: value });
-                    }}
-                    size="xs"
-                    placeholder="Nom"
-                    renderOption={({ option }) => (
-                      <Group justify="space-between" style={{ flex: 1 }}>
-                        <Text size="xs" style={{ flex: 1 }}>{option.value}</Text>
-                        <Popover
-                          position="top"
-                          withArrow
-                          shadow="md"
-                          withinPortal
-                        >
-                          <Popover.Target>
-                            <ActionIcon
-                              size="xs"
-                              variant="subtle"
-                              color="red"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <IconTrash size={12} />
-                            </ActionIcon>
-                          </Popover.Target>
-                          <Popover.Dropdown>
-                            <Stack gap="xs" p="xs">
-                              <Text size="sm" fw={500}>Supprimer la suggestion</Text>
-                              <Text size="xs" c="dimmed">
-                                Supprimer "{option.value}" des suggestions ?
-                              </Text>
-                              <Group gap="xs" justify="flex-end" mt="xs">
-                                <Button
-                                  size="xs"
-                                  variant="subtle"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                  }}
-                                >
-                                  Annuler
-                                </Button>
-                                <Button
-                                  size="xs"
-                                  color="red"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteNameSuggestion(option.value, e);
-                                  }}
-                                >
-                                  Supprimer
-                                </Button>
-                              </Group>
-                            </Stack>
-                          </Popover.Dropdown>
-                        </Popover>
-                      </Group>
-                    )}
-                    comboboxProps={{ withinPortal: true }}
-                    rightSection={
-                      newTransaction.name &&
-                      newTransaction.name.trim().length > 0 &&
-                      !nameSuggestions.some(s => s.toLowerCase() === newTransaction.name?.toLowerCase().trim()) ? (
-                        <ActionIcon
-                          size="sm"
-                          variant="subtle"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleAddNameSuggestion(newTransaction.name!);
-                          }}
-                        >
-                          <IconPlus size={14} />
-                        </ActionIcon>
-                      ) : null
-                    }
-                  />
-                </Table.Td>
-                <Table.Td style={{ padding: '16px' }}>
-                  <Autocomplete
-                    data={descriptionSuggestions}
-                    value={newTransaction.description || ''}
-                    onChange={(value) => {
-                      setNewTransaction({ ...newTransaction, description: value || undefined });
-                    }}
-                    size="xs"
-                    placeholder="Description"
-                    renderOption={({ option }) => (
-                      <Group justify="space-between" style={{ flex: 1 }}>
-                        <Text size="xs" style={{ flex: 1 }}>{option.value}</Text>
-                        <Popover
-                          position="top"
-                          withArrow
-                          shadow="md"
-                          withinPortal
-                        >
-                          <Popover.Target>
-                            <ActionIcon
-                              size="xs"
-                              variant="subtle"
-                              color="red"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <IconTrash size={12} />
-                            </ActionIcon>
-                          </Popover.Target>
-                          <Popover.Dropdown>
-                            <Stack gap="xs" p="xs">
-                              <Text size="sm" fw={500}>Supprimer la suggestion</Text>
-                              <Text size="xs" c="dimmed">
-                                Supprimer "{option.value}" des suggestions ?
-                              </Text>
-                              <Group gap="xs" justify="flex-end" mt="xs">
-                                <Button
-                                  size="xs"
-                                  variant="subtle"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                  }}
-                                >
-                                  Annuler
-                                </Button>
-                                <Button
-                                  size="xs"
-                                  color="red"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteDescriptionSuggestion(option.value, e);
-                                  }}
-                                >
-                                  Supprimer
-                                </Button>
-                              </Group>
-                            </Stack>
-                          </Popover.Dropdown>
-                        </Popover>
-                      </Group>
-                    )}
-                    comboboxProps={{ withinPortal: true }}
-                    rightSection={
-                      newTransaction.description &&
-                      newTransaction.description.trim().length > 0 &&
-                      !descriptionSuggestions.some(s => s.toLowerCase() === newTransaction.description?.toLowerCase().trim()) ? (
-                        <ActionIcon
-                          size="sm"
-                          variant="subtle"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleAddDescriptionSuggestion(newTransaction.description!);
-                          }}
-                        >
-                          <IconPlus size={14} />
-                        </ActionIcon>
-                      ) : null
-                    }
-                  />
-                </Table.Td>
-                <Table.Td style={{ padding: '16px', textAlign: 'right' }}>
-                  <NumberInput
-                    value={newTransaction.amount ? Number(newTransaction.amount) : undefined}
-                    onChange={(value) => {
-                      setNewTransaction({
-                        ...newTransaction,
-                        amount: value ? Number(value) : undefined,
-                      });
-                    }}
-                    size="xs"
-                    min={0}
-                    decimalScale={2}
-                    placeholder="0.00"
-                    style={{ width: '100%' }}
-                  />
-                </Table.Td>
-                <Table.Td style={{ padding: '16px', textAlign: 'center' }}>
-                  <Group gap="xs" justify="center" wrap="nowrap">
-                    <ActionIcon
-                      size="sm"
-                      variant="subtle"
-                      color="green"
-                      onClick={() => {
-                        handleSaveTransaction(newTransaction);
-                      }}
-                      disabled={!newTransaction.date || !newTransaction.type || !newTransaction.name || !newTransaction.amount}
-                    >
-                      <IconCheck size={18} />
-                    </ActionIcon>
-                    <ActionIcon
-                      size="sm"
-                      variant="subtle"
-                      color="gray"
-                      onClick={() => setNewTransaction(null)}
-                    >
-                      <IconX size={18} />
-                    </ActionIcon>
-                  </Group>
-                </Table.Td>
-              </Table.Tr>
-            )}
-          </Table.Tbody>
-        </Table>
-
-        {!newTransaction && (
-          <Group p="lg" justify="center">
-            <Button
-              leftSection={<IconPlus size={18} />}
-              onClick={() => {
-                setNewTransaction({
-                  date: new Date(),
-                  type: 'DEPOSIT',
-                  name: '',
-                  description: '',
-                  amount: undefined,
-                  order: week.transactions.length,
-                });
-              }}
-              size="md"
-              radius="md"
-            >
-              Ajouter une transaction
-            </Button>
-          </Group>
-        )}
+          {!newTransaction && (
+            <Group p="lg" justify="center">
+              <Button
+                leftSection={<IconPlus size={18} />}
+                onClick={() => {
+                  setNewTransaction({
+                    date: new Date(),
+                    type: 'DEPOSIT',
+                    name: '',
+                    description: '',
+                    amount: undefined,
+                    order: week.transactions.length,
+                  });
+                }}
+                size="md"
+                radius="md"
+              >
+                Ajouter une transaction
+              </Button>
+            </Group>
+          )}
         </Paper>
       </DatesProvider>
       </Stack>
