@@ -53,6 +53,7 @@ import type { BankAccountWithRelations } from '@/types/bankAccounts';
 import type { BankAccountWeek, BankTransaction } from '@prisma/client';
 import { useRouter } from 'next/navigation';
 import { routes } from '@/types/routes';
+import { ActiveFilters } from '@/app/_components/ActiveFilters/ActiveFilters';
 
 type SerializedBankAccountWeek = Omit<BankAccountWeek, 'balance'> & {
   balance: number;
@@ -664,23 +665,28 @@ export default function BankAccountPageClient({
         </Paper>
 
       <DatesProvider settings={{ locale: 'fr' }}>
+        <ActiveFilters
+          filters={[
+            {
+              label: 'Type',
+              value: typeFilter.length > 0 ? typeFilter.join(', ') : null,
+              onRemove: () => setTypeFilter([]),
+              displayValue: typeFilter.length > 0
+                ? typeFilter
+                    .map((type) => {
+                      const typeInfo = transactionTypeOptions.find(opt => opt.value === type);
+                      return typeInfo ? typeInfo.label : type;
+                    })
+                    .join(', ')
+                : undefined,
+            },
+          ]}
+        />
         <Paper shadow="sm" withBorder radius="md" p={0}>
-          <Group p="md" justify="space-between" align="flex-end">
-            <MultiSelect
-              label="Filtrer par type"
-              placeholder="Sélectionner les types de transactions"
-              data={transactionTypeOptions.map(opt => ({ value: opt.value, label: opt.label }))}
-              value={typeFilter}
-              onChange={setTypeFilter}
-              clearable
-              style={{ minWidth: 250 }}
-              size="sm"
-            />
-            {!newTransaction && (
-              <ActionIcon
-                size="lg"
-                variant="light"
-                color="blue"
+          {!newTransaction && (
+            <Group p="md" justify="flex-end">
+              <Button
+                leftSection={<IconPlus size={18} />}
                 onClick={() => {
                   setNewTransaction({
                     date: new Date(),
@@ -691,11 +697,13 @@ export default function BankAccountPageClient({
                     order: week.transactions.length,
                   });
                 }}
+                size="sm"
+                radius="md"
               >
-                <IconPlus size={20} />
-              </ActionIcon>
-            )}
-          </Group>
+                Ajouter une transaction
+              </Button>
+            </Group>
+          )}
           <DataTable
             records={dataTableRecords}
             columns={[
@@ -744,6 +752,17 @@ export default function BankAccountPageClient({
                 accessor: 'type',
                 title: 'Type',
                 sortable: false,
+                filter: (
+                  <MultiSelect
+                    placeholder="Filtrer par type"
+                    data={transactionTypeOptions.map(opt => ({ value: opt.value, label: opt.label }))}
+                    value={typeFilter}
+                    onChange={setTypeFilter}
+                    clearable
+                    style={{ minWidth: 200 }}
+                    size="xs"
+                  />
+                ),
                 render: (transaction: any) => {
                   const isNew = transaction.isNew;
                   const isEditing = !isNew && editingTransaction === transaction.id;
@@ -1398,7 +1417,11 @@ export default function BankAccountPageClient({
             striped
             highlightOnHover
             fetching={loading}
-            noRecordsText="Aucune transaction trouvée"
+            noRecordsText={
+              typeFilter.length > 0
+                ? 'Aucune transaction trouvée avec ces filtres'
+                : 'Aucune transaction trouvée'
+            }
             sortStatus={{
               columnAccessor: 'date',
               direction: sortOrder,
@@ -1410,28 +1433,6 @@ export default function BankAccountPageClient({
               }
             }}
           />
-
-          {!newTransaction && (
-            <Group p="lg" justify="center">
-              <Button
-                leftSection={<IconPlus size={18} />}
-                onClick={() => {
-                  setNewTransaction({
-                    date: new Date(),
-                    type: 'DEPOSIT',
-                    name: '',
-                    description: '',
-                    amount: undefined,
-                    order: week.transactions.length,
-                  });
-                }}
-                size="md"
-                radius="md"
-              >
-                Ajouter une transaction
-              </Button>
-            </Group>
-          )}
         </Paper>
       </DatesProvider>
       </Stack>
