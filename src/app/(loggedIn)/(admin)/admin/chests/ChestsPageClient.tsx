@@ -22,7 +22,7 @@ interface ChestsPageClientProps {
   initialChests: ChestWithStockHistory[];
 }
 
-// Fonction pour normaliser les chaînes (enlever les accents et mettre en minuscule)
+// Function to normalize strings (remove accents and convert to lowercase)
 const normalizeString = (str: string): string => {
   return str
     .toLowerCase()
@@ -74,7 +74,6 @@ export default function ChestsPageClient({
     setModalOpened(true);
   };
 
-  // Filtrer les coffres par nom
   const filteredChests = chests.filter((chest) => {
     const matchesName =
       !nameFilter ||
@@ -82,7 +81,6 @@ export default function ChestsPageClient({
     return matchesName;
   });
 
-  // Trier par ordre, puis par date de création (plus récent en premier)
   const sortedChests = [...filteredChests].sort((a, b) => {
     if (a.order !== undefined && b.order !== undefined) {
       return a.order - b.order;
@@ -90,14 +88,12 @@ export default function ChestsPageClient({
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 
-  // Calculer la pagination
   const totalRecords = sortedChests.length;
   const paginatedChests = sortedChests.slice(
     (page - 1) * pageSize,
     page * pageSize
   );
 
-  // Réinitialiser la page quand les filtres changent
   useEffect(() => {
     setPage(1);
   }, [nameFilter]);

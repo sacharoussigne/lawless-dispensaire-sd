@@ -138,7 +138,7 @@ export default function CraftModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opened, sourceChestId]);
 
-  // Réinitialiser les états quand la modal se ferme
+  // Reset states when modal closes
   useEffect(() => {
     if (!opened) {
       setSelectedCraftItem(null);
@@ -158,12 +158,12 @@ export default function CraftModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourceChestId]);
 
-  // Réinitialiser les coffres des ingrédients quand le coffre source de base change
+  // Reset ingredient chests when base source chest changes
   useEffect(() => {
     if (sourceChestId) {
       setIngredientChests((prev) => {
         const updated: Record<string, string> = {};
-        // Garder les valeurs existantes mais réinitialiser celles qui n'ont pas été modifiées
+        // Keep existing values but reset those that haven't been modified
         Object.keys(prev).forEach((ingredientId) => {
           updated[ingredientId] = prev[ingredientId];
         });
@@ -172,7 +172,7 @@ export default function CraftModal({
     }
   }, [sourceChestId]);
 
-  // Réinitialiser les coffres des ingrédients quand la recette change
+  // Reset ingredient chests when recipe changes
   useEffect(() => {
     if (selectedRecipe) {
       setIngredientChests({});
@@ -240,7 +240,7 @@ export default function CraftModal({
     const recipe = craftRecipes.find((r) => r.id === selectedRecipe);
     if (!recipe) return;
 
-    // Construire le tableau des coffres sources par ingrédient
+    // Build array of source chests per ingredient
     const ingredientChestsArray = recipe.ingredients.map((ingredient) => ({
       ingredientId: ingredient.id,
       chestId: ingredientChests[ingredient.id] || sourceChestId,
@@ -256,7 +256,7 @@ export default function CraftModal({
     );
   };
 
-  // Helper pour obtenir le stock disponible d'un item dans un coffre spécifique
+  // Helper to get available stock of an item in a specific chest
   const getItemStockInChest = (itemId: string, chestId: string | null): { stock: number | null; isToday: boolean } => {
     if (!chestId) return { stock: null, isToday: false };
     
@@ -276,7 +276,6 @@ export default function CraftModal({
     return { stock: null, isToday: false };
   };
 
-  // Options pour les coffres
   const chestOptions = chests.map((chest) => ({
     value: chest.id,
     label: chest.name,
@@ -287,7 +286,7 @@ export default function CraftModal({
     label: chest.name,
   }));
 
-  // Vérifications pour le bouton de craft
+  // Validations for craft button
   const getCraftValidation = () => {
     if (!canCraft) {
       return { canCraft: false, reason: "Vous n'avez pas la permission d'effectuer un craft" };

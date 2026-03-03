@@ -7,19 +7,19 @@ export async function hasAdminRoleMiddleware(
   session: any,
 ) {
   if (!session) {
-    // Si pas de session, on laisse le middleware de connexion gérer
+    // If no session, let login middleware handle it
     return NextResponse.next();
   }
 
-  // Vérifier que l'utilisateur a le rôle admin
+  // Check that user has admin role
   const userRole = session.user?.role;
   
   if (userRole !== 'admin') {
-    // Pour les requêtes JSON, retourner une erreur JSON
+    // For JSON requests, return JSON error
     if (request.headers.get("content-type") === "application/json") {
       return forbiddenResponse({ error: "Accès administrateur requis" });
     }
-    // Sinon, rediriger vers la page no-management-access (car c'est généralement pour les pages admin)
+    // Otherwise, redirect to no-management-access page (as it's usually for admin pages)
     return routes.redirect(request, routes.auth.noManagementAccess);
   }
 

@@ -62,7 +62,6 @@ export default function Login() {
 
   return (
     <Container size={420} my={40}>
-      {/*<Title ta="center" className={classes.title}>*/}
       <Title ta="center">Bon retour ! </Title>
       <Text c="dimmed" size="sm" ta="center" mt={5}>
         Vous n'avez pas encore de compte ?{' '}

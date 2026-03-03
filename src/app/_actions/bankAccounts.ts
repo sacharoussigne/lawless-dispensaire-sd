@@ -6,7 +6,6 @@ import { actionErrorParser } from '@/lib/action';
 import { getAuthSession } from '@/lib/auth';
 import { startOfWeek, endOfWeek, parseISO } from 'date-fns';
 
-// Schémas de validation
 const createBankAccountSchema = z.object({
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
 });
@@ -54,15 +53,15 @@ const deleteTransactionSchema = z.object({
   id: z.string().uuid('ID invalide'),
 });
 
-// Fonction utilitaire pour obtenir le lundi et dimanche d'une semaine
+// Utility function to get Monday and Sunday of a week
 function getWeekBounds(date: Date) {
-  const start = startOfWeek(date, { weekStartsOn: 1 }); // Lundi
-  const end = endOfWeek(date, { weekStartsOn: 1 }); // Dimanche
+  const start = startOfWeek(date, { weekStartsOn: 1 });
+  const end = endOfWeek(date, { weekStartsOn: 1 });
   return { start, end };
 }
 
 /**
- * Vérifie si l'utilisateur a accès au compte (propriétaire ou accès)
+ * Checks if the user has access to the account (owner or access)
  */
 async function checkAccountAccess(accountId: string, userId: string, requireWrite: boolean = false) {
   const account = await prisma.bankAccount.findUnique({
@@ -78,12 +77,12 @@ async function checkAccountAccess(accountId: string, userId: string, requireWrit
     return { hasAccess: false, error: 'Compte introuvable' };
   }
 
-  // Le propriétaire a toujours accès
+  // Owner always has access
   if (account.ownerId === userId) {
     return { hasAccess: true };
   }
 
-  // Vérifier les accès
+  // Check access
   const access = account.accesses[0];
   if (!access) {
     return { hasAccess: false, error: 'Accès non autorisé' };
@@ -97,7 +96,7 @@ async function checkAccountAccess(accountId: string, userId: string, requireWrit
 }
 
 /**
- * Crée un nouveau compte bancaire
+ * Creates a new bank account
  */
 export async function createBankAccount(data: { name: string }) {
   try {
@@ -148,7 +147,7 @@ export async function createBankAccount(data: { name: string }) {
 }
 
 /**
- * Récupère tous les comptes bancaires accessibles par l'utilisateur
+ * Gets all bank accounts accessible by the user
  */
 export async function getBankAccounts() {
   try {
@@ -208,7 +207,7 @@ export async function getBankAccounts() {
 }
 
 /**
- * Récupère un compte bancaire par son ID
+ * Gets a bank account by its ID
  */
 export async function getBankAccount(accountId: string) {
   try {
@@ -269,7 +268,7 @@ export async function getBankAccount(accountId: string) {
 }
 
 /**
- * Modifie un compte bancaire
+ * Updates a bank account
  */
 export async function updateBankAccount(data: { id: string; name: string }) {
   try {
@@ -328,7 +327,7 @@ export async function updateBankAccount(data: { id: string; name: string }) {
 }
 
 /**
- * Supprime un compte bancaire
+ * Deletes a bank account
  */
 export async function deleteBankAccount(data: { id: string }) {
   try {
@@ -376,7 +375,7 @@ export async function deleteBankAccount(data: { id: string }) {
 }
 
 /**
- * Crée un accès à un compte bancaire
+ * Creates access to a bank account
  */
 export async function createBankAccountAccess(data: {
   accountId: string;
@@ -394,7 +393,7 @@ export async function createBankAccountAccess(data: {
 
     const validatedData = createBankAccountAccessSchema.parse(data);
 
-    // Seul le propriétaire peut donner accès
+    // Only the owner can grant access
     const account = await prisma.bankAccount.findUnique({
       where: { id: validatedData.accountId },
       select: { ownerId: true },
@@ -414,7 +413,7 @@ export async function createBankAccountAccess(data: {
       };
     }
 
-    // Ne pas permettre de donner accès à soi-même
+    // Do not allow granting access to oneself
     if (validatedData.userId === session.user.id) {
       return {
         status: 400,
@@ -449,7 +448,7 @@ export async function createBankAccountAccess(data: {
 }
 
 /**
- * Supprime un accès à un compte bancaire
+ * Deletes access to a bank account
  */
 export async function deleteBankAccountAccess(data: { id: string }) {
   try {
@@ -463,7 +462,7 @@ export async function deleteBankAccountAccess(data: { id: string }) {
 
     const validatedData = deleteBankAccountAccessSchema.parse(data);
 
-    // Seul le propriétaire peut supprimer un accès
+    // Only the owner can delete access
     const access = await prisma.bankAccountAccess.findUnique({
       where: { id: validatedData.id },
       include: {
@@ -501,7 +500,7 @@ export async function deleteBankAccountAccess(data: { id: string }) {
 }
 
 /**
- * Récupère ou crée une semaine pour un compte
+ * Gets or creates a week for an account
  */
 export async function getOrCreateWeek(accountId: string, date: Date) {
   try {
@@ -523,7 +522,7 @@ export async function getOrCreateWeek(accountId: string, date: Date) {
 
     const { start, end } = getWeekBounds(date);
 
-    // Chercher la semaine existante
+    // Find existing week
     let week = await prisma.bankAccountWeek.findUnique({
       where: {
         accountId_weekStart: {
@@ -541,9 +540,9 @@ export async function getOrCreateWeek(accountId: string, date: Date) {
       },
     });
 
-    // Si elle n'existe pas, la créer
+    // If it doesn't exist, create it
     if (!week) {
-      // Récupérer le solde de la semaine précédente
+      // Get previous week balance
       const previousWeek = await prisma.bankAccountWeek.findFirst({
         where: {
           accountId,
@@ -593,7 +592,7 @@ export async function getOrCreateWeek(accountId: string, date: Date) {
 }
 
 /**
- * Récupère toutes les semaines d'un compte
+ * Gets all weeks of an account
  */
 export async function getAccountWeeks(accountId: string) {
   try {
@@ -647,7 +646,7 @@ export async function getAccountWeeks(accountId: string) {
 }
 
 /**
- * Crée une transaction
+ * Creates a transaction
  */
 export async function createTransaction(data: {
   weekId: string;
@@ -669,7 +668,7 @@ export async function createTransaction(data: {
 
     const validatedData = createTransactionSchema.parse(data);
 
-    // Vérifier l'accès via la semaine
+    // Check access via the week
     const week = await prisma.bankAccountWeek.findUnique({
       where: { id: validatedData.weekId },
       include: {
@@ -694,11 +693,11 @@ export async function createTransaction(data: {
 
     const date = typeof validatedData.date === 'string' ? parseISO(validatedData.date) : validatedData.date;
 
-    // Normaliser la date pour comparer seulement la date (sans l'heure)
+    // Normalize date to compare only the date (without time)
     const normalizedDate = new Date(date);
     normalizedDate.setHours(0, 0, 0, 0);
 
-    // Récupérer toutes les transactions de la semaine pour calculer l'ordre
+    // Get all week transactions to calculate order
     const allTransactions = await prisma.bankTransaction.findMany({
       where: {
         weekId: validatedData.weekId,
@@ -710,7 +709,7 @@ export async function createTransaction(data: {
       },
     });
 
-    // Trouver toutes les transactions de la même date
+    // Find all transactions with the same date
     const sameDateTransactions = allTransactions.filter((t) => {
       const tDate = new Date(t.date);
       tDate.setHours(0, 0, 0, 0);
@@ -772,7 +771,7 @@ export async function createTransaction(data: {
 }
 
 /**
- * Modifie une transaction
+ * Updates a transaction
  */
 export async function updateTransaction(data: {
   id: string;
@@ -916,7 +915,7 @@ export async function updateTransaction(data: {
       const normalizedCurrentDate = new Date(transaction.date);
       normalizedCurrentDate.setHours(0, 0, 0, 0);
       
-      // Trouver toutes les transactions de la même date
+      // Find all transactions with the same date
       const sameDateTransactions = allTransactions.filter((t) => {
         const tDate = new Date(t.date);
         tDate.setHours(0, 0, 0, 0);
@@ -994,7 +993,7 @@ export async function updateTransaction(data: {
 }
 
 /**
- * Supprime une transaction
+ * Deletes a transaction
  */
 export async function deleteTransaction(data: { id: string }) {
   try {
@@ -1094,8 +1093,8 @@ export async function deleteTransaction(data: { id: string }) {
 }
 
 /**
- * Recalcule le solde d'une semaine et de toutes les semaines suivantes
- * (car le balance d'une semaine dépend du balance de la semaine précédente)
+ * Recalculates the balance of a week and all following weeks
+ * (because a week's balance depends on the previous week's balance)
  */
 async function recalculateWeekBalance(weekId: string) {
   const week = await prisma.bankAccountWeek.findUnique({
@@ -1112,7 +1111,7 @@ async function recalculateWeekBalance(weekId: string) {
 
   if (!week) return;
 
-  // Récupérer le solde de la semaine précédente
+  // Get previous week balance
   const previousWeek = await prisma.bankAccountWeek.findFirst({
     where: {
       accountId: week.accountId,
@@ -1198,7 +1197,7 @@ async function recalculateWeekBalance(weekId: string) {
 }
 
 /**
- * Récupère les suggestions de noms
+ * Gets name suggestions
  */
 export async function getNameSuggestions() {
   try {
@@ -1219,7 +1218,7 @@ export async function getNameSuggestions() {
 }
 
 /**
- * Récupère les suggestions de descriptions
+ * Gets description suggestions
  */
 export async function getDescriptionSuggestions() {
   try {
@@ -1240,7 +1239,7 @@ export async function getDescriptionSuggestions() {
 }
 
 /**
- * Ajoute une suggestion de nom
+ * Adds a name suggestion
  */
 export async function addNameSuggestion(data: { value: string }) {
   try {
@@ -1275,7 +1274,7 @@ export async function addNameSuggestion(data: { value: string }) {
 }
 
 /**
- * Ajoute une suggestion de description
+ * Adds a description suggestion
  */
 export async function addDescriptionSuggestion(data: { value: string }) {
   try {
@@ -1310,7 +1309,7 @@ export async function addDescriptionSuggestion(data: { value: string }) {
 }
 
 /**
- * Supprime une suggestion de nom
+ * Deletes a name suggestion
  */
 export async function deleteNameSuggestion(data: { value: string }) {
   try {
@@ -1343,7 +1342,7 @@ export async function deleteNameSuggestion(data: { value: string }) {
 }
 
 /**
- * Supprime une suggestion de description
+ * Deletes a description suggestion
  */
 export async function deleteDescriptionSuggestion(data: { value: string }) {
   try {

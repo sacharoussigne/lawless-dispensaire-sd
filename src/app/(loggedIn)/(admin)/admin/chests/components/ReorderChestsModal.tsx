@@ -52,7 +52,7 @@ export function ReorderChestsModal({
     })
   );
 
-  // Initialiser la liste de réordonnancement avec les coffres triés quand la modal s'ouvre
+  // Initialize reorder list with sorted chests when modal opens
   useEffect(() => {
     if (opened) {
       const sortedChests = [...chests].sort((a, b) => {

@@ -124,7 +124,6 @@ export default function BankAccountPageClient({
       if (nameData) setNameSuggestions(nameData);
       if (descData) setDescriptionSuggestions(descData);
     } catch (error) {
-      // Ignore errors
     }
   };
 
@@ -230,7 +229,6 @@ export default function BankAccountPageClient({
         setWeeks(data);
       }
     } catch (error) {
-      // Ignore errors
     }
   };
 
@@ -270,7 +268,7 @@ export default function BankAccountPageClient({
     }
   };
 
-  // Calculer le solde de la semaine précédente
+  // Calculate previous week balance
   const previousWeek = useMemo(() => {
     return weeks
       .filter((w) => w.weekStart < week.weekStart)
@@ -279,11 +277,11 @@ export default function BankAccountPageClient({
 
   const previousBalance = previousWeek ? Number(previousWeek.balance) : 0;
 
-  // Calculer le solde actuel basé sur TOUTES les transactions (pour les cartes en haut)
+  // Calculate current balance based on ALL transactions (for top cards)
   const currentBalance = useMemo(() => {
     let runningBalance = previousBalance;
     
-    // Trier toutes les transactions par date puis par order
+    // Sort all transactions by date then by order
     const sortedAllTransactions = [...week.transactions].sort((a, b) => {
       const dateA = new Date(a.date);
       dateA.setHours(0, 0, 0, 0);
@@ -300,7 +298,6 @@ export default function BankAccountPageClient({
       return a.order - b.order;
     });
     
-    // Calculer le solde final
     for (const transaction of sortedAllTransactions) {
       const amount = Number(transaction.amount);
       if (transaction.type === 'DEPOSIT' || transaction.type === 'TRANSFER_IN') {
@@ -313,17 +310,15 @@ export default function BankAccountPageClient({
     return runningBalance;
   }, [week.transactions, previousBalance]);
 
-  // Filtrer et trier les transactions selon les filtres et l'ordre de tri
+  // Filter and sort transactions according to filters and sort order
   const filteredTransactions = useMemo(() => {
-    // Filtrer par type si un filtre est actif
     let transactions = week.transactions;
     if (typeFilter.length > 0) {
       transactions = week.transactions.filter((t) => typeFilter.includes(t.type));
     }
     
-    // Créer une copie triée des transactions filtrées selon l'ordre d'affichage
     return [...transactions].sort((a, b) => {
-      // Normaliser les dates pour comparer seulement la date (sans l'heure)
+      // Normalize dates to compare only the date (without time)
       const dateA = new Date(a.date);
       dateA.setHours(0, 0, 0, 0);
       const dateATime = dateA.getTime();
@@ -332,17 +327,15 @@ export default function BankAccountPageClient({
       dateB.setHours(0, 0, 0, 0);
       const dateBTime = dateB.getTime();
       
-      // Comparer d'abord par date
       if (dateATime !== dateBTime) {
         return sortOrder === 'asc' ? dateATime - dateBTime : dateBTime - dateATime;
       }
       
-      // Si les dates sont identiques, comparer par order
       return sortOrder === 'asc' ? a.order - b.order : b.order - a.order;
     });
   }, [week.transactions, sortOrder, typeFilter]);
 
-  // Préparer les records pour DataTable (inclure la nouvelle transaction si elle existe)
+  // Prepare records for DataTable (include new transaction if it exists)
   const dataTableRecords = useMemo(() => {
     const records = [...filteredTransactions];
     
@@ -358,7 +351,7 @@ export default function BankAccountPageClient({
         order: newTransaction.order || 0,
       };
       
-      // Ajouter en haut si sortOrder === 'desc', en bas si sortOrder === 'asc'
+      // Add at top if sortOrder === 'desc', at bottom if sortOrder === 'asc'
       if (sortOrder === 'desc') {
         records.unshift(newRecord as any);
       } else {
@@ -383,7 +376,6 @@ export default function BankAccountPageClient({
     try {
       setLoading(true);
       if (transaction.id) {
-        // Update
         const result = await updateTransaction({
           id: transaction.id,
           date: transaction.date,
@@ -405,7 +397,6 @@ export default function BankAccountPageClient({
           setEditingTransaction(null);
         }
       } else {
-        // Create
         if (!transaction.date || !transaction.type || !transaction.name) {
           notifications.show({
             title: 'Erreur',
@@ -477,43 +468,43 @@ export default function BankAccountPageClient({
     try {
       setLoading(true);
       
-      // Trouver la transaction à réordonner
+      // Find transaction to reorder
       const transaction = week.transactions.find((t) => t.id === transactionId);
       if (!transaction) return;
 
-      // Normaliser la date de la transaction
+      // Normalize transaction date
       const transactionDate = new Date(transaction.date);
       transactionDate.setHours(0, 0, 0, 0);
 
-      // Trouver toutes les transactions de la même date
+      // Find all transactions with the same date
       const sameDateTransactions = week.transactions.filter((t) => {
         const tDate = new Date(t.date);
         tDate.setHours(0, 0, 0, 0);
         return tDate.getTime() === transactionDate.getTime();
       });
 
-      // Ne pas réordonner s'il n'y a qu'une seule transaction de cette date
+      // Don't reorder if there's only one transaction for this date
       if (sameDateTransactions.length < 2) {
         return;
       }
 
-      // Trier par ordre pour déterminer la position
+      // Sort by order to determine position
       const sortedSameDate = [...sameDateTransactions].sort((a, b) => a.order - b.order);
       const currentIndex = sortedSameDate.findIndex((t) => t.id === transactionId);
 
-      // Inverser la direction selon l'ordre du tableau
-      // En mode desc, "up" dans le tableau = "down" dans l'ordre réel, et vice versa
+      // Invert direction according to table order
+      // In desc mode, "up" in table = "down" in real order, and vice versa
       const actualDirection = sortOrder === 'desc' 
         ? (direction === 'up' ? 'down' : 'up')
         : direction;
 
       if (actualDirection === 'up' && currentIndex === 0) {
-        // Déjà en première position, ne rien faire
+        // Already in first position, do nothing
         return;
       }
 
       if (actualDirection === 'down' && currentIndex === sortedSameDate.length - 1) {
-        // Déjà en dernière position, ne rien faire
+        // Already in last position, do nothing
         return;
       }
 
@@ -1300,7 +1291,7 @@ export default function BankAccountPageClient({
                     );
                   }
                   
-                  // Calculer si la transaction peut être montée ou descendue
+                  // Calculate if transaction can be moved up or down
                   const transactionDate = new Date(transaction.date);
                   transactionDate.setHours(0, 0, 0, 0);
                   
@@ -1427,7 +1418,7 @@ export default function BankAccountPageClient({
               direction: sortOrder,
             }}
             onSortStatusChange={(status) => {
-              // Utiliser notre propre logique de tri
+              // Use our own sorting logic
               if (status) {
                 setSortOrder(status.direction === 'asc' ? 'asc' : 'desc');
               }

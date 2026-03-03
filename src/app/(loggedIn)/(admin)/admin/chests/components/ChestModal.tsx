@@ -42,7 +42,7 @@ export function ChestModal({
     },
   });
 
-  // Initialiser le formulaire quand le coffre change
+  // Initialize form when chest changes
   useEffect(() => {
     if (editingChest) {
       form.setValues({

@@ -43,7 +43,7 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
   const [craftModalOpened, setCraftModalOpened] = useState(false);
   const [transferModalOpened, setTransferModalOpened] = useState(false);
 
-  // État pour stocker les valeurs d'input brutes (avec expressions)
+  // State to store raw input values (with expressions)
   const [stockInputValues, setStockInputValues] = useState<Record<string, string>>({});
 
   const loadItems = async () => {
@@ -65,13 +65,11 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
     }
   };
 
-  // Recharger les items quand le coffre sélectionné change
   useEffect(() => {
     loadItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedChestId]);
 
-  // Initialiser les valeurs de stock avec les valeurs actuelles
   useEffect(() => {
     if (isEditing && items.length > 0) {
       const initialValues: Record<string, number | ''> = {};
@@ -86,8 +84,8 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
     try {
       setSaving(true);
 
-      // Si aucun coffre n'est sélectionné, utiliser le coffre "foure tout" par défaut
-      // Cela garantit qu'on modifie toujours un coffre spécifique
+      // If no chest is selected, use "foure tout" chest by default
+      // This ensures we always modify a specific chest
       const targetChestId = selectedChestId || null;
 
       const stockData = Object.entries(stockValues)
@@ -109,7 +107,6 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
       const result = await updateStock(stockData, targetChestId);
       handleAction(result);
 
-      // Déterminer le nom du coffre modifié pour le message
       const chestName = targetChestId
         ? chests.find(c => c.id === targetChestId)?.name || 'le coffre sélectionné'
         : 'Foure tout';
@@ -139,22 +136,22 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
     setStockValues({});
   };
 
-  // Fonction pour évaluer une expression mathématique simple de manière sécurisée
+  // Function to safely evaluate a simple mathematical expression
   const evaluateExpression = (expression: string): number | '' => {
     if (!expression || expression.trim() === '') return '';
 
-    // Nettoyer l'expression : enlever les espaces
+    // Clean expression: remove spaces
     const cleaned = expression.replace(/\s/g, '');
 
-    // Vérifier que l'expression contient uniquement des caractères autorisés
-    // Permettre les chiffres, +, -, *, /, (, ), et le point pour les décimales
+    // Check that expression contains only allowed characters
+    // Allow digits, +, -, *, /, (, ), and decimal point
     if (!/^[\d+\-*/().]+$/.test(cleaned)) {
       return '';
     }
 
     try {
-      // Utiliser Function constructor pour évaluer de manière plus sécurisée que eval()
-      // On limite aux calculs mathématiques de base
+      // Use Function constructor to evaluate more safely than eval()
+      // Limited to basic mathematical calculations
       const result = new Function('return ' + cleaned)();
       if (typeof result === 'number' && !isNaN(result) && isFinite(result)) {
         return Math.round(result); // Arrondir pour les entiers
@@ -166,13 +163,11 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
   };
 
   const handleStockInputChange = (itemId: string, value: string) => {
-    // Stocker la valeur brute pour l'affichage
     setStockInputValues((prev) => ({
       ...prev,
       [itemId]: value,
     }));
 
-    // Si l'expression contient des opérateurs, évaluer et stocker le résultat
     const trimmed = value.trim();
     if (trimmed === '') {
       setStockValues((prev) => ({
@@ -180,14 +175,13 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
         [itemId]: '',
       }));
     } else if (/[\+\-\*\/]/.test(trimmed)) {
-      // Contient des opérateurs mathématiques, évaluer l'expression
+      // Contains mathematical operators, evaluate expression
       const result = evaluateExpression(trimmed);
       setStockValues((prev) => ({
         ...prev,
         [itemId]: result,
       }));
     } else {
-      // Sinon, convertir en nombre
       const parsed = Number(trimmed);
       const numValue = isNaN(parsed) ? '' : parsed;
       setStockValues((prev) => ({
@@ -197,7 +191,6 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
     }
   };
 
-  // Initialiser les valeurs d'input brutes
   useEffect(() => {
     if (isEditing && items.length > 0) {
       const initialInputValues: Record<string, string> = {};
@@ -408,23 +401,22 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
                     {categoryData.items.map((item) => {
                       const hasStockToday = item.stockToday !== null;
 
-                      // Déterminer le stock à utiliser pour vérifier si c'est bas
-                      // Utiliser stockToday si disponible, sinon stockYesterday si disponible
+                      // Determine stock to use for low stock check
+                      // Use stockToday if available, otherwise stockYesterday if available
                       const currentStock = item.stockToday !== null
                         ? item.stockToday
                         : (item.stockYesterday !== null ? item.stockYesterday : null);
 
-                      // Vérifier si le stock est bas UNIQUEMENT quand "Tous les coffres" est sélectionné
+                      // Check if stock is low ONLY when "All chests" is selected
                       const isStockLow = selectedChestId === null && currentStock !== null && currentStock < item.idealQuantity;
 
-                      // Déterminer la couleur selon le type d'item
                       let backgroundColor: string | undefined = undefined;
                       if (isStockLow) {
-                        // Items craftables OU items non-craftables sans groupe d'entreprise
+                        // Craftable items OR non-craftable items without company group
                         if (item.isCraftable || (item.companyGroupId === null)) {
                           backgroundColor = '#fff3cd'; // Jaune clair
                         }
-                        // Items non-craftables avec groupe d'entreprise
+                        // Non-craftable items with company group
                         else if (!item.isCraftable && item.companyGroupId !== null) {
                           backgroundColor = '#f8d7da'; // Rouge clair
                         }
@@ -477,7 +469,7 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
                                 value={stockInputValues[item.id] ?? (item.stockToday !== null ? String(item.stockToday) : '')}
                                 onChange={(e) => handleStockInputChange(item.id, String(e.currentTarget.value))}
                                 onBlur={(e) => {
-                                  // Quand on quitte le champ, évaluer l'expression et mettre à jour l'affichage
+                                  // When leaving field, evaluate expression and update display
                                   const inputValue = e.currentTarget.value.trim();
                                   if (inputValue === '') {
                                     setStockInputValues((prev) => ({

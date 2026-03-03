@@ -5,14 +5,12 @@ import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
 import { getAuthSession } from '@/lib/auth';
 
-// Schéma de validation pour créer un coffre
 const createChestSchema = z.object({
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
   description: z.string().max(1000, 'La description est trop longue').optional(),
   isEnabled: z.boolean().default(true),
 });
 
-// Schéma de validation pour modifier un coffre
 const updateChestSchema = z.object({
   id: z.string().uuid('ID invalide'),
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
@@ -20,13 +18,11 @@ const updateChestSchema = z.object({
   isEnabled: z.boolean(),
 });
 
-// Schéma pour supprimer un coffre
 const deleteChestSchema = z.object({
   id: z.string().uuid('ID invalide'),
   targetChestId: z.string().uuid('ID de coffre de destination invalide'),
 });
 
-// Schéma pour réordonner les coffres
 const reorderChestsSchema = z.object({
   items: z.array(z.object({
     id: z.string().uuid('ID invalide'),
@@ -35,7 +31,7 @@ const reorderChestsSchema = z.object({
 });
 
 /**
- * Crée un nouveau coffre
+ * Creates a new chest
  */
 export async function createChest(data: {
   name: string;
@@ -53,7 +49,7 @@ export async function createChest(data: {
 
     const validatedData = createChestSchema.parse(data);
 
-    // Récupérer le maximum de l'ordre actuel pour placer le nouveau coffre en dernier
+    // Get the maximum current order to place the new chest last
     const maxOrderResult = await prisma.chest.aggregate({
       _max: {
         order: true,
@@ -81,7 +77,7 @@ export async function createChest(data: {
 }
 
 /**
- * Récupère tous les coffres
+ * Gets all chests
  * @param onlyEnabled
  */
 export async function getChests(onlyEnabled: boolean = false) {
@@ -119,7 +115,7 @@ export async function getChests(onlyEnabled: boolean = false) {
 }
 
 /**
- * Modifie un coffre existant
+ * Updates an existing chest
  */
 export async function updateChest(data: {
   id: string;
@@ -159,7 +155,7 @@ export async function updateChest(data: {
 }
 
 /**
- * Supprime un coffre et transfère les stocks vers un autre coffre
+ * Deletes a chest and transfers stocks to another chest
  */
 export async function deleteChest(data: { id: string; targetChestId: string }) {
   try {
@@ -226,7 +222,7 @@ export async function deleteChest(data: { id: string; targetChestId: string }) {
 }
 
 /**
- * Réordonne les coffres
+ * Reorders chests
  */
 export async function reorderChests(data: { items: { id: string; order: number }[] }) {
   try {
@@ -240,7 +236,7 @@ export async function reorderChests(data: { items: { id: string; order: number }
 
     const validatedData = reorderChestsSchema.parse(data);
 
-    // Mettre à jour l'ordre de chaque coffre
+    // Update the order of each chest
     await Promise.all(
       validatedData.items.map(({ id, order }) =>
         prisma.chest.update({

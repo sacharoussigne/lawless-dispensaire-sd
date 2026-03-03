@@ -8,20 +8,20 @@ export async function hasManagementAccessMiddleware(
   session: any,
 ) {
   if (!session) {
-    // Si pas de session, on laisse le middleware de connexion gérer
+    // If no session, let login middleware handle it
     return NextResponse.next();
   }
 
-  // Utiliser directement les rôles pour vérifier les permissions (plus performant)
+  // Use roles directly to check permissions (more performant)
   const userRole = session.user?.role;
   const hasManagementAccess = checkRolePermission(userRole, "application", "management");
 
   if (!hasManagementAccess) {
-    // Pour les requêtes JSON, retourner une erreur JSON
+    // For JSON requests, return JSON error
     if (request.headers.get("content-type") === "application/json") {
       return forbiddenResponse({ error: "Accès à la gestion refusé" });
     }
-    // Sinon, rediriger vers la page no-management-access
+    // Otherwise, redirect to no-management-access page
     return routes.redirect(request, routes.auth.noManagementAccess);
   }
 

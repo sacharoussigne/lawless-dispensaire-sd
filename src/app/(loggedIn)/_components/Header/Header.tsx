@@ -50,8 +50,8 @@ export default function Header({
     });
   };
 
-  // Déterminer si l'utilisateur peut voir le SegmentedControl
-  // Seulement si l'utilisateur a la permission management (accès à l'espace admin)
+  // Determine if user can see SegmentedControl
+  // Only if user has management permission (access to admin space)
   const canSwitchSpaces = permissions?.application.management === true;
 
   return (
@@ -126,7 +126,6 @@ export default function Header({
                     </Menu.Dropdown>
                   </Menu>
                 ) : (
-                  // Liens de navigation dans l'espace employé
                   <>
                     <Link
                       href={routes.stock.index}

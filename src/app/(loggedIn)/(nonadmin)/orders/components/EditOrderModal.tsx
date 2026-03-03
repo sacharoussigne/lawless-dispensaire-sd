@@ -106,7 +106,7 @@ export function EditOrderModal({
   const [chests, setChests] = useState<ChestWithStockHistory[]>([]);
   const [selectedChestId, setSelectedChestId] = useState<string | null>(null);
 
-  // Fonction utilitaire pour convertir le prix en nombre
+  // Utility function to convert price to number
   const normalizePrice = (price: unknown): number | null => {
     if (price == null) return null;
     if (typeof price === 'number') return price;
@@ -127,7 +127,6 @@ export function EditOrderModal({
     },
   });
 
-  // Charger les items disponibles et les coffres
   useEffect(() => {
     if (opened) {
       const loadItems = async () => {
@@ -154,7 +153,7 @@ export function EditOrderModal({
           const chestsData = handleAction(chestsResult);
           if (chestsData) {
             setChests(chestsData);
-            // Par défaut, sélectionner le coffre "Foure tout" s'il existe
+            // Select "Foure tout" chest by default if it exists
             const defaultChest = chestsData.find((c: ChestWithStockHistory) => c.name === 'Foure tout');
             if (defaultChest) {
               setSelectedChestId(defaultChest.id);
@@ -176,7 +175,6 @@ export function EditOrderModal({
     }
   }, [opened]);
 
-  // Initialiser les items de la commande
   useEffect(() => {
     if (editingOrder) {
       setOrderItems(
@@ -193,7 +191,7 @@ export function EditOrderModal({
     }
   }, [editingOrder, opened]);
 
-  // Calculer le prix total pour les commandes sortantes
+  // Calculate total price for outgoing orders
   const calculatedPrice = useMemo(() => {
     const orderType = form.values.type || (editingOrder?.type as OrderTypeEnum);
     if (orderType !== OrderTypeEnum.OUTGOING) return null;
@@ -223,12 +221,11 @@ export function EditOrderModal({
     }
   }, [editingOrder, opened]);
 
-  // Obtenir les items disponibles selon le type de commande
   const getAvailableItems = () => {
     const orderType = form.values.type || (editingOrder?.type as OrderTypeEnum);
     
     if (orderType === OrderTypeEnum.OUTGOING) {
-      // Pour les commandes sortantes, on peut choisir les items qui peuvent être vendus
+      // For outgoing orders, can choose items that can be sold
       return allItems.filter((item) => {
         const hasCanBeSold = item.canBeSold === true;
         const price = normalizePrice(item.price);
@@ -239,8 +236,8 @@ export function EditOrderModal({
       });
     }
     
-    // Pour les commandes entrantes, on filtre par groupe d'entreprise
-    // On récupère le groupe d'entreprise depuis les items existants
+    // For incoming orders, filter by company group
+    // Get company group from existing items
     if (orderItems.length > 0) {
       const firstItem = allItems.find((item) => item.id === orderItems[0].itemId);
       const companyGroupId = firstItem?.companyGroupId;
@@ -255,12 +252,10 @@ export function EditOrderModal({
     return [];
   };
 
-  // Retirer un item de la commande
   const handleRemoveItem = (itemId: string) => {
     setOrderItems(orderItems.filter((oi) => oi.itemId !== itemId));
   };
 
-  // Mettre à jour la quantité d'un item
   const handleQuantityChange = (itemId: string, quantity: number | string) => {
     const numQuantity = typeof quantity === 'number' ? quantity : (quantity === '' ? 1 : Number(quantity) || 1);
     setOrderItems(
@@ -270,7 +265,6 @@ export function EditOrderModal({
     );
   };
 
-  // Ajouter un item à la commande
   const handleAddItem = (itemId: string) => {
     const itemToAdd = allItems.find((item) => item.id === itemId);
     if (itemToAdd && !orderItems.some((oi) => oi.itemId === itemId)) {
@@ -301,17 +295,17 @@ export function EditOrderModal({
             ? selectedChestId
             : (chests.length === 1 ? chests[0].id : null);
         
-        // Pour les commandes sortantes, vérifier qu'on a assez de stock
+        // For outgoing orders, check if there's enough stock
         if (orderType === OrderTypeEnum.OUTGOING) {
           const result = await checkOrderItemsStockSufficient(editingOrder.id, chestIdToCheck);
           const data = handleAction(result);
           if (data) {
             setStockCheckResult(data);
-            // Pour les commandes sortantes, on ne peut pas terminer si on n'a pas assez de stock
+            // For outgoing orders, cannot complete if there's not enough stock
             setAddToStock(false); // Pas de checkbox pour les commandes sortantes
           }
         } else {
-          // Pour les commandes entrantes, vérifier si le stock d'aujourd'hui existe
+          // For incoming orders, check if today's stock exists
           const result = await checkOrderItemsStockToday(editingOrder.id, chestIdToCheck);
           const data = handleAction(result);
           if (data) {
@@ -338,7 +332,7 @@ export function EditOrderModal({
     }
   };
 
-  // Refaire la vérification quand on change de coffre (si on est en train de passer à COMPLETED)
+  // Re-run verification when changing chest (if transitioning to COMPLETED)
   useEffect(() => {
     if (!opened || !editingOrder) return;
     if (form.values.status !== OrderStatusEnum.COMPLETED) return;
@@ -523,7 +517,7 @@ export function EditOrderModal({
                   {(() => {
                     const orderType = form.values.type || (editingOrder?.type as OrderTypeEnum);
                     
-                    // Pour les commandes sortantes
+                    // For outgoing orders
                     if (orderType === OrderTypeEnum.OUTGOING) {
                       if (!stockCheckResult.allHaveStockToday) {
                         return (
@@ -555,7 +549,7 @@ export function EditOrderModal({
                       );
                     }
                     
-                    // Pour les commandes entrantes
+                    // For incoming orders
                     if (!stockCheckResult.allHaveStockToday) {
                       return (
                         <Text size="sm" c="orange" fw={500}>
