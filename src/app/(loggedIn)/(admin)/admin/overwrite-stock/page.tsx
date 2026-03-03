@@ -11,7 +11,7 @@ async function OverwriteStockContent() {
   const today = dayjs().toDate();
   const [itemsResult, chestsResult] = await Promise.all([
     getItemsWithStockForDate(today),
-    getChests(),
+    getChests(true),
   ]);
 
   const items: ItemWithStock[] =

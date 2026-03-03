@@ -1,6 +1,6 @@
 'use client';
 
-import { Paper, TextInput, Group, ActionIcon } from '@mantine/core';
+import { Paper, TextInput, Group, ActionIcon, Badge } from '@mantine/core';
 import { DataTable } from 'mantine-datatable';
 import { IconEdit, IconTrash } from '@tabler/icons-react';
 import type { ChestWithStockHistory } from '@/types/chests';
@@ -57,6 +57,15 @@ export function ChestsTable({
               <span style={{ fontSize: '14px' }}>
                 {chest.description || <span style={{ color: '#999' }}>Aucune description</span>}
               </span>
+            ),
+          },
+          {
+            accessor: 'isEnabled',
+            title: 'État',
+            render: (chest: ChestWithStockHistory) => (
+              <Badge color={chest.isEnabled ? 'green' : 'red'} variant="light">
+                {chest.isEnabled ? 'Activé' : 'Désactivé'}
+              </Badge>
             ),
           },
           {

@@ -7,7 +7,7 @@ import { getDataOrThrow } from '@/lib/response';
 async function SearchItemsContent() {
   const [itemsResult, chestsResult] = await Promise.all([
     getItems(),
-    getChests(),
+    getChests(true),
   ]);
 
   const items = getDataOrThrow(itemsResult, 'Erreur lors du chargement des items');

@@ -18,10 +18,11 @@ async function getDefaultChestId(): Promise<string> {
   const defaultChest = await prisma.chest.findFirst({
     where: {
       name: 'Foure tout',
+      isEnabled: true,
     },
   });
   if (!defaultChest) {
-    throw new Error('Coffre par défaut "Foure tout" non trouvé');
+    throw new Error('Coffre par défaut "Foure tout" non trouvé ou désactivé');
   }
   return defaultChest.id;
 }
@@ -84,6 +85,9 @@ export async function getItemsWithStock(chestId?: string | null) {
             timestamp: {
               gte: yesterday,
               lt: tomorrow,
+            },
+            chest: {
+              isEnabled: true, // Seulement les stocks des coffres activés
             },
           },
           select: {
@@ -203,12 +207,13 @@ export async function updateStock(data: { itemId: string; quantity: number }[], 
       const defaultChest = await prisma.chest.findFirst({
         where: {
           name: 'Foure tout',
+          isEnabled: true, // Seulement les coffres activés
         },
       });
       if (!defaultChest) {
         return {
           status: 404,
-          error: 'Coffre par défaut "Foure tout" non trouvé',
+          error: 'Coffre par défaut "Foure tout" non trouvé ou désactivé',
         };
       }
       targetChestId = defaultChest.id;
@@ -602,6 +607,9 @@ export async function getItemsWithStockForDate(date: Date, chestId?: string | nu
               lt: dayEnd,
             },
             ...(chestId ? { chestId: chestId } : {}),
+            chest: {
+              isEnabled: true, // Seulement les stocks des coffres activés
+            },
           },
           orderBy: {
             timestamp: 'desc',
@@ -744,6 +752,9 @@ export async function getItemsWithDetailedStock(itemIds?: string[]) {
             timestamp: {
               gte: yesterday,
             },
+            chest: {
+              isEnabled: true, // Seulement les stocks des coffres activés
+            },
           },
           select: {
             id: true,
@@ -765,6 +776,9 @@ export async function getItemsWithDetailedStock(itemIds?: string[]) {
     });
 
     const allChests = await prisma.chest.findMany({
+      where: {
+        isEnabled: true, // Seulement les coffres activés
+      },
       orderBy: {
         name: 'asc',
       },

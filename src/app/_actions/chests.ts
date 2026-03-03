@@ -9,6 +9,7 @@ import { getAuthSession } from '@/lib/auth';
 const createChestSchema = z.object({
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
   description: z.string().max(1000, 'La description est trop longue').optional(),
+  isEnabled: z.boolean().default(true),
 });
 
 // Schéma de validation pour modifier un coffre
@@ -16,6 +17,7 @@ const updateChestSchema = z.object({
   id: z.string().uuid('ID invalide'),
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
   description: z.string().max(1000, 'La description est trop longue').optional(),
+  isEnabled: z.boolean(),
 });
 
 // Schéma pour supprimer un coffre
@@ -30,6 +32,7 @@ const deleteChestSchema = z.object({
 export async function createChest(data: {
   name: string;
   description?: string;
+  isEnabled?: boolean;
 }) {
   try {
     const session = await getAuthSession();
@@ -46,6 +49,7 @@ export async function createChest(data: {
       data: {
         name: validatedData.name,
         description: validatedData.description,
+        isEnabled: validatedData.isEnabled ?? true,
       },
     });
 
@@ -60,8 +64,9 @@ export async function createChest(data: {
 
 /**
  * Récupère tous les coffres
+ * @param onlyEnabled
  */
-export async function getChests() {
+export async function getChests(onlyEnabled: boolean = false) {
   try {
     const session = await getAuthSession();
     if (!session) {
@@ -72,6 +77,7 @@ export async function getChests() {
     }
 
     const chests = await prisma.chest.findMany({
+      where: onlyEnabled ? { isEnabled: true } : undefined,
       orderBy: {
         createdAt: 'desc',
       },
@@ -100,6 +106,7 @@ export async function updateChest(data: {
   id: string;
   name: string;
   description?: string;
+  isEnabled?: boolean;
 }) {
   try {
     const session = await getAuthSession();
@@ -119,6 +126,7 @@ export async function updateChest(data: {
       data: {
         name: validatedData.name,
         description: validatedData.description,
+        isEnabled: validatedData.isEnabled,
       },
     });
 

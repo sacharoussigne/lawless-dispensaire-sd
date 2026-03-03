@@ -7,7 +7,7 @@ import { getDataOrThrow } from '@/lib/response';
 async function StockContent() {
   const [itemsResult, chestsResult] = await Promise.all([
     getItemsWithStock(),
-    getChests(),
+    getChests(true),
   ]);
   
   // Lance une erreur si la réponse est une erreur (sera capturée par error.tsx)

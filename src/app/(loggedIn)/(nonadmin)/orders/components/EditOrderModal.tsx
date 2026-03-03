@@ -135,7 +135,7 @@ export function EditOrderModal({
           setLoadingItems(true);
           const [itemsResult, chestsResult] = await Promise.all([
             getItems(),
-            getChests(),
+            getChests(true),
           ]);
           
           const itemsData = handleAction(itemsResult);

@@ -8,6 +8,7 @@ import {
   Textarea,
   Button,
   Group,
+  Switch,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
@@ -34,6 +35,7 @@ export function ChestModal({
     initialValues: {
       name: '',
       description: '',
+      isEnabled: true,
     },
     validate: {
       name: (value) => (value.length < 1 ? 'Le nom est requis' : null),
@@ -46,6 +48,7 @@ export function ChestModal({
       form.setValues({
         name: editingChest.name,
         description: editingChest.description || '',
+        isEnabled: editingChest.isEnabled ?? true,
       });
     } else {
       form.reset();
@@ -61,11 +64,13 @@ export function ChestModal({
           id: editingChest.id,
           name: values.name,
           description: values.description || undefined,
+          isEnabled: values.isEnabled,
         });
       } else {
         result = await createChest({
           name: values.name,
           description: values.description || undefined,
+          isEnabled: values.isEnabled,
         });
       }
 
@@ -116,6 +121,11 @@ export function ChestModal({
             placeholder="Description du coffre (optionnel)"
             rows={4}
             {...form.getInputProps('description')}
+          />
+          <Switch
+            label="Coffre activé"
+            description="Un coffre désactivé ne sera pas disponible dans les sélections"
+            {...form.getInputProps('isEnabled', { type: 'checkbox' })}
           />
           <Group justify="flex-end" mt="md">
             <Button
