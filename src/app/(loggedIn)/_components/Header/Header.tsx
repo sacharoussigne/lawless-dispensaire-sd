@@ -51,7 +51,8 @@ export default function Header({
   };
 
   // Déterminer si l'utilisateur peut voir le SegmentedControl
-  const canSwitchSpaces = permissions?.application.management || permissions?.application.access;
+  // Seulement si l'utilisateur a la permission management (accès à l'espace admin)
+  const canSwitchSpaces = permissions?.application.management === true;
 
   return (
     <header className={`${classes.header} mb-10`}>
