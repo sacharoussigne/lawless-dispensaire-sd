@@ -298,7 +298,7 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
             </Badge>
           )}
           <Group>
-            {(permissions?.stock.craftRead || permissions?.stock.craftWrite) && (
+            {!isEditing && (permissions?.stock.craftRead || permissions?.stock.craftWrite) && (
               <Button
                 leftSection={<IconTools size={16} />}
                 onClick={() => setCraftModalOpened(true)}
@@ -308,7 +308,7 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
                 Craft
               </Button>
             )}
-            {permissions?.stock.update && (
+            {!isEditing && permissions?.stock.update && (
               <Button
                 leftSection={<IconArrowsExchange size={16} />}
                 onClick={() => setTransferModalOpened(true)}
@@ -364,6 +364,7 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
           value={selectedChestId || ''}
           onChange={(value) => setSelectedChestId(value === '' ? null : value)}
           clearable={false}
+          disabled={isEditing}
           style={{ minWidth: 200 }}
         />
       </div>
