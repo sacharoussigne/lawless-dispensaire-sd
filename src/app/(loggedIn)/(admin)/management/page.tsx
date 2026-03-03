@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { routes } from '@/types/routes';
 
-export default function AdminPage() {
-  redirect(routes.management.index);
+export default function ManagementPage() {
+  redirect(routes.management.locations);
 }

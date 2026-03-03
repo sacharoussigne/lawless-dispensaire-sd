@@ -72,7 +72,7 @@ export function LocationsTable({
             render: (location: LocationWithCompanies) =>
               location.companies.length > 0 ? (
                 <Link
-                  href={`${routes.admin.companies}?locationId=${location.id}`}
+                  href={`${routes.management.companies}?locationId=${location.id}`}
                   style={{ textDecoration: 'none', color: 'inherit' }}
                 >
                   <Text

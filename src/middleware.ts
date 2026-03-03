@@ -21,6 +21,11 @@ export async function middleware(req: NextRequest) {
     if (pathname !== routes.auth.noAccess && pathname !== routes.auth.noManagementAccess) {
       middlewares.push(hasToBeLoggedOutMiddleware);
     }
+  } else if (pathname.startsWith(routes.management.index)) {
+    // For management routes, check login, application access, then management access
+    middlewares.push(hasToBeLoggedInMiddleware);
+    middlewares.push(hasApplicationAccessMiddleware);
+    middlewares.push(hasManagementAccessMiddleware);
   } else if (pathname.startsWith(routes.admin.index)) {
     // For admin routes, check login, application access, then management access
     middlewares.push(hasToBeLoggedInMiddleware);

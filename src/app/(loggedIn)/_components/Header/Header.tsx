@@ -31,12 +31,14 @@ export default function Header({
   const { permissions, userRole } = usePermissions();
   
   const isAdminSpace = pathname?.startsWith(routes.admin.index) || false;
+  const isManagementSpace = pathname?.startsWith(routes.management.index) || false;
+  const isAdminOrManagementSpace = isAdminSpace || isManagementSpace;
   
   const handleSpaceChange = (value: string) => {
     if (value === 'employee') {
       router.push(routes.stock.index);
     } else if (value === 'management') {
-      router.push(routes.admin.index);
+      router.push(routes.management.index);
     }
   };
 
@@ -74,7 +76,7 @@ export default function Header({
           <Group>
             {session ? (
               <>
-                {isAdminSpace ? (
+                {isAdminOrManagementSpace ? (
                   <Menu
                     width={260}
                     position="bottom-start"
@@ -88,37 +90,37 @@ export default function Header({
                     </Menu.Target>
                     <Menu.Dropdown>
                       <Menu.Label>Gestion</Menu.Label>
-                      <Link href={routes.admin.items}>
+                      <Link href={routes.management.items}>
                         <Menu.Item>
                           Objets
                         </Menu.Item>
                       </Link>
-                      <Link href={routes.admin.categoryItems}>
+                      <Link href={routes.management.categoryItems}>
                         <Menu.Item>
                           Catégories d'objets
                         </Menu.Item>
                       </Link>
-                      <Link href={routes.admin.companies}>
+                      <Link href={routes.management.companies}>
                         <Menu.Item>
                           Entreprises
                         </Menu.Item>
                       </Link>
-                      <Link href={routes.admin.companyGroups}>
+                      <Link href={routes.management.companyGroups}>
                         <Menu.Item>
                           Groupes d'entreprises
                         </Menu.Item>
                       </Link>
-                      <Link href={routes.admin.locations}>
+                      <Link href={routes.management.locations}>
                         <Menu.Item>
                           Lieux
                         </Menu.Item>
                       </Link>
-                      <Link href={routes.admin.chests}>
+                      <Link href={routes.management.chests}>
                         <Menu.Item>
                           Coffres
                         </Menu.Item>
                       </Link>
-                      <Link href={routes.admin.letterTemplates}>
+                      <Link href={routes.management.letterTemplates}>
                         <Menu.Item>
                           Templates de lettres
                         </Menu.Item>
@@ -155,7 +157,7 @@ export default function Header({
                 )}
                 {canSwitchSpaces && (
                   <SegmentedControl
-                    value={isAdminSpace ? 'management' : 'employee'}
+                    value={isAdminOrManagementSpace ? 'management' : 'employee'}
                     onChange={handleSpaceChange}
                     data={[
                       { label: 'Employé', value: 'employee' },
