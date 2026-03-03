@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "chest" ADD COLUMN     "order" INTEGER NOT NULL DEFAULT 0;

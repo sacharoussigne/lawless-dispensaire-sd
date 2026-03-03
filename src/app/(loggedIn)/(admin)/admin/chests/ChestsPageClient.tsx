@@ -13,6 +13,7 @@ import { handleAction } from '@/lib/action';
 import { notifications } from '@mantine/notifications';
 import { ChestModal } from './components/ChestModal';
 import { DeleteChestModal } from './components/DeleteChestModal';
+import { ReorderChestsModal } from './components/ReorderChestsModal';
 import { ActiveFilters } from '@/app/_components/ActiveFilters/ActiveFilters';
 import { ChestsTable } from './components/ChestsTable';
 import type { ChestWithStockHistory } from '@/types/chests';
@@ -38,6 +39,7 @@ export default function ChestsPageClient({
   const [editingChest, setEditingChest] = useState<ChestWithStockHistory | null>(null);
   const [deleteModalOpened, setDeleteModalOpened] = useState(false);
   const [chestToDelete, setChestToDelete] = useState<ChestWithStockHistory | null>(null);
+  const [reorderModalOpened, setReorderModalOpened] = useState(false);
 
   const [nameFilter, setNameFilter] = useState<string>('');
   const [page, setPage] = useState(1);
@@ -80,8 +82,11 @@ export default function ChestsPageClient({
     return matchesName;
   });
 
-  // Trier par date de création (plus récent en premier)
+  // Trier par ordre, puis par date de création (plus récent en premier)
   const sortedChests = [...filteredChests].sort((a, b) => {
+    if (a.order !== undefined && b.order !== undefined) {
+      return a.order - b.order;
+    }
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 
@@ -102,6 +107,13 @@ export default function ChestsPageClient({
       <Group justify="space-between" mb="xl">
         <Title order={1}>Coffres</Title>
         <Group>
+          <Button
+            variant="light"
+            onClick={() => setReorderModalOpened(true)}
+            disabled={chests.length === 0}
+          >
+            Réordonner
+          </Button>
           <Button leftSection={<IconPlus size={16} />} onClick={openCreateModal}>
             Créer un coffre
           </Button>
@@ -153,6 +165,13 @@ export default function ChestsPageClient({
         }}
         chestToDelete={chestToDelete}
         allChests={chests}
+        onSuccess={loadChests}
+      />
+
+      <ReorderChestsModal
+        opened={reorderModalOpened}
+        onClose={() => setReorderModalOpened(false)}
+        chests={chests}
         onSuccess={loadChests}
       />
     </Container>
