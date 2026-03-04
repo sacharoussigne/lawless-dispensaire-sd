@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRolePermission } from "@/lib/auth/permissions";
 import { routes } from "@/types/routes";
-import { forbiddenResponse } from "@/lib/response";
 
 export async function hasManagementAccessMiddleware(
   request: NextRequest,
@@ -18,9 +17,9 @@ export async function hasManagementAccessMiddleware(
 
   if (!hasManagementAccess) {
     // For JSON requests, return JSON error
-    if (request.headers.get("content-type") === "application/json") {
-      return forbiddenResponse({ error: "Accès à la gestion refusé" });
-    }
+    // if (request.headers.get("content-type") === "application/json") {
+    //   return forbiddenResponse({ error: "Accès à la gestion refusé" });
+    // }
     // Otherwise, redirect to no-management-access page
     return routes.redirect(request, routes.auth.noManagementAccess);
   }
