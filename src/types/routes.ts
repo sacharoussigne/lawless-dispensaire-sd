@@ -11,7 +11,6 @@ export const routes = {
   },
   management: {
     index: '/management',
-    locations: '/management/locations',
     companies: '/management/companies',
     companyGroups: '/management/companygroups',
     categoryItems: '/management/categoryitems',

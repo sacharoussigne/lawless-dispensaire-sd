@@ -5,17 +5,11 @@ export interface CompanyGroupWithRelations extends CompanyGroup {
   companies: {
     id: string;
     companyId?: string;
-    company: Company & {
-      location: {
-        id: string;
-        name: string;
-      };
-    };
+    company: Company;
   }[];
 }
 
 export interface CompanyWithRelations extends Company {
-  location: { id: string; name: string };
   companyGroups: { id: string }[];
 }
 

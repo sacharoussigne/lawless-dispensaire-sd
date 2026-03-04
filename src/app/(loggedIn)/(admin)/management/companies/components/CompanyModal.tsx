@@ -15,13 +15,12 @@ import { createCompany, updateCompany } from '@/app/_actions/companies';
 import { handleAction } from '@/lib/action';
 import { handleApiZodError } from '@/lib/services/zod';
 import { ParsedZodError } from '@/lib/errors/ParsedZodError';
-import type { CompanyWithRelations, Location } from '@/types/companies';
+import type { CompanyWithRelations } from '@/types/companies';
 
 interface CompanyModalProps {
   opened: boolean;
   onClose: () => void;
   editingCompany: CompanyWithRelations | null;
-  locations: Location[];
   onSuccess: () => void;
 }
 
@@ -29,17 +28,14 @@ export function CompanyModal({
   opened,
   onClose,
   editingCompany,
-  locations,
   onSuccess,
 }: CompanyModalProps) {
   const form = useForm({
     initialValues: {
       name: '',
-      locationId: '',
     },
     validate: {
       name: (value) => (value.length < 1 ? 'Le nom est requis' : null),
-      locationId: (value) => (!value ? 'Le lieu est requis' : null),
     },
   });
 
@@ -48,7 +44,6 @@ export function CompanyModal({
     if (editingCompany) {
       form.setValues({
         name: editingCompany.name,
-        locationId: editingCompany.locationId,
       });
     } else {
       form.reset();
@@ -62,12 +57,10 @@ export function CompanyModal({
         result = await updateCompany({
           id: editingCompany.id,
           name: values.name,
-          locationId: values.locationId,
         });
       } else {
         result = await createCompany({
           name: values.name,
-          locationId: values.locationId,
         });
       }
 
@@ -95,13 +88,6 @@ export function CompanyModal({
     }
   };
 
-  const locationOptions = [...locations]
-    .sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }))
-    .map((location) => ({
-      value: location.id,
-      label: location.name,
-    }));
-
   return (
     <Modal
       opened={opened}
@@ -119,13 +105,6 @@ export function CompanyModal({
             placeholder="Nom de l'entreprise"
             required
             {...form.getInputProps('name')}
-          />
-          <Select
-            label="Lieu"
-            placeholder="Sélectionner un lieu"
-            data={locationOptions}
-            required
-            {...form.getInputProps('locationId')}
           />
           <Group justify="flex-end" mt="md">
             <Button

@@ -110,11 +110,6 @@ export default function Header({
                           Groupes d'entreprises
                         </Menu.Item>
                       </Link>
-                      <Link href={routes.management.locations}>
-                        <Menu.Item>
-                          Lieux
-                        </Menu.Item>
-                      </Link>
                       <Link href={routes.management.chests}>
                         <Menu.Item>
                           Coffres

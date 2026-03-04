@@ -103,7 +103,7 @@ export function CompanyGroupModal({
     .sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }))
     .map((company) => ({
       value: company.id,
-      label: `${company.name} - ${company.location.name}`,
+      label: company.name,
     }));
 
   return (

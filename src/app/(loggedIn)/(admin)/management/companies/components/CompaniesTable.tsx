@@ -1,20 +1,17 @@
 'use client';
 
-import { Paper, TextInput, Select, Group, ActionIcon } from '@mantine/core';
+import { Paper, TextInput, Group, ActionIcon } from '@mantine/core';
 import { DataTable } from 'mantine-datatable';
 import { IconEdit, IconTrash } from '@tabler/icons-react';
-import type { CompanyWithRelations, Location } from '@/types/companies';
+import type { CompanyWithRelations } from '@/types/companies';
 
 interface CompaniesTableProps {
   companies: CompanyWithRelations[];
   loading: boolean;
-  locations: Location[];
-  locationFilter: string | null;
   nameFilter: string;
   page: number;
   pageSize: number;
   totalRecords: number;
-  onLocationFilterChange: (value: string | null) => void;
   onNameFilterChange: (value: string) => void;
   onPageChange: (page: number) => void;
   onEdit: (company: CompanyWithRelations) => void;
@@ -24,29 +21,15 @@ interface CompaniesTableProps {
 export function CompaniesTable({
   companies,
   loading,
-  locations,
-  locationFilter,
   nameFilter,
   page,
   pageSize,
   totalRecords,
-  onLocationFilterChange,
   onNameFilterChange,
   onPageChange,
   onEdit,
   onDelete,
 }: CompaniesTableProps) {
-  const locationOptions = [...locations]
-    .sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }))
-    .map((location) => ({
-      value: location.id,
-      label: location.name,
-    }));
-
-  const filterOptions = [
-    { value: '', label: 'Tous les lieux' },
-    ...locationOptions,
-  ];
 
   return (
     <Paper shadow="sm" p="md" withBorder>
@@ -61,20 +44,6 @@ export function CompaniesTable({
                 placeholder="Rechercher un nom..."
                 value={nameFilter}
                 onChange={(e) => onNameFilterChange(e.currentTarget.value)}
-                style={{ minWidth: 200 }}
-              />
-            ),
-          },
-          {
-            accessor: 'location.name',
-            title: 'Lieu',
-            filter: (
-              <Select
-                placeholder="Tous les lieux"
-                data={filterOptions}
-                value={locationFilter || ''}
-                onChange={(value) => onLocationFilterChange(value || null)}
-                clearable
                 style={{ minWidth: 200 }}
               />
             ),
@@ -104,7 +73,7 @@ export function CompaniesTable({
         ]}
         fetching={loading}
         noRecordsText={
-          locationFilter || nameFilter
+          nameFilter
             ? 'Aucune entreprise trouvée avec ces filtres'
             : 'Aucune entreprise trouvée'
         }

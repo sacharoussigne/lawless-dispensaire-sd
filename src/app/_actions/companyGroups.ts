@@ -64,16 +64,7 @@ export async function createCompanyGroup(data: {
         },
         companies: {
           include: {
-            company: {
-              include: {
-                location: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
+            company: true,
           },
         },
       },
@@ -113,16 +104,7 @@ export async function getCompanyGroups() {
         },
         companies: {
           include: {
-            company: {
-              include: {
-                location: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
+            company: true,
           },
         },
       },
@@ -196,16 +178,7 @@ export async function updateCompanyGroup(data: {
         },
         companies: {
           include: {
-            company: {
-              include: {
-                location: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
+            company: true,
           },
         },
       },

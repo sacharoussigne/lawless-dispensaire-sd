@@ -2,5 +2,5 @@ import { redirect } from 'next/navigation';
 import { routes } from '@/types/routes';
 
 export default function ManagementPage() {
-  redirect(routes.management.locations);
+  redirect(routes.management.companies);
 }

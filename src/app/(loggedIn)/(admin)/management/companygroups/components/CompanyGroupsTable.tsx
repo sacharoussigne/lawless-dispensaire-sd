@@ -86,7 +86,7 @@ export function CompanyGroupsTable({
                     if (!company) return null;
                     return (
                       <Badge key={companyRelation.id} variant="light" size="sm">
-                        {company.name} - {company.location.name}
+                        {company.name}
                       </Badge>
                     );
                   })
