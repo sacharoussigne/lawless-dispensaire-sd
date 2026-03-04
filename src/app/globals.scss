@@ -12,3 +12,60 @@
   background-color: var(--mantine-primary-color-filled-hover) !important;
   color: #fff !important;
 }
+
+// Fix rounded corners for tables inside Paper components
+.mantine-Paper-root {
+  overflow: hidden;
+
+  // Native Mantine Table
+  .mantine-Table-root {
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .mantine-Table-thead {
+    .mantine-Table-tr:first-child {
+      .mantine-Table-th:first-child {
+        border-top-left-radius: var(--mantine-radius-md);
+      }
+      .mantine-Table-th:last-child {
+        border-top-right-radius: var(--mantine-radius-md);
+      }
+    }
+  }
+
+  .mantine-Table-tbody {
+    .mantine-Table-tr:last-child {
+      .mantine-Table-td:first-child {
+        border-bottom-left-radius: var(--mantine-radius-md);
+      }
+      .mantine-Table-td:last-child {
+        border-bottom-right-radius: var(--mantine-radius-md);
+      }
+    }
+  }
+
+  // DataTable (mantine-datatable)
+  table {
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  thead tr:first-child {
+    th:first-child {
+      border-top-left-radius: var(--mantine-radius-md);
+    }
+    th:last-child {
+      border-top-right-radius: var(--mantine-radius-md);
+    }
+  }
+
+  tbody tr:last-child {
+    td:first-child {
+      border-bottom-left-radius: var(--mantine-radius-md);
+    }
+    td:last-child {
+      border-bottom-right-radius: var(--mantine-radius-md);
+    }
+  }
+}
