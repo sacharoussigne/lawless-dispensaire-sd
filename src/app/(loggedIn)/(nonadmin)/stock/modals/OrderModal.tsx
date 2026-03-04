@@ -545,7 +545,7 @@ export default function OrderModal({
                     {prefillItemsNeedingRestock && items.length > 0 && items[0].stockToday !== null && (
                       <>
                         <Table.Th>Stock actuel</Table.Th>
-                        <Table.Th>Quantité idéale</Table.Th>
+                        <Table.Th>Quantité minimale</Table.Th>
                         <Table.Th>Quantité finale</Table.Th>
                       </>
                     )}

@@ -55,7 +55,7 @@ export function ItemModal({
     validate: {
       name: (value) => (value.length < 1 ? 'Le nom est requis' : null),
       idealQuantity: (value) =>
-        value < 0 ? 'La quantité idéale doit être positive' : null,
+        value < 0 ? 'La quantité minimale doit être positive' : null,
       categoryId: (value) => (!value ? 'La catégorie est requise' : null),
       price: (value, values) => {
         const requirePrice = values.canBeSold;
@@ -222,8 +222,8 @@ export function ItemModal({
             </Text>
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
               <NumberInput
-                label="Quantité idéale"
-                placeholder="Quantité idéale"
+                label="Quantité minimale"
+                placeholder="Quantité minimale"
                 required
                 min={0}
                 {...form.getInputProps('idealQuantity')}

@@ -165,7 +165,7 @@ export function ItemsTable({
           },
           {
             accessor: 'idealQuantity',
-            title: 'Quantité idéale',
+            title: 'Quantité minimale',
             render: (item: ItemWithRelations) => item.idealQuantity,
           },
           {

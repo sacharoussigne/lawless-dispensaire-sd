@@ -161,7 +161,7 @@ export default function SearchItemsPageClient({
                             )}
                             {item.canBeSold && (
                               <Badge color="green" variant="light">
-                                Vendu
+                                Peut être vendu
                               </Badge>
                             )}
                           </Group>
@@ -178,7 +178,7 @@ export default function SearchItemsPageClient({
                           <Group gap="md">
                             <Text size="sm">
                               <Text span fw={500}>
-                                Quantité idéale :
+                                Quantité minimale :
                               </Text>{' '}
                               {item.idealQuantity}
                             </Text>
@@ -196,18 +196,18 @@ export default function SearchItemsPageClient({
                           <Group gap="md">
                             <Stack gap={2} align="flex-end">
                               <Text size="xs" c="dimmed">
-                                Stock total aujourd'hui
-                              </Text>
-                              <Text size="xl" fw={700} c={item.totalStockToday !== null ? 'blue' : 'dimmed'}>
-                                {item.totalStockToday !== null ? item.totalStockToday : '?'}
-                              </Text>
-                            </Stack>
-                            <Stack gap={2} align="flex-end">
-                              <Text size="xs" c="dimmed">
                                 Stock total hier
                               </Text>
                               <Text size="lg" fw={500} c={item.totalStockYesterday !== null ? 'dimmed' : 'dimmed'}>
                                 {item.totalStockYesterday !== null ? item.totalStockYesterday : '?'}
+                              </Text>
+                            </Stack>
+                            <Stack gap={2} align="flex-end">
+                              <Text size="xs" c="dimmed">
+                                Stock total aujourd'hui
+                              </Text>
+                              <Text size="xl" fw={700} c={item.totalStockToday !== null ? 'blue' : 'dimmed'}>
+                                {item.totalStockToday !== null ? item.totalStockToday : '?'}
                               </Text>
                             </Stack>
                           </Group>
@@ -218,8 +218,8 @@ export default function SearchItemsPageClient({
                         <Table.Thead>
                           <Table.Tr>
                             <Table.Th>Coffre</Table.Th>
-                            <Table.Th>Stock aujourd'hui</Table.Th>
                             <Table.Th>Stock hier</Table.Th>
+                            <Table.Th>Stock aujourd'hui</Table.Th>
                           </Table.Tr>
                         </Table.Thead>
                         <Table.Tbody>
@@ -229,13 +229,13 @@ export default function SearchItemsPageClient({
                                 <Text fw={500}>{chestStock.chestName}</Text>
                               </Table.Td>
                               <Table.Td>
-                                <Text c={chestStock.stockToday !== null ? 'blue' : 'dimmed'}>
-                                  {chestStock.stockToday !== null ? chestStock.stockToday : '?'}
+                                <Text c="dimmed">
+                                  {chestStock.stockYesterday !== null ? chestStock.stockYesterday : '?'}
                                 </Text>
                               </Table.Td>
                               <Table.Td>
-                                <Text c="dimmed">
-                                  {chestStock.stockYesterday !== null ? chestStock.stockYesterday : '?'}
+                                <Text c={chestStock.stockToday !== null ? 'blue' : 'dimmed'}>
+                                  {chestStock.stockToday !== null ? chestStock.stockToday : '?'}
                                 </Text>
                               </Table.Td>
                             </Table.Tr>
