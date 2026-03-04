@@ -1,14 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import {
-  Container,
-  Title,
-  Group,
-  Button,
-  Tabs,
-  Stack,
-} from '@mantine/core';
+import { Container, Title, Group, Button, Tabs, Stack } from '@mantine/core';
 import { IconPlus, IconTemplate, IconLink } from '@tabler/icons-react';
 import { getLetterTemplates } from '@/app/_actions/letterTemplates';
 import { getOrderLetterTemplateAssignments } from '@/app/_actions/orderLetterTemplateAssignments';
@@ -23,6 +16,7 @@ import { LetterTemplatesTable } from './components/LetterTemplatesTable';
 import { OrderLetterTemplateAssignmentsTable } from './components/OrderLetterTemplateAssignmentsTable';
 import type { LetterTemplate } from '@/types/letterTemplates';
 import type { OrderLetterTemplateAssignment } from '@prisma/client';
+import { ManagementSectionThemeProvider } from '../ManagementSectionThemeProvider';
 
 interface OrderLetterTemplateAssignmentWithTemplate extends OrderLetterTemplateAssignment {
   letterTemplate: {
@@ -149,7 +143,8 @@ export default function LetterTemplatesPageClient({
   }, [nameFilter]);
 
   return (
-    <Container size="xl" py="xl">
+    <ManagementSectionThemeProvider section="letterTemplates">
+      <Container size="xl" py="xl">
       <Title order={1} mb="xl">Templates de lettres</Title>
 
       <Tabs defaultValue="templates">
@@ -261,6 +256,7 @@ export default function LetterTemplatesPageClient({
         assignmentToDelete={assignmentToDelete}
         onSuccess={loadAssignments}
       />
-    </Container>
+      </Container>
+    </ManagementSectionThemeProvider>
   );
 }

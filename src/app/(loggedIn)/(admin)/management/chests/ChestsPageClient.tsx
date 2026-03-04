@@ -1,12 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import {
-  Container,
-  Title,
-  Group,
-  Button,
-} from '@mantine/core';
+import { Container, Title, Group, Button } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
 import { getChests } from '@/app/_actions/chests';
 import { handleAction } from '@/lib/action';
@@ -17,6 +12,7 @@ import { ReorderChestsModal } from './components/ReorderChestsModal';
 import { ActiveFilters } from '@/app/_components/ActiveFilters/ActiveFilters';
 import { ChestsTable } from './components/ChestsTable';
 import type { ChestWithStockHistory } from '@/types/chests';
+import { ManagementSectionThemeProvider } from '../ManagementSectionThemeProvider';
 
 interface ChestsPageClientProps {
   initialChests: ChestWithStockHistory[];
@@ -99,7 +95,8 @@ export default function ChestsPageClient({
   }, [nameFilter]);
 
   return (
-    <Container size="xl" py="xl">
+    <ManagementSectionThemeProvider section="chests">
+      <Container size="xl" py="xl">
       <Group justify="space-between" mb="xl">
         <Title order={1}>Coffres</Title>
         <Group>
@@ -170,6 +167,7 @@ export default function ChestsPageClient({
         chests={chests}
         onSuccess={loadChests}
       />
-    </Container>
+      </Container>
+    </ManagementSectionThemeProvider>
   );
 }

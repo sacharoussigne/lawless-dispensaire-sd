@@ -1,12 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import {
-  Container,
-  Title,
-  Group,
-  Button,
-} from '@mantine/core';
+import { Container, Title, Group, Button } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
 import { getCategoryItems } from '@/app/_actions/categoryItems';
 import { handleAction } from '@/lib/action';
@@ -17,6 +12,7 @@ import { ActiveFilters } from '@/app/_components/ActiveFilters/ActiveFilters';
 import { CategoryItemsTable } from './components/CategoryItemsTable';
 import { ReorderCategoryItemsModal } from './components/ReorderCategoryItemsModal';
 import type { CategoryItemWithItems } from '@/types/categoryItems';
+import { ManagementSectionThemeProvider } from '../ManagementSectionThemeProvider';
 
 interface CategoryItemsPageClientProps {
   initialCategoryItems: CategoryItemWithItems[];
@@ -105,7 +101,8 @@ export default function CategoryItemsPageClient({
   }, [nameFilter]);
 
   return (
-    <Container size="xl" py="xl">
+    <ManagementSectionThemeProvider section="categoryItems">
+      <Container size="xl" py="xl">
       <Group justify="space-between" mb="xl">
         <Title order={1}>Catégories d'objets</Title>
         <Group>
@@ -174,7 +171,8 @@ export default function CategoryItemsPageClient({
         categoryItems={categoryItems}
         onSuccess={loadCategoryItems}
       />
-    </Container>
+      </Container>
+    </ManagementSectionThemeProvider>
   );
 }
 

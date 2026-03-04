@@ -1,12 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import {
-  Container,
-  Title,
-  Group,
-  Button,
-} from '@mantine/core';
+import { Container, Title, Group, Button } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
 import { getItems } from '@/app/_actions/items';
 import { handleAction } from '@/lib/action';
@@ -18,6 +13,7 @@ import { ItemsTable } from './components/ItemsTable';
 import { ReorderModal } from './components/ReorderModal';
 import { CraftRecipesModal } from './components/CraftRecipesModal';
 import type { ItemWithRelations, CategoryItem, CompanyGroup } from '@/types/items';
+import { ManagementSectionThemeProvider } from '../ManagementSectionThemeProvider';
 
 interface ItemsPageClientProps {
   initialItems: ItemWithRelations[];
@@ -137,7 +133,8 @@ export default function ItemsPageClient({
   ]);
 
   return (
-    <Container size="xl" py="xl">
+    <ManagementSectionThemeProvider section="items">
+      <Container size="xl" py="xl">
       <Group justify="space-between" mb="xl">
         <Title order={1}>Objets</Title>
         <Group>
@@ -261,6 +258,7 @@ export default function ItemsPageClient({
         categoryItems={categoryItems}
         onSuccess={loadItems}
       />
-    </Container>
+      </Container>
+    </ManagementSectionThemeProvider>
   );
 }

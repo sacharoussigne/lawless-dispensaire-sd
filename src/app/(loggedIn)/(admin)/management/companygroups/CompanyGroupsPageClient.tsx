@@ -1,12 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import {
-  Container,
-  Title,
-  Group,
-  Button,
-} from '@mantine/core';
+import { Container, Title, Group, Button } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
 import { getCompanyGroups } from '@/app/_actions/companyGroups';
 import { handleAction } from '@/lib/action';
@@ -16,6 +11,7 @@ import { DeleteCompanyGroupModal } from './components/DeleteCompanyGroupModal';
 import { ActiveFilters } from '@/app/_components/ActiveFilters/ActiveFilters';
 import { CompanyGroupsTable } from './components/CompanyGroupsTable';
 import type { CompanyGroupWithRelations, CompanyWithRelations } from '@/types/companyGroups';
+import { ManagementSectionThemeProvider } from '../ManagementSectionThemeProvider';
 
 interface CompanyGroupsPageClientProps {
   initialCompanyGroups: CompanyGroupWithRelations[];
@@ -108,7 +104,8 @@ export default function CompanyGroupsPageClient({
   }, [nameFilter, descriptionFilter]);
 
   return (
-    <Container size="xl" py="xl">
+    <ManagementSectionThemeProvider section="companyGroups">
+      <Container size="xl" py="xl">
       <Group justify="space-between" mb="xl">
         <Title order={1}>Groupes d'entreprises</Title>
         <Button leftSection={<IconPlus size={16} />} onClick={openCreateModal}>
@@ -169,7 +166,8 @@ export default function CompanyGroupsPageClient({
         companyGroupToDelete={companyGroupToDelete}
         onSuccess={loadCompanyGroups}
       />
-    </Container>
+      </Container>
+    </ManagementSectionThemeProvider>
   );
 }
 
