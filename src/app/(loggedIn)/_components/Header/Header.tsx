@@ -29,11 +29,11 @@ export default function Header({
   const pathname = usePathname();
   const [userMenuOpened, setUserMenuOpened] = useState(false);
   const { permissions, userRole } = usePermissions();
-  
+
   const isAdminSpace = pathname?.startsWith(routes.admin.index) || false;
   const isManagementSpace = pathname?.startsWith(routes.management.index) || false;
   const isAdminOrManagementSpace = isAdminSpace || isManagementSpace;
-  
+
   const handleSpaceChange = (value: string) => {
     if (value === 'employee') {
       router.push(routes.stock.index);
@@ -60,7 +60,7 @@ export default function Header({
     <header className={`${classes.header} mb-10`}>
       <Container size={'xl'}>
         <div className={'flex justify-between items-center w-full h-[60px]'}>
-          <Link href={routes.stock.index}>
+          <Link href={isManagementSpace ? routes.management.index : routes.stock.index}>
             <Image
               src="/logo_dispensaire.png"
               alt="Dispensaire Saint-Denis"
@@ -90,19 +90,19 @@ export default function Header({
                     </Menu.Target>
                     <Menu.Dropdown>
                       <Menu.Label>Gestion</Menu.Label>
-                      <Link href={routes.management.items}>
-                        <Menu.Item>
-                          Objets
-                        </Menu.Item>
-                      </Link>
                       <Link href={routes.management.categoryItems}>
                         <Menu.Item>
                           Catégories d'objets
                         </Menu.Item>
                       </Link>
-                      <Link href={routes.management.companies}>
+                      <Link href={routes.management.items}>
                         <Menu.Item>
-                          Entreprises
+                          Objets
+                        </Menu.Item>
+                      </Link>
+                      <Link href={routes.management.chests}>
+                        <Menu.Item>
+                          Coffres
                         </Menu.Item>
                       </Link>
                       <Link href={routes.management.companyGroups}>
@@ -110,9 +110,9 @@ export default function Header({
                           Groupes d'entreprises
                         </Menu.Item>
                       </Link>
-                      <Link href={routes.management.chests}>
+                      <Link href={routes.management.companies}>
                         <Menu.Item>
-                          Coffres
+                          Entreprises
                         </Menu.Item>
                       </Link>
                       <Link href={routes.management.letterTemplates}>
@@ -183,22 +183,22 @@ export default function Header({
                     </UnstyledButton>
                   </Menu.Target>
                   <Menu.Dropdown>
-                  {userRole === 'admin' && (
-                        <>
-                          <Menu.Label>Admin</Menu.Label>
-                          <Link href={routes.admin.users}>
-                            <Menu.Item>
-                              Gestion Utilisateur
-                            </Menu.Item>
-                          </Link>
-                          <Link href={routes.admin.overwriteStock}>
-                            <Menu.Item>
-                              Écraser les stocks
-                            </Menu.Item>
-                          </Link>
-                          <Menu.Divider />
-                        </>
-                      )}
+                    {userRole === 'admin' && (
+                      <>
+                        <Menu.Label>Admin</Menu.Label>
+                        <Link href={routes.admin.users}>
+                          <Menu.Item>
+                            Gestion Utilisateur
+                          </Menu.Item>
+                        </Link>
+                        <Link href={routes.admin.overwriteStock}>
+                          <Menu.Item>
+                            Écraser les stocks
+                          </Menu.Item>
+                        </Link>
+                        <Menu.Divider />
+                      </>
+                    )}
                     <Menu.Item
                       leftSection={<IconLogout size={16} stroke={1.5} />}
                       onClick={handleLogout}
