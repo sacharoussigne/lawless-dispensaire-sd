@@ -9,7 +9,7 @@ import { getAuthSession } from '@/lib/auth';
 const createItemSchema = z.object({
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
   description: z.string().max(1000, 'La description est trop longue').optional(),
-  idealQuantity: z.number().int().min(0, 'La quantité idéale doit être positive'),
+  idealQuantity: z.number().int().min(0, 'La quantité minimale doit être positive'),
   isCraftable: z.boolean().default(false),
   isEnabled: z.boolean().default(true),
   canBeSold: z.boolean().default(false),
@@ -23,7 +23,7 @@ const updateItemSchema = z.object({
   id: z.string().uuid('ID invalide'),
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
   description: z.string().max(1000, 'La description est trop longue').optional(),
-  idealQuantity: z.number().int().min(0, 'La quantité idéale doit être positive'),
+  idealQuantity: z.number().int().min(0, 'La quantité minimale doit être positive'),
   isCraftable: z.boolean().default(false),
   isEnabled: z.boolean().default(true),
   canBeSold: z.boolean().default(false),

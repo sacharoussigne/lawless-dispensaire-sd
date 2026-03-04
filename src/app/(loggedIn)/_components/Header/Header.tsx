@@ -56,6 +56,16 @@ export default function Header({
   // Only if user has management permission (access to admin space)
   const canSwitchSpaces = permissions?.application.management === true;
 
+  // Check if a route is active
+  const isRouteActive = (route: string) => {
+    if (!pathname) return false;
+    // Exact match
+    if (pathname === route) return true;
+    // Starts with route + '/' (for sub-routes)
+    if (pathname.startsWith(`${route}/`)) return true;
+    return false;
+  };
+
   return (
     <header className={`${classes.header} mb-10`}>
       <Container size={'xl'}>
@@ -129,25 +139,25 @@ export default function Header({
                   <>
                     <Link
                       href={routes.stock.index}
-                      className={classes.link}
+                      className={`${classes.link} ${isRouteActive(routes.stock.index) ? classes.linkActive : ''}`}
                     >
                       Stocks
                     </Link>
                     <Link
                       href={routes.orders.index}
-                      className={classes.link}
+                      className={`${classes.link} ${isRouteActive(routes.orders.index) ? classes.linkActive : ''}`}
                     >
                       Commandes
                     </Link>
                     <Link
                       href={routes.searchItems.index}
-                      className={classes.link}
+                      className={`${classes.link} ${isRouteActive(routes.searchItems.index) ? classes.linkActive : ''}`}
                     >
                       Recherche
                     </Link>
                     <Link
                       href={routes.bank.index}
-                      className={classes.link}
+                      className={`${classes.link} ${isRouteActive(routes.bank.index) ? classes.linkActive : ''}`}
                     >
                       Banque
                     </Link>

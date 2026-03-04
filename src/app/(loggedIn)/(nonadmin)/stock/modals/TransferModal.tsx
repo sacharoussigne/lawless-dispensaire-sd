@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Modal,
   Stack,
@@ -28,8 +28,8 @@ interface TransferModalProps {
   onClose: () => void;
   items: ItemWithRelations[];
   chests: ChestWithStockHistory[];
-  initialSourceChestId?: string | null; // Coffre source pré-sélectionné depuis la vue stock
-  onTransfer: () => void; // Callback après un transfert réussi
+  initialSourceChestId?: string | null; // Pre-selected source chest from stock view
+  onTransfer: () => void; // Callback after successful transfer
 }
 
 export default function TransferModal({
@@ -47,7 +47,7 @@ export default function TransferModal({
   const [loadingItems, setLoadingItems] = useState(false);
   const [quantitiesByItem, setQuantitiesByItem] = useState<Record<string, number | ''>>({});
 
-  // Mettre à jour sourceChestId quand initialSourceChestId change
+  // Update sourceChestId when initialSourceChestId changes
   useEffect(() => {
     if (opened && initialSourceChestId !== null) {
       setSourceChestId(initialSourceChestId);
@@ -56,7 +56,7 @@ export default function TransferModal({
     }
   }, [opened, initialSourceChestId]);
 
-  // Charger les items avec le stock du coffre source sélectionné
+  // Load items with stock from selected source chest
   useEffect(() => {
     if (opened && sourceChestId) {
       const loadItemsForChest = async () => {
@@ -66,7 +66,7 @@ export default function TransferModal({
           const data = handleAction(result);
           if (data) {
             setItemsWithStock(data);
-            // Réinitialiser les quantités quand le coffre source change
+            // Reset quantities when source chest changes
             const initialQuantities: Record<string, number | ''> = {};
             data
               .filter((item: ItemWithRelations) => item.stockToday !== null && item.stockToday > 0)
@@ -87,13 +87,13 @@ export default function TransferModal({
       };
       loadItemsForChest();
     } else if (opened && !sourceChestId) {
-      // Si aucun coffre source n'est sélectionné, réinitialiser les items et les quantités
+      // If no source chest is selected, reset items and quantities
       setItemsWithStock([]);
       setQuantitiesByItem({});
     }
   }, [opened, sourceChestId]);
 
-  // Réinitialiser les états quand la modal se ferme
+  // Reset states when modal closes
   useEffect(() => {
     if (!opened) {
       setDestinationChestId(null);
@@ -101,15 +101,36 @@ export default function TransferModal({
     }
   }, [opened]);
 
-  // Filtrer les coffres pour exclure le coffre source de la liste des destinations
+  // Filter chests to exclude source chest from destination list
   const availableDestinationChests = chests.filter((chest) => chest.id !== sourceChestId);
 
-  // Items éligibles au transfert (avec stock disponible)
-  const transferableItems = itemsWithStock.filter(
-    (item) => item.stockToday !== null && item.stockToday > 0
-  );
+  // Items eligible for transfer (with available stock), sorted by category then by item order
+  const transferableItems = useMemo(() => {
+    const filtered = itemsWithStock.filter(
+      (item) => item.stockToday !== null && item.stockToday > 0
+    );
+    
+    return filtered.sort((a, b) => {
+      // Sort by category order
+      const categoryOrderA = a.category?.order ?? 0;
+      const categoryOrderB = b.category?.order ?? 0;
+      if (categoryOrderA !== categoryOrderB) {
+        return categoryOrderA - categoryOrderB;
+      }
+      
+      // If same category order, sort by item order
+      const itemOrderA = a.order ?? 0;
+      const itemOrderB = b.order ?? 0;
+      if (itemOrderA !== itemOrderB) {
+        return itemOrderA - itemOrderB;
+      }
+      
+      // If same order, alphabetical sort by name
+      return a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' });
+    });
+  }, [itemsWithStock]);
 
-  // Options pour les coffres
+  // Options for chests
   const sourceChestOptions = chests.map((chest) => ({
     value: chest.id,
     label: chest.name,
@@ -120,7 +141,7 @@ export default function TransferModal({
     label: chest.name,
   }));
 
-  // Construire la liste des transferts à partir des quantités saisies
+  // Build transfer list from entered quantities
   const transferItems = transferableItems
     .map((item) => {
       const quantity = quantitiesByItem[item.id];

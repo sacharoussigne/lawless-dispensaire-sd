@@ -391,7 +391,7 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
                   <Table.Thead>
                     <Table.Tr>
                       <Table.Th>Nom</Table.Th>
-                      <Table.Th>Quantité idéale</Table.Th>
+                      <Table.Th>Quantité minimale</Table.Th>
                       <Table.Th>Stock J-1</Table.Th>
                       <Table.Th>Stock aujourd'hui</Table.Th>
                       {isEditing && permissions?.stock.update && <Table.Th>Nouveau stock</Table.Th>}
