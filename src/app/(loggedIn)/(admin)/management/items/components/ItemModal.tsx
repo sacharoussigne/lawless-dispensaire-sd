@@ -11,6 +11,9 @@ import {
   Switch,
   Button,
   Group,
+  Text,
+  Divider,
+  SimpleGrid,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
@@ -187,75 +190,105 @@ export function ItemModal({
         form.reset();
       }}
       title={editingItem ? "Modifier l'objet" : 'Créer un objet'}
-      size="md"
+      size="lg"
     >
       <form onSubmit={form.onSubmit(handleSubmit)}>
-        <Stack>
-          <TextInput
-            label="Nom"
-            placeholder="Nom de l'objet"
-            required
-            {...form.getInputProps('name')}
-          />
-          <Textarea
-            label="Description"
-            placeholder="Description de l'objet (optionnel)"
-            rows={4}
-            {...form.getInputProps('description')}
-          />
-          <NumberInput
-            label="Quantité idéale"
-            placeholder="Quantité idéale"
-            required
-            min={0}
-            {...form.getInputProps('idealQuantity')}
-          />
-          <Select
-            label="Catégorie"
-            placeholder="Sélectionner une catégorie"
-            data={categoryOptions}
-            required
-            searchable
-            {...form.getInputProps('categoryId')}
-          />
-          <Switch
-            label="Peut être crafté"
-            {...form.getInputProps('isCraftable', { type: 'checkbox' })}
-          />
-          {!form.values.isCraftable && (
-            <Select
-              label="Groupe d'entreprises"
-              placeholder="Sélectionner un groupe d'entreprises (optionnel)"
-              data={companyGroupOptions}
-              clearable
-              searchable
-              {...form.getInputProps('companyGroupId')}
-            />
-          )}
-          <Switch
-            label="Activé"
-            description="Si désactivé, l'objet ne sera pas visible dans la page de stock"
-            {...form.getInputProps('isEnabled', { type: 'checkbox' })}
-          />
-          <Switch
-            label="Peut être vendu"
-            description="Si activé, cet objet peut être vendu dans les commandes"
-            {...form.getInputProps('canBeSold', { type: 'checkbox' })}
-          />
-          {form.values.canBeSold && (
-            <NumberInput
-              label="Prix"
-              placeholder="Prix de vente"
+        <Stack gap="md">
+          {/* Section: informations générales */}
+          <Stack gap="sm">
+            <Text fw={600} size="xs" c="dimmed" tt="uppercase">
+              Informations générales
+            </Text>
+            <TextInput
+              label="Nom"
+              placeholder="Nom de l'objet"
               required
-              min={0}
-              step={0.01}
-              decimalScale={2}
-              fixedDecimalScale
-              leftSection="$"
-              description="Prix de vente de l'objet"
-              {...form.getInputProps('price')}
+              {...form.getInputProps('name')}
             />
-          )}
+            <Textarea
+              label="Description"
+              placeholder="Description de l'objet (optionnel)"
+              rows={3}
+              autosize
+              minRows={3}
+              {...form.getInputProps('description')}
+            />
+          </Stack>
+
+          {/* Section: stock et catégorisation */}
+          <Stack gap="sm" mt="xs">
+            <Text fw={600} size="xs" c="dimmed" tt="uppercase">
+              Stock et catégorisation
+            </Text>
+            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+              <NumberInput
+                label="Quantité idéale"
+                placeholder="Quantité idéale"
+                required
+                min={0}
+                {...form.getInputProps('idealQuantity')}
+              />
+              <Select
+                label="Catégorie"
+                placeholder="Sélectionner une catégorie"
+                data={categoryOptions}
+                required
+                searchable
+                {...form.getInputProps('categoryId')}
+              />
+            </SimpleGrid>
+
+            <Group grow align="flex-start" mt="xs">
+              <Switch
+                label="Peut être crafté"
+                {...form.getInputProps('isCraftable', { type: 'checkbox' })}
+              />
+              <Switch
+                label="Activé"
+                description="Si désactivé, l'objet ne sera pas visible dans la page de stock"
+                {...form.getInputProps('isEnabled', { type: 'checkbox' })}
+              />
+            </Group>
+
+            {!form.values.isCraftable && (
+              <Select
+                label="Groupe d'entreprises"
+                placeholder="Sélectionner un groupe d'entreprises (optionnel)"
+                data={companyGroupOptions}
+                clearable
+                searchable
+                {...form.getInputProps('companyGroupId')}
+              />
+            )}
+          </Stack>
+
+          {/* Section: vente */}
+          <Stack gap="sm" mt="xs">
+            <Text fw={600} size="xs" c="dimmed" tt="uppercase">
+              Vente
+            </Text>
+            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+              <Switch
+                label="Peut être vendu"
+                description="Si activé, cet objet peut être vendu dans les commandes"
+                {...form.getInputProps('canBeSold', { type: 'checkbox' })}
+              />
+              {form.values.canBeSold && (
+                <NumberInput
+                  label="Prix"
+                  placeholder="Prix de vente"
+                  required
+                  min={0}
+                  step={0.01}
+                  decimalScale={2}
+                  fixedDecimalScale
+                  leftSection="$"
+                  description="Prix de vente de l'objet"
+                  {...form.getInputProps('price')}
+                />
+              )}
+            </SimpleGrid>
+          </Stack>
           <Group justify="flex-end" mt="md">
             <Button
               variant="subtle"

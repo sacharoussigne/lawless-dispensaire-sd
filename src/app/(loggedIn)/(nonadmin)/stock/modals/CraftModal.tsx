@@ -14,6 +14,8 @@ import {
   Badge,
   Table,
   ScrollArea,
+  Divider,
+  SimpleGrid,
 } from '@mantine/core';
 import { IconAlertCircle } from '@tabler/icons-react';
 import { getCraftRecipesByItemId } from '@/app/_actions/craftRecipes';
@@ -358,56 +360,61 @@ export default function CraftModal({
       yOffset={60}
       scrollAreaComponent={ScrollArea.Autosize}
     >
-      <Stack gap="md">
-        <Alert icon={<IconAlertCircle size={16} />} title="Information" color="blue">
-          Sélectionnez un coffre source de base, puis choisissez individuellement le coffre source pour chaque ingrédient. Le résultat du craft sera déposé dans le coffre de destination.
-        </Alert>
+      <Stack gap="lg">
+        <Stack gap="sm">
+          <Text fw={600} size="xs" c="dimmed" tt="uppercase">
+            Coffres
+          </Text>
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+            <Select
+              label="Coffre source de base"
+              placeholder="Sélectionner le coffre source"
+              data={chestOptions}
+              value={sourceChestId}
+              onChange={(value) => setSourceChestId(value)}
+              required
+              clearable={false}
+            />
 
-        <Group grow align="flex-end">
+            <Select
+              label="Coffre de destination"
+              placeholder="Sélectionner le coffre destination"
+              data={destinationChestOptions}
+              value={destinationChestId}
+              onChange={(value) => setDestinationChestId(value)}
+              required
+              clearable={false}
+            />
+          </SimpleGrid>
+        </Stack>
+
+        <Stack gap="sm">
+          <Text fw={600} size="xs" c="dimmed" tt="uppercase">
+            Objet et recette
+          </Text>
           <Select
-            label="Coffre source de base"
-            placeholder="Sélectionner le coffre source"
-            data={chestOptions}
-            value={sourceChestId}
-            onChange={(value) => setSourceChestId(value)}
+            label="Objet à craft"
+            placeholder="Sélectionner un objet craftable"
+            data={items
+              .filter((item) => item.isCraftable)
+              .sort((a, b) => {
+                if (a.order !== undefined && b.order !== undefined) {
+                  return a.order - b.order;
+                }
+                if (a.order !== undefined) return -1;
+                if (b.order !== undefined) return 1;
+                return a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' });
+              })
+              .map((item) => ({
+                value: item.id,
+                label: item.name,
+              }))}
+            value={selectedCraftItem}
+            onChange={handleItemChange}
+            searchable
             required
-            clearable={false}
+            disabled={loadingItems}
           />
-
-          <Select
-            label="Coffre de destination"
-            placeholder="Sélectionner le coffre destination"
-            data={destinationChestOptions}
-            value={destinationChestId}
-            onChange={(value) => setDestinationChestId(value)}
-            required
-            clearable={false}
-          />
-        </Group>
-
-        <Select
-          label="Objet à craft"
-          placeholder="Sélectionner un objet craftable"
-          data={items
-            .filter((item) => item.isCraftable)
-            .sort((a, b) => {
-              if (a.order !== undefined && b.order !== undefined) {
-                return a.order - b.order;
-              }
-              if (a.order !== undefined) return -1;
-              if (b.order !== undefined) return 1;
-              return a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' });
-            })
-            .map((item) => ({
-              value: item.id,
-              label: item.name,
-            }))}
-          value={selectedCraftItem}
-          onChange={handleItemChange}
-          searchable
-          required
-          disabled={loadingItems}
-        />
 
         {selectedCraftItem && craftRecipes.length > 0 && (
           <>
@@ -461,9 +468,11 @@ export default function CraftModal({
                   description={`Quantité totale produite : ${totalQuantityProduced}`}
                 />
 
+                <Divider />
+
                 <Paper withBorder shadow="xs" p="sm">
-                  <Stack gap="xs">
-                    <Text size="sm" fw={500}>
+                  <Stack gap="sm">
+                    <Text size="xs" c="dimmed" fw={600} tt="uppercase">
                       Ingrédients nécessaires
                     </Text>
                     <Table striped highlightOnHover>
@@ -544,6 +553,7 @@ export default function CraftModal({
             )}
           </>
         )}
+        </Stack>
 
         {selectedCraftItem && craftRecipes.length === 0 && !loadingRecipes && (
           <Text c="dimmed" size="sm">

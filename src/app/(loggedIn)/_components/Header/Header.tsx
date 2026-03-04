@@ -60,7 +60,10 @@ export default function Header({
     <header className={`${classes.header} mb-10`}>
       <Container size={'xl'}>
         <div className={'flex justify-between items-center w-full h-[60px]'}>
-          <Link href={isManagementSpace ? routes.management.index : routes.stock.index}>
+          <Link 
+            href={isManagementSpace ? routes.management.index : routes.stock.index}
+            className={classes.logoLink}
+          >
             <Image
               src="/logo_dispensaire.png"
               alt="Dispensaire Saint-Denis"
