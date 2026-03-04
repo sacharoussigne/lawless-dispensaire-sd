@@ -12,23 +12,24 @@ import {
 } from '@/lib/date';
 
 /**
- * Récupère le coffre par défaut "Foure tout"
+ * Gets the default "Foure tout" chest
  */
 async function getDefaultChestId(): Promise<string> {
   const defaultChest = await prisma.chest.findFirst({
     where: {
       name: 'Foure tout',
+      isEnabled: true,
     },
   });
   if (!defaultChest) {
-    throw new Error('Coffre par défaut "Foure tout" non trouvé');
+    throw new Error('Coffre par défaut "Foure tout" non trouvé ou désactivé');
   }
   return defaultChest.id;
 }
 
 /**
- * Récupère tous les items avec leurs stocks d'aujourd'hui et d'hier
- * @param chestId - ID du coffre à filtrer (optionnel, null pour tous les coffres)
+ * Gets all items with their today's and yesterday's stocks
+ * @param chestId - Chest ID to filter (optional, null for all chests)
  */
 export async function getItemsWithStock(chestId?: string | null) {
   try {
@@ -84,6 +85,9 @@ export async function getItemsWithStock(chestId?: string | null) {
             timestamp: {
               gte: yesterday,
               lt: tomorrow,
+            },
+            chest: {
+              isEnabled: true,
             },
           },
           select: {
@@ -179,11 +183,11 @@ export async function getItemsWithStock(chestId?: string | null) {
 }
 
 /**
- * Met à jour le stock pour plusieurs items
- * Si un stock existe déjà aujourd'hui pour le coffre spécifié, il est mis à jour
- * Sinon, un nouveau stock est créé pour ce coffre
- * @param data - Tableau d'items avec leurs quantités
- * @param chestId - ID du coffre (optionnel, si null ou non fourni, utilise le coffre "foure tout")
+ * Updates stock for multiple items
+ * If stock already exists today for the specified chest, it is updated
+ * Otherwise, a new stock is created for this chest
+ * @param data - Array of items with their quantities
+ * @param chestId - Chest ID (optional, if null or not provided, uses the "foure tout" chest)
  */
 export async function updateStock(data: { itemId: string; quantity: number }[], chestId?: string | null) {
   try {
@@ -203,12 +207,13 @@ export async function updateStock(data: { itemId: string; quantity: number }[], 
       const defaultChest = await prisma.chest.findFirst({
         where: {
           name: 'Foure tout',
+          isEnabled: true,
         },
       });
       if (!defaultChest) {
         return {
           status: 404,
-          error: 'Coffre par défaut "Foure tout" non trouvé',
+          error: 'Coffre par défaut "Foure tout" non trouvé ou désactivé',
         };
       }
       targetChestId = defaultChest.id;
@@ -261,15 +266,15 @@ export async function updateStock(data: { itemId: string; quantity: number }[], 
 }
 
 /**
- * Effectue un craft : ajoute l'item crafté au stock et enlève les ingrédients
+ * Performs a craft: adds the crafted item to stock and removes ingredients
  */
 export async function craftItem(data: {
   craftedItemId: string;
   recipeId: string;
-  times: number; // Nombre de fois qu'on craft la recette
-  sourceChestId: string | null; // ID du coffre source de base
-  ingredientChests: { ingredientId: string; chestId: string }[]; // Mapping ingrédient -> coffre source
-  destinationChestId: string | null; // ID du coffre de destination pour l'item crafté
+  times: number;
+  sourceChestId: string | null;
+  ingredientChests: { ingredientId: string; chestId: string }[];
+  destinationChestId: string | null;
 }) {
   try {
     const session = await getAuthSession();
@@ -280,7 +285,7 @@ export async function craftItem(data: {
       };
     }
 
-    // Déterminer le coffre de destination
+    // Determine the destination chest
     const destinationChestId = data.destinationChestId || await getDefaultChestId();
 
     const recipe = await prisma.craftRecipe.findUnique({
@@ -454,10 +459,10 @@ export async function craftItem(data: {
 }
 
 /**
- * Ajoute les items d'une commande au stock d'aujourd'hui
- * Additionne les quantités aux stocks existants
- * @param orderId - ID de la commande
- * @param chestId - ID du coffre où ajouter les stocks (optionnel, utilise "foure tout" par défaut)
+ * Adds order items to today's stock
+ * Adds quantities to existing stocks
+ * @param orderId - Order ID
+ * @param chestId - Chest ID where to add stocks (optional, uses "foure tout" by default)
  */
 export async function addOrderItemsToStock(orderId: string, chestId?: string | null) {
   try {
@@ -545,7 +550,7 @@ export async function addOrderItemsToStock(orderId: string, chestId?: string | n
 }
 
 /**
- * Récupère tous les items avec leurs stocks pour une date donnée
+ * Gets all items with their stocks for a given date
  */
 export async function getItemsWithStockForDate(date: Date, chestId?: string | null) {
   try {
@@ -602,6 +607,9 @@ export async function getItemsWithStockForDate(date: Date, chestId?: string | nu
               lt: dayEnd,
             },
             ...(chestId ? { chestId: chestId } : {}),
+            chest: {
+              isEnabled: true,
+            },
           },
           orderBy: {
             timestamp: 'desc',
@@ -633,8 +641,8 @@ export async function getItemsWithStockForDate(date: Date, chestId?: string | nu
 }
 
 /**
- * Écrase les stocks pour une date donnée et un coffre spécifique
- * Supprime tous les stocks existants pour cette date et ce coffre, puis crée de nouveaux stocks
+ * Overwrites stocks for a given date and specific chest
+ * Deletes all existing stocks for this date and chest, then creates new stocks
  */
 export async function overwriteStockForDate(data: {
   date: Date;
@@ -691,8 +699,8 @@ export async function overwriteStockForDate(data: {
 }
 
 /**
- * Récupère les items avec leurs stocks détaillés par coffre
- * Utile pour la recherche d'items avec informations complètes
+ * Gets items with their detailed stocks by chest
+ * Useful for item search with complete information
  */
 export async function getItemsWithDetailedStock(itemIds?: string[]) {
   try {
@@ -744,6 +752,9 @@ export async function getItemsWithDetailedStock(itemIds?: string[]) {
             timestamp: {
               gte: yesterday,
             },
+            chest: {
+              isEnabled: true,
+            },
           },
           select: {
             id: true,
@@ -765,6 +776,9 @@ export async function getItemsWithDetailedStock(itemIds?: string[]) {
     });
 
     const allChests = await prisma.chest.findMany({
+      where: {
+        isEnabled: true,
+      },
       orderBy: {
         name: 'asc',
       },
@@ -775,7 +789,7 @@ export async function getItemsWithDetailedStock(itemIds?: string[]) {
     });
 
     const itemsWithDetailedStock = items.map((item) => {
-      // Grouper les stocks par coffre pour aujourd'hui
+      // Group stocks by chest for today
       const stocksByChestToday = new Map<string, { quantity: number; timestamp: Date }>();
       const stocksByChestYesterday = new Map<string, { quantity: number; timestamp: Date }>();
 
@@ -797,7 +811,7 @@ export async function getItemsWithDetailedStock(itemIds?: string[]) {
         }
       });
 
-      // Calculer le stock total aujourd'hui et hier
+      // Calculate total stock today and yesterday
       const totalStockToday = Array.from(stocksByChestToday.values()).reduce((sum, sh) => sum + sh.quantity, 0);
       const totalStockYesterday = Array.from(stocksByChestYesterday.values()).reduce((sum, sh) => sum + sh.quantity, 0);
 
@@ -832,7 +846,7 @@ export async function getItemsWithDetailedStock(itemIds?: string[]) {
 }
 
 /**
- * Vérifie si tous les items d'une commande ont un stock d'aujourd'hui
+ * Checks if all order items have today's stock
  */
 export async function checkOrderItemsStockToday(orderId: string, chestId?: string | null) {
   try {
@@ -996,10 +1010,10 @@ export async function checkOrderItemsStockSufficient(orderId: string, chestId?: 
 }
 
 /**
- * Retire les items d'une commande sortante du stock d'aujourd'hui
- * Vérifie qu'on a assez de stock avant de retirer
- * @param orderId - ID de la commande
- * @param chestId - ID du coffre d'où retirer les stocks (optionnel, utilise "foure tout" par défaut)
+ * Removes items from an outgoing order from today's stock
+ * Checks if there is enough stock before removing
+ * @param orderId - Order ID
+ * @param chestId - Chest ID to remove stocks from (optional, uses "foure tout" by default)
  */
 export async function removeOrderItemsFromStock(orderId: string, chestId?: string | null) {
   try {
@@ -1092,11 +1106,11 @@ export async function removeOrderItemsFromStock(orderId: string, chestId?: strin
       };
     }
 
-    // Retirer les quantités du stock du coffre spécifié
+    // Remove quantities from the specified chest stock
     await prisma.$transaction(async (tx) => {
       for (const check of stockChecks) {
         if (check.stockToday) {
-          // Vérification de sécurité : s'assurer que le stock appartient au bon coffre
+          // Security check: ensure stock belongs to the correct chest
           if (check.stockToday.chestId !== targetChestId) {
             throw new Error(`Le stock trouvé n'appartient pas au coffre attendu pour ${check.orderItem.item.name}`);
           }
@@ -1125,12 +1139,12 @@ export async function removeOrderItemsFromStock(orderId: string, chestId?: strin
 }
 
 /**
- * Transfère un item d'un coffre source vers un coffre destination
- * Vérifie que le coffre source a assez de stock avant de transférer
- * @param itemId - ID de l'item à transférer
- * @param quantity - Quantité à transférer
- * @param sourceChestId - ID du coffre source
- * @param destinationChestId - ID du coffre destination
+ * Transfers an item from a source chest to a destination chest
+ * Checks that the source chest has enough stock before transferring
+ * @param itemId - Item ID to transfer
+ * @param quantity - Quantity to transfer
+ * @param sourceChestId - Source chest ID
+ * @param destinationChestId - Destination chest ID
  */
 export async function transferStock(data: {
   itemId: string;
@@ -1243,9 +1257,9 @@ export async function transferStock(data: {
 }
 
 /**
- * Transfère plusieurs items d'un coffre source vers un coffre destination
- * Vérifie que le coffre source a assez de stock pour chaque item avant de transférer
- * L'opération est transactionnelle : soit tous les transferts réussissent, soit aucun n'est appliqué
+ * Transfers multiple items from a source chest to a destination chest
+ * Checks that the source chest has enough stock for each item before transferring
+ * The operation is transactional: either all transfers succeed, or none are applied
  */
 export async function transferMultipleStock(data: {
   sourceChestId: string;

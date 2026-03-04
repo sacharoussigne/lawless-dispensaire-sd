@@ -19,10 +19,14 @@ import {
   deleteBankAccountAccess,
   getBankAccount,
 } from '@/app/_actions/bankAccounts';
-import { listUsers } from '@/app/_actions/users';
+import { listUsersForBankAccess } from '@/app/_actions/users';
 import { handleAction } from '@/lib/action';
 import type { BankAccountWithRelations } from '@/types/bankAccounts';
-import type { User } from '@/types/users';
+
+type BankAccessUser = {
+  id: string;
+  name: string;
+};
 
 interface ManageAccessModalProps {
   opened: boolean;
@@ -38,7 +42,7 @@ export function ManageAccessModal({
   onSuccess,
 }: ManageAccessModalProps) {
   const [localAccount, setLocalAccount] = useState<BankAccountWithRelations | null>(account);
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<BankAccessUser[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [accessType, setAccessType] = useState<'READ' | 'WRITE'>('READ');
   const [loading, setLoading] = useState(false);
@@ -66,15 +70,15 @@ export function ManageAccessModal({
 
   const loadUsers = async (accountToUse: BankAccountWithRelations) => {
     try {
-      const result = await listUsers();
+      const result = await listUsersForBankAccess();
       const data = handleAction(result);
       if (data && accountToUse) {
         const filteredUsers = (data.users || []).filter(
-          (user: any) =>
+          (user: BankAccessUser) =>
             user.id !== accountToUse.ownerId &&
             !accountToUse.accesses.some((access) => access.userId === user.id)
         );
-        setUsers(filteredUsers as User[]);
+        setUsers(filteredUsers as BankAccessUser[]);
       }
     } catch (error: any) {
       notifications.show({
@@ -153,7 +157,7 @@ export function ManageAccessModal({
 
   const userOptions = users.map((user) => ({
     value: user.id,
-    label: `${user.name} (${user.email})`,
+    label: user.name,
   }));
 
   return (

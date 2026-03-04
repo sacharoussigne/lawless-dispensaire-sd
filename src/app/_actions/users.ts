@@ -1,9 +1,10 @@
 'use server';
 
-import { auth } from '@/lib/auth';
+import { auth, getAuthSession } from '@/lib/auth';
 import { headers } from 'next/headers';
 import { z } from 'zod';
 import prisma from '@/lib/prisma';
+import { checkRolePermission } from '@/lib/auth/permissions';
 
 const createUserSchema = z.object({
   email: z.string().email(),
@@ -51,6 +52,55 @@ export async function listUsers(params?: {
     return {
       status: 200,
       data: result,
+    };
+  } catch (error: any) {
+    return {
+      status: 500,
+      error: error.message || 'Erreur lors de la récupération des utilisateurs',
+    };
+  }
+}
+
+/**
+ * List users for bank access management
+ * Returns only id and name, accessible to roles with application.access (including employee)
+ */
+export async function listUsersForBankAccess() {
+  try {
+    const session = await getAuthSession();
+
+    if (!session) {
+      return {
+        status: 401,
+        error: 'Non autorisé',
+      };
+    }
+
+    const role = session.user?.role ?? null;
+    const hasAccess = checkRolePermission(role, 'application', 'access');
+
+    if (!hasAccess) {
+      return {
+        status: 403,
+        error: 'Accès refusé',
+      };
+    }
+
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        name: true,
+      },
+      orderBy: {
+        name: 'asc',
+      },
+    });
+
+    return {
+      status: 200,
+      data: {
+        users,
+      },
     };
   } catch (error: any) {
     return {
@@ -159,8 +209,8 @@ export async function deleteUser(data: z.infer<typeof deleteUserSchema>) {
   try {
     const validated = deleteUserSchema.parse(data);
 
-    // Suppression directe via Prisma
-    // Les sessions et accounts seront supprimés automatiquement grâce à onDelete: Cascade
+    // Direct deletion via Prisma
+    // Sessions and accounts are deleted automatically thanks to onDelete: Cascade
     await prisma.user.delete({
       where: {
         id: validated.id,
@@ -187,8 +237,6 @@ export async function deleteUser(data: z.infer<typeof deleteUserSchema>) {
 
 export async function impersonateUser(userId: string) {
   try {
-    // Utiliser l'API admin pour l'impersonation
-    // Note: better-auth expose l'impersonation via l'API admin
     const result = await (auth.api as any).admin.impersonateUser({
       body: {
         userId,
@@ -201,7 +249,6 @@ export async function impersonateUser(userId: string) {
       data: result,
     };
   } catch (error: any) {
-    // Si admin.impersonateUser ne fonctionne pas, essayer impersonateUser directement
     try {
       const result = await auth.api.impersonateUser({
         body: {

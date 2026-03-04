@@ -8,14 +8,12 @@ import { getAuthSession } from '@/lib/auth';
 // Schéma de validation pour créer une entreprise
 const createCompanySchema = z.object({
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
-  locationId: z.string().uuid('La location est requise'),
 });
 
 // Schéma de validation pour modifier une entreprise
 const updateCompanySchema = z.object({
   id: z.string().uuid('ID invalide'),
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
-  locationId: z.string().uuid('La location est requise'),
 });
 
 // Schéma pour supprimer une entreprise
@@ -28,7 +26,6 @@ const deleteCompanySchema = z.object({
  */
 export async function createCompany(data: {
   name: string;
-  locationId: string;
 }) {
   try {
     const session = await getAuthSession();
@@ -44,15 +41,8 @@ export async function createCompany(data: {
     const company = await prisma.company.create({
       data: {
         name: validatedData.name,
-        locationId: validatedData.locationId,
       },
       include: {
-        location: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
         companyGroups: {
           select: {
             id: true,
@@ -88,12 +78,6 @@ export async function getCompanies() {
         createdAt: 'desc',
       },
       include: {
-        location: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
         companyGroups: {
           select: {
             id: true,
@@ -117,7 +101,6 @@ export async function getCompanies() {
 export async function updateCompany(data: {
   id: string;
   name: string;
-  locationId: string;
 }) {
   try {
     const session = await getAuthSession();
@@ -136,15 +119,8 @@ export async function updateCompany(data: {
       },
       data: {
         name: validatedData.name,
-        locationId: validatedData.locationId,
       },
       include: {
-        location: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
         companyGroups: {
           select: {
             id: true,

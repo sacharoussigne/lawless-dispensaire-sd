@@ -119,6 +119,8 @@ model Chest {
   id          String         @id @default(uuid())
   name        String
   description String?
+  isEnabled   Boolean        @default(true)
+  order       Int            @default(0)
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   stockHistory StockHistory[]
@@ -141,28 +143,14 @@ model StockHistory {
   @@map("stock_history")
 }
 
-model Location {
-  id          String    @id @default(uuid())
-  name        String
-  description String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  companies   Company[]
-
-  @@map("location")
-}
-
 model Company {
   id            String                @id @default(uuid())
   name          String
-  locationId    String
-  location      Location              @relation(fields: [locationId], references: [id], onDelete: Cascade)
   createdAt     DateTime              @default(now())
   updatedAt     DateTime              @updatedAt
   companyGroups CompanyGroupCompany[]
   orders        Order[]
 
-  @@index([locationId])
   @@map("company")
 }
 model CraftRecipe {

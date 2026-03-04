@@ -1,6 +1,6 @@
 import { getAuthSession } from '@/lib/auth';
 import { Container } from '@mantine/core';
-import AdminHeader from '../_components/AdminHeader/AdminHeader';
+import Header from '../_components/Header/Header';
 import { PermissionsProvider } from '@/app/_contexts/PermissionsContext';
 import { calculatePermissions } from '@/lib/auth/calculatePermissions';
 
@@ -17,7 +17,7 @@ export default async function LanguageLayout({
 
   return (
     <PermissionsProvider initialPermissions={permissions} initialRole={role}>
-      <AdminHeader session={session as any} />
+      <Header session={session as any} />
 
       <Container size={'xl'} className={'flex-1 pb-[72px] sm:pb-0'}>
         {children}

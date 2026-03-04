@@ -1,63 +1,63 @@
 /**
- * Fonctions utilitaires pour gérer les dates
- * Utilise dayjs configuré avec le fuseau horaire Europe/Paris par défaut
+ * Utility functions for date management
+ * Uses dayjs configured with Europe/Paris timezone by default
  */
 
 import dayjs from '@/lib/dayjs';
 
 /**
- * Obtient la date actuelle
+ * Gets the current date
  */
 export function getNow(): Date {
   return dayjs.tz().toDate();
 }
 
 /**
- * Obtient le début de la journée (00:00:00) pour une date donnée
+ * Gets the start of the day (00:00:00) for a given date
  */
 export function getStartOfDay(date?: Date): Date {
   return dayjs(date).tz().startOf('day').toDate();
 }
 
 /**
- * Obtient le début de la journée d'aujourd'hui
+ * Gets the start of today
  */
 export function getTodayStart(): Date {
   return dayjs.tz().startOf('day').toDate();
 }
 
 /**
- * Obtient le début de la journée d'hier
+ * Gets the start of yesterday
  */
 export function getYesterdayStart(): Date {
   return dayjs.tz().subtract(1, 'day').startOf('day').toDate();
 }
 
 /**
- * Obtient le début de la journée de demain
+ * Gets the start of tomorrow
  */
 export function getTomorrowStart(): Date {
   return dayjs.tz().add(1, 'day').startOf('day').toDate();
 }
 
 /**
- * Convertit une date en string formatée (YYYY-MM-DD)
+ * Converts a date to formatted string (YYYY-MM-DD)
  */
 export function formatDate(date: Date): string {
   return dayjs(date).tz().format('YYYY-MM-DD');
 }
 
 /**
- * Vérifie si une date est dans la plage d'une journée
- * Les dates sont comparées en fonction de leur jour, pas de leur heure UTC
+ * Checks if a date is within a day range
+ * Dates are compared by their day, not their UTC time
  */
 export function isDateInDayRange(date: Date, dayStart: Date, dayEnd: Date): boolean {
-  // Convertir les dates en format YYYY-MM-DD pour comparaison par jour
+  // Convert dates to YYYY-MM-DD format for day comparison
   const dateStr = formatDate(date);
   const dayStartStr = formatDate(dayStart);
   const dayEndStr = formatDate(dayEnd);
   
-  // Si la date est entre le début et la fin (exclus) du jour
+  // If date is between start and end (exclusive) of the day
   return dateStr >= dayStartStr && dateStr < dayEndStr;
 }
 

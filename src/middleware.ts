@@ -16,24 +16,28 @@ export async function middleware(req: NextRequest) {
   const middlewares = [];
 
   if (pathname.startsWith(routes.auth.index)) {
-    // Pour les routes d'authentification, on vérifie seulement si l'utilisateur doit être déconnecté
-    // Sauf pour les pages no-access qui doivent être accessibles même si connecté
+    // For auth routes, only check if user should be logged out
+    // Except for no-access pages which should be accessible even if logged in
     if (pathname !== routes.auth.noAccess && pathname !== routes.auth.noManagementAccess) {
       middlewares.push(hasToBeLoggedOutMiddleware);
     }
-    // Les pages no-access sont accessibles sans vérification
+  } else if (pathname.startsWith(routes.management.index)) {
+    // For management routes, check login, application access, then management access
+    middlewares.push(hasToBeLoggedInMiddleware);
+    middlewares.push(hasApplicationAccessMiddleware);
+    middlewares.push(hasManagementAccessMiddleware);
   } else if (pathname.startsWith(routes.admin.index)) {
-    // Pour les routes admin, on vérifie la connexion, l'accès à l'application, puis l'accès au management
+    // For admin routes, check login, application access, then management access
     middlewares.push(hasToBeLoggedInMiddleware);
     middlewares.push(hasApplicationAccessMiddleware);
     middlewares.push(hasManagementAccessMiddleware);
     
-    // Pour la page users, on vérifie aussi que l'utilisateur a le rôle admin
+    // For users page, also check that user has admin role
     if (pathname === routes.admin.users || pathname === routes.admin.overwriteStock) {
       middlewares.push(hasAdminRoleMiddleware);
     }
   } else {
-    // Pour les autres routes, on vérifie d'abord la connexion, puis l'accès à l'application
+    // For other routes, first check login, then application access
     middlewares.push(hasToBeLoggedInMiddleware);
     middlewares.push(hasApplicationAccessMiddleware);
   }

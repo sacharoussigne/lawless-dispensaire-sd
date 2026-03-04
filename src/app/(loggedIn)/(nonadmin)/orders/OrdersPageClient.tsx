@@ -27,14 +27,14 @@ interface OrdersPageClientProps {
   initialOrders: OrderWithRelations[];
 }
 
-// Fonction pour transformer un texte en slug (comme les noms de commande)
+// Function to transform text into slug (like order names)
 const toSlug = (text: string): string => {
   return text
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // Supprimer les accents
-    .replace(/[^a-z0-9]+/g, '-') // Remplacer tout ce qui n'est pas alphanumérique par un tiret
-    .replace(/^-+|-+$/g, ''); // Supprimer les tirets en début et fin
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 };
 
 export default function OrdersPageClient({
@@ -113,7 +113,7 @@ export default function OrdersPageClient({
     setLetterPreviewModalOpened(true);
   };
 
-  // Pré-calculer les couples (type, statut) qui ont un template de lettre
+  // Pre-calculate (type, status) pairs that have a letter template
   const assignmentKeys = useMemo(() => {
     const keys = new Set<string>();
     assignments.forEach((assignment) => {
@@ -130,7 +130,6 @@ export default function OrdersPageClient({
     [assignmentKeys]
   );
 
-  // Filtrer les commandes par statut et nom
   const filteredOrders = orders.filter((order) => {
     const matchesStatus = !statusFilter || order.status === statusFilter;
     const orderNameSlug = toSlug(order.name);
@@ -139,24 +138,20 @@ export default function OrdersPageClient({
     return matchesStatus && matchesName;
   });
 
-  // Trier par date de création (plus récent en premier)
   const sortedOrders = [...filteredOrders].sort((a, b) => {
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 
-  // Calculer la pagination
   const totalRecords = sortedOrders.length;
   const paginatedOrders = sortedOrders.slice(
     (page - 1) * pageSize,
     page * pageSize
   );
 
-  // Réinitialiser la page quand les filtres changent
   useEffect(() => {
     setPage(1);
   }, [statusFilter, nameFilter]);
 
-  // Charger les assignations au montage
   useEffect(() => {
     loadAssignments();
     // eslint-disable-next-line react-hooks/exhaustive-deps

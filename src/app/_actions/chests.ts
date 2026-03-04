@@ -5,31 +5,38 @@ import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
 import { getAuthSession } from '@/lib/auth';
 
-// Schéma de validation pour créer un coffre
 const createChestSchema = z.object({
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
   description: z.string().max(1000, 'La description est trop longue').optional(),
+  isEnabled: z.boolean().default(true),
 });
 
-// Schéma de validation pour modifier un coffre
 const updateChestSchema = z.object({
   id: z.string().uuid('ID invalide'),
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
   description: z.string().max(1000, 'La description est trop longue').optional(),
+  isEnabled: z.boolean(),
 });
 
-// Schéma pour supprimer un coffre
 const deleteChestSchema = z.object({
   id: z.string().uuid('ID invalide'),
   targetChestId: z.string().uuid('ID de coffre de destination invalide'),
 });
 
+const reorderChestsSchema = z.object({
+  items: z.array(z.object({
+    id: z.string().uuid('ID invalide'),
+    order: z.number().int(),
+  })),
+});
+
 /**
- * Crée un nouveau coffre
+ * Creates a new chest
  */
 export async function createChest(data: {
   name: string;
   description?: string;
+  isEnabled?: boolean;
 }) {
   try {
     const session = await getAuthSession();
@@ -42,10 +49,21 @@ export async function createChest(data: {
 
     const validatedData = createChestSchema.parse(data);
 
+    // Get the maximum current order to place the new chest last
+    const maxOrderResult = await prisma.chest.aggregate({
+      _max: {
+        order: true,
+      },
+    });
+    const maxOrder = maxOrderResult._max.order ?? -1;
+    const newOrder = maxOrder + 1;
+
     const chest = await prisma.chest.create({
       data: {
         name: validatedData.name,
         description: validatedData.description,
+        isEnabled: validatedData.isEnabled ?? true,
+        order: newOrder,
       },
     });
 
@@ -59,9 +77,10 @@ export async function createChest(data: {
 }
 
 /**
- * Récupère tous les coffres
+ * Gets all chests
+ * @param onlyEnabled
  */
-export async function getChests() {
+export async function getChests(onlyEnabled: boolean = false) {
   try {
     const session = await getAuthSession();
     if (!session) {
@@ -72,9 +91,11 @@ export async function getChests() {
     }
 
     const chests = await prisma.chest.findMany({
-      orderBy: {
-        createdAt: 'desc',
-      },
+      where: onlyEnabled ? { isEnabled: true } : undefined,
+      orderBy: [
+        { order: 'asc' },
+        { createdAt: 'desc' },
+      ],
       include: {
         stockHistory: {
           select: {
@@ -94,12 +115,13 @@ export async function getChests() {
 }
 
 /**
- * Modifie un coffre existant
+ * Updates an existing chest
  */
 export async function updateChest(data: {
   id: string;
   name: string;
   description?: string;
+  isEnabled?: boolean;
 }) {
   try {
     const session = await getAuthSession();
@@ -119,6 +141,7 @@ export async function updateChest(data: {
       data: {
         name: validatedData.name,
         description: validatedData.description,
+        isEnabled: validatedData.isEnabled,
       },
     });
 
@@ -132,7 +155,7 @@ export async function updateChest(data: {
 }
 
 /**
- * Supprime un coffre et transfère les stocks vers un autre coffre
+ * Deletes a chest and transfers stocks to another chest
  */
 export async function deleteChest(data: { id: string; targetChestId: string }) {
   try {
@@ -195,5 +218,39 @@ export async function deleteChest(data: { id: string; targetChestId: string }) {
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la suppression du coffre');
+  }
+}
+
+/**
+ * Reorders chests
+ */
+export async function reorderChests(data: { items: { id: string; order: number }[] }) {
+  try {
+    const session = await getAuthSession();
+    if (!session) {
+      return {
+        status: 401,
+        error: 'Non autorisé',
+      };
+    }
+
+    const validatedData = reorderChestsSchema.parse(data);
+
+    // Update the order of each chest
+    await Promise.all(
+      validatedData.items.map(({ id, order }) =>
+        prisma.chest.update({
+          where: { id },
+          data: { order },
+        })
+      )
+    );
+
+    return {
+      status: 200,
+      data: { success: true },
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors du réordonnancement des coffres');
   }
 }

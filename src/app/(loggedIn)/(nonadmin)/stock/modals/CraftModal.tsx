@@ -14,6 +14,8 @@ import {
   Badge,
   Table,
   ScrollArea,
+  Divider,
+  SimpleGrid,
 } from '@mantine/core';
 import { IconAlertCircle } from '@tabler/icons-react';
 import { getCraftRecipesByItemId } from '@/app/_actions/craftRecipes';
@@ -138,7 +140,7 @@ export default function CraftModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opened, sourceChestId]);
 
-  // Réinitialiser les états quand la modal se ferme
+  // Reset states when modal closes
   useEffect(() => {
     if (!opened) {
       setSelectedCraftItem(null);
@@ -158,12 +160,12 @@ export default function CraftModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourceChestId]);
 
-  // Réinitialiser les coffres des ingrédients quand le coffre source de base change
+  // Reset ingredient chests when base source chest changes
   useEffect(() => {
     if (sourceChestId) {
       setIngredientChests((prev) => {
         const updated: Record<string, string> = {};
-        // Garder les valeurs existantes mais réinitialiser celles qui n'ont pas été modifiées
+        // Keep existing values but reset those that haven't been modified
         Object.keys(prev).forEach((ingredientId) => {
           updated[ingredientId] = prev[ingredientId];
         });
@@ -172,7 +174,7 @@ export default function CraftModal({
     }
   }, [sourceChestId]);
 
-  // Réinitialiser les coffres des ingrédients quand la recette change
+  // Reset ingredient chests when recipe changes
   useEffect(() => {
     if (selectedRecipe) {
       setIngredientChests({});
@@ -240,7 +242,7 @@ export default function CraftModal({
     const recipe = craftRecipes.find((r) => r.id === selectedRecipe);
     if (!recipe) return;
 
-    // Construire le tableau des coffres sources par ingrédient
+    // Build array of source chests per ingredient
     const ingredientChestsArray = recipe.ingredients.map((ingredient) => ({
       ingredientId: ingredient.id,
       chestId: ingredientChests[ingredient.id] || sourceChestId,
@@ -256,7 +258,7 @@ export default function CraftModal({
     );
   };
 
-  // Helper pour obtenir le stock disponible d'un item dans un coffre spécifique
+  // Helper to get available stock of an item in a specific chest
   const getItemStockInChest = (itemId: string, chestId: string | null): { stock: number | null; isToday: boolean } => {
     if (!chestId) return { stock: null, isToday: false };
     
@@ -276,7 +278,6 @@ export default function CraftModal({
     return { stock: null, isToday: false };
   };
 
-  // Options pour les coffres
   const chestOptions = chests.map((chest) => ({
     value: chest.id,
     label: chest.name,
@@ -287,7 +288,7 @@ export default function CraftModal({
     label: chest.name,
   }));
 
-  // Vérifications pour le bouton de craft
+  // Validations for craft button
   const getCraftValidation = () => {
     if (!canCraft) {
       return { canCraft: false, reason: "Vous n'avez pas la permission d'effectuer un craft" };
@@ -359,56 +360,61 @@ export default function CraftModal({
       yOffset={60}
       scrollAreaComponent={ScrollArea.Autosize}
     >
-      <Stack gap="md">
-        <Alert icon={<IconAlertCircle size={16} />} title="Information" color="blue">
-          Sélectionnez un coffre source de base, puis choisissez individuellement le coffre source pour chaque ingrédient. Le résultat du craft sera déposé dans le coffre de destination.
-        </Alert>
+      <Stack gap="lg">
+        <Stack gap="sm">
+          <Text fw={600} size="xs" c="dimmed" tt="uppercase">
+            Coffres
+          </Text>
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+            <Select
+              label="Coffre source de base"
+              placeholder="Sélectionner le coffre source"
+              data={chestOptions}
+              value={sourceChestId}
+              onChange={(value) => setSourceChestId(value)}
+              required
+              clearable={false}
+            />
 
-        <Group grow align="flex-end">
+            <Select
+              label="Coffre de destination"
+              placeholder="Sélectionner le coffre destination"
+              data={destinationChestOptions}
+              value={destinationChestId}
+              onChange={(value) => setDestinationChestId(value)}
+              required
+              clearable={false}
+            />
+          </SimpleGrid>
+        </Stack>
+
+        <Stack gap="sm">
+          <Text fw={600} size="xs" c="dimmed" tt="uppercase">
+            Objet et recette
+          </Text>
           <Select
-            label="Coffre source de base"
-            placeholder="Sélectionner le coffre source"
-            data={chestOptions}
-            value={sourceChestId}
-            onChange={(value) => setSourceChestId(value)}
+            label="Objet à craft"
+            placeholder="Sélectionner un objet craftable"
+            data={items
+              .filter((item) => item.isCraftable)
+              .sort((a, b) => {
+                if (a.order !== undefined && b.order !== undefined) {
+                  return a.order - b.order;
+                }
+                if (a.order !== undefined) return -1;
+                if (b.order !== undefined) return 1;
+                return a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' });
+              })
+              .map((item) => ({
+                value: item.id,
+                label: item.name,
+              }))}
+            value={selectedCraftItem}
+            onChange={handleItemChange}
+            searchable
             required
-            clearable={false}
+            disabled={loadingItems}
           />
-
-          <Select
-            label="Coffre de destination"
-            placeholder="Sélectionner le coffre destination"
-            data={destinationChestOptions}
-            value={destinationChestId}
-            onChange={(value) => setDestinationChestId(value)}
-            required
-            clearable={false}
-          />
-        </Group>
-
-        <Select
-          label="Objet à craft"
-          placeholder="Sélectionner un objet craftable"
-          data={items
-            .filter((item) => item.isCraftable)
-            .sort((a, b) => {
-              if (a.order !== undefined && b.order !== undefined) {
-                return a.order - b.order;
-              }
-              if (a.order !== undefined) return -1;
-              if (b.order !== undefined) return 1;
-              return a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' });
-            })
-            .map((item) => ({
-              value: item.id,
-              label: item.name,
-            }))}
-          value={selectedCraftItem}
-          onChange={handleItemChange}
-          searchable
-          required
-          disabled={loadingItems}
-        />
 
         {selectedCraftItem && craftRecipes.length > 0 && (
           <>
@@ -462,9 +468,11 @@ export default function CraftModal({
                   description={`Quantité totale produite : ${totalQuantityProduced}`}
                 />
 
+                <Divider />
+
                 <Paper withBorder shadow="xs" p="sm">
-                  <Stack gap="xs">
-                    <Text size="sm" fw={500}>
+                  <Stack gap="sm">
+                    <Text size="xs" c="dimmed" fw={600} tt="uppercase">
                       Ingrédients nécessaires
                     </Text>
                     <Table striped highlightOnHover>
@@ -545,6 +553,7 @@ export default function CraftModal({
             )}
           </>
         )}
+        </Stack>
 
         {selectedCraftItem && craftRecipes.length === 0 && !loadingRecipes && (
           <Text c="dimmed" size="sm">

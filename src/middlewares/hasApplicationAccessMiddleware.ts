@@ -8,20 +8,20 @@ export async function hasApplicationAccessMiddleware(
   session: any,
 ) {
   if (!session) {
-    // Si pas de session, on laisse le middleware de connexion gérer
+    // If no session, let login middleware handle it
     return NextResponse.next();
   }
 
-  // Utiliser directement les rôles pour vérifier les permissions (plus performant)
+  // Use roles directly to check permissions (more performant)
   const userRole = session.user?.role;
   const hasAccess = checkRolePermission(userRole, "application", "access");
 
   if (!hasAccess) {
-    // Pour les requêtes JSON, retourner une erreur JSON
+    // For JSON requests, return JSON error
     if (request.headers.get("content-type") === "application/json") {
       return forbiddenResponse({ error: "Accès refusé" });
     }
-    // Sinon, rediriger vers la page no-access
+    // Otherwise, redirect to no-access page
     return routes.redirect(request, routes.auth.noAccess);
   }
 

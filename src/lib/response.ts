@@ -4,7 +4,7 @@ import { ForbiddenError } from './errors/ForbiddenError';
 import { NextResponse } from 'next/server';
 
 /**
- * Vérifie si une réponse de Server Action est réussie
+ * Checks if a Server Action response is successful
  */
 export function isSuccessResponse<T>(
   response: ServerActionResponse<T>
@@ -13,7 +13,7 @@ export function isSuccessResponse<T>(
 }
 
 /**
- * Vérifie si une réponse de Server Action est une erreur
+ * Checks if a Server Action response is an error
  */
 export function isErrorResponse(
   response: ServerActionResponse<unknown>
@@ -22,8 +22,8 @@ export function isErrorResponse(
 }
 
 /**
- * Lance une erreur si la réponse de Server Action est une erreur
- * Utilisé dans les Server Components pour gérer les erreurs
+ * Throws an error if the Server Action response is an error
+ * Used in Server Components to handle errors
  */
 export function throwIfError<T>(response: ServerActionResponse<T>, defaultMessage?: string): asserts response is { status: 200; data: T } {
   if (isErrorResponse(response)) {
@@ -31,7 +31,7 @@ export function throwIfError<T>(response: ServerActionResponse<T>, defaultMessag
       ? response.error 
       : defaultMessage || 'Une erreur est survenue';
     
-    // Utiliser les classes d'erreur appropriées pour une meilleure gestion
+    // Use appropriate error classes for better error handling
     if (response.status === 404) {
       throw new NotFoundError(errorMessage);
     } else if (response.status === 403) {
@@ -42,20 +42,20 @@ export function throwIfError<T>(response: ServerActionResponse<T>, defaultMessag
       throw error;
     }
     
-    // Pour les autres erreurs, lancer une Error standard
+    // For other errors, throw a standard Error
     throw new Error(errorMessage);
   }
 }
 
 /**
- * Extrait les données d'une réponse de Server Action ou lance une erreur
- * Utilisé dans les Server Components pour simplifier la gestion d'erreurs
+ * Extracts data from a Server Action response or throws an error
+ * Used in Server Components to simplify error handling
  */
 export function getDataOrThrow<T>(
   response: ServerActionResponse<T> | { status: number; data?: T; error?: string | Array<{ field: string | number; message: string }> },
   defaultMessage?: string
 ): T {
-  // Type guard pour vérifier si c'est une erreur
+  // Type guard to check if it's an error
   if (response.status >= 400) {
     const errorResponse = response as { status: number; error?: string | Array<{ field: string | number; message: string }> };
     const errorMessage = typeof errorResponse.error === 'string' 
@@ -83,16 +83,16 @@ export function getDataOrThrow<T>(
 }
 
 /**
- * Retourne une réponse NextResponse pour une erreur 401 (Non autorisé)
- * Utilisé dans les middlewares
+ * Returns a NextResponse for a 401 (Unauthorized) error
+ * Used in middlewares
  */
 export function unauthorizedResponse(data: { error: string }): NextResponse {
   return NextResponse.json(data, { status: 401 });
 }
 
 /**
- * Retourne une réponse NextResponse pour une erreur 403 (Interdit)
- * Utilisé dans les middlewares
+ * Returns a NextResponse for a 403 (Forbidden) error
+ * Used in middlewares
  */
 export function forbiddenResponse(data: { error: string }): NextResponse {
   return NextResponse.json(data, { status: 403 });

@@ -253,7 +253,6 @@ export class Fetcher {
   }
 }
 
-// Create a default instance
 export const api = new Fetcher({
   baseUrl: "/",
   defaultHeaders: {
@@ -263,5 +262,4 @@ export const api = new Fetcher({
   timeout: 15000, // 15 seconds
 });
 
-// Default export for easier imports
 export default api;
