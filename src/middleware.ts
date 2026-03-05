@@ -7,6 +7,9 @@ import { hasApplicationAccessMiddleware } from './middlewares/hasApplicationAcce
 import { hasManagementAccessMiddleware } from './middlewares/hasManagementAccessMiddleware';
 import { hasAdminRoleMiddleware } from './middlewares/hasAdminRoleMiddleware';
 import { hasStockViewAccessMiddleware } from './middlewares/hasStockViewAccessMiddleware';
+import { hasOrdersViewAccessMiddleware } from './middlewares/hasOrdersViewAccessMiddleware';
+import { hasSearchAccessMiddleware } from './middlewares/hasSearchAccessMiddleware';
+import { hasBankAccessMiddleware } from './middlewares/hasBankAccessMiddleware';
 import { chain } from './middlewares/chain';
 
 export async function middleware(req: NextRequest) {
@@ -42,6 +45,21 @@ export async function middleware(req: NextRequest) {
     middlewares.push(hasToBeLoggedInMiddleware);
     middlewares.push(hasApplicationAccessMiddleware);
     middlewares.push(hasStockViewAccessMiddleware);
+  } else if (pathname.startsWith(routes.orders.index)) {
+    // For orders routes, check login, application access, then orders view access
+    middlewares.push(hasToBeLoggedInMiddleware);
+    middlewares.push(hasApplicationAccessMiddleware);
+    middlewares.push(hasOrdersViewAccessMiddleware);
+  } else if (pathname.startsWith(routes.searchItems.index)) {
+    // For search-items routes, check login, application access, then search access
+    middlewares.push(hasToBeLoggedInMiddleware);
+    middlewares.push(hasApplicationAccessMiddleware);
+    middlewares.push(hasSearchAccessMiddleware);
+  } else if (pathname.startsWith(routes.bank.index)) {
+    // For bank routes, check login, application access, then bank access
+    middlewares.push(hasToBeLoggedInMiddleware);
+    middlewares.push(hasApplicationAccessMiddleware);
+    middlewares.push(hasBankAccessMiddleware);
   } else {
     // For other routes, first check login, then application access
     middlewares.push(hasToBeLoggedInMiddleware);
@@ -62,6 +80,7 @@ export const config = {
     '/inventory/:path*',
     '/orders/:path*',
     '/stock/:path*',
+    '/search-items/:path*',
     '/bank/:path*',
     '/employee/:path*',
     '/management/:path*',

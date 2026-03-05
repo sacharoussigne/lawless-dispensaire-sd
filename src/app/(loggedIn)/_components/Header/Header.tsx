@@ -19,7 +19,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { IconLogout } from '@tabler/icons-react';
 import { usePermissions } from '@/app/_contexts/PermissionsContext';
-import { hasRole } from '@/lib/auth/permissions';
+import { hasRole, checkRolePermission } from '@/lib/auth/permissions';
 import { Role } from '@/types/enum/roles';
 
 export default function Header({
@@ -147,24 +147,30 @@ export default function Header({
                         Stocks
                       </Link>
                     )}
-                    <Link
-                      href={routes.orders.index}
-                      className={`${classes.link} ${isRouteActive(routes.orders.index) ? classes.linkActive : ''}`}
-                    >
-                      Commandes
-                    </Link>
-                    <Link
-                      href={routes.searchItems.index}
-                      className={`${classes.link} ${isRouteActive(routes.searchItems.index) ? classes.linkActive : ''}`}
-                    >
-                      Recherche
-                    </Link>
-                    <Link
-                      href={routes.bank.index}
-                      className={`${classes.link} ${isRouteActive(routes.bank.index) ? classes.linkActive : ''}`}
-                    >
-                      Banque
-                    </Link>
+                    {permissions?.orders.view && (
+                      <Link
+                        href={routes.orders.index}
+                        className={`${classes.link} ${isRouteActive(routes.orders.index) ? classes.linkActive : ''}`}
+                      >
+                        Commandes
+                      </Link>
+                    )}
+                    {checkRolePermission(userRole, 'search', 'access') && (
+                      <Link
+                        href={routes.searchItems.index}
+                        className={`${classes.link} ${isRouteActive(routes.searchItems.index) ? classes.linkActive : ''}`}
+                      >
+                        Recherche
+                      </Link>
+                    )}
+                    {checkRolePermission(userRole, 'bank', 'access') && (
+                      <Link
+                        href={routes.bank.index}
+                        className={`${classes.link} ${isRouteActive(routes.bank.index) ? classes.linkActive : ''}`}
+                      >
+                        Banque
+                      </Link>
+                    )}
                   </>
                 )}
                 {canSwitchSpaces && (

@@ -55,6 +55,16 @@ const inventory_manager = ac.newRole({
     application: ["access", "management"],
 });
 
+const inventory_viewer = ac.newRole({
+    ...userAc.statements,
+    stock: ["view",  "craft-read"],
+    orders: ["view"],
+    search: ["access"],
+    bank: ["access"],
+    private_practice: [],
+    application: ["access"],
+});
+
 const private_practitioner = ac.newRole({
     ...userAc.statements,
     orders: ["view"],
@@ -69,6 +79,7 @@ const rolesMap = {
     admin,
     employee,
     inventory_manager,
+    inventory_viewer,
     private_practitioner,
 } as const;
 
@@ -124,4 +135,4 @@ export function hasRole(
     return roles.includes(target);
 }
 
-export { ac, user, admin, employee, inventory_manager, private_practitioner };
+export { ac, user, admin, employee, inventory_manager, inventory_viewer, private_practitioner };

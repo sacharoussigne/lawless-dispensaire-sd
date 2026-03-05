@@ -131,6 +131,14 @@ export function UsersTable({
                         color = 'blue';
                         label = rolesAsString(Role.INVENTORY_MANAGER);
                         break;
+                      case Role.INVENTORY_VIEWER:
+                        color = 'cyan';
+                        label = rolesAsString(Role.INVENTORY_VIEWER);
+                        break;
+                      case Role.PRIVATE_PRACTITIONER:
+                        color = 'purple';
+                        label = rolesAsString(Role.PRIVATE_PRACTITIONER);
+                        break;
                       default:
                         color = 'gray';
                         label = r;

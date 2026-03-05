@@ -4,6 +4,7 @@ import { z } from 'zod/v3';
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
 import { getAuthSession } from '@/lib/auth';
+import { checkRolePermission } from '@/lib/auth/permissions';
 import { addOrderItemsToStock, removeOrderItemsFromStock } from '@/app/_actions/stock';
 import type { OrderStatus } from '@prisma/client';
 
@@ -41,6 +42,14 @@ export async function createOrder(data: {
       return {
         status: 401,
         error: 'Non autorisé',
+      };
+    }
+
+    const userRole = session.user?.role;
+    if (!checkRolePermission(userRole, 'orders', 'create')) {
+      return {
+        status: 403,
+        error: 'Permission refusée : vous n\'avez pas la permission de créer une commande',
       };
     }
 
@@ -187,6 +196,14 @@ export async function getOrders() {
       };
     }
 
+    const userRole = session.user?.role;
+    if (!checkRolePermission(userRole, 'orders', 'view')) {
+      return {
+        status: 403,
+        error: 'Permission refusée : vous n\'avez pas la permission de voir les commandes',
+      };
+    }
+
     const orders = await prisma.order.findMany({
       orderBy: {
         createdAt: 'desc',
@@ -254,6 +271,14 @@ export async function updateOrder(data: {
       return {
         status: 401,
         error: 'Non autorisé',
+      };
+    }
+
+    const userRole = session.user?.role;
+    if (!checkRolePermission(userRole, 'orders', 'update')) {
+      return {
+        status: 403,
+        error: 'Permission refusée : vous n\'avez pas la permission de modifier une commande',
       };
     }
 
@@ -444,6 +469,14 @@ export async function deleteOrder(data: { id: string }) {
       return {
         status: 401,
         error: 'Non autorisé',
+      };
+    }
+
+    const userRole = session.user?.role;
+    if (!checkRolePermission(userRole, 'orders', 'delete')) {
+      return {
+        status: 403,
+        error: 'Permission refusée : vous n\'avez pas la permission de supprimer une commande',
       };
     }
 

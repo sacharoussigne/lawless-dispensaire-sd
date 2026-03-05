@@ -6,7 +6,7 @@ import { z } from 'zod';
 import prisma from '@/lib/prisma';
 import { checkRolePermission } from '@/lib/auth/permissions';
 
-const roleEnum = z.enum(['user', 'admin', 'employee', 'inventory_manager', 'private_practitioner']);
+const roleEnum = z.enum(['user', 'admin', 'employee', 'inventory_manager', 'inventory_viewer', 'private_practitioner']);
 
 const createUserSchema = z.object({
   email: z.string().email(),
