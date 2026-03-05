@@ -77,18 +77,39 @@ export function checkRolePermission(
         return false;
     }
 
-    const role = rolesMap[roleName as keyof typeof rolesMap];
-    if (!role) {
+    const roles = roleName.split(",").map((r) => r.trim()).filter((r) => r.length > 0);
+
+    for (const role of roles) {
+        const roleObj = rolesMap[role as keyof typeof rolesMap];
+        if (!roleObj) {
+            continue;
+        }
+
+        const resourcePermissions = roleObj.statements[resource];
+        if (!resourcePermissions) {
+            continue;
+        }
+
+        if (resourcePermissions.includes(action as any)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+export function hasRole(
+    roleName: string | null | undefined,
+    roleToCheck: keyof typeof rolesMap | string
+): boolean {
+    if (!roleName) {
         return false;
     }
 
-    // Vérifier directement les statements du rôle
-    const resourcePermissions = role.statements[resource];
-    if (!resourcePermissions) {
-        return false;
-    }
+    const roles = roleName.split(",").map((r) => r.trim()).filter((r) => r.length > 0);
+    const target = String(roleToCheck).trim();
 
-    return resourcePermissions.includes(action as any);
+    return roles.includes(target);
 }
 
 export { ac, user, admin, employee, inventory_manager };

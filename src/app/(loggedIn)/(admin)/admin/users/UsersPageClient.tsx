@@ -135,7 +135,8 @@ export default function UsersPageClient({
 
   // Filtrer les utilisateurs côté client pour le filtre de rôle
   const filteredUsers = users.filter((user) => {
-    const matchesRole = !roleFilter || user.role === roleFilter;
+    const matchesRole =
+      !roleFilter || (user.role && user.role.split(',').map((r: string) => r.trim()).includes(roleFilter));
     return matchesRole;
   });
 

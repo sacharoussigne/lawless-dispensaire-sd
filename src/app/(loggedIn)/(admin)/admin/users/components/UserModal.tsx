@@ -6,9 +6,9 @@ import {
   Stack,
   TextInput,
   PasswordInput,
-  Select,
   Button,
   Group,
+  MultiSelect,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
@@ -44,7 +44,7 @@ export function UserModal({
       name: '',
       email: '',
       password: '',
-      role: 'user' as Role,
+      roles: [Role.USER] as Role[],
     },
     validate: {
       name: (value) => (value.length < 1 ? 'Le nom est requis' : null),
@@ -70,11 +70,25 @@ export function UserModal({
         name: editingUser.name,
         email: editingUser.email,
         password: '',
-        role: (editingUser.role as Role) || 'user',
+        roles: (
+          (editingUser.role ?? 'user')
+            .split(',')
+            .map((r) => r.trim())
+            .filter((r) =>
+              [Role.USER, Role.ADMIN, Role.EMPLOYEE, Role.INVENTORY_MANAGER].includes(r as Role)
+            ) as Role[]
+        ).length > 0
+          ? (editingUser.role ?? 'user')
+              .split(',')
+              .map((r) => r.trim())
+              .filter((r) =>
+                [Role.USER, Role.ADMIN, Role.EMPLOYEE, Role.INVENTORY_MANAGER].includes(r as Role)
+              ) as Role[]
+          : [Role.USER],
       });
     } else {
       form.reset();
-      form.setFieldValue('role', Role.USER);
+      form.setFieldValue('roles', [Role.USER]);
     }
   }, [editingUser, opened]);
 
@@ -84,7 +98,7 @@ export function UserModal({
         const result = await updateUser({
           id: editingUser.id,
           name: values.name,
-          role: values.role,
+          roles: values.roles,
         });
         handleAction(result);
         notifications.show({
@@ -97,7 +111,7 @@ export function UserModal({
           name: values.name,
           email: values.email,
           password: values.password,
-          role: values.role,
+          roles: values.roles,
         });
         handleAction(result);
         notifications.show({
@@ -162,11 +176,13 @@ export function UserModal({
               {...form.getInputProps('password')}
             />
           )}
-          <Select
-            label="Rôle"
+          <MultiSelect
+            label="Rôles"
             data={roleOptions}
             required
-            {...form.getInputProps('role')}
+            searchable
+            clearable={false}
+            {...form.getInputProps('roles')}
           />
           <Group justify="flex-end" mt="md">
             <Button

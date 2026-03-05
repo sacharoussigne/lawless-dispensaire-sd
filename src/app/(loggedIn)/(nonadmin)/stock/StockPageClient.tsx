@@ -25,6 +25,7 @@ import TransferModal from './modals/TransferModal';
 import type { ItemWithRelations, CategoryWithItems } from '@/types/stock';
 import { usePermissions } from '@/app/_contexts/PermissionsContext';
 import type { ChestWithStockHistory } from '@/types/chests';
+import { authClient } from '@/lib/client';
 
 interface StockPageClientProps {
   initialItems: ItemWithRelations[];

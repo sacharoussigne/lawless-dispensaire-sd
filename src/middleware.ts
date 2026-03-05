@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { routes } from './types/routes';
-import { getAuthSession } from './lib/auth';
+import { auth, getAuthSession } from './lib/auth';
 import { hasToBeLoggedOutMiddleware } from './middlewares/hasToBeLoggedOutMiddleware';
 import { hasToBeLoggedInMiddleware } from './middlewares/hasToBeLoggedInMiddleware';
 import { hasApplicationAccessMiddleware } from './middlewares/hasApplicationAccessMiddleware';

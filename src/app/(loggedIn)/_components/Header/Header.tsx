@@ -19,6 +19,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { IconLogout } from '@tabler/icons-react';
 import { usePermissions } from '@/app/_contexts/PermissionsContext';
+import { hasRole } from '@/lib/auth/permissions';
+import { Role } from '@/types/enum/roles';
 
 export default function Header({
   session,
@@ -196,7 +198,7 @@ export default function Header({
                     </UnstyledButton>
                   </Menu.Target>
                   <Menu.Dropdown>
-                    {userRole === 'admin' && (
+                    {hasRole(userRole, Role.ADMIN) && (
                       <>
                         <Menu.Label>Admin</Menu.Label>
                         <Link href={routes.admin.users}>
