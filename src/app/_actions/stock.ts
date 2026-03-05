@@ -3,6 +3,7 @@
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
 import { getAuthSession } from '@/lib/auth';
+import { checkRolePermission } from '@/lib/auth/permissions';
 import {
   getTodayStart,
   getYesterdayStart,
@@ -199,6 +200,14 @@ export async function updateStock(data: { itemId: string; quantity: number }[], 
       };
     }
 
+    const userRole = session.user?.role;
+    if (!checkRolePermission(userRole, 'stock', 'update')) {
+      return {
+        status: 403,
+        error: 'Permission refusée : vous n\'avez pas la permission de mettre à jour le stock',
+      };
+    }
+
     const today = getTodayStart();
     const tomorrow = getTomorrowStart();
 
@@ -282,6 +291,14 @@ export async function craftItem(data: {
       return {
         status: 401,
         error: 'Non autorisé',
+      };
+    }
+
+    const userRole = session.user?.role;
+    if (!checkRolePermission(userRole, 'stock', 'craft-write')) {
+      return {
+        status: 403,
+        error: 'Permission refusée : vous n\'avez pas la permission d\'effectuer un craft',
       };
     }
 

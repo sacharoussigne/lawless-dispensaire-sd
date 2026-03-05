@@ -31,6 +31,7 @@ const roleOptions = [
   { value: 'admin', label: rolesAsString(Role.ADMIN) },
   { value: 'employee', label: rolesAsString(Role.EMPLOYEE) },
   { value: 'inventory_manager', label: rolesAsString(Role.INVENTORY_MANAGER) },
+  { value: 'private_practitioner', label: rolesAsString(Role.PRIVATE_PRACTITIONER) },
 ];
 
 export function UserModal({

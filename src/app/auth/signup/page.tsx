@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 export default async function LoginPage() {
   const session = await getAuthSession();
   if (session) {
-    redirect(routes.stock.index);
+    redirect(routes.employee.index);
   }
   return <Signup />;
 }

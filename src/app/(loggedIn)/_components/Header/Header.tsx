@@ -38,7 +38,7 @@ export default function Header({
 
   const handleSpaceChange = (value: string) => {
     if (value === 'employee') {
-      router.push(routes.stock.index);
+      router.push(routes.employee.index);
     } else if (value === 'management') {
       router.push(routes.management.index);
     }
@@ -73,7 +73,7 @@ export default function Header({
       <Container size={'xl'}>
         <div className={'flex justify-between items-center w-full h-[60px]'}>
           <Link 
-            href={isManagementSpace ? routes.management.index : routes.stock.index}
+            href={isManagementSpace ? routes.management.index : routes.employee.index}
             className={classes.logoLink}
           >
             <Image
@@ -139,12 +139,14 @@ export default function Header({
                   </Menu>
                 ) : (
                   <>
-                    <Link
-                      href={routes.stock.index}
-                      className={`${classes.link} ${isRouteActive(routes.stock.index) ? classes.linkActive : ''}`}
-                    >
-                      Stocks
-                    </Link>
+                    {permissions?.stock.view && (
+                      <Link
+                        href={routes.stock.index}
+                        className={`${classes.link} ${isRouteActive(routes.stock.index) ? classes.linkActive : ''}`}
+                      >
+                        Stocks
+                      </Link>
+                    )}
                     <Link
                       href={routes.orders.index}
                       className={`${classes.link} ${isRouteActive(routes.orders.index) ? classes.linkActive : ''}`}

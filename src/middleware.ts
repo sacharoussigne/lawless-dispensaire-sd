@@ -1,11 +1,12 @@
 import { NextRequest } from 'next/server';
 import { routes } from './types/routes';
-import { auth, getAuthSession } from './lib/auth';
+import { getAuthSession } from './lib/auth';
 import { hasToBeLoggedOutMiddleware } from './middlewares/hasToBeLoggedOutMiddleware';
 import { hasToBeLoggedInMiddleware } from './middlewares/hasToBeLoggedInMiddleware';
 import { hasApplicationAccessMiddleware } from './middlewares/hasApplicationAccessMiddleware';
 import { hasManagementAccessMiddleware } from './middlewares/hasManagementAccessMiddleware';
 import { hasAdminRoleMiddleware } from './middlewares/hasAdminRoleMiddleware';
+import { hasStockViewAccessMiddleware } from './middlewares/hasStockViewAccessMiddleware';
 import { chain } from './middlewares/chain';
 
 export async function middleware(req: NextRequest) {
@@ -36,6 +37,11 @@ export async function middleware(req: NextRequest) {
     if (pathname === routes.admin.users || pathname === routes.admin.overwriteStock) {
       middlewares.push(hasAdminRoleMiddleware);
     }
+  } else if (pathname.startsWith(routes.stock.index)) {
+    // For stock routes, check login, application access, then stock view access
+    middlewares.push(hasToBeLoggedInMiddleware);
+    middlewares.push(hasApplicationAccessMiddleware);
+    middlewares.push(hasStockViewAccessMiddleware);
   } else {
     // For other routes, first check login, then application access
     middlewares.push(hasToBeLoggedInMiddleware);
@@ -57,6 +63,7 @@ export const config = {
     '/orders/:path*',
     '/stock/:path*',
     '/bank/:path*',
+    '/employee/:path*',
     '/management/:path*',
   ],
 };

@@ -34,6 +34,9 @@ export const routes = {
   bank: {
     index: '/bank',
   },
+  employee: {
+    index: '/employee',
+  },
   auth: {
     index: '/auth',
     login: '/auth/login',

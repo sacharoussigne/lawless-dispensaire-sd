@@ -5,8 +5,9 @@ import { defaultStatements, adminAc, userAc } from "better-auth/plugins/admin/ac
 const defaultApplicationPermissions = {
     stock: ["view", "create", "update", "delete", "craft-read", "craft-write"],
     orders: ["view", "create", "update", "delete"],
-    // items: ["view", "create", "update", "delete"],
-    // companies: ["view", "create", "update", "delete"],
+    search: ["access"],
+    bank: ["access"],
+    private_practice: ["access"],
     application: ["access", "management"],
 };
 export const statement = {
@@ -24,8 +25,9 @@ const user = ac.newRole({
     ...userAc.statements,
     stock: [],
     orders: [],
-    // items: [],
-    // companies: [],
+    search: [],
+    bank: [],
+    private_practice: [],
     application: []
 });
 
@@ -36,10 +38,10 @@ const admin = ac.newRole({
 
 const employee = ac.newRole({
     ...userAc.statements,
-    stock: ["view", "craft-read"],
+    // stock: ["view", "craft-read"],
     orders: ["view"],
-    // items: ["view"],
-    // companies: ["view"],
+    private_practice: [],
+    bank: ["access"],
     application: ["access"],
 });
 
@@ -47,9 +49,18 @@ const inventory_manager = ac.newRole({
     ...userAc.statements,
     stock: ["view", "create", "update", "delete", "craft-read", "craft-write"],
     orders: ["view", "create", "update", "delete"],
-    // items: ["view"],
-    // companies: ["view"],
+    search: ["access"],
+    bank: ["access"],
+    private_practice: [],
     application: ["access", "management"],
+});
+
+const private_practitioner = ac.newRole({
+    ...userAc.statements,
+    orders: ["view"],
+    private_practice: ["access"],
+    bank: ["access"],
+    application: ["access"],
 });
 
 // Map des rôles pour faciliter l'accès
@@ -58,6 +69,7 @@ const rolesMap = {
     admin,
     employee,
     inventory_manager,
+    private_practitioner,
 } as const;
 
 /**
@@ -85,7 +97,7 @@ export function checkRolePermission(
             continue;
         }
 
-        const resourcePermissions = roleObj.statements[resource];
+        const resourcePermissions = roleObj.statements[resource as keyof typeof roleObj.statements];
         if (!resourcePermissions) {
             continue;
         }
@@ -112,4 +124,4 @@ export function hasRole(
     return roles.includes(target);
 }
 
-export { ac, user, admin, employee, inventory_manager };
+export { ac, user, admin, employee, inventory_manager, private_practitioner };
