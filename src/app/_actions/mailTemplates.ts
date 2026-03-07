@@ -35,7 +35,7 @@ export async function createMailTemplate(data: {
 
     const validatedData = createMailTemplateSchema.parse(data);
 
-    const mailTemplate = await prisma.letterTemplate.create({
+    const mailTemplate = await prisma.mailTemplate.create({
       data: {
         name: validatedData.name,
         content: validatedData.content,
@@ -61,7 +61,7 @@ export async function getMailTemplates() {
       };
     }
 
-    const mailTemplates = await prisma.letterTemplate.findMany({
+    const mailTemplates = await prisma.mailTemplate.findMany({
       orderBy: {
         createdAt: 'desc',
       },
@@ -92,7 +92,7 @@ export async function updateMailTemplate(data: {
 
     const validatedData = updateMailTemplateSchema.parse(data);
 
-    const mailTemplate = await prisma.letterTemplate.update({
+    const mailTemplate = await prisma.mailTemplate.update({
       where: {
         id: validatedData.id,
       },
@@ -123,7 +123,7 @@ export async function deleteMailTemplate(data: { id: string }) {
 
     const validatedData = deleteMailTemplateSchema.parse(data);
 
-    await prisma.letterTemplate.delete({
+    await prisma.mailTemplate.delete({
       where: {
         id: validatedData.id,
       },
@@ -180,7 +180,7 @@ export async function generateOrderMailPreview(data: {
       };
     }
 
-    const assignment = await prisma.orderLetterTemplateAssignment.findUnique({
+    const assignment = await prisma.orderMailTemplateAssignment.findUnique({
       where: {
         orderType_orderStatus: {
           orderType: order.type,
@@ -188,7 +188,7 @@ export async function generateOrderMailPreview(data: {
         },
       },
       include: {
-        letterTemplate: true,
+        mailTemplate: true,
       },
     });
 
@@ -199,7 +199,7 @@ export async function generateOrderMailPreview(data: {
       };
     }
 
-    const template = assignment.letterTemplate;
+    const template = assignment.mailTemplate;
 
     const itemsText = order.items
       .map((orderItem) => {

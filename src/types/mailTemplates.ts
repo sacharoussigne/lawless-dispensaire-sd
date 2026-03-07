@@ -1,3 +1,3 @@
-import type { LetterTemplate } from '@prisma/client';
+import type { MailTemplate } from '@prisma/client';
 
-export type { LetterTemplate as MailTemplate };
+export type { MailTemplate };

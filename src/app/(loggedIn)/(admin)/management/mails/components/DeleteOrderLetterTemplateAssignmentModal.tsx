@@ -4,12 +4,12 @@ import { Modal, Text, Button, Group, Stack } from '@mantine/core';
 import { deleteOrderLetterTemplateAssignment } from '@/app/_actions/orderLetterTemplateAssignments';
 import { handleAction } from '@/lib/action';
 import { notifications } from '@mantine/notifications';
-import type { OrderLetterTemplateAssignment } from '@prisma/client';
+import type { OrderMailTemplateAssignment } from '@prisma/client';
 import { getOrderTypeLabel } from '@/types/enum/orderType';
 import { getOrderStatusLabel } from '@/types/enum/orderStatus';
 
-interface OrderLetterTemplateAssignmentWithTemplate extends OrderLetterTemplateAssignment {
-  letterTemplate: {
+interface OrderMailTemplateAssignmentWithTemplate extends OrderMailTemplateAssignment {
+  mailTemplate: {
     id: string;
     name: string;
   };
@@ -18,7 +18,7 @@ interface OrderLetterTemplateAssignmentWithTemplate extends OrderLetterTemplateA
 interface DeleteOrderLetterTemplateAssignmentModalProps {
   opened: boolean;
   onClose: () => void;
-  assignmentToDelete: OrderLetterTemplateAssignmentWithTemplate | null;
+  assignmentToDelete: OrderMailTemplateAssignmentWithTemplate | null;
   onSuccess: () => void;
 }
 

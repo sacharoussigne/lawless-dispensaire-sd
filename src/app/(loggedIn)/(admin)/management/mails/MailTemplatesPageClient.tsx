@@ -15,11 +15,11 @@ import { ActiveFilters } from '@/app/_components/ActiveFilters/ActiveFilters';
 import { MailTemplatesTable } from './components/MailTemplatesTable';
 import { OrderLetterTemplateAssignmentsTable } from './components/OrderLetterTemplateAssignmentsTable';
 import type { MailTemplate } from '@/types/mailTemplates';
-import type { OrderLetterTemplateAssignment } from '@prisma/client';
+import type { OrderMailTemplateAssignment } from '@prisma/client';
 import { ManagementSectionThemeProvider } from '../ManagementSectionThemeProvider';
 
-interface OrderLetterTemplateAssignmentWithTemplate extends OrderLetterTemplateAssignment {
-  letterTemplate: {
+interface OrderMailTemplateAssignmentWithTemplate extends OrderMailTemplateAssignment {
+  mailTemplate: {
     id: string;
     name: string;
   };
@@ -27,7 +27,7 @@ interface OrderLetterTemplateAssignmentWithTemplate extends OrderLetterTemplateA
 
 interface MailTemplatesPageClientProps {
   initialMailTemplates: MailTemplate[];
-  initialAssignments: OrderLetterTemplateAssignmentWithTemplate[];
+  initialAssignments: OrderMailTemplateAssignmentWithTemplate[];
 }
 
 const normalizeString = (str: string): string => {
@@ -42,7 +42,7 @@ export default function MailTemplatesPageClient({
   initialAssignments,
 }: MailTemplatesPageClientProps) {
   const [mailTemplates, setMailTemplates] = useState<MailTemplate[]>(initialMailTemplates);
-  const [assignments, setAssignments] = useState<OrderLetterTemplateAssignmentWithTemplate[]>(initialAssignments);
+  const [assignments, setAssignments] = useState<OrderMailTemplateAssignmentWithTemplate[]>(initialAssignments);
   const [loading, setLoading] = useState(false);
   const [assignmentsLoading, setAssignmentsLoading] = useState(false);
   const [modalOpened, setModalOpened] = useState(false);
@@ -50,9 +50,9 @@ export default function MailTemplatesPageClient({
   const [deleteModalOpened, setDeleteModalOpened] = useState(false);
   const [mailTemplateToDelete, setMailTemplateToDelete] = useState<MailTemplate | null>(null);
   const [assignmentModalOpened, setAssignmentModalOpened] = useState(false);
-  const [editingAssignment, setEditingAssignment] = useState<OrderLetterTemplateAssignmentWithTemplate | null>(null);
+  const [editingAssignment, setEditingAssignment] = useState<OrderMailTemplateAssignmentWithTemplate | null>(null);
   const [deleteAssignmentModalOpened, setDeleteAssignmentModalOpened] = useState(false);
-  const [assignmentToDelete, setAssignmentToDelete] = useState<OrderLetterTemplateAssignmentWithTemplate | null>(null);
+  const [assignmentToDelete, setAssignmentToDelete] = useState<OrderMailTemplateAssignmentWithTemplate | null>(null);
 
   const [nameFilter, setNameFilter] = useState<string>('');
   const [page, setPage] = useState(1);
@@ -106,7 +106,7 @@ export default function MailTemplatesPageClient({
     setModalOpened(true);
   };
 
-  const handleEditAssignment = (assignment: OrderLetterTemplateAssignmentWithTemplate) => {
+  const handleEditAssignment = (assignment: OrderMailTemplateAssignmentWithTemplate) => {
     setEditingAssignment(assignment);
     setAssignmentModalOpened(true);
   };
