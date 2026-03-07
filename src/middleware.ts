@@ -10,6 +10,7 @@ import { hasStockViewAccessMiddleware } from './middlewares/hasStockViewAccessMi
 import { hasOrdersViewAccessMiddleware } from './middlewares/hasOrdersViewAccessMiddleware';
 import { hasSearchAccessMiddleware } from './middlewares/hasSearchAccessMiddleware';
 import { hasBankAccessMiddleware } from './middlewares/hasBankAccessMiddleware';
+import { hasPrivatePracticeAccessMiddleware } from './middlewares/hasPrivatePracticeAccessMiddleware';
 import { chain } from './middlewares/chain';
 
 export async function middleware(req: NextRequest) {
@@ -60,6 +61,11 @@ export async function middleware(req: NextRequest) {
     middlewares.push(hasToBeLoggedInMiddleware);
     middlewares.push(hasApplicationAccessMiddleware);
     middlewares.push(hasBankAccessMiddleware);
+  } else if (pathname.startsWith(routes.privatePractice.index)) {
+    // For private practice routes, check login, application access, then private practice access
+    middlewares.push(hasToBeLoggedInMiddleware);
+    middlewares.push(hasApplicationAccessMiddleware);
+    middlewares.push(hasPrivatePracticeAccessMiddleware);
   } else {
     // For other routes, first check login, then application access
     middlewares.push(hasToBeLoggedInMiddleware);
@@ -82,6 +88,7 @@ export const config = {
     '/stock/:path*',
     '/search-items/:path*',
     '/bank/:path*',
+    '/private-practice/:path*',
     '/employee/:path*',
     '/management/:path*',
   ],

@@ -171,6 +171,14 @@ export default function Header({
                         Banque
                       </Link>
                     )}
+                    {checkRolePermission(userRole, 'private_practice', 'access') && (
+                      <Link
+                        href={routes.privatePractice.index}
+                        className={`${classes.link} ${isRouteActive(routes.privatePractice.index) ? classes.linkActive : ''}`}
+                      >
+                        Cabinet privé
+                      </Link>
+                    )}
                   </>
                 )}
                 {canSwitchSpaces && (
