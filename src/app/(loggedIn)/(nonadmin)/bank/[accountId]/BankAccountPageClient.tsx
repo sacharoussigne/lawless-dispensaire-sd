@@ -13,18 +13,16 @@ import {
   Text,
   Badge,
   Stack,
-  Autocomplete,
   Popover,
   MultiSelect,
 } from '@mantine/core';
 import { DataTable } from 'mantine-datatable';
-import { DatePickerInput, DateInput, DatesProvider } from '@mantine/dates';
+import { DateInput, DatesProvider } from '@mantine/dates';
 import 'dayjs/locale/fr';
 import { 
   IconPlus, 
   IconTrash, 
-  IconChevronLeft, 
-  IconChevronRight,
+  IconChevronLeft,
   IconArrowDown,
   IconArrowUp,
   IconTransfer,
@@ -54,6 +52,9 @@ import type { BankAccountWeek, BankTransaction } from '@prisma/client';
 import { useRouter } from 'next/navigation';
 import { routes } from '@/types/routes';
 import { ActiveFilters } from '@/app/_components/ActiveFilters/ActiveFilters';
+import { WeekNavigation } from '@/app/_components/WeekNavigation/WeekNavigation';
+import { SuggestionAutocomplete } from '@/app/_components/SuggestionAutocomplete/SuggestionAutocomplete';
+import { SummaryCards } from '@/app/_components/SummaryCards/SummaryCards';
 
 type SerializedBankAccountWeek = Omit<BankAccountWeek, 'balance'> & {
   balance: number;
@@ -124,6 +125,7 @@ export default function BankAccountPageClient({
       if (nameData) setNameSuggestions(nameData);
       if (descData) setDescriptionSuggestions(descData);
     } catch (error) {
+      // Error handled by handleAction
     }
   };
 
@@ -229,6 +231,7 @@ export default function BankAccountPageClient({
         setWeeks(data);
       }
     } catch (error) {
+      // Error handled by handleAction
     }
   };
 
@@ -262,9 +265,9 @@ export default function BankAccountPageClient({
     loadWeek(newDate);
   };
 
-  const handleWeekChange = (date: Date | null) => {
+  const handleWeekChange = async (date: Date | null) => {
     if (date) {
-      loadWeek(date);
+      await loadWeek(date);
     }
   };
 
@@ -539,8 +542,6 @@ export default function BankAccountPageClient({
     }
   };
 
-  const weekRange = `${format(week.weekStart, 'd MMM', { locale: fr })} - ${format(week.weekEnd, 'd MMM yyyy', { locale: fr })}`;
-
   return (
     <Container size="xl" py="xl">
       <Stack gap="lg">
@@ -561,97 +562,41 @@ export default function BankAccountPageClient({
           </Group>
         </Group>
 
-        {/* Week Selector & Summary Cards */}
         <Paper shadow="sm" p="lg" withBorder radius="md">
           <Stack gap="lg">
-            <DatesProvider settings={{ locale: 'fr' }}>
-              <Group align="center" wrap="nowrap" gap="md">
-                <ActionIcon 
-                  variant="light" 
-                  onClick={handlePreviousWeek} 
-                  disabled={loading} 
-                  size="md"
-                  radius="md"
-                >
-                  <IconChevronLeft size={18} />
-                </ActionIcon>
-                <Group gap="xs" align="center">
-                  <Text size="sm" fw={500} c="dimmed" style={{ whiteSpace: 'nowrap' }}>
-                    Semaine du
-                  </Text>
-                  <DatePickerInput
-                    value={weekDateValue}
-                    onChange={(date) => {
-                      const dateValue = date as unknown as Date | null;
-                      setWeekDateValue(dateValue);
-                      if (dateValue) {
-                        handleWeekChange(dateValue);
-                      }
-                    }}
-                    placeholder="Sélectionner le lundi"
-                    valueFormat="D MMMM YYYY"
-                    style={{ width: 180 }}
-                    clearable={false}
-                    radius="md"
-                    size="sm"
-                  />
-                </Group>
-                <ActionIcon 
-                  variant="light" 
-                  onClick={handleNextWeek} 
-                  disabled={loading} 
-                  size="md"
-                  radius="md"
-                >
-                  <IconChevronRight size={18} />
-                </ActionIcon>
-                <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-                  <Text size="xs" c="dimmed" mb={2}>Période</Text>
-                  <Text size="sm" fw={500}>{weekRange}</Text>
-                </div>
-              </Group>
-            </DatesProvider>
+            <WeekNavigation
+              weekStart={week.weekStart}
+              weekEnd={week.weekEnd}
+              weekDateValue={weekDateValue}
+              onWeekChange={handleWeekChange}
+              onPreviousWeek={handlePreviousWeek}
+              onNextWeek={handleNextWeek}
+              loading={loading}
+            />
 
-            {/* Balance Cards */}
-            <Group gap="md" grow>
-              <Paper p="md" withBorder radius="md" style={{ background: 'var(--mantine-color-gray-0)' }}>
-                <Stack gap={4}>
-                  <Text size="xs" c="dimmed" fw={500}>Solde précédent</Text>
-                  <Text size="xl" fw={700} c="dimmed">
-                    {previousBalance.toFixed(2)} $
-                  </Text>
-                </Stack>
-              </Paper>
-              <Paper p="md" withBorder radius="md" style={{ background: 'var(--mantine-color-gray-0)' }}>
-                <Stack gap={4}>
-                  <Text size="xs" c="dimmed" fw={500}>Solde actuel</Text>
-                  <Text size="xl" fw={700}>
-                    {currentBalance.toFixed(2)} $
-                  </Text>
-                </Stack>
-              </Paper>
-              <Paper 
-                p="md" 
-                withBorder 
-                radius="md" 
-                style={{ 
-                  background: balanceDifference >= 0 
-                    ? 'var(--mantine-color-green-0)' 
-                    : 'var(--mantine-color-red-0)' 
-                }}
-              >
-                <Stack gap={4}>
-                  <Text size="xs" c="dimmed" fw={500}>Variation</Text>
-                  <Text 
-                    size="xl" 
-                    fw={700} 
-                    c={balanceDifference >= 0 ? 'green' : 'red'}
-                  >
-                    {balanceDifference >= 0 ? '+' : ''}{balanceDifference.toFixed(2)} $
-                  </Text>
-                </Stack>
-              </Paper>
-            </Group>
+            <SummaryCards
+              cards={[
+                {
+                  label: 'Solde précédent',
+                  value: previousBalance,
+                  color: 'dimmed',
+                },
+                {
+                  label: 'Solde actuel',
+                  value: currentBalance,
+                },
+                {
+                  label: 'Variation',
+                  value: balanceDifference,
+                  color: balanceDifference >= 0 ? 'green' : 'red',
+                  backgroundColor:
+                    balanceDifference >= 0
+                      ? 'var(--mantine-color-green-0)'
+                      : 'var(--mantine-color-red-0)',
+                  formatValue: (value) => `${value >= 0 ? '+' : ''}${value.toFixed(2)} $`,
+                },
+              ]}
+            />
           </Stack>
         </Paper>
 
@@ -813,166 +758,35 @@ export default function BankAccountPageClient({
                   
                   if (isNew) {
                     return (
-                      <Autocomplete
-                        data={nameSuggestions}
+                      <SuggestionAutocomplete
                         value={newTransaction?.name || ''}
                         onChange={(value) => {
                           if (newTransaction) {
                             setNewTransaction({ ...newTransaction, name: value });
                           }
                         }}
-                        size="xs"
+                        suggestions={nameSuggestions}
+                        onAddSuggestion={handleAddNameSuggestion}
+                        onDeleteSuggestion={handleDeleteNameSuggestion}
                         placeholder="Nom"
-                        renderOption={({ option }) => (
-                          <Group justify="space-between" style={{ flex: 1 }}>
-                            <Text size="xs" style={{ flex: 1 }}>{option.value}</Text>
-                            <Popover
-                              position="top"
-                              withArrow
-                              shadow="md"
-                              withinPortal
-                            >
-                              <Popover.Target>
-                                <ActionIcon
-                                  size="xs"
-                                  variant="subtle"
-                                  color="red"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <IconTrash size={12} />
-                                </ActionIcon>
-                              </Popover.Target>
-                              <Popover.Dropdown>
-                                <Stack gap="xs" p="xs">
-                                  <Text size="sm" fw={500}>Supprimer la suggestion</Text>
-                                  <Text size="xs" c="dimmed">
-                                    Supprimer "{option.value}" des suggestions ?
-                                  </Text>
-                                  <Group gap="xs" justify="flex-end" mt="xs">
-                                    <Button
-                                      size="xs"
-                                      variant="subtle"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                      }}
-                                    >
-                                      Annuler
-                                    </Button>
-                                    <Button
-                                      size="xs"
-                                      color="red"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeleteNameSuggestion(option.value, e);
-                                      }}
-                                    >
-                                      Supprimer
-                                    </Button>
-                                  </Group>
-                                </Stack>
-                              </Popover.Dropdown>
-                            </Popover>
-                          </Group>
-                        )}
-                        comboboxProps={{ withinPortal: true }}
-                        rightSection={
-                          newTransaction?.name &&
-                          newTransaction.name.trim().length > 0 &&
-                          !nameSuggestions.some(s => s.toLowerCase() === newTransaction.name?.toLowerCase().trim()) ? (
-                            <ActionIcon
-                              size="sm"
-                              variant="subtle"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleAddNameSuggestion(newTransaction.name!);
-                              }}
-                            >
-                              <IconPlus size={14} />
-                            </ActionIcon>
-                          ) : null
-                        }
+                        size="xs"
                       />
                     );
                   }
                   
                   if (isEditing) {
                     return (
-                      <Autocomplete
-                        data={nameSuggestions}
+                      <SuggestionAutocomplete
                         value={editingTransactionData?.name || transaction.name}
                         onChange={(value) => {
                           if (editingTransactionData) {
                             setEditingTransactionData({ ...editingTransactionData, name: value });
                           }
                         }}
+                        suggestions={nameSuggestions}
+                        onAddSuggestion={handleAddNameSuggestion}
+                        onDeleteSuggestion={handleDeleteNameSuggestion}
                         size="xs"
-                        renderOption={({ option }) => (
-                          <Group justify="space-between" style={{ flex: 1 }}>
-                            <Text size="xs" style={{ flex: 1 }}>{option.value}</Text>
-                            <Popover
-                              position="top"
-                              withArrow
-                              shadow="md"
-                              withinPortal
-                            >
-                              <Popover.Target>
-                                <ActionIcon
-                                  size="xs"
-                                  variant="subtle"
-                                  color="red"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <IconTrash size={12} />
-                                </ActionIcon>
-                              </Popover.Target>
-                              <Popover.Dropdown>
-                                <Stack gap="xs" p="xs">
-                                  <Text size="sm" fw={500}>Supprimer la suggestion</Text>
-                                  <Text size="xs" c="dimmed">
-                                    Supprimer "{option.value}" des suggestions ?
-                                  </Text>
-                                  <Group gap="xs" justify="flex-end" mt="xs">
-                                    <Button
-                                      size="xs"
-                                      variant="subtle"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                      }}
-                                    >
-                                      Annuler
-                                    </Button>
-                                    <Button
-                                      size="xs"
-                                      color="red"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeleteNameSuggestion(option.value, e);
-                                      }}
-                                    >
-                                      Supprimer
-                                    </Button>
-                                  </Group>
-                                </Stack>
-                              </Popover.Dropdown>
-                            </Popover>
-                          </Group>
-                        )}
-                        rightSection={
-                          editingTransactionData?.name &&
-                          editingTransactionData.name.trim().length > 0 &&
-                          !nameSuggestions.some(s => s.toLowerCase() === editingTransactionData.name?.toLowerCase().trim()) ? (
-                            <ActionIcon
-                              size="sm"
-                              variant="subtle"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleAddNameSuggestion(editingTransactionData.name!);
-                              }}
-                            >
-                              <IconPlus size={14} />
-                            </ActionIcon>
-                          ) : null
-                        }
                       />
                     );
                   }
@@ -990,166 +804,35 @@ export default function BankAccountPageClient({
                   
                   if (isNew) {
                     return (
-                      <Autocomplete
-                        data={descriptionSuggestions}
+                      <SuggestionAutocomplete
                         value={newTransaction?.description || ''}
                         onChange={(value) => {
                           if (newTransaction) {
                             setNewTransaction({ ...newTransaction, description: value || undefined });
                           }
                         }}
-                        size="xs"
+                        suggestions={descriptionSuggestions}
+                        onAddSuggestion={handleAddDescriptionSuggestion}
+                        onDeleteSuggestion={handleDeleteDescriptionSuggestion}
                         placeholder="Description"
-                        renderOption={({ option }) => (
-                          <Group justify="space-between" style={{ flex: 1 }}>
-                            <Text size="xs" style={{ flex: 1 }}>{option.value}</Text>
-                            <Popover
-                              position="top"
-                              withArrow
-                              shadow="md"
-                              withinPortal
-                            >
-                              <Popover.Target>
-                                <ActionIcon
-                                  size="xs"
-                                  variant="subtle"
-                                  color="red"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <IconTrash size={12} />
-                                </ActionIcon>
-                              </Popover.Target>
-                              <Popover.Dropdown>
-                                <Stack gap="xs" p="xs">
-                                  <Text size="sm" fw={500}>Supprimer la suggestion</Text>
-                                  <Text size="xs" c="dimmed">
-                                    Supprimer "{option.value}" des suggestions ?
-                                  </Text>
-                                  <Group gap="xs" justify="flex-end" mt="xs">
-                                    <Button
-                                      size="xs"
-                                      variant="subtle"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                      }}
-                                    >
-                                      Annuler
-                                    </Button>
-                                    <Button
-                                      size="xs"
-                                      color="red"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeleteDescriptionSuggestion(option.value, e);
-                                      }}
-                                    >
-                                      Supprimer
-                                    </Button>
-                                  </Group>
-                                </Stack>
-                              </Popover.Dropdown>
-                            </Popover>
-                          </Group>
-                        )}
-                        comboboxProps={{ withinPortal: true }}
-                        rightSection={
-                          newTransaction?.description &&
-                          newTransaction.description.trim().length > 0 &&
-                          !descriptionSuggestions.some(s => s.toLowerCase() === newTransaction.description?.toLowerCase().trim()) ? (
-                            <ActionIcon
-                              size="sm"
-                              variant="subtle"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleAddDescriptionSuggestion(newTransaction.description!);
-                              }}
-                            >
-                              <IconPlus size={14} />
-                            </ActionIcon>
-                          ) : null
-                        }
+                        size="xs"
                       />
                     );
                   }
                   
                   if (isEditing) {
                     return (
-                      <Autocomplete
-                        data={descriptionSuggestions}
+                      <SuggestionAutocomplete
                         value={editingTransactionData?.description || transaction.description || ''}
                         onChange={(value) => {
                           if (editingTransactionData) {
                             setEditingTransactionData({ ...editingTransactionData, description: value || undefined });
                           }
                         }}
+                        suggestions={descriptionSuggestions}
+                        onAddSuggestion={handleAddDescriptionSuggestion}
+                        onDeleteSuggestion={handleDeleteDescriptionSuggestion}
                         size="xs"
-                        renderOption={({ option }) => (
-                          <Group justify="space-between" style={{ flex: 1 }}>
-                            <Text size="xs" style={{ flex: 1 }}>{option.value}</Text>
-                            <Popover
-                              position="top"
-                              withArrow
-                              shadow="md"
-                              withinPortal
-                            >
-                              <Popover.Target>
-                                <ActionIcon
-                                  size="xs"
-                                  variant="subtle"
-                                  color="red"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <IconTrash size={12} />
-                                </ActionIcon>
-                              </Popover.Target>
-                              <Popover.Dropdown>
-                                <Stack gap="xs" p="xs">
-                                  <Text size="sm" fw={500}>Supprimer la suggestion</Text>
-                                  <Text size="xs" c="dimmed">
-                                    Supprimer "{option.value}" des suggestions ?
-                                  </Text>
-                                  <Group gap="xs" justify="flex-end" mt="xs">
-                                    <Button
-                                      size="xs"
-                                      variant="subtle"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                      }}
-                                    >
-                                      Annuler
-                                    </Button>
-                                    <Button
-                                      size="xs"
-                                      color="red"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeleteDescriptionSuggestion(option.value, e);
-                                      }}
-                                    >
-                                      Supprimer
-                                    </Button>
-                                  </Group>
-                                </Stack>
-                              </Popover.Dropdown>
-                            </Popover>
-                          </Group>
-                        )}
-                        rightSection={
-                          editingTransactionData?.description &&
-                          editingTransactionData.description.trim().length > 0 &&
-                          !descriptionSuggestions.some(s => s.toLowerCase() === editingTransactionData.description?.toLowerCase().trim()) ? (
-                            <ActionIcon
-                              size="sm"
-                              variant="subtle"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleAddDescriptionSuggestion(editingTransactionData.description!);
-                              }}
-                            >
-                              <IconPlus size={14} />
-                            </ActionIcon>
-                          ) : null
-                        }
                       />
                     );
                   }
