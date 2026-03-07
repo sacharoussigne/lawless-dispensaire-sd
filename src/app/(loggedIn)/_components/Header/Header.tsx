@@ -130,9 +130,9 @@ export default function Header({
                           Entreprises
                         </Menu.Item>
                       </Link>
-                      <Link href={routes.management.letterTemplates}>
+                      <Link href={routes.management.mails}>
                         <Menu.Item>
-                          Templates de lettres
+                          Courriers
                         </Menu.Item>
                       </Link>
                     </Menu.Dropdown>

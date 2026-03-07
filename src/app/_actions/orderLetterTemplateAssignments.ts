@@ -10,13 +10,13 @@ import type { OrderType, OrderStatus } from '@prisma/client';
 const createAssignmentSchema = z.object({
   orderType: z.enum(['INCOMING', 'OUTGOING']),
   orderStatus: z.enum(['DRAFT', 'LETTER_SENT', 'PROCESSING', 'READY', 'COMPLETED', 'CANCELLED']),
-  letterTemplateId: z.string().uuid('ID de template invalide'),
+  mailTemplateId: z.string().uuid('ID de template invalide'),
 });
 
 // Schéma de validation pour modifier une assignation
 const updateAssignmentSchema = z.object({
   id: z.string().uuid('ID invalide'),
-  letterTemplateId: z.string().uuid('ID de template invalide'),
+  mailTemplateId: z.string().uuid('ID de template invalide'),
 });
 
 // Schéma pour supprimer une assignation
@@ -25,12 +25,12 @@ const deleteAssignmentSchema = z.object({
 });
 
 /**
- * Crée une nouvelle assignation de template de lettre
+ * Crée une nouvelle assignation de modèle de courrier
  */
 export async function createOrderLetterTemplateAssignment(data: {
   orderType: OrderType;
   orderStatus: OrderStatus;
-  letterTemplateId: string;
+  mailTemplateId: string;
 }) {
   try {
     const session = await getAuthSession();
@@ -44,19 +44,19 @@ export async function createOrderLetterTemplateAssignment(data: {
     const validatedData = createAssignmentSchema.parse(data);
 
     // Vérifier que le template existe
-    const template = await prisma.letterTemplate.findUnique({
-      where: { id: validatedData.letterTemplateId },
+    const template = await prisma.mailTemplate.findUnique({
+      where: { id: validatedData.mailTemplateId },
     });
 
     if (!template) {
       return {
         status: 404,
-        error: 'Template de lettre introuvable',
+        error: 'Modèle de courrier introuvable',
       };
     }
 
     // Vérifier qu'il n'existe pas déjà une assignation pour cette combinaison
-    const existing = await prisma.orderLetterTemplateAssignment.findUnique({
+    const existing = await prisma.orderMailTemplateAssignment.findUnique({
       where: {
         orderType_orderStatus: {
           orderType: validatedData.orderType,
@@ -72,14 +72,14 @@ export async function createOrderLetterTemplateAssignment(data: {
       };
     }
 
-    const assignment = await prisma.orderLetterTemplateAssignment.create({
+    const assignment = await prisma.orderMailTemplateAssignment.create({
       data: {
         orderType: validatedData.orderType,
         orderStatus: validatedData.orderStatus,
-        letterTemplateId: validatedData.letterTemplateId,
+        mailTemplateId: validatedData.mailTemplateId,
       },
       include: {
-        letterTemplate: {
+        mailTemplate: {
           select: {
             id: true,
             name: true,
@@ -110,9 +110,9 @@ export async function getOrderLetterTemplateAssignments() {
       };
     }
 
-    const assignments = await prisma.orderLetterTemplateAssignment.findMany({
+    const assignments = await prisma.orderMailTemplateAssignment.findMany({
       include: {
-        letterTemplate: {
+        mailTemplate: {
           select: {
             id: true,
             name: true,
@@ -150,7 +150,7 @@ export async function getOrderLetterTemplateAssignmentByTypeAndStatus(data: {
       };
     }
 
-    const assignment = await prisma.orderLetterTemplateAssignment.findUnique({
+    const assignment = await prisma.orderMailTemplateAssignment.findUnique({
       where: {
         orderType_orderStatus: {
           orderType: data.orderType,
@@ -158,7 +158,7 @@ export async function getOrderLetterTemplateAssignmentByTypeAndStatus(data: {
         },
       },
       include: {
-        letterTemplate: true,
+        mailTemplate: true,
       },
     });
 
@@ -176,7 +176,7 @@ export async function getOrderLetterTemplateAssignmentByTypeAndStatus(data: {
  */
 export async function updateOrderLetterTemplateAssignment(data: {
   id: string;
-  letterTemplateId: string;
+  mailTemplateId: string;
 }) {
   try {
     const session = await getAuthSession();
@@ -190,19 +190,19 @@ export async function updateOrderLetterTemplateAssignment(data: {
     const validatedData = updateAssignmentSchema.parse(data);
 
     // Vérifier que le template existe
-    const template = await prisma.letterTemplate.findUnique({
-      where: { id: validatedData.letterTemplateId },
+    const template = await prisma.mailTemplate.findUnique({
+      where: { id: validatedData.mailTemplateId },
     });
 
     if (!template) {
       return {
         status: 404,
-        error: 'Template de lettre introuvable',
+        error: 'Modèle de courrier introuvable',
       };
     }
 
     // Vérifier que l'assignation existe
-    const existing = await prisma.orderLetterTemplateAssignment.findUnique({
+    const existing = await prisma.orderMailTemplateAssignment.findUnique({
       where: { id: validatedData.id },
     });
 
@@ -213,15 +213,15 @@ export async function updateOrderLetterTemplateAssignment(data: {
       };
     }
 
-    const assignment = await prisma.orderLetterTemplateAssignment.update({
+    const assignment = await prisma.orderMailTemplateAssignment.update({
       where: {
         id: validatedData.id,
       },
       data: {
-        letterTemplateId: validatedData.letterTemplateId,
+        mailTemplateId: validatedData.mailTemplateId,
       },
       include: {
-        letterTemplate: {
+        mailTemplate: {
           select: {
             id: true,
             name: true,
@@ -254,7 +254,7 @@ export async function deleteOrderLetterTemplateAssignment(data: { id: string }) 
 
     const validatedData = deleteAssignmentSchema.parse(data);
 
-    await prisma.orderLetterTemplateAssignment.delete({
+    await prisma.orderMailTemplateAssignment.delete({
       where: {
         id: validatedData.id,
       },

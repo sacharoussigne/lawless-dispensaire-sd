@@ -3,34 +3,33 @@
 import { useEffect, useState } from 'react';
 import { Container, Title, Group, Button, Tabs, Stack } from '@mantine/core';
 import { IconPlus, IconTemplate, IconLink } from '@tabler/icons-react';
-import { getLetterTemplates } from '@/app/_actions/letterTemplates';
+import { getMailTemplates } from '@/app/_actions/mailTemplates';
 import { getOrderLetterTemplateAssignments } from '@/app/_actions/orderLetterTemplateAssignments';
 import { handleAction } from '@/lib/action';
 import { notifications } from '@mantine/notifications';
-import { LetterTemplateModal } from './components/LetterTemplateModal';
-import { DeleteLetterTemplateModal } from './components/DeleteLetterTemplateModal';
+import { MailTemplateModal } from './components/MailTemplateModal';
+import { DeleteMailTemplateModal } from './components/DeleteMailTemplateModal';
 import { OrderLetterTemplateAssignmentModal } from './components/OrderLetterTemplateAssignmentModal';
 import { DeleteOrderLetterTemplateAssignmentModal } from './components/DeleteOrderLetterTemplateAssignmentModal';
 import { ActiveFilters } from '@/app/_components/ActiveFilters/ActiveFilters';
-import { LetterTemplatesTable } from './components/LetterTemplatesTable';
+import { MailTemplatesTable } from './components/MailTemplatesTable';
 import { OrderLetterTemplateAssignmentsTable } from './components/OrderLetterTemplateAssignmentsTable';
-import type { LetterTemplate } from '@/types/letterTemplates';
-import type { OrderLetterTemplateAssignment } from '@prisma/client';
+import type { MailTemplate } from '@/types/mailTemplates';
+import type { OrderMailTemplateAssignment } from '@prisma/client';
 import { ManagementSectionThemeProvider } from '../ManagementSectionThemeProvider';
 
-interface OrderLetterTemplateAssignmentWithTemplate extends OrderLetterTemplateAssignment {
-  letterTemplate: {
+interface OrderMailTemplateAssignmentWithTemplate extends OrderMailTemplateAssignment {
+  mailTemplate: {
     id: string;
     name: string;
   };
 }
 
-interface LetterTemplatesPageClientProps {
-  initialLetterTemplates: LetterTemplate[];
-  initialAssignments: OrderLetterTemplateAssignmentWithTemplate[];
+interface MailTemplatesPageClientProps {
+  initialMailTemplates: MailTemplate[];
+  initialAssignments: OrderMailTemplateAssignmentWithTemplate[];
 }
 
-// Fonction pour normaliser les chaînes (enlever les accents et mettre en minuscule)
 const normalizeString = (str: string): string => {
   return str
     .toLowerCase()
@@ -38,39 +37,39 @@ const normalizeString = (str: string): string => {
     .replace(/[\u0300-\u036f]/g, '');
 };
 
-export default function LetterTemplatesPageClient({
-  initialLetterTemplates,
+export default function MailTemplatesPageClient({
+  initialMailTemplates,
   initialAssignments,
-}: LetterTemplatesPageClientProps) {
-  const [letterTemplates, setLetterTemplates] = useState<LetterTemplate[]>(initialLetterTemplates);
-  const [assignments, setAssignments] = useState<OrderLetterTemplateAssignmentWithTemplate[]>(initialAssignments);
+}: MailTemplatesPageClientProps) {
+  const [mailTemplates, setMailTemplates] = useState<MailTemplate[]>(initialMailTemplates);
+  const [assignments, setAssignments] = useState<OrderMailTemplateAssignmentWithTemplate[]>(initialAssignments);
   const [loading, setLoading] = useState(false);
   const [assignmentsLoading, setAssignmentsLoading] = useState(false);
   const [modalOpened, setModalOpened] = useState(false);
-  const [editingLetterTemplate, setEditingLetterTemplate] = useState<LetterTemplate | null>(null);
+  const [editingMailTemplate, setEditingMailTemplate] = useState<MailTemplate | null>(null);
   const [deleteModalOpened, setDeleteModalOpened] = useState(false);
-  const [letterTemplateToDelete, setLetterTemplateToDelete] = useState<LetterTemplate | null>(null);
+  const [mailTemplateToDelete, setMailTemplateToDelete] = useState<MailTemplate | null>(null);
   const [assignmentModalOpened, setAssignmentModalOpened] = useState(false);
-  const [editingAssignment, setEditingAssignment] = useState<OrderLetterTemplateAssignmentWithTemplate | null>(null);
+  const [editingAssignment, setEditingAssignment] = useState<OrderMailTemplateAssignmentWithTemplate | null>(null);
   const [deleteAssignmentModalOpened, setDeleteAssignmentModalOpened] = useState(false);
-  const [assignmentToDelete, setAssignmentToDelete] = useState<OrderLetterTemplateAssignmentWithTemplate | null>(null);
+  const [assignmentToDelete, setAssignmentToDelete] = useState<OrderMailTemplateAssignmentWithTemplate | null>(null);
 
   const [nameFilter, setNameFilter] = useState<string>('');
   const [page, setPage] = useState(1);
   const [pageSize] = useState(10);
 
-  const loadLetterTemplates = async () => {
+  const loadMailTemplates = async () => {
     try {
       setLoading(true);
-      const result = await getLetterTemplates();
+      const result = await getMailTemplates();
       const data = handleAction(result);
       if (data) {
-        setLetterTemplates(data);
+        setMailTemplates(data);
       }
     } catch (error: any) {
       notifications.show({
         title: 'Erreur',
-        message: error.message || 'Erreur lors du chargement des templates de lettres',
+        message: error.message || 'Erreur lors du chargement des modèles de courriers',
         color: 'red',
       });
     } finally {
@@ -97,17 +96,17 @@ export default function LetterTemplatesPageClient({
     }
   };
 
-  const handleEdit = (letterTemplate: LetterTemplate) => {
-    setEditingLetterTemplate(letterTemplate);
+  const handleEdit = (mailTemplate: MailTemplate) => {
+    setEditingMailTemplate(mailTemplate);
     setModalOpened(true);
   };
 
   const openCreateModal = () => {
-    setEditingLetterTemplate(null);
+    setEditingMailTemplate(null);
     setModalOpened(true);
   };
 
-  const handleEditAssignment = (assignment: OrderLetterTemplateAssignmentWithTemplate) => {
+  const handleEditAssignment = (assignment: OrderMailTemplateAssignmentWithTemplate) => {
     setEditingAssignment(assignment);
     setAssignmentModalOpened(true);
   };
@@ -117,35 +116,31 @@ export default function LetterTemplatesPageClient({
     setAssignmentModalOpened(true);
   };
 
-  // Filtrer les templates par nom
-  const filteredLetterTemplates = letterTemplates.filter((letterTemplate) => {
+  const filteredMailTemplates = mailTemplates.filter((mailTemplate) => {
     const matchesName =
       !nameFilter ||
-      normalizeString(letterTemplate.name).includes(normalizeString(nameFilter));
+      normalizeString(mailTemplate.name).includes(normalizeString(nameFilter));
     return matchesName;
   });
 
-  // Trier par nom
-  const sortedLetterTemplates = [...filteredLetterTemplates].sort((a, b) =>
+  const sortedMailTemplates = [...filteredMailTemplates].sort((a, b) =>
     a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' })
   );
 
-  // Calculer la pagination
-  const totalRecords = sortedLetterTemplates.length;
-  const paginatedLetterTemplates = sortedLetterTemplates.slice(
+  const totalRecords = sortedMailTemplates.length;
+  const paginatedMailTemplates = sortedMailTemplates.slice(
     (page - 1) * pageSize,
     page * pageSize
   );
 
-  // Réinitialiser la page quand les filtres changent
   useEffect(() => {
     setPage(1);
   }, [nameFilter]);
 
   return (
-    <ManagementSectionThemeProvider section="letterTemplates">
+    <ManagementSectionThemeProvider section="mails">
       <Container size="xl" py="xl">
-      <Title order={1} mb="xl">Templates de lettres</Title>
+      <Title order={1} mb="xl">Courriers</Title>
 
       <Tabs defaultValue="templates">
         <Tabs.List>
@@ -160,9 +155,9 @@ export default function LetterTemplatesPageClient({
         <Tabs.Panel value="templates" pt="xl">
           <Stack gap="md">
             <Group justify="space-between">
-              <Title order={2}>Gestion des templates</Title>
+              <Title order={2}>Gestion des modèles</Title>
               <Button leftSection={<IconPlus size={16} />} onClick={openCreateModal}>
-                Créer un template
+                Créer un modèle
               </Button>
             </Group>
 
@@ -176,8 +171,8 @@ export default function LetterTemplatesPageClient({
               ]}
             />
 
-            <LetterTemplatesTable
-              letterTemplates={paginatedLetterTemplates}
+            <MailTemplatesTable
+              mailTemplates={paginatedMailTemplates}
               loading={loading}
               nameFilter={nameFilter}
               page={page}
@@ -186,8 +181,8 @@ export default function LetterTemplatesPageClient({
               onNameFilterChange={(value) => setNameFilter(value)}
               onPageChange={(p) => setPage(p)}
               onEdit={handleEdit}
-              onDelete={(letterTemplate) => {
-                setLetterTemplateToDelete(letterTemplate);
+              onDelete={(mailTemplate) => {
+                setMailTemplateToDelete(mailTemplate);
                 setDeleteModalOpened(true);
               }}
             />
@@ -216,24 +211,24 @@ export default function LetterTemplatesPageClient({
         </Tabs.Panel>
       </Tabs>
 
-      <LetterTemplateModal
+      <MailTemplateModal
         opened={modalOpened}
         onClose={() => {
           setModalOpened(false);
-          setEditingLetterTemplate(null);
+          setEditingMailTemplate(null);
         }}
-        editingLetterTemplate={editingLetterTemplate}
-        onSuccess={loadLetterTemplates}
+        editingMailTemplate={editingMailTemplate}
+        onSuccess={loadMailTemplates}
       />
 
-      <DeleteLetterTemplateModal
+      <DeleteMailTemplateModal
         opened={deleteModalOpened}
         onClose={() => {
           setDeleteModalOpened(false);
-          setLetterTemplateToDelete(null);
+          setMailTemplateToDelete(null);
         }}
-        letterTemplateToDelete={letterTemplateToDelete}
-        onSuccess={loadLetterTemplates}
+        mailTemplateToDelete={mailTemplateToDelete}
+        onSuccess={loadMailTemplates}
       />
 
       <OrderLetterTemplateAssignmentModal
@@ -243,7 +238,7 @@ export default function LetterTemplatesPageClient({
           setEditingAssignment(null);
         }}
         editingAssignment={editingAssignment}
-        letterTemplates={letterTemplates}
+        mailTemplates={mailTemplates}
         onSuccess={loadAssignments}
       />
 

@@ -3,22 +3,22 @@
 import { DataTable } from 'mantine-datatable';
 import { Paper, ActionIcon, Group, Badge } from '@mantine/core';
 import { IconEdit, IconTrash } from '@tabler/icons-react';
-import type { OrderLetterTemplateAssignment } from '@prisma/client';
+import type { OrderMailTemplateAssignment } from '@prisma/client';
 import { getOrderTypeLabel } from '@/types/enum/orderType';
 import { getOrderStatusLabel } from '@/types/enum/orderStatus';
 
-interface OrderLetterTemplateAssignmentWithTemplate extends OrderLetterTemplateAssignment {
-  letterTemplate: {
+interface OrderMailTemplateAssignmentWithTemplate extends OrderMailTemplateAssignment {
+  mailTemplate: {
     id: string;
     name: string;
   };
 }
 
 interface OrderLetterTemplateAssignmentsTableProps {
-  assignments: OrderLetterTemplateAssignmentWithTemplate[];
+  assignments: OrderMailTemplateAssignmentWithTemplate[];
   loading: boolean;
-  onEdit: (assignment: OrderLetterTemplateAssignmentWithTemplate) => void;
-  onDelete: (assignment: OrderLetterTemplateAssignmentWithTemplate) => void;
+  onEdit: (assignment: OrderMailTemplateAssignmentWithTemplate) => void;
+  onDelete: (assignment: OrderMailTemplateAssignmentWithTemplate) => void;
 }
 
 export function OrderLetterTemplateAssignmentsTable({
@@ -35,7 +35,7 @@ export function OrderLetterTemplateAssignmentsTable({
           {
             accessor: 'orderType',
             title: 'Type de commande',
-            render: (assignment: OrderLetterTemplateAssignmentWithTemplate) => (
+            render: (assignment: OrderMailTemplateAssignmentWithTemplate) => (
               <Badge color="blue" variant="light">
                 {getOrderTypeLabel(assignment.orderType)}
               </Badge>
@@ -44,20 +44,20 @@ export function OrderLetterTemplateAssignmentsTable({
           {
             accessor: 'orderStatus',
             title: 'Statut de commande',
-            render: (assignment: OrderLetterTemplateAssignmentWithTemplate) => (
+            render: (assignment: OrderMailTemplateAssignmentWithTemplate) => (
               <Badge color="grape" variant="light">
                 {getOrderStatusLabel(assignment.orderStatus)}
               </Badge>
             ),
           },
           {
-            accessor: 'letterTemplate.name',
+            accessor: 'mailTemplate.name',
             title: 'Template assigné',
           },
           {
             accessor: 'actions',
             title: 'Actions',
-            render: (assignment: OrderLetterTemplateAssignmentWithTemplate) => (
+            render: (assignment: OrderMailTemplateAssignmentWithTemplate) => (
               <Group gap="xs" wrap="nowrap" justify="flex-end">
                 <ActionIcon
                   variant="light"

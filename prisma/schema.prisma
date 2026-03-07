@@ -259,30 +259,30 @@ model OrderItem {
   @@map("order_item")
 }
 
-model LetterTemplate {
+model MailTemplate {
   id        String                          @id @default(uuid())
   name      String
   content   String
   createdAt DateTime                        @default(now())
   updatedAt DateTime                        @updatedAt
-  assignments OrderLetterTemplateAssignment[]
+  assignments OrderMailTemplateAssignment[]
 
-  @@map("letter_template")
+  @@map("mail_template")
 }
 
-model OrderLetterTemplateAssignment {
+model OrderMailTemplateAssignment {
   id              String         @id @default(uuid())
   orderType       OrderType
   orderStatus     OrderStatus
-  letterTemplateId String
-  letterTemplate  LetterTemplate @relation(fields: [letterTemplateId], references: [id], onDelete: Cascade)
+  mailTemplateId  String
+  mailTemplate    MailTemplate @relation(fields: [mailTemplateId], references: [id], onDelete: Cascade)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
   @@unique([orderType, orderStatus])
-  @@index([letterTemplateId])
+  @@index([mailTemplateId])
   @@index([orderType, orderStatus])
-  @@map("order_letter_template_assignment")
+  @@map("order_mail_template_assignment")
 }
 
 enum BankAccountAccessType {

@@ -9,15 +9,15 @@ import {
 } from '@/app/_actions/orderLetterTemplateAssignments';
 import { handleAction } from '@/lib/action';
 import { notifications } from '@mantine/notifications';
-import type { OrderLetterTemplateAssignment, OrderType, OrderStatus } from '@prisma/client';
-import type { LetterTemplate } from '@/types/letterTemplates';
+import type { OrderMailTemplateAssignment, OrderType, OrderStatus } from '@prisma/client';
+import type { MailTemplate } from '@/types/mailTemplates';
 import { OrderTypeEnum } from '@/types/enum/orderType';
 import { OrderStatusEnum } from '@/types/enum/orderStatus';
 import { getOrderTypeLabel } from '@/types/enum/orderType';
 import { getOrderStatusLabel } from '@/types/enum/orderStatus';
 
-interface OrderLetterTemplateAssignmentWithTemplate extends OrderLetterTemplateAssignment {
-  letterTemplate: {
+interface OrderMailTemplateAssignmentWithTemplate extends OrderMailTemplateAssignment {
+  mailTemplate: {
     id: string;
     name: string;
   };
@@ -26,8 +26,8 @@ interface OrderLetterTemplateAssignmentWithTemplate extends OrderLetterTemplateA
 interface OrderLetterTemplateAssignmentModalProps {
   opened: boolean;
   onClose: () => void;
-  editingAssignment: OrderLetterTemplateAssignmentWithTemplate | null;
-  letterTemplates: LetterTemplate[];
+  editingAssignment: OrderMailTemplateAssignmentWithTemplate | null;
+  mailTemplates: MailTemplate[];
   onSuccess: () => void;
 }
 
@@ -35,19 +35,19 @@ export function OrderLetterTemplateAssignmentModal({
   opened,
   onClose,
   editingAssignment,
-  letterTemplates,
+  mailTemplates,
   onSuccess,
 }: OrderLetterTemplateAssignmentModalProps) {
   const form = useForm({
     initialValues: {
       orderType: '' as OrderType | '',
       orderStatus: '' as OrderStatus | '',
-      letterTemplateId: '',
+      mailTemplateId: '',
     },
     validate: {
       orderType: (value) => (!value ? 'Le type de commande est requis' : null),
       orderStatus: (value) => (!value ? 'Le statut de commande est requis' : null),
-      letterTemplateId: (value) => (!value ? 'Le template de lettre est requis' : null),
+      mailTemplateId: (value) => (!value ? 'Le modèle de courrier est requis' : null),
     },
   });
 
@@ -56,7 +56,7 @@ export function OrderLetterTemplateAssignmentModal({
       form.setValues({
         orderType: editingAssignment.orderType,
         orderStatus: editingAssignment.orderStatus,
-        letterTemplateId: editingAssignment.letterTemplateId,
+        mailTemplateId: editingAssignment.mailTemplateId,
       });
     } else {
       form.reset();
@@ -69,13 +69,13 @@ export function OrderLetterTemplateAssignmentModal({
       if (editingAssignment) {
         result = await updateOrderLetterTemplateAssignment({
           id: editingAssignment.id,
-          letterTemplateId: values.letterTemplateId,
+          mailTemplateId: values.mailTemplateId,
         });
       } else {
         result = await createOrderLetterTemplateAssignment({
           orderType: values.orderType as OrderType,
           orderStatus: values.orderStatus as OrderStatus,
-          letterTemplateId: values.letterTemplateId,
+          mailTemplateId: values.mailTemplateId,
         });
       }
 
@@ -115,7 +115,7 @@ export function OrderLetterTemplateAssignmentModal({
     { value: OrderStatusEnum.CANCELLED, label: getOrderStatusLabel(OrderStatusEnum.CANCELLED) },
   ];
 
-  const letterTemplateOptions = letterTemplates.map((template) => ({
+  const mailTemplateOptions = mailTemplates.map((template) => ({
     value: template.id,
     label: template.name,
   }));
@@ -149,12 +149,12 @@ export function OrderLetterTemplateAssignmentModal({
             {...form.getInputProps('orderStatus')}
           />
           <Select
-            label="Template de lettre"
-            placeholder="Sélectionner un template"
-            data={letterTemplateOptions}
+            label="Modèle de courrier"
+            placeholder="Sélectionner un modèle"
+            data={mailTemplateOptions}
             required
             searchable
-            {...form.getInputProps('letterTemplateId')}
+            {...form.getInputProps('mailTemplateId')}
           />
           <Group justify="flex-end" mt="md">
             <Button

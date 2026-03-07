@@ -15,7 +15,7 @@ export const routes = {
     companyGroups: '/management/companygroups',
     categoryItems: '/management/categoryitems',
     items: '/management/items',
-    letterTemplates: '/management/lettertemplates',
+    mails: '/management/mails',
     chests: '/management/chests',
   },
   api: {},

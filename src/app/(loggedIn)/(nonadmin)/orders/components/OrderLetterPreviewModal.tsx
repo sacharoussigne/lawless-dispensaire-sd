@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Modal, Stack, Text, Button, Group, Loader, Paper } from '@mantine/core';
 import { IconCopy, IconCheck } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
-import { generateOrderLetterPreview } from '@/app/_actions/letterTemplates';
+import { generateOrderMailPreview } from '@/app/_actions/mailTemplates';
 import { handleAction } from '@/lib/action';
 import type { OrderWithRelations } from '@/types/orders';
 
@@ -36,7 +36,7 @@ export function OrderLetterPreviewModal({
 
     try {
       setLoading(true);
-      const result = await generateOrderLetterPreview({ orderId: order.id });
+      const result = await generateOrderMailPreview({ orderId: order.id });
       const data = handleAction(result);
       if (data) {
         setPreview(data.preview);
@@ -60,7 +60,7 @@ export function OrderLetterPreviewModal({
       setCopied(true);
       notifications.show({
         title: 'Succès',
-        message: 'Lettre copiée dans le presse-papiers',
+        message: 'Courrier copié dans le presse-papiers',
         color: 'green',
       });
       // Réinitialiser l'état après 2 secondes
@@ -68,7 +68,7 @@ export function OrderLetterPreviewModal({
     } catch (error) {
       notifications.show({
         title: 'Erreur',
-        message: 'Impossible de copier la lettre',
+        message: 'Impossible de copier le courrier',
         color: 'red',
       });
     }
@@ -78,7 +78,7 @@ export function OrderLetterPreviewModal({
     <Modal
       opened={opened}
       onClose={onClose}
-      title="Aperçu de la lettre"
+      title="Aperçu du courrier"
       size="lg"
     >
       <Stack>
@@ -110,7 +110,7 @@ export function OrderLetterPreviewModal({
               variant={copied ? 'light' : 'default'}
               color={copied ? 'green' : undefined}
             >
-              {copied ? 'Copiée !' : 'Copier la lettre'}
+              {copied ? 'Copiée !' : 'Copier le courrier'}
             </Button>
           )}
           <Button onClick={onClose}>Fermer</Button>

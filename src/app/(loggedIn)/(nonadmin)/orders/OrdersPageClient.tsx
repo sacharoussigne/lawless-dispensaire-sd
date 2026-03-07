@@ -21,7 +21,7 @@ import OrderModal from '@/app/(loggedIn)/(nonadmin)/stock/modals/OrderModal';
 import { usePermissions } from '@/app/_contexts/PermissionsContext';
 import type { OrderWithRelations } from '@/types/orders';
 import { getOrderLetterTemplateAssignments } from '@/app/_actions/orderLetterTemplateAssignments';
-import type { OrderLetterTemplateAssignment } from '@prisma/client';
+import type { OrderMailTemplateAssignment } from '@prisma/client';
 
 interface OrdersPageClientProps {
   initialOrders: OrderWithRelations[];
@@ -42,7 +42,7 @@ export default function OrdersPageClient({
 }: OrdersPageClientProps) {
   const { permissions } = usePermissions();
   const [orders, setOrders] = useState<OrderWithRelations[]>(initialOrders);
-  const [assignments, setAssignments] = useState<OrderLetterTemplateAssignment[]>([]);
+  const [assignments, setAssignments] = useState<OrderMailTemplateAssignment[]>([]);
   const [loading, setLoading] = useState(false);
   const [assignmentsLoading, setAssignmentsLoading] = useState(false);
   const [modalOpened, setModalOpened] = useState(false);
@@ -90,7 +90,7 @@ export default function OrdersPageClient({
     } catch (error: any) {
       notifications.show({
         title: 'Erreur',
-        message: error.message || 'Erreur lors du chargement des assignations de lettres',
+        message: error.message || 'Erreur lors du chargement des assignations de modèles de courriers',
         color: 'red',
       });
     } finally {

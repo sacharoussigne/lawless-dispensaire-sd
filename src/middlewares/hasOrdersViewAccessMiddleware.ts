@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRolePermission } from "@/lib/auth/permissions";
 import { routes } from "@/types/routes";
-import { forbiddenResponse } from "@/lib/response";
 
 export async function hasOrdersViewAccessMiddleware(
   request: NextRequest,
@@ -15,9 +14,6 @@ export async function hasOrdersViewAccessMiddleware(
   const hasAccess = checkRolePermission(userRole, "orders", "view");
 
   if (!hasAccess) {
-    if (request.headers.get("content-type") === "application/json") {
-      return forbiddenResponse({ error: "Accès aux commandes refusé" });
-    }
     return routes.redirect(request, routes.auth.noAccess);
   }
 

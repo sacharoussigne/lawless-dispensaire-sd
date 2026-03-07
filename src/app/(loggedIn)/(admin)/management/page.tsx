@@ -51,11 +51,11 @@ const managementSections = [
     color: 'blue',
   },
   {
-    title: 'Templates de lettres',
+    title: 'Courriers',
     description:
-      'Gérez les modèles de lettres utilisés pour les entreprises et le suivi administratif.',
+      'Gérez les courriers utilisés pour les entreprises et le suivi administratif.',
     icon: IconClipboardText,
-    href: routes.management.letterTemplates,
+    href: routes.management.mails,
     color: 'violet',
   },
 ] as const;

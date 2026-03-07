@@ -5,28 +5,22 @@ import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
 import { getAuthSession } from '@/lib/auth';
 
-// Schéma de validation pour créer un template de lettre
-const createLetterTemplateSchema = z.object({
+const createMailTemplateSchema = z.object({
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
   content: z.string().min(1, 'Le contenu est requis'),
 });
 
-// Schéma de validation pour modifier un template de lettre
-const updateLetterTemplateSchema = z.object({
+const updateMailTemplateSchema = z.object({
   id: z.string().uuid('ID invalide'),
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
   content: z.string().min(1, 'Le contenu est requis'),
 });
 
-// Schéma pour supprimer un template de lettre
-const deleteLetterTemplateSchema = z.object({
+const deleteMailTemplateSchema = z.object({
   id: z.string().uuid('ID invalide'),
 });
 
-/**
- * Crée un nouveau template de lettre
- */
-export async function createLetterTemplate(data: {
+export async function createMailTemplate(data: {
   name: string;
   content: string;
 }) {
@@ -39,9 +33,9 @@ export async function createLetterTemplate(data: {
       };
     }
 
-    const validatedData = createLetterTemplateSchema.parse(data);
+    const validatedData = createMailTemplateSchema.parse(data);
 
-    const letterTemplate = await prisma.letterTemplate.create({
+    const mailTemplate = await prisma.mailTemplate.create({
       data: {
         name: validatedData.name,
         content: validatedData.content,
@@ -50,17 +44,14 @@ export async function createLetterTemplate(data: {
 
     return {
       status: 201,
-      data: letterTemplate,
+      data: mailTemplate,
     };
   } catch (error) {
-    return actionErrorParser(error, 'Erreur lors de la création du template de lettre');
+    return actionErrorParser(error, 'Erreur lors de la création du modèle de courrier');
   }
 }
 
-/**
- * Récupère tous les templates de lettres
- */
-export async function getLetterTemplates() {
+export async function getMailTemplates() {
   try {
     const session = await getAuthSession();
     if (!session) {
@@ -70,7 +61,7 @@ export async function getLetterTemplates() {
       };
     }
 
-    const letterTemplates = await prisma.letterTemplate.findMany({
+    const mailTemplates = await prisma.mailTemplate.findMany({
       orderBy: {
         createdAt: 'desc',
       },
@@ -78,17 +69,14 @@ export async function getLetterTemplates() {
 
     return {
       status: 200,
-      data: letterTemplates,
+      data: mailTemplates,
     };
   } catch (error) {
-    return actionErrorParser(error, 'Erreur lors de la récupération des templates de lettres');
+    return actionErrorParser(error, 'Erreur lors de la récupération des modèles de courriers');
   }
 }
 
-/**
- * Modifie un template de lettre existant
- */
-export async function updateLetterTemplate(data: {
+export async function updateMailTemplate(data: {
   id: string;
   name: string;
   content: string;
@@ -102,9 +90,9 @@ export async function updateLetterTemplate(data: {
       };
     }
 
-    const validatedData = updateLetterTemplateSchema.parse(data);
+    const validatedData = updateMailTemplateSchema.parse(data);
 
-    const letterTemplate = await prisma.letterTemplate.update({
+    const mailTemplate = await prisma.mailTemplate.update({
       where: {
         id: validatedData.id,
       },
@@ -116,17 +104,14 @@ export async function updateLetterTemplate(data: {
 
     return {
       status: 200,
-      data: letterTemplate,
+      data: mailTemplate,
     };
   } catch (error) {
-    return actionErrorParser(error, 'Erreur lors de la modification du template de lettre');
+    return actionErrorParser(error, 'Erreur lors de la modification du modèle de courrier');
   }
 }
 
-/**
- * Supprime un template de lettre
- */
-export async function deleteLetterTemplate(data: { id: string }) {
+export async function deleteMailTemplate(data: { id: string }) {
   try {
     const session = await getAuthSession();
     if (!session) {
@@ -136,9 +121,9 @@ export async function deleteLetterTemplate(data: { id: string }) {
       };
     }
 
-    const validatedData = deleteLetterTemplateSchema.parse(data);
+    const validatedData = deleteMailTemplateSchema.parse(data);
 
-    await prisma.letterTemplate.delete({
+    await prisma.mailTemplate.delete({
       where: {
         id: validatedData.id,
       },
@@ -149,14 +134,11 @@ export async function deleteLetterTemplate(data: { id: string }) {
       data: { success: true },
     };
   } catch (error) {
-    return actionErrorParser(error, 'Erreur lors de la suppression du template de lettre');
+    return actionErrorParser(error, 'Erreur lors de la suppression du modèle de courrier');
   }
 }
 
-/**
- * Génère l'aperçu de la lettre pour une commande
- */
-export async function generateOrderLetterPreview(data: {
+export async function generateOrderMailPreview(data: {
   orderId: string;
 }) {
   try {
@@ -198,8 +180,7 @@ export async function generateOrderLetterPreview(data: {
       };
     }
 
-    // Récupérer l'assignation pour ce type et statut de commande
-    const assignment = await prisma.orderLetterTemplateAssignment.findUnique({
+    const assignment = await prisma.orderMailTemplateAssignment.findUnique({
       where: {
         orderType_orderStatus: {
           orderType: order.type,
@@ -207,20 +188,19 @@ export async function generateOrderLetterPreview(data: {
         },
       },
       include: {
-        letterTemplate: true,
+        mailTemplate: true,
       },
     });
 
     if (!assignment) {
       return {
         status: 404,
-        error: `Aucun template de lettre assigné pour le type "${order.type}" et le statut "${order.status}"`,
+        error: `Aucun modèle de courrier assigné pour le type "${order.type}" et le statut "${order.status}"`,
       };
     }
 
-    const template = assignment.letterTemplate;
+    const template = assignment.mailTemplate;
 
-    // Formater les items
     const itemsText = order.items
       .map((orderItem) => {
         const itemName = orderItem.item.name;
@@ -229,32 +209,25 @@ export async function generateOrderLetterPreview(data: {
       })
       .join('\n');
 
-    // Formater le prix
     const priceText = order.price != null ? `${order.price.toFixed(2)} $` : 'Non spécifié';
 
-    // Récupérer le nom d'utilisateur de la session
     const username = session.user.name || 'Utilisateur';
 
-    // Remplacer les variables dans le template
     let preview = template.content;
     preview = preview.replace(/\${name}/g, order.company.name);
     preview = preview.replace(/\${items}/g, itemsText);
     preview = preview.replace(/\${price}/g, priceText);
     preview = preview.replace(/\${username}/g, username);
 
-    // Remplacer les salutations selon l'heure de la journée
     const currentHour = new Date().getHours();
-    const isEvening = currentHour >= 18; // Après 18h = soir
+    const isEvening = currentHour >= 18;
 
     if (isEvening) {
-      // Remplacer "Bonjour" par "Bonsoir" (gère les variations de casse)
       preview = preview.replace(/Bonjour/gi, (match) => {
-        // Préserver la casse : "Bonjour" -> "Bonsoir", "bonjour" -> "bonsoir", "BONJOUR" -> "BONSOIR"
         if (match === 'Bonjour') return 'Bonsoir';
         if (match === 'BONJOUR') return 'BONSOIR';
         return 'bonsoir';
       });
-      // Remplacer "journée" par "soirée" (gère les variations de casse)
       preview = preview.replace(/journée/gi, (match) => {
         if (match === 'Journée') return 'Soirée';
         if (match === 'JOURNÉE') return 'SOIRÉE';
@@ -262,13 +235,11 @@ export async function generateOrderLetterPreview(data: {
         return 'soirée';
       });
     } else {
-      // Remplacer "Bonsoir" par "Bonjour" (gère les variations de casse)
       preview = preview.replace(/Bonsoir/gi, (match) => {
         if (match === 'Bonsoir') return 'Bonjour';
         if (match === 'BONSOIR') return 'BONJOUR';
         return 'bonjour';
       });
-      // Remplacer "soirée" par "journée" (gère les variations de casse)
       preview = preview.replace(/soirée/gi, (match) => {
         if (match === 'Soirée') return 'Journée';
         if (match === 'SOIRÉE') return 'JOURNÉE';
@@ -285,6 +256,6 @@ export async function generateOrderLetterPreview(data: {
       },
     };
   } catch (error) {
-    return actionErrorParser(error, 'Erreur lors de la génération de l\'aperçu de la lettre');
+    return actionErrorParser(error, 'Erreur lors de la génération de l\'aperçu du courrier');
   }
 }
