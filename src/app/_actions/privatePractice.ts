@@ -314,3 +314,100 @@ export async function deletePatient(data: { id: string }) {
     return actionErrorParser(error, 'Erreur lors de la suppression du patient');
   }
 }
+
+/**
+ * Gets identity suggestions
+ */
+export async function getIdentitySuggestions() {
+  try {
+    const accessCheck = await checkPrivatePracticeAccess();
+    if (!accessCheck.hasAccess) {
+      return {
+        status: 403,
+        error: accessCheck.error || 'Accès non autorisé',
+      };
+    }
+
+    const suggestions = await prisma.patientIdentitySuggestion.findMany({
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: 50,
+    });
+
+    return {
+      status: 200,
+      data: suggestions.map(s => s.value),
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de la récupération des suggestions d\'identité');
+  }
+}
+
+/**
+ * Adds an identity suggestion
+ */
+export async function addIdentitySuggestion(data: { value: string }) {
+  try {
+    const accessCheck = await checkPrivatePracticeAccess();
+    if (!accessCheck.hasAccess) {
+      return {
+        status: 403,
+        error: accessCheck.error || 'Accès non autorisé',
+      };
+    }
+
+    if (!data.value || data.value.trim().length === 0) {
+      return {
+        status: 400,
+        error: 'L\'identité ne peut pas être vide',
+      };
+    }
+
+    const suggestion = await prisma.patientIdentitySuggestion.upsert({
+      where: { value: data.value.trim() },
+      update: {},
+      create: { value: data.value.trim() },
+    });
+
+    return {
+      status: 201,
+      data: suggestion.value,
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de l\'ajout de la suggestion d\'identité');
+  }
+}
+
+/**
+ * Deletes an identity suggestion
+ */
+export async function deleteIdentitySuggestion(data: { value: string }) {
+  try {
+    const accessCheck = await checkPrivatePracticeAccess();
+    if (!accessCheck.hasAccess) {
+      return {
+        status: 403,
+        error: accessCheck.error || 'Accès non autorisé',
+      };
+    }
+
+    if (!data.value || data.value.trim().length === 0) {
+      return {
+        status: 400,
+        error: 'L\'identité ne peut pas être vide',
+      };
+    }
+
+    await prisma.patientIdentitySuggestion.delete({
+      where: { value: data.value.trim() },
+    });
+
+    return {
+      status: 200,
+      data: { success: true },
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de la suppression de la suggestion d\'identité');
+  }
+}

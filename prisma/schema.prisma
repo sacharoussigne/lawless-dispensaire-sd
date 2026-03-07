@@ -382,6 +382,16 @@ model TransactionDescriptionSuggestion {
   @@map("transaction_description_suggestion")
 }
 
+model PatientIdentitySuggestion {
+  id        String   @id @default(uuid())
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([value])
+  @@map("patient_identity_suggestion")
+}
+
 model PrivatePracticeWeek {
   id        String   @id @default(uuid())
   weekStart DateTime // Lundi de la semaine

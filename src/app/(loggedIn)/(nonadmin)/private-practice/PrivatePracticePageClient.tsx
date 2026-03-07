@@ -10,6 +10,8 @@ import {
   NumberInput,
   TextInput,
   Select,
+  Autocomplete,
+  Popover,
   ActionIcon,
   Text,
   Badge,
@@ -19,10 +21,10 @@ import {
 import { DataTable } from 'mantine-datatable';
 import { DatePickerInput, DateInput, DatesProvider } from '@mantine/dates';
 import 'dayjs/locale/fr';
-import { 
-  IconPlus, 
-  IconTrash, 
-  IconChevronLeft, 
+import {
+  IconPlus,
+  IconTrash,
+  IconChevronLeft,
   IconChevronRight,
   IconArrowDown,
   IconArrowUp,
@@ -37,6 +39,9 @@ import {
   createPatient,
   updatePatient,
   deletePatient,
+  getIdentitySuggestions,
+  addIdentitySuggestion,
+  deleteIdentitySuggestion,
 } from '@/app/_actions/privatePractice';
 import { handleAction } from '@/lib/action';
 import { format, addWeeks, subWeeks } from 'date-fns';
@@ -63,9 +68,9 @@ interface PrivatePracticePageClientProps {
 
 const getPatientTypeOptions = (existingTypes: string[] = []) => {
   const defaultOptions = PatientTypeEnumValues;
-  
+
   const allTypes = Array.from(new Set([...defaultOptions, ...existingTypes]));
-  
+
   return allTypes.map((type) => ({
     value: type,
     label: getPatientTypeLabel(type),
@@ -106,6 +111,7 @@ export default function PrivatePracticePageClient({
   } | null>(null);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [amountForCashRegisterManuallyModified, setAmountForCashRegisterManuallyModified] = useState(false);
+  const [identitySuggestions, setIdentitySuggestions] = useState<string[]>([]);
 
   const existingTypes = useMemo(() => {
     const types = new Set<string>();
@@ -121,7 +127,66 @@ export default function PrivatePracticePageClient({
 
   useEffect(() => {
     loadWeeks();
+    loadIdentitySuggestions();
   }, []);
+
+  const loadIdentitySuggestions = async () => {
+    try {
+      const result = await getIdentitySuggestions();
+      const data = handleAction(result);
+      if (data) {
+        setIdentitySuggestions(data);
+      }
+    } catch (error) {
+    }
+  };
+
+  const handleAddIdentitySuggestion = async (value: string) => {
+    if (!value || value.trim().length === 0) return;
+
+    try {
+      const result = await addIdentitySuggestion({ value });
+      const data = handleAction(result);
+      if (data) {
+        setIdentitySuggestions([...identitySuggestions, data]);
+        notifications.show({
+          title: 'Succès',
+          message: 'Suggestion ajoutée',
+          color: 'green',
+        });
+      }
+    } catch (error: any) {
+      notifications.show({
+        title: 'Erreur',
+        message: error.message || 'Erreur lors de l\'ajout de la suggestion',
+        color: 'red',
+      });
+    }
+  };
+
+  const handleDeleteIdentitySuggestion = async (value: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!value || value.trim().length === 0) return;
+
+    try {
+      const result = await deleteIdentitySuggestion({ value });
+      const data = handleAction(result);
+      if (data) {
+        setIdentitySuggestions(identitySuggestions.filter(s => s.toLowerCase() !== value.toLowerCase().trim()));
+        notifications.show({
+          title: 'Succès',
+          message: 'Suggestion supprimée',
+          color: 'green',
+        });
+      }
+    } catch (error: any) {
+      notifications.show({
+        title: 'Erreur',
+        message: error.message || 'Erreur lors de la suppression de la suggestion',
+        color: 'red',
+      });
+    }
+  };
 
   const loadWeeks = async () => {
     try {
@@ -175,22 +240,22 @@ export default function PrivatePracticePageClient({
       const dateA = new Date(a.date);
       dateA.setHours(0, 0, 0, 0);
       const dateATime = dateA.getTime();
-      
+
       const dateB = new Date(b.date);
       dateB.setHours(0, 0, 0, 0);
       const dateBTime = dateB.getTime();
-      
+
       if (dateATime !== dateBTime) {
         return sortOrder === 'asc' ? dateATime - dateBTime : dateBTime - dateATime;
       }
-      
+
       return sortOrder === 'asc' ? a.order - b.order : b.order - a.order;
     });
   }, [week.patients, sortOrder]);
 
   const dataTableRecords = useMemo(() => {
     const records = [...filteredPatients];
-    
+
     if (newPatient) {
       const newRecord = {
         id: 'new-patient',
@@ -206,14 +271,14 @@ export default function PrivatePracticePageClient({
         retrievedFromCashRegister: newPatient.retrievedFromCashRegister || false,
         order: newPatient.order || 0,
       };
-      
+
       if (sortOrder === 'desc') {
         records.unshift(newRecord as any);
       } else {
         records.push(newRecord as any);
       }
     }
-    
+
     return records;
   }, [filteredPatients, newPatient, sortOrder]);
 
@@ -306,6 +371,7 @@ export default function PrivatePracticePageClient({
           });
           await loadWeek(week.weekStart);
           await loadWeeks();
+          await loadIdentitySuggestions();
           setNewPatient(null);
           setAmountForCashRegisterManuallyModified(false);
         }
@@ -349,7 +415,7 @@ export default function PrivatePracticePageClient({
   const handleReorderPatient = async (patientId: string, direction: 'up' | 'down') => {
     try {
       setLoading(true);
-      
+
       const patient = week.patients.find((p) => p.id === patientId);
       if (!patient) return;
 
@@ -369,7 +435,7 @@ export default function PrivatePracticePageClient({
       const sortedSameDate = [...sameDatePatients].sort((a, b) => a.order - b.order);
       const currentIndex = sortedSameDate.findIndex((p) => p.id === patientId);
 
-      const actualDirection = sortOrder === 'desc' 
+      const actualDirection = sortOrder === 'desc'
         ? (direction === 'up' ? 'down' : 'up')
         : direction;
 
@@ -426,10 +492,10 @@ export default function PrivatePracticePageClient({
           <Stack gap="lg">
             <DatesProvider settings={{ locale: 'fr' }}>
               <Group align="center" wrap="nowrap" gap="md">
-                <ActionIcon 
-                  variant="light" 
-                  onClick={handlePreviousWeek} 
-                  disabled={loading} 
+                <ActionIcon
+                  variant="light"
+                  onClick={handlePreviousWeek}
+                  disabled={loading}
                   size="md"
                   radius="md"
                 >
@@ -456,10 +522,10 @@ export default function PrivatePracticePageClient({
                     size="sm"
                   />
                 </Group>
-                <ActionIcon 
-                  variant="light" 
-                  onClick={handleNextWeek} 
-                  disabled={loading} 
+                <ActionIcon
+                  variant="light"
+                  onClick={handleNextWeek}
+                  disabled={loading}
                   size="md"
                   radius="md"
                 >
@@ -497,21 +563,21 @@ export default function PrivatePracticePageClient({
                   </Text>
                 </Stack>
               </Paper>
-              <Paper 
-                p="md" 
-                withBorder 
-                radius="md" 
-                style={{ 
-                  background: variation >= 0 
-                    ? 'var(--mantine-color-green-0)' 
-                    : 'var(--mantine-color-red-0)' 
+              <Paper
+                p="md"
+                withBorder
+                radius="md"
+                style={{
+                  background: variation >= 0
+                    ? 'var(--mantine-color-green-0)'
+                    : 'var(--mantine-color-red-0)'
                 }}
               >
                 <Stack gap={4}>
                   <Text size="xs" c="dimmed" fw={500}>Variation</Text>
-                  <Text 
-                    size="xl" 
-                    fw={700} 
+                  <Text
+                    size="xl"
+                    fw={700}
                     c={variation >= 0 ? 'green' : 'red'}
                   >
                     {variation >= 0 ? '+' : ''}{variation.toFixed(2)} $
@@ -560,7 +626,7 @@ export default function PrivatePracticePageClient({
                   render: (patient: any) => {
                     const isNew = patient.isNew;
                     const isEditing = !isNew && editingPatient === patient.id;
-                    
+
                     if (isNew) {
                       return (
                         <DateInput
@@ -575,7 +641,7 @@ export default function PrivatePracticePageClient({
                         />
                       );
                     }
-                    
+
                     if (isEditing) {
                       return (
                         <DateInput
@@ -590,7 +656,7 @@ export default function PrivatePracticePageClient({
                         />
                       );
                     }
-                    
+
                     return <Text size="sm">{format(new Date(patient.date), 'dd/MM/yyyy', { locale: fr })}</Text>;
                   },
                 },
@@ -600,7 +666,7 @@ export default function PrivatePracticePageClient({
                   render: (patient: any) => {
                     const isNew = patient.isNew;
                     const isEditing = !isNew && editingPatient === patient.id;
-                    
+
                     if (isNew) {
                       return (
                         <Select
@@ -616,7 +682,7 @@ export default function PrivatePracticePageClient({
                         />
                       );
                     }
-                    
+
                     if (isEditing) {
                       return (
                         <Select
@@ -631,7 +697,7 @@ export default function PrivatePracticePageClient({
                         />
                       );
                     }
-                    
+
                     return (
                       <Badge
                         color={getPatientTypeColor(patient.type)}
@@ -649,78 +715,216 @@ export default function PrivatePracticePageClient({
                   render: (patient: any) => {
                     const isNew = patient.isNew;
                     const isEditing = !isNew && editingPatient === patient.id;
-                    
+
                     if (isNew) {
                       return (
-                        <TextInput
+                        <Autocomplete
+                          data={identitySuggestions}
                           value={newPatient?.identity || ''}
-                          onChange={(e) => {
+                          onChange={(value) => {
                             if (newPatient) {
-                              setNewPatient({ ...newPatient, identity: e.target.value });
+                              setNewPatient({ ...newPatient, identity: value });
                             }
                           }}
                           size="xs"
                           placeholder="Identité"
+                          renderOption={({ option }) => (
+                            <Group justify="space-between" style={{ flex: 1 }}>
+                              <Text size="xs" style={{ flex: 1 }}>{option.value}</Text>
+                              <Popover
+                                position="top"
+                                withArrow
+                                shadow="md"
+                                withinPortal
+                              >
+                                <Popover.Target>
+                                  <ActionIcon
+                                    size="xs"
+                                    variant="subtle"
+                                    color="red"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <IconTrash size={12} />
+                                  </ActionIcon>
+                                </Popover.Target>
+                                <Popover.Dropdown>
+                                  <Stack gap="xs" p="xs">
+                                    <Text size="sm" fw={500}>Supprimer la suggestion</Text>
+                                    <Text size="xs" c="dimmed">
+                                      Supprimer "{option.value}" des suggestions ?
+                                    </Text>
+                                    <Group gap="xs" justify="flex-end" mt="xs">
+                                      <Button
+                                        size="xs"
+                                        variant="subtle"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                        }}
+                                      >
+                                        Annuler
+                                      </Button>
+                                      <Button
+                                        size="xs"
+                                        color="red"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDeleteIdentitySuggestion(option.value, e);
+                                        }}
+                                      >
+                                        Supprimer
+                                      </Button>
+                                    </Group>
+                                  </Stack>
+                                </Popover.Dropdown>
+                              </Popover>
+                            </Group>
+                          )}
+                          comboboxProps={{ withinPortal: true }}
+                          rightSection={
+                            newPatient?.identity &&
+                              newPatient.identity.trim().length > 0 &&
+                              !identitySuggestions.some(s => s.toLowerCase() === newPatient.identity?.toLowerCase().trim()) ? (
+                              <ActionIcon
+                                size="sm"
+                                variant="subtle"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleAddIdentitySuggestion(newPatient.identity!);
+                                }}
+                              >
+                                <IconPlus size={14} />
+                              </ActionIcon>
+                            ) : null
+                          }
                         />
                       );
                     }
-                    
+
                     if (isEditing) {
                       return (
-                        <TextInput
+                        <Autocomplete
+                          data={identitySuggestions}
                           value={editingPatientData?.identity || patient.identity}
-                          onChange={(e) => {
+                          onChange={(value) => {
                             if (editingPatientData) {
-                              setEditingPatientData({ ...editingPatientData, identity: e.target.value });
+                              setEditingPatientData({ ...editingPatientData, identity: value });
                             }
                           }}
                           size="xs"
+                          renderOption={({ option }) => (
+                            <Group justify="space-between" style={{ flex: 1 }}>
+                              <Text size="xs" style={{ flex: 1 }}>{option.value}</Text>
+                              <Popover
+                                position="top"
+                                withArrow
+                                shadow="md"
+                                withinPortal
+                              >
+                                <Popover.Target>
+                                  <ActionIcon
+                                    size="xs"
+                                    variant="subtle"
+                                    color="red"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <IconTrash size={12} />
+                                  </ActionIcon>
+                                </Popover.Target>
+                                <Popover.Dropdown>
+                                  <Stack gap="xs" p="xs">
+                                    <Text size="sm" fw={500}>Supprimer la suggestion</Text>
+                                    <Text size="xs" c="dimmed">
+                                      Supprimer "{option.value}" des suggestions ?
+                                    </Text>
+                                    <Group gap="xs" justify="flex-end" mt="xs">
+                                      <Button
+                                        size="xs"
+                                        variant="subtle"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                        }}
+                                      >
+                                        Annuler
+                                      </Button>
+                                      <Button
+                                        size="xs"
+                                        color="red"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDeleteIdentitySuggestion(option.value, e);
+                                        }}
+                                      >
+                                        Supprimer
+                                      </Button>
+                                    </Group>
+                                  </Stack>
+                                </Popover.Dropdown>
+                              </Popover>
+                            </Group>
+                          )}
+                          comboboxProps={{ withinPortal: true }}
+                          rightSection={
+                            editingPatientData?.identity &&
+                              editingPatientData.identity.trim().length > 0 &&
+                              !identitySuggestions.some(s => s.toLowerCase() === editingPatientData.identity?.toLowerCase().trim()) ? (
+                              <ActionIcon
+                                size="sm"
+                                variant="subtle"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleAddIdentitySuggestion(editingPatientData.identity!);
+                                }}
+                              >
+                                <IconPlus size={14} />
+                              </ActionIcon>
+                            ) : null
+                          }
                         />
                       );
                     }
-                    
+
                     return <Text size="sm">{patient.identity}</Text>;
                   },
                 },
-                {
-                  accessor: 'description',
-                  title: 'Description',
-                  render: (patient: any) => {
-                    const isNew = patient.isNew;
-                    const isEditing = !isNew && editingPatient === patient.id;
-                    
-                    if (isNew) {
-                      return (
-                        <TextInput
-                          value={newPatient?.description || ''}
-                          onChange={(e) => {
-                            if (newPatient) {
-                              setNewPatient({ ...newPatient, description: e.target.value });
-                            }
-                          }}
-                          size="xs"
-                          placeholder="Description"
-                        />
-                      );
-                    }
-                    
-                    if (isEditing) {
-                      return (
-                        <TextInput
-                          value={editingPatientData?.description || patient.description || ''}
-                          onChange={(e) => {
-                            if (editingPatientData) {
-                              setEditingPatientData({ ...editingPatientData, description: e.target.value });
-                            }
-                          }}
-                          size="xs"
-                        />
-                      );
-                    }
-                    
-                    return <Text size="sm">{patient.description || '-'}</Text>;
-                  },
-                },
+                // {
+                //   accessor: 'description',
+                //   title: 'Description',
+                //   render: (patient: any) => {
+                //     const isNew = patient.isNew;
+                //     const isEditing = !isNew && editingPatient === patient.id;
+
+                //     if (isNew) {
+                //       return (
+                //         <TextInput
+                //           value={newPatient?.description || ''}
+                //           onChange={(e) => {
+                //             if (newPatient) {
+                //               setNewPatient({ ...newPatient, description: e.target.value });
+                //             }
+                //           }}
+                //           size="xs"
+                //           placeholder="Description"
+                //         />
+                //       );
+                //     }
+
+                //     if (isEditing) {
+                //       return (
+                //         <TextInput
+                //           value={editingPatientData?.description || patient.description || ''}
+                //           onChange={(e) => {
+                //             if (editingPatientData) {
+                //               setEditingPatientData({ ...editingPatientData, description: e.target.value });
+                //             }
+                //           }}
+                //           size="xs"
+                //         />
+                //       );
+                //     }
+
+                //     return <Text size="sm">{patient.description || '-'}</Text>;
+                //   },
+                // },
                 {
                   accessor: 'consultationPrice',
                   title: 'Consultation ($)',
@@ -728,7 +932,7 @@ export default function PrivatePracticePageClient({
                   render: (patient: any) => {
                     const isNew = patient.isNew;
                     const isEditing = !isNew && editingPatient === patient.id;
-                    
+
                     if (isNew) {
                       return (
                         <NumberInput
@@ -736,11 +940,11 @@ export default function PrivatePracticePageClient({
                           onChange={(value) => {
                             if (newPatient) {
                               const consultationPrice = value ? Number(value) : 0;
-                              const newAmountForCashRegister = !amountForCashRegisterManuallyModified 
-                                ? Math.round((consultationPrice * 0.5) * 100) / 100 
+                              const newAmountForCashRegister = !amountForCashRegisterManuallyModified
+                                ? Math.round((consultationPrice * 0.5) * 100) / 100
                                 : newPatient.amountForCashRegister;
-                              setNewPatient({ 
-                                ...newPatient, 
+                              setNewPatient({
+                                ...newPatient,
                                 consultationPrice,
                                 amountForCashRegister: newAmountForCashRegister,
                               });
@@ -754,7 +958,7 @@ export default function PrivatePracticePageClient({
                         />
                       );
                     }
-                    
+
                     if (isEditing) {
                       return (
                         <NumberInput
@@ -762,14 +966,14 @@ export default function PrivatePracticePageClient({
                           onChange={(value) => {
                             if (editingPatientData) {
                               const consultationPrice = value ? Number(value) : 0;
-                              const currentAmountForCashRegister = editingPatientData.amountForCashRegister !== undefined 
-                                ? editingPatientData.amountForCashRegister 
+                              const currentAmountForCashRegister = editingPatientData.amountForCashRegister !== undefined
+                                ? editingPatientData.amountForCashRegister
                                 : Number(patient.amountForCashRegister);
-                              const newAmountForCashRegister = !amountForCashRegisterManuallyModified 
-                                ? Math.round((consultationPrice * 0.5) * 100) / 100 
+                              const newAmountForCashRegister = !amountForCashRegisterManuallyModified
+                                ? Math.round((consultationPrice * 0.5) * 100) / 100
                                 : currentAmountForCashRegister;
-                              setEditingPatientData({ 
-                                ...editingPatientData, 
+                              setEditingPatientData({
+                                ...editingPatientData,
                                 consultationPrice,
                                 amountForCashRegister: newAmountForCashRegister,
                               });
@@ -782,7 +986,7 @@ export default function PrivatePracticePageClient({
                         />
                       );
                     }
-                    
+
                     return <Text size="sm" fw={600}>{Number(patient.consultationPrice).toFixed(2)} $</Text>;
                   },
                 },
@@ -793,7 +997,7 @@ export default function PrivatePracticePageClient({
                   render: (patient: any) => {
                     const isNew = patient.isNew;
                     const isEditing = !isNew && editingPatient === patient.id;
-                    
+
                     if (isNew) {
                       return (
                         <NumberInput
@@ -811,7 +1015,7 @@ export default function PrivatePracticePageClient({
                         />
                       );
                     }
-                    
+
                     if (isEditing) {
                       return (
                         <NumberInput
@@ -828,7 +1032,7 @@ export default function PrivatePracticePageClient({
                         />
                       );
                     }
-                    
+
                     return <Text size="sm" fw={600}>{Number(patient.otherPrice).toFixed(2)} $</Text>;
                   },
                 },
@@ -839,7 +1043,7 @@ export default function PrivatePracticePageClient({
                   render: (patient: any) => {
                     const isNew = patient.isNew;
                     const isEditing = !isNew && editingPatient === patient.id;
-                    
+
                     if (isNew) {
                       return (
                         <NumberInput
@@ -858,7 +1062,7 @@ export default function PrivatePracticePageClient({
                         />
                       );
                     }
-                    
+
                     if (isEditing) {
                       return (
                         <NumberInput
@@ -876,7 +1080,7 @@ export default function PrivatePracticePageClient({
                         />
                       );
                     }
-                    
+
                     return <Text size="sm" fw={600}>{Number(patient.amountForCashRegister).toFixed(2)} $</Text>;
                   },
                 },
@@ -887,22 +1091,25 @@ export default function PrivatePracticePageClient({
                   render: (patient: any) => {
                     const isNew = patient.isNew;
                     const isEditing = !isNew && editingPatient === patient.id;
-                    
+
                     if (isNew || isEditing) {
                       return (
-                        <Checkbox
-                          checked={isNew ? (newPatient?.depositedInCashRegister || false) : (editingPatientData?.depositedInCashRegister !== undefined ? editingPatientData.depositedInCashRegister : patient.depositedInCashRegister)}
-                          onChange={(e) => {
-                            if (isNew && newPatient) {
-                              setNewPatient({ ...newPatient, depositedInCashRegister: e.target.checked });
-                            } else if (editingPatientData) {
-                              setEditingPatientData({ ...editingPatientData, depositedInCashRegister: e.target.checked });
-                            }
-                          }}
-                        />
+                        <div className="flex justify-center">
+                          <Checkbox
+                            width={"min-content"}
+                            checked={isNew ? (newPatient?.depositedInCashRegister || false) : (editingPatientData?.depositedInCashRegister !== undefined ? editingPatientData.depositedInCashRegister : patient.depositedInCashRegister)}
+                            onChange={(e) => {
+                              if (isNew && newPatient) {
+                                setNewPatient({ ...newPatient, depositedInCashRegister: e.target.checked });
+                              } else if (editingPatientData) {
+                                setEditingPatientData({ ...editingPatientData, depositedInCashRegister: e.target.checked });
+                              }
+                            }}
+                          />
+                        </div>
                       );
                     }
-                    
+
                     return (
                       <Badge color={patient.depositedInCashRegister ? 'green' : 'gray'} variant="light" size="sm">
                         {patient.depositedInCashRegister ? 'Oui' : 'Non'}
@@ -917,22 +1124,25 @@ export default function PrivatePracticePageClient({
                   render: (patient: any) => {
                     const isNew = patient.isNew;
                     const isEditing = !isNew && editingPatient === patient.id;
-                    
+
                     if (isNew || isEditing) {
                       return (
-                        <Checkbox
-                          checked={isNew ? (newPatient?.retrievedFromCashRegister || false) : (editingPatientData?.retrievedFromCashRegister !== undefined ? editingPatientData.retrievedFromCashRegister : patient.retrievedFromCashRegister)}
-                          onChange={(e) => {
-                            if (isNew && newPatient) {
-                              setNewPatient({ ...newPatient, retrievedFromCashRegister: e.target.checked });
-                            } else if (editingPatientData) {
-                              setEditingPatientData({ ...editingPatientData, retrievedFromCashRegister: e.target.checked });
-                            }
-                          }}
-                        />
+                        <div className="flex justify-center">
+                          <Checkbox
+                            width={"min-content"}
+                            checked={isNew ? (newPatient?.retrievedFromCashRegister || false) : (editingPatientData?.retrievedFromCashRegister !== undefined ? editingPatientData.retrievedFromCashRegister : patient.retrievedFromCashRegister)}
+                            onChange={(e) => {
+                              if (isNew && newPatient) {
+                                setNewPatient({ ...newPatient, retrievedFromCashRegister: e.target.checked });
+                              } else if (editingPatientData) {
+                                setEditingPatientData({ ...editingPatientData, retrievedFromCashRegister: e.target.checked });
+                              }
+                            }}
+                          />
+                        </div>
                       );
                     }
-                    
+
                     return (
                       <Badge color={patient.retrievedFromCashRegister ? 'green' : 'gray'} variant="light" size="sm">
                         {patient.retrievedFromCashRegister ? 'Oui' : 'Non'}
@@ -947,7 +1157,7 @@ export default function PrivatePracticePageClient({
                   render: (patient: any) => {
                     const isNew = patient.isNew;
                     const isEditing = !isNew && editingPatient === patient.id;
-                    
+
                     if (isNew) {
                       return (
                         <Group gap="xs" justify="center" wrap="nowrap">
@@ -975,7 +1185,7 @@ export default function PrivatePracticePageClient({
                         </Group>
                       );
                     }
-                    
+
                     if (isEditing) {
                       return (
                         <Group gap="xs" justify="center" wrap="nowrap">
@@ -984,7 +1194,7 @@ export default function PrivatePracticePageClient({
                             variant="light"
                             onClick={() => {
                               if (editingPatientData) {
-                                handleSavePatient({ 
+                                handleSavePatient({
                                   id: patient.id,
                                   date: editingPatientData.date || patient.date,
                                   type: editingPatientData.type || patient.type,
@@ -1006,35 +1216,35 @@ export default function PrivatePracticePageClient({
                             color="gray"
                             variant="light"
                             onClick={() => {
-                            setEditingPatient(null);
-                            setEditingPatientData(null);
-                            setAmountForCashRegisterManuallyModified(false);
-                          }}
+                              setEditingPatient(null);
+                              setEditingPatientData(null);
+                              setAmountForCashRegisterManuallyModified(false);
+                            }}
                           >
                             <IconX size={16} />
                           </ActionIcon>
                         </Group>
                       );
                     }
-                    
+
                     const patientDate = new Date(patient.date);
                     patientDate.setHours(0, 0, 0, 0);
-                    
+
                     const sameDatePatients = week.patients.filter((p) => {
                       const pDate = new Date(p.date);
                       pDate.setHours(0, 0, 0, 0);
                       return pDate.getTime() === patientDate.getTime();
                     });
-                    
+
                     const sortedSameDate = [...sameDatePatients].sort((a, b) => a.order - b.order);
                     const currentIndex = sortedSameDate.findIndex((p) => p.id === patient.id);
-                    
+
                     const canMoveUpInOrder = currentIndex > 0;
                     const canMoveDownInOrder = currentIndex < sortedSameDate.length - 1;
-                    
+
                     const canMoveUp = sortOrder === 'desc' ? canMoveDownInOrder : canMoveUpInOrder;
                     const canMoveDown = sortOrder === 'desc' ? canMoveUpInOrder : canMoveDownInOrder;
-                    
+
                     return (
                       <Group gap="xs" justify="center" wrap="nowrap">
                         {sameDatePatients.length >= 2 && (
