@@ -8,10 +8,7 @@ import {
   Button,
   Paper,
   NumberInput,
-  TextInput,
   Select,
-  Autocomplete,
-  Popover,
   ActionIcon,
   Text,
   Badge,
@@ -19,13 +16,11 @@ import {
   Checkbox,
 } from '@mantine/core';
 import { DataTable } from 'mantine-datatable';
-import { DatePickerInput, DateInput, DatesProvider } from '@mantine/dates';
+import { DateInput, DatesProvider } from '@mantine/dates';
 import 'dayjs/locale/fr';
 import {
   IconPlus,
   IconTrash,
-  IconChevronLeft,
-  IconChevronRight,
   IconArrowDown,
   IconArrowUp,
   IconEdit,
@@ -53,6 +48,9 @@ import {
   getPatientTypeColor,
   PatientTypeEnumValues,
 } from '@/types/enum/patientType';
+import { WeekNavigation } from '@/app/_components/WeekNavigation/WeekNavigation';
+import { SuggestionAutocomplete } from '@/app/_components/SuggestionAutocomplete/SuggestionAutocomplete';
+import { SummaryCards } from '@/app/_components/SummaryCards/SummaryCards';
 
 type SerializedPrivatePracticeWeek = PrivatePracticeWeek & {
   patients: Array<Omit<PrivatePracticePatient, 'consultationPrice' | 'otherPrice' | 'amountForCashRegister'> & {
@@ -138,6 +136,7 @@ export default function PrivatePracticePageClient({
         setIdentitySuggestions(data);
       }
     } catch (error) {
+      // Error handled by handleAction
     }
   };
 
@@ -196,6 +195,7 @@ export default function PrivatePracticePageClient({
         setWeeks(data);
       }
     } catch (error) {
+      // Error handled by handleAction
     }
   };
 
@@ -229,9 +229,9 @@ export default function PrivatePracticePageClient({
     loadWeek(newDate);
   };
 
-  const handleWeekChange = (date: Date | null) => {
+  const handleWeekChange = async (date: Date | null) => {
     if (date) {
-      loadWeek(date);
+      await loadWeek(date);
     }
   };
 
@@ -476,8 +476,6 @@ export default function PrivatePracticePageClient({
     }
   };
 
-  const weekRange = `${format(week.weekStart, 'd MMM', { locale: fr })} - ${format(week.weekEnd, 'd MMM yyyy', { locale: fr })}`;
-
   return (
     <Container size="xl" py="xl">
       <Stack gap="lg">
@@ -490,101 +488,42 @@ export default function PrivatePracticePageClient({
 
         <Paper shadow="sm" p="lg" withBorder radius="md">
           <Stack gap="lg">
-            <DatesProvider settings={{ locale: 'fr' }}>
-              <Group align="center" wrap="nowrap" gap="md">
-                <ActionIcon
-                  variant="light"
-                  onClick={handlePreviousWeek}
-                  disabled={loading}
-                  size="md"
-                  radius="md"
-                >
-                  <IconChevronLeft size={18} />
-                </ActionIcon>
-                <Group gap="xs" align="center">
-                  <Text size="sm" fw={500} c="dimmed" style={{ whiteSpace: 'nowrap' }}>
-                    Semaine du
-                  </Text>
-                  <DatePickerInput
-                    value={weekDateValue}
-                    onChange={(date) => {
-                      const dateValue = date as unknown as Date | null;
-                      setWeekDateValue(dateValue);
-                      if (dateValue) {
-                        handleWeekChange(dateValue);
-                      }
-                    }}
-                    placeholder="Sélectionner le lundi"
-                    valueFormat="D MMMM YYYY"
-                    style={{ width: 180 }}
-                    clearable={false}
-                    radius="md"
-                    size="sm"
-                  />
-                </Group>
-                <ActionIcon
-                  variant="light"
-                  onClick={handleNextWeek}
-                  disabled={loading}
-                  size="md"
-                  radius="md"
-                >
-                  <IconChevronRight size={18} />
-                </ActionIcon>
-                <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-                  <Text size="xs" c="dimmed" mb={2}>Période</Text>
-                  <Text size="sm" fw={500}>{weekRange}</Text>
-                </div>
-              </Group>
-            </DatesProvider>
+            <WeekNavigation
+              weekStart={week.weekStart}
+              weekEnd={week.weekEnd}
+              weekDateValue={weekDateValue}
+              onWeekChange={handleWeekChange}
+              onPreviousWeek={handlePreviousWeek}
+              onNextWeek={handleNextWeek}
+              loading={loading}
+            />
 
-            <Group gap="md" grow>
-              <Paper p="md" withBorder radius="md" style={{ background: 'var(--mantine-color-gray-0)' }}>
-                <Stack gap={4}>
-                  <Text size="xs" c="dimmed" fw={500}>Total consultations</Text>
-                  <Text size="xl" fw={700}>
-                    {totalConsultation.toFixed(2)} $
-                  </Text>
-                </Stack>
-              </Paper>
-              <Paper p="md" withBorder radius="md" style={{ background: 'var(--mantine-color-gray-0)' }}>
-                <Stack gap={4}>
-                  <Text size="xs" c="dimmed" fw={500}>Total autres ventes</Text>
-                  <Text size="xl" fw={700}>
-                    {totalOther.toFixed(2)} $
-                  </Text>
-                </Stack>
-              </Paper>
-              <Paper p="md" withBorder radius="md" style={{ background: 'var(--mantine-color-gray-0)' }}>
-                <Stack gap={4}>
-                  <Text size="xs" c="dimmed" fw={500}>Total déposé en caisse</Text>
-                  <Text size="xl" fw={700}>
-                    {totalAmountForCashRegister.toFixed(2)} $
-                  </Text>
-                </Stack>
-              </Paper>
-              <Paper
-                p="md"
-                withBorder
-                radius="md"
-                style={{
-                  background: variation >= 0
-                    ? 'var(--mantine-color-green-0)'
-                    : 'var(--mantine-color-red-0)'
-                }}
-              >
-                <Stack gap={4}>
-                  <Text size="xs" c="dimmed" fw={500}>Variation</Text>
-                  <Text
-                    size="xl"
-                    fw={700}
-                    c={variation >= 0 ? 'green' : 'red'}
-                  >
-                    {variation >= 0 ? '+' : ''}{variation.toFixed(2)} $
-                  </Text>
-                </Stack>
-              </Paper>
-            </Group>
+            <SummaryCards
+              cards={[
+                {
+                  label: 'Total consultations',
+                  value: totalConsultation,
+                },
+                {
+                  label: 'Total autres ventes',
+                  value: totalOther,
+                },
+                {
+                  label: 'Total déposé en caisse',
+                  value: totalAmountForCashRegister,
+                },
+                {
+                  label: 'Variation',
+                  value: variation,
+                  color: variation >= 0 ? 'green' : 'red',
+                  backgroundColor:
+                    variation >= 0
+                      ? 'var(--mantine-color-green-0)'
+                      : 'var(--mantine-color-red-0)',
+                  formatValue: (value) => `${value >= 0 ? '+' : ''}${value.toFixed(2)} $`,
+                },
+              ]}
+            />
           </Stack>
         </Paper>
 
@@ -718,167 +657,35 @@ export default function PrivatePracticePageClient({
 
                     if (isNew) {
                       return (
-                        <Autocomplete
-                          data={identitySuggestions}
+                        <SuggestionAutocomplete
                           value={newPatient?.identity || ''}
                           onChange={(value) => {
                             if (newPatient) {
                               setNewPatient({ ...newPatient, identity: value });
                             }
                           }}
-                          size="xs"
+                          suggestions={identitySuggestions}
+                          onAddSuggestion={handleAddIdentitySuggestion}
+                          onDeleteSuggestion={handleDeleteIdentitySuggestion}
                           placeholder="Identité"
-                          renderOption={({ option }) => (
-                            <Group justify="space-between" style={{ flex: 1 }}>
-                              <Text size="xs" style={{ flex: 1 }}>{option.value}</Text>
-                              <Popover
-                                position="top"
-                                withArrow
-                                shadow="md"
-                                withinPortal
-                              >
-                                <Popover.Target>
-                                  <ActionIcon
-                                    size="xs"
-                                    variant="subtle"
-                                    color="red"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <IconTrash size={12} />
-                                  </ActionIcon>
-                                </Popover.Target>
-                                <Popover.Dropdown>
-                                  <Stack gap="xs" p="xs">
-                                    <Text size="sm" fw={500}>Supprimer la suggestion</Text>
-                                    <Text size="xs" c="dimmed">
-                                      Supprimer "{option.value}" des suggestions ?
-                                    </Text>
-                                    <Group gap="xs" justify="flex-end" mt="xs">
-                                      <Button
-                                        size="xs"
-                                        variant="subtle"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                        }}
-                                      >
-                                        Annuler
-                                      </Button>
-                                      <Button
-                                        size="xs"
-                                        color="red"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleDeleteIdentitySuggestion(option.value, e);
-                                        }}
-                                      >
-                                        Supprimer
-                                      </Button>
-                                    </Group>
-                                  </Stack>
-                                </Popover.Dropdown>
-                              </Popover>
-                            </Group>
-                          )}
-                          comboboxProps={{ withinPortal: true }}
-                          rightSection={
-                            newPatient?.identity &&
-                              newPatient.identity.trim().length > 0 &&
-                              !identitySuggestions.some(s => s.toLowerCase() === newPatient.identity?.toLowerCase().trim()) ? (
-                              <ActionIcon
-                                size="sm"
-                                variant="subtle"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleAddIdentitySuggestion(newPatient.identity!);
-                                }}
-                              >
-                                <IconPlus size={14} />
-                              </ActionIcon>
-                            ) : null
-                          }
+                          size="xs"
                         />
                       );
                     }
 
                     if (isEditing) {
                       return (
-                        <Autocomplete
-                          data={identitySuggestions}
+                        <SuggestionAutocomplete
                           value={editingPatientData?.identity || patient.identity}
                           onChange={(value) => {
                             if (editingPatientData) {
                               setEditingPatientData({ ...editingPatientData, identity: value });
                             }
                           }}
+                          suggestions={identitySuggestions}
+                          onAddSuggestion={handleAddIdentitySuggestion}
+                          onDeleteSuggestion={handleDeleteIdentitySuggestion}
                           size="xs"
-                          renderOption={({ option }) => (
-                            <Group justify="space-between" style={{ flex: 1 }}>
-                              <Text size="xs" style={{ flex: 1 }}>{option.value}</Text>
-                              <Popover
-                                position="top"
-                                withArrow
-                                shadow="md"
-                                withinPortal
-                              >
-                                <Popover.Target>
-                                  <ActionIcon
-                                    size="xs"
-                                    variant="subtle"
-                                    color="red"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <IconTrash size={12} />
-                                  </ActionIcon>
-                                </Popover.Target>
-                                <Popover.Dropdown>
-                                  <Stack gap="xs" p="xs">
-                                    <Text size="sm" fw={500}>Supprimer la suggestion</Text>
-                                    <Text size="xs" c="dimmed">
-                                      Supprimer "{option.value}" des suggestions ?
-                                    </Text>
-                                    <Group gap="xs" justify="flex-end" mt="xs">
-                                      <Button
-                                        size="xs"
-                                        variant="subtle"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                        }}
-                                      >
-                                        Annuler
-                                      </Button>
-                                      <Button
-                                        size="xs"
-                                        color="red"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleDeleteIdentitySuggestion(option.value, e);
-                                        }}
-                                      >
-                                        Supprimer
-                                      </Button>
-                                    </Group>
-                                  </Stack>
-                                </Popover.Dropdown>
-                              </Popover>
-                            </Group>
-                          )}
-                          comboboxProps={{ withinPortal: true }}
-                          rightSection={
-                            editingPatientData?.identity &&
-                              editingPatientData.identity.trim().length > 0 &&
-                              !identitySuggestions.some(s => s.toLowerCase() === editingPatientData.identity?.toLowerCase().trim()) ? (
-                              <ActionIcon
-                                size="sm"
-                                variant="subtle"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleAddIdentitySuggestion(editingPatientData.identity!);
-                                }}
-                              >
-                                <IconPlus size={14} />
-                              </ActionIcon>
-                            ) : null
-                          }
                         />
                       );
                     }
@@ -886,45 +693,6 @@ export default function PrivatePracticePageClient({
                     return <Text size="sm">{patient.identity}</Text>;
                   },
                 },
-                // {
-                //   accessor: 'description',
-                //   title: 'Description',
-                //   render: (patient: any) => {
-                //     const isNew = patient.isNew;
-                //     const isEditing = !isNew && editingPatient === patient.id;
-
-                //     if (isNew) {
-                //       return (
-                //         <TextInput
-                //           value={newPatient?.description || ''}
-                //           onChange={(e) => {
-                //             if (newPatient) {
-                //               setNewPatient({ ...newPatient, description: e.target.value });
-                //             }
-                //           }}
-                //           size="xs"
-                //           placeholder="Description"
-                //         />
-                //       );
-                //     }
-
-                //     if (isEditing) {
-                //       return (
-                //         <TextInput
-                //           value={editingPatientData?.description || patient.description || ''}
-                //           onChange={(e) => {
-                //             if (editingPatientData) {
-                //               setEditingPatientData({ ...editingPatientData, description: e.target.value });
-                //             }
-                //           }}
-                //           size="xs"
-                //         />
-                //       );
-                //     }
-
-                //     return <Text size="sm">{patient.description || '-'}</Text>;
-                //   },
-                // },
                 {
                   accessor: 'consultationPrice',
                   title: 'Consultation ($)',
@@ -1094,10 +862,15 @@ export default function PrivatePracticePageClient({
 
                     if (isNew || isEditing) {
                       return (
-                        <div className="flex justify-center">
+                        <Group justify="center">
                           <Checkbox
-                            width={"min-content"}
-                            checked={isNew ? (newPatient?.depositedInCashRegister || false) : (editingPatientData?.depositedInCashRegister !== undefined ? editingPatientData.depositedInCashRegister : patient.depositedInCashRegister)}
+                            checked={
+                              isNew
+                                ? newPatient?.depositedInCashRegister || false
+                                : editingPatientData?.depositedInCashRegister !== undefined
+                                  ? editingPatientData.depositedInCashRegister
+                                  : patient.depositedInCashRegister
+                            }
                             onChange={(e) => {
                               if (isNew && newPatient) {
                                 setNewPatient({ ...newPatient, depositedInCashRegister: e.target.checked });
@@ -1106,7 +879,7 @@ export default function PrivatePracticePageClient({
                               }
                             }}
                           />
-                        </div>
+                        </Group>
                       );
                     }
 
@@ -1127,10 +900,15 @@ export default function PrivatePracticePageClient({
 
                     if (isNew || isEditing) {
                       return (
-                        <div className="flex justify-center">
+                        <Group justify="center">
                           <Checkbox
-                            width={"min-content"}
-                            checked={isNew ? (newPatient?.retrievedFromCashRegister || false) : (editingPatientData?.retrievedFromCashRegister !== undefined ? editingPatientData.retrievedFromCashRegister : patient.retrievedFromCashRegister)}
+                            checked={
+                              isNew
+                                ? newPatient?.retrievedFromCashRegister || false
+                                : editingPatientData?.retrievedFromCashRegister !== undefined
+                                  ? editingPatientData.retrievedFromCashRegister
+                                  : patient.retrievedFromCashRegister
+                            }
                             onChange={(e) => {
                               if (isNew && newPatient) {
                                 setNewPatient({ ...newPatient, retrievedFromCashRegister: e.target.checked });
@@ -1139,7 +917,7 @@ export default function PrivatePracticePageClient({
                               }
                             }}
                           />
-                        </div>
+                        </Group>
                       );
                     }
 
