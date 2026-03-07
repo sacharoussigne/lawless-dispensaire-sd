@@ -14,6 +14,7 @@ import {
   Badge,
   Stack,
   Checkbox,
+  Autocomplete,
 } from '@mantine/core';
 import { DataTable } from 'mantine-datatable';
 import { DateInput, DatesProvider } from '@mantine/dates';
@@ -110,6 +111,8 @@ export default function PrivatePracticePageClient({
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [amountForCashRegisterManuallyModified, setAmountForCashRegisterManuallyModified] = useState(false);
   const [identitySuggestions, setIdentitySuggestions] = useState<string[]>([]);
+  const [filterType, setFilterType] = useState<string | null>(null);
+  const [filterIdentity, setFilterIdentity] = useState<string | null>(null);
 
   const existingTypes = useMemo(() => {
     const types = new Set<string>();
@@ -122,6 +125,23 @@ export default function PrivatePracticePageClient({
   const patientTypeOptions = useMemo(() => {
     return getPatientTypeOptions(existingTypes);
   }, [existingTypes]);
+
+  const existingIdentities = useMemo(() => {
+    const identities = new Set<string>();
+    week.patients.forEach((p) => {
+      if (p.identity && p.identity.trim()) {
+        identities.add(p.identity.trim());
+      }
+    });
+    return Array.from(identities).sort();
+  }, [week.patients]);
+
+  const identityFilterOptions = useMemo(() => {
+    return existingIdentities.map((identity) => ({
+      value: identity,
+      label: identity,
+    }));
+  }, [existingIdentities]);
 
   useEffect(() => {
     loadWeeks();
@@ -236,7 +256,20 @@ export default function PrivatePracticePageClient({
   };
 
   const filteredPatients = useMemo(() => {
-    return [...week.patients].sort((a, b) => {
+    let filtered = [...week.patients];
+
+    if (filterType) {
+      filtered = filtered.filter((p) => p.type === filterType);
+    }
+
+    if (filterIdentity && filterIdentity.trim()) {
+      const filterIdentityLower = filterIdentity.toLowerCase().trim();
+      filtered = filtered.filter((p) => 
+        p.identity.toLowerCase().includes(filterIdentityLower)
+      );
+    }
+
+    return filtered.sort((a, b) => {
       const dateA = new Date(a.date);
       dateA.setHours(0, 0, 0, 0);
       const dateATime = dateA.getTime();
@@ -251,7 +284,7 @@ export default function PrivatePracticePageClient({
 
       return sortOrder === 'asc' ? a.order - b.order : b.order - a.order;
     });
-  }, [week.patients, sortOrder]);
+  }, [week.patients, sortOrder, filterType, filterIdentity]);
 
   const dataTableRecords = useMemo(() => {
     const records = [...filteredPatients];
@@ -282,6 +315,10 @@ export default function PrivatePracticePageClient({
     return records;
   }, [filteredPatients, newPatient, sortOrder]);
 
+  const displayedRowCount = useMemo(() => {
+    return dataTableRecords.length;
+  }, [dataTableRecords]);
+
   const totalConsultation = useMemo(() => {
     return week.patients.reduce((sum, p) => sum + p.consultationPrice, 0);
   }, [week.patients]);
@@ -295,7 +332,7 @@ export default function PrivatePracticePageClient({
   }, [week.patients]);
 
   const variation = useMemo(() => {
-    return totalConsultation + totalOther - totalAmountForCashRegister;
+    return totalConsultation - totalOther - totalAmountForCashRegister;
   }, [totalConsultation, totalOther, totalAmountForCashRegister]);
 
   const handleSavePatient = async (patient: {
@@ -509,7 +546,7 @@ export default function PrivatePracticePageClient({
                   value: totalOther,
                 },
                 {
-                  label: 'Total déposé en caisse',
+                  label: 'Total % Dispensaire',
                   value: totalAmountForCashRegister,
                 },
                 {
@@ -602,6 +639,20 @@ export default function PrivatePracticePageClient({
                 {
                   accessor: 'type',
                   title: 'Type',
+                  filter: (
+                    <Select
+                      placeholder="Tous les types"
+                      data={[
+                        { value: '', label: 'Tous les types' },
+                        ...patientTypeOptions,
+                      ]}
+                      value={filterType || ''}
+                      onChange={(value) => setFilterType(value === '' ? null : value)}
+                      clearable
+                      style={{ minWidth: 200 }}
+                    />
+                  ),
+                  filtering: filterType !== null,
                   render: (patient: any) => {
                     const isNew = patient.isNew;
                     const isEditing = !isNew && editingPatient === patient.id;
@@ -651,6 +702,29 @@ export default function PrivatePracticePageClient({
                 {
                   accessor: 'identity',
                   title: 'Identité',
+                  filter: (
+                    <Autocomplete
+                      data={existingIdentities}
+                      value={filterIdentity || ''}
+                      onChange={(value) => setFilterIdentity(value === '' ? null : value)}
+                      placeholder="Rechercher une identité..."
+                      size="sm"
+                      rightSection={
+                        filterIdentity && filterIdentity.trim() ? (
+                          <ActionIcon
+                            size="sm"
+                            variant="subtle"
+                            onClick={() => setFilterIdentity(null)}
+                            style={{ pointerEvents: 'auto' }}
+                          >
+                            <IconX size={14} />
+                          </ActionIcon>
+                        ) : null
+                      }
+                      style={{ minWidth: 200 }}
+                    />
+                  ),
+                  filtering: filterIdentity !== null && filterIdentity.trim() !== '',
                   render: (patient: any) => {
                     const isNew = patient.isNew;
                     const isEditing = !isNew && editingPatient === patient.id;
@@ -806,7 +880,7 @@ export default function PrivatePracticePageClient({
                 },
                 {
                   accessor: 'amountForCashRegister',
-                  title: 'Caisse ($)',
+                  title: '% Dispensaire',
                   textAlign: 'right',
                   render: (patient: any) => {
                     const isNew = patient.isNew;
@@ -1104,6 +1178,11 @@ export default function PrivatePracticePageClient({
                 }
               }}
             />
+            <Group p="md" justify="space-between" style={{ borderTop: '1px solid var(--mantine-color-gray-3)' }}>
+              <Text size="sm" c="dimmed">
+                {displayedRowCount} ligne{displayedRowCount > 1 ? 's' : ''}
+              </Text>
+            </Group>
           </Paper>
         </DatesProvider>
       </Stack>

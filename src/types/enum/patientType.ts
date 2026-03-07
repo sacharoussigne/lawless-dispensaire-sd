@@ -1,10 +1,11 @@
 export enum PatientTypeEnum {
-  SHERIF = 'sherif',
-  DOCTOR = 'doctor',
   CIVIL = 'civil',
+  SHERIF_NH = 'sherif_nh',
+  SHERIF_WE = 'sherif_we',
+  DOCTOR = 'doctor',
 }
 
-export type PatientType = PatientTypeEnum.SHERIF | PatientTypeEnum.DOCTOR | PatientTypeEnum.CIVIL;
+export type PatientType = PatientTypeEnum.SHERIF_NH | PatientTypeEnum.SHERIF_WE | PatientTypeEnum.DOCTOR | PatientTypeEnum.CIVIL;
 
 export const PatientTypeEnumKeys: string[] = Object.keys(PatientTypeEnum);
 export const PatientTypeEnumValues: string[] = Object.values(PatientTypeEnum);
@@ -14,7 +15,8 @@ export const PatientTypeEnumValues: string[] = Object.values(PatientTypeEnum);
  */
 export function getPatientTypeLabel(type: string): string {
   const labels: Record<string, string> = {
-    [PatientTypeEnum.SHERIF]: 'Shérif',
+    [PatientTypeEnum.SHERIF_NH]: 'Shérif NH',
+    [PatientTypeEnum.SHERIF_WE]: 'Shérif WE',
     [PatientTypeEnum.DOCTOR]: 'Médecin',
     [PatientTypeEnum.CIVIL]: 'Civil',
   };
@@ -26,7 +28,8 @@ export function getPatientTypeLabel(type: string): string {
  */
 export function getPatientTypeColor(type: string): string {
   const colors: Record<string, string> = {
-    [PatientTypeEnum.SHERIF]: 'blue',
+    [PatientTypeEnum.SHERIF_NH]: 'blue',
+    [PatientTypeEnum.SHERIF_WE]: 'orange',
     [PatientTypeEnum.DOCTOR]: 'green',
     [PatientTypeEnum.CIVIL]: 'gray',
   };
