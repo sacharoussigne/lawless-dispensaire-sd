@@ -5,8 +5,9 @@ import { defaultStatements, adminAc, userAc } from "better-auth/plugins/admin/ac
 const defaultApplicationPermissions = {
     stock: ["view", "create", "update", "delete", "craft-read", "craft-write"],
     orders: ["view", "create", "update", "delete"],
-    // items: ["view", "create", "update", "delete"],
-    // companies: ["view", "create", "update", "delete"],
+    search: ["access"],
+    bank: ["access"],
+    private_practice: ["access"],
     application: ["access", "management"],
 };
 export const statement = {
@@ -24,8 +25,9 @@ const user = ac.newRole({
     ...userAc.statements,
     stock: [],
     orders: [],
-    // items: [],
-    // companies: [],
+    search: [],
+    bank: [],
+    private_practice: [],
     application: []
 });
 
@@ -36,10 +38,10 @@ const admin = ac.newRole({
 
 const employee = ac.newRole({
     ...userAc.statements,
-    stock: ["view", "craft-read"],
+    // stock: ["view", "craft-read"],
     orders: ["view"],
-    // items: ["view"],
-    // companies: ["view"],
+    private_practice: [],
+    bank: ["access"],
     application: ["access"],
 });
 
@@ -47,9 +49,28 @@ const inventory_manager = ac.newRole({
     ...userAc.statements,
     stock: ["view", "create", "update", "delete", "craft-read", "craft-write"],
     orders: ["view", "create", "update", "delete"],
-    // items: ["view"],
-    // companies: ["view"],
+    search: ["access"],
+    bank: ["access"],
+    private_practice: [],
     application: ["access", "management"],
+});
+
+const inventory_viewer = ac.newRole({
+    ...userAc.statements,
+    stock: ["view",  "craft-read"],
+    orders: ["view"],
+    search: ["access"],
+    bank: ["access"],
+    private_practice: [],
+    application: ["access"],
+});
+
+const private_practitioner = ac.newRole({
+    ...userAc.statements,
+    orders: ["view"],
+    private_practice: ["access"],
+    bank: ["access"],
+    application: ["access"],
 });
 
 // Map des rôles pour faciliter l'accès
@@ -58,6 +79,8 @@ const rolesMap = {
     admin,
     employee,
     inventory_manager,
+    inventory_viewer,
+    private_practitioner,
 } as const;
 
 /**
@@ -77,18 +100,39 @@ export function checkRolePermission(
         return false;
     }
 
-    const role = rolesMap[roleName as keyof typeof rolesMap];
-    if (!role) {
-        return false;
+    const roles = roleName.split(",").map((r) => r.trim()).filter((r) => r.length > 0);
+
+    for (const role of roles) {
+        const roleObj = rolesMap[role as keyof typeof rolesMap];
+        if (!roleObj) {
+            continue;
+        }
+
+        const resourcePermissions = roleObj.statements[resource as keyof typeof roleObj.statements];
+        if (!resourcePermissions) {
+            continue;
+        }
+
+        if (resourcePermissions.includes(action as any)) {
+            return true;
+        }
     }
 
-    // Vérifier directement les statements du rôle
-    const resourcePermissions = role.statements[resource];
-    if (!resourcePermissions) {
-        return false;
-    }
-
-    return resourcePermissions.includes(action as any);
+    return false;
 }
 
-export { ac, user, admin, employee, inventory_manager };
+export function hasRole(
+    roleName: string | null | undefined,
+    roleToCheck: keyof typeof rolesMap | string
+): boolean {
+    if (!roleName) {
+        return false;
+    }
+
+    const roles = roleName.split(",").map((r) => r.trim()).filter((r) => r.length > 0);
+    const target = String(roleToCheck).trim();
+
+    return roles.includes(target);
+}
+
+export { ac, user, admin, employee, inventory_manager, inventory_viewer, private_practitioner };

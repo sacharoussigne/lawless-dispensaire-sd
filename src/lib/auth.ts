@@ -4,7 +4,7 @@ import { nextCookies } from 'better-auth/next-js';
 import { admin as adminPlugin, openAPI } from 'better-auth/plugins';
 import { headers } from 'next/headers';
 import prisma from '@/lib/prisma';
-import { ac, admin, user, employee, inventory_manager } from './auth/permissions';
+import { ac, admin, user, employee, inventory_manager, inventory_viewer, private_practitioner } from './auth/permissions';
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
@@ -20,6 +20,8 @@ export const auth = betterAuth({
       user,
       employee,
       inventory_manager,
+      inventory_viewer,
+      private_practitioner,
     }
   })],
   socialProviders: {

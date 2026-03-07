@@ -5,6 +5,7 @@ import { DataTable } from 'mantine-datatable';
 import { IconEdit, IconTrash, IconKey, IconUser, IconDots } from '@tabler/icons-react';
 import { Role, rolesAsString } from '@/types/enum/roles';
 import type { User } from '@/types/users';
+import { hasRole } from '@/lib/auth/permissions';
 
 interface UsersTableProps {
   users: User[];
@@ -95,22 +96,64 @@ export function UsersTable({
           },
           {
             accessor: 'role',
-            title: 'Rôle',
-            render: (user: User) => (
-              <Badge
-                color={
-                  user.role === 'admin'
-                    ? 'red'
-                    : user.role === 'inventory_manager'
-                    ? 'blue'
-                    : user.role === 'employee'
-                    ? 'green'
-                    : 'gray'
-                }
-              >
-                {user.role ? rolesAsString(user.role as Role) : 'Aucun'}
-              </Badge>
-            ),
+            title: 'Rôles',
+            render: (user: User) => {
+              const rawRoles = (user.role ?? '')
+                .split(',')
+                .map((r) => r.trim())
+                .filter((r) => !!r)
+                .sort((a, b) => a.localeCompare(b)) as string[];
+
+              if (rawRoles.length === 0) {
+                return <Badge color="gray">Aucun</Badge>;
+              }
+
+              return (
+                <Group gap="xs" wrap="wrap">
+                  {rawRoles.map((r) => {
+                    let color: string = 'gray';
+                    let label: string = r;
+
+                    switch (r) {
+                      case Role.USER:
+                        color = 'gray';
+                        label = rolesAsString(Role.USER);
+                        break;
+                      case Role.ADMIN:
+                        color = 'red';
+                        label = rolesAsString(Role.ADMIN);
+                        break;
+                      case Role.EMPLOYEE:
+                        color = 'green';
+                        label = rolesAsString(Role.EMPLOYEE);
+                        break;
+                      case Role.INVENTORY_MANAGER:
+                        color = 'blue';
+                        label = rolesAsString(Role.INVENTORY_MANAGER);
+                        break;
+                      case Role.INVENTORY_VIEWER:
+                        color = 'cyan';
+                        label = rolesAsString(Role.INVENTORY_VIEWER);
+                        break;
+                      case Role.PRIVATE_PRACTITIONER:
+                        color = 'purple';
+                        label = rolesAsString(Role.PRIVATE_PRACTITIONER);
+                        break;
+                      default:
+                        color = 'gray';
+                        label = r;
+                        break;
+                    }
+
+                    return (
+                      <Badge key={r} color={color}>
+                        {label}
+                      </Badge>
+                    );
+                  })}
+                </Group>
+              );
+            },
             filter: (
               <Select
                 placeholder="Tous les rôles"
@@ -120,15 +163,6 @@ export function UsersTable({
                 clearable
                 style={{ minWidth: 200 }}
               />
-            ),
-          },
-          {
-            accessor: 'emailVerified',
-            title: 'Email vérifié',
-            render: (user: User) => (
-              <Badge color={user.emailVerified ? 'green' : 'red'}>
-                {user.emailVerified ? 'Oui' : 'Non'}
-              </Badge>
             ),
           },
           {

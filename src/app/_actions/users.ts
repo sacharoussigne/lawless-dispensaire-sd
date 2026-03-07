@@ -6,17 +6,19 @@ import { z } from 'zod';
 import prisma from '@/lib/prisma';
 import { checkRolePermission } from '@/lib/auth/permissions';
 
+const roleEnum = z.enum(['user', 'admin', 'employee', 'inventory_manager', 'inventory_viewer', 'private_practitioner']);
+
 const createUserSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
   name: z.string().min(1),
-  role: z.enum(['user', 'admin', 'employee', 'inventory_manager']).optional(),
+  roles: z.array(roleEnum).optional(),
 });
 
 const updateUserSchema = z.object({
   id: z.string(),
   name: z.string().min(1).optional(),
-  role: z.enum(['user', 'admin', 'employee', 'inventory_manager']).optional(),
+  roles: z.array(roleEnum).optional(),
 });
 
 const setPasswordSchema = z.object({
@@ -119,7 +121,9 @@ export async function createUser(data: z.infer<typeof createUserSchema>) {
         email: validated.email,
         password: validated.password,
         name: validated.name,
-        role: validated.role || 'user',
+        role: (validated.roles && validated.roles.length > 0)
+          ? (validated.roles.join(',') as any)
+          : ('user' as any),
       },
       headers: await headers(),
     });
@@ -151,7 +155,9 @@ export async function updateUser(data: z.infer<typeof updateUserSchema>) {
         userId: validated.id,
         data: {
           name: validated.name,
-          role: validated.role,
+          role: validated.roles && validated.roles.length > 0
+            ? validated.roles.join(',')
+            : undefined,
         }
       },
       headers: await headers(),

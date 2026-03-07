@@ -19,6 +19,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { IconLogout } from '@tabler/icons-react';
 import { usePermissions } from '@/app/_contexts/PermissionsContext';
+import { hasRole, checkRolePermission } from '@/lib/auth/permissions';
+import { Role } from '@/types/enum/roles';
 
 export default function Header({
   session,
@@ -36,7 +38,7 @@ export default function Header({
 
   const handleSpaceChange = (value: string) => {
     if (value === 'employee') {
-      router.push(routes.stock.index);
+      router.push(routes.employee.index);
     } else if (value === 'management') {
       router.push(routes.management.index);
     }
@@ -71,7 +73,7 @@ export default function Header({
       <Container size={'xl'}>
         <div className={'flex justify-between items-center w-full h-[60px]'}>
           <Link 
-            href={isManagementSpace ? routes.management.index : routes.stock.index}
+            href={isManagementSpace ? routes.management.index : routes.employee.index}
             className={classes.logoLink}
           >
             <Image
@@ -137,30 +139,46 @@ export default function Header({
                   </Menu>
                 ) : (
                   <>
-                    <Link
-                      href={routes.stock.index}
-                      className={`${classes.link} ${isRouteActive(routes.stock.index) ? classes.linkActive : ''}`}
-                    >
-                      Stocks
-                    </Link>
-                    <Link
-                      href={routes.orders.index}
-                      className={`${classes.link} ${isRouteActive(routes.orders.index) ? classes.linkActive : ''}`}
-                    >
-                      Commandes
-                    </Link>
-                    <Link
-                      href={routes.searchItems.index}
-                      className={`${classes.link} ${isRouteActive(routes.searchItems.index) ? classes.linkActive : ''}`}
-                    >
-                      Recherche
-                    </Link>
-                    <Link
-                      href={routes.bank.index}
-                      className={`${classes.link} ${isRouteActive(routes.bank.index) ? classes.linkActive : ''}`}
-                    >
-                      Banque
-                    </Link>
+                    {permissions?.stock.view && (
+                      <Link
+                        href={routes.stock.index}
+                        className={`${classes.link} ${isRouteActive(routes.stock.index) ? classes.linkActive : ''}`}
+                      >
+                        Stocks
+                      </Link>
+                    )}
+                    {permissions?.orders.view && (
+                      <Link
+                        href={routes.orders.index}
+                        className={`${classes.link} ${isRouteActive(routes.orders.index) ? classes.linkActive : ''}`}
+                      >
+                        Commandes
+                      </Link>
+                    )}
+                    {checkRolePermission(userRole, 'search', 'access') && (
+                      <Link
+                        href={routes.searchItems.index}
+                        className={`${classes.link} ${isRouteActive(routes.searchItems.index) ? classes.linkActive : ''}`}
+                      >
+                        Recherche
+                      </Link>
+                    )}
+                    {checkRolePermission(userRole, 'bank', 'access') && (
+                      <Link
+                        href={routes.bank.index}
+                        className={`${classes.link} ${isRouteActive(routes.bank.index) ? classes.linkActive : ''}`}
+                      >
+                        Banque
+                      </Link>
+                    )}
+                    {checkRolePermission(userRole, 'private_practice', 'access') && (
+                      <Link
+                        href={routes.privatePractice.index}
+                        className={`${classes.link} ${isRouteActive(routes.privatePractice.index) ? classes.linkActive : ''}`}
+                      >
+                        Cabinet privé
+                      </Link>
+                    )}
                   </>
                 )}
                 {canSwitchSpaces && (
@@ -196,7 +214,7 @@ export default function Header({
                     </UnstyledButton>
                   </Menu.Target>
                   <Menu.Dropdown>
-                    {userRole === 'admin' && (
+                    {hasRole(userRole, Role.ADMIN) && (
                       <>
                         <Menu.Label>Admin</Menu.Label>
                         <Link href={routes.admin.users}>

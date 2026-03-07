@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { routes } from "@/types/routes";
 import { forbiddenResponse } from "@/lib/response";
+import { hasRole } from "@/lib/auth/permissions";
+import { Role } from "@/types/enum/roles";
 
 export async function hasAdminRoleMiddleware(
   request: NextRequest,
@@ -14,7 +16,7 @@ export async function hasAdminRoleMiddleware(
   // Check that user has admin role
   const userRole = session.user?.role;
   
-  if (userRole !== 'admin') {
+  if (!hasRole(userRole, Role.ADMIN)) {
     // For JSON requests, return JSON error
     if (request.headers.get("content-type") === "application/json") {
       return forbiddenResponse({ error: "Accès administrateur requis" });

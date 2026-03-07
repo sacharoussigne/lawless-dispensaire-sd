@@ -381,3 +381,48 @@ model TransactionDescriptionSuggestion {
   @@unique([value])
   @@map("transaction_description_suggestion")
 }
+
+model PatientIdentitySuggestion {
+  id        String   @id @default(uuid())
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([value])
+  @@map("patient_identity_suggestion")
+}
+
+model PrivatePracticeWeek {
+  id        String   @id @default(uuid())
+  weekStart DateTime // Lundi de la semaine
+  weekEnd   DateTime // Dimanche de la semaine
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  patients  PrivatePracticePatient[]
+
+  @@unique([weekStart])
+  @@index([weekStart])
+  @@map("private_practice_week")
+}
+
+model PrivatePracticePatient {
+  id                      String   @id @default(uuid())
+  weekId                  String
+  week                    PrivatePracticeWeek @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  date                    DateTime
+  type                    String
+  identity                String
+  description             String?
+  consultationPrice       Decimal  @db.Decimal(10, 2)
+  otherPrice              Decimal  @db.Decimal(10, 2)
+  amountForCashRegister   Decimal  @db.Decimal(10, 2)
+  depositedInCashRegister Boolean  @default(false)
+  retrievedFromCashRegister Boolean @default(false)
+  order                   Int      @default(0)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@index([weekId])
+  @@index([date])
+  @@map("private_practice_patient")
+}
