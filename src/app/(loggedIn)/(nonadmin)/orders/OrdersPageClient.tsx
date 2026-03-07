@@ -90,7 +90,7 @@ export default function OrdersPageClient({
     } catch (error: any) {
       notifications.show({
         title: 'Erreur',
-        message: error.message || 'Erreur lors du chargement des assignations de lettres',
+        message: error.message || 'Erreur lors du chargement des assignations de modèles de courriers',
         color: 'red',
       });
     } finally {

@@ -11,25 +11,25 @@ import {
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
-import { createLetterTemplate, updateLetterTemplate } from '@/app/_actions/letterTemplates';
+import { createMailTemplate, updateMailTemplate } from '@/app/_actions/mailTemplates';
 import { handleAction } from '@/lib/action';
 import { handleApiZodError } from '@/lib/services/zod';
 import { ParsedZodError } from '@/lib/errors/ParsedZodError';
-import type { LetterTemplate } from '@/types/letterTemplates';
+import type { MailTemplate } from '@/types/mailTemplates';
 
-interface LetterTemplateModalProps {
+interface MailTemplateModalProps {
   opened: boolean;
   onClose: () => void;
-  editingLetterTemplate: LetterTemplate | null;
+  editingMailTemplate: MailTemplate | null;
   onSuccess: () => void;
 }
 
-export function LetterTemplateModal({
+export function MailTemplateModal({
   opened,
   onClose,
-  editingLetterTemplate,
+  editingMailTemplate,
   onSuccess,
-}: LetterTemplateModalProps) {
+}: MailTemplateModalProps) {
   const form = useForm({
     initialValues: {
       name: '',
@@ -41,29 +41,28 @@ export function LetterTemplateModal({
     },
   });
 
-  // Initialiser le formulaire quand le template change
   useEffect(() => {
-    if (editingLetterTemplate) {
+    if (editingMailTemplate) {
       form.setValues({
-        name: editingLetterTemplate.name,
-        content: editingLetterTemplate.content,
+        name: editingMailTemplate.name,
+        content: editingMailTemplate.content,
       });
     } else {
       form.reset();
     }
-  }, [editingLetterTemplate, opened]);
+  }, [editingMailTemplate, opened]);
 
   const handleSubmit = async (values: typeof form.values) => {
     try {
       let result;
-      if (editingLetterTemplate) {
-        result = await updateLetterTemplate({
-          id: editingLetterTemplate.id,
+      if (editingMailTemplate) {
+        result = await updateMailTemplate({
+          id: editingMailTemplate.id,
           name: values.name,
           content: values.content,
         });
       } else {
-        result = await createLetterTemplate({
+        result = await createMailTemplate({
           name: values.name,
           content: values.content,
         });
@@ -72,7 +71,7 @@ export function LetterTemplateModal({
       handleAction(result);
       notifications.show({
         title: 'Succès',
-        message: editingLetterTemplate
+        message: editingMailTemplate
           ? 'Template modifié avec succès'
           : 'Template créé avec succès',
         color: 'green',
@@ -100,7 +99,7 @@ export function LetterTemplateModal({
         onClose();
         form.reset();
       }}
-      title={editingLetterTemplate ? 'Modifier le template' : 'Créer un template'}
+      title={editingMailTemplate ? 'Modifier le modèle' : 'Créer un modèle'}
       size="lg"
     >
       <form onSubmit={form.onSubmit(handleSubmit)}>
@@ -113,7 +112,7 @@ export function LetterTemplateModal({
           />
           <Textarea
             label="Contenu"
-            placeholder="Contenu de la lettre"
+            placeholder="Contenu du modèle de courrier"
             required
             minRows={10}
             autosize
@@ -130,7 +129,7 @@ export function LetterTemplateModal({
               Annuler
             </Button>
             <Button type="submit">
-              {editingLetterTemplate ? 'Modifier' : 'Créer'}
+              {editingMailTemplate ? 'Modifier' : 'Créer'}
             </Button>
           </Group>
         </Stack>

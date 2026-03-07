@@ -4,10 +4,10 @@ import { Paper, TextInput } from '@mantine/core';
 import { DataTable } from 'mantine-datatable';
 import { IconEdit, IconTrash } from '@tabler/icons-react';
 import { Group, ActionIcon } from '@mantine/core';
-import type { LetterTemplate } from '@/types/letterTemplates';
+import type { MailTemplate } from '@/types/mailTemplates';
 
-interface LetterTemplatesTableProps {
-  letterTemplates: LetterTemplate[];
+interface MailTemplatesTableProps {
+  mailTemplates: MailTemplate[];
   loading: boolean;
   nameFilter: string;
   page: number;
@@ -15,12 +15,12 @@ interface LetterTemplatesTableProps {
   totalRecords: number;
   onNameFilterChange: (value: string) => void;
   onPageChange: (page: number) => void;
-  onEdit: (letterTemplate: LetterTemplate) => void;
-  onDelete: (letterTemplate: LetterTemplate) => void;
+  onEdit: (mailTemplate: MailTemplate) => void;
+  onDelete: (mailTemplate: MailTemplate) => void;
 }
 
-export function LetterTemplatesTable({
-  letterTemplates,
+export function MailTemplatesTable({
+  mailTemplates,
   loading,
   nameFilter,
   page,
@@ -30,11 +30,11 @@ export function LetterTemplatesTable({
   onPageChange,
   onEdit,
   onDelete,
-}: LetterTemplatesTableProps) {
+}: MailTemplatesTableProps) {
   return (
     <Paper shadow="sm" p="md" withBorder>
       <DataTable
-        records={letterTemplates}
+        records={mailTemplates}
         columns={[
           {
             accessor: 'name',
@@ -51,29 +51,29 @@ export function LetterTemplatesTable({
           {
             accessor: 'content',
             title: 'Contenu',
-            render: (letterTemplate: LetterTemplate) => {
-              const preview = letterTemplate.content.length > 100
-                ? letterTemplate.content.substring(0, 100) + '...'
-                : letterTemplate.content;
-              return <span title={letterTemplate.content}>{preview}</span>;
+            render: (mailTemplate: MailTemplate) => {
+              const preview = mailTemplate.content.length > 100
+                ? mailTemplate.content.substring(0, 100) + '...'
+                : mailTemplate.content;
+              return <span title={mailTemplate.content}>{preview}</span>;
             },
           },
           {
             accessor: 'actions',
             title: 'Actions',
-            render: (letterTemplate: LetterTemplate) => (
+            render: (mailTemplate: MailTemplate) => (
               <Group gap="xs" wrap="nowrap" justify="flex-end">
                 <ActionIcon
                   variant="light"
                   color="blue"
-                  onClick={() => onEdit(letterTemplate)}
+                  onClick={() => onEdit(mailTemplate)}
                 >
                   <IconEdit size={16} />
                 </ActionIcon>
                 <ActionIcon
                   variant="light"
                   color="red"
-                  onClick={() => onDelete(letterTemplate)}
+                  onClick={() => onDelete(mailTemplate)}
                 >
                   <IconTrash size={16} />
                 </ActionIcon>

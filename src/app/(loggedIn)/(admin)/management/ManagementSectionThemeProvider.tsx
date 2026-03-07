@@ -10,7 +10,7 @@ type ManagementSection =
   | 'chests'
   | 'companyGroups'
   | 'companies'
-  | 'letterTemplates';
+  | 'mails';
 
 const sectionPrimaryColor: Record<ManagementSection, MantineThemeOverride['primaryColor']> = {
   categoryItems: 'teal',
@@ -18,7 +18,7 @@ const sectionPrimaryColor: Record<ManagementSection, MantineThemeOverride['prima
   chests: 'orange',
   companyGroups: 'indigo',
   companies: 'blue',
-  letterTemplates: 'violet',
+  mails: 'violet',
 };
 
 export function ManagementSectionThemeProvider({

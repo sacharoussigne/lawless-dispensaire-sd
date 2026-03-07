@@ -25,7 +25,7 @@ const deleteAssignmentSchema = z.object({
 });
 
 /**
- * Crée une nouvelle assignation de template de lettre
+ * Crée une nouvelle assignation de modèle de courrier
  */
 export async function createOrderLetterTemplateAssignment(data: {
   orderType: OrderType;
@@ -51,7 +51,7 @@ export async function createOrderLetterTemplateAssignment(data: {
     if (!template) {
       return {
         status: 404,
-        error: 'Template de lettre introuvable',
+        error: 'Modèle de courrier introuvable',
       };
     }
 
@@ -197,7 +197,7 @@ export async function updateOrderLetterTemplateAssignment(data: {
     if (!template) {
       return {
         status: 404,
-        error: 'Template de lettre introuvable',
+        error: 'Modèle de courrier introuvable',
       };
     }
 

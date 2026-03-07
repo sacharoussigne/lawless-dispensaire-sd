@@ -2,28 +2,28 @@
 
 import { Modal, Stack, Button, Group, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { deleteLetterTemplate } from '@/app/_actions/letterTemplates';
+import { deleteMailTemplate } from '@/app/_actions/mailTemplates';
 import { handleAction } from '@/lib/action';
-import type { LetterTemplate } from '@/types/letterTemplates';
+import type { MailTemplate } from '@/types/mailTemplates';
 
-interface DeleteLetterTemplateModalProps {
+interface DeleteMailTemplateModalProps {
   opened: boolean;
   onClose: () => void;
-  letterTemplateToDelete: LetterTemplate | null;
+  mailTemplateToDelete: MailTemplate | null;
   onSuccess: () => void;
 }
 
-export function DeleteLetterTemplateModal({
+export function DeleteMailTemplateModal({
   opened,
   onClose,
-  letterTemplateToDelete,
+  mailTemplateToDelete,
   onSuccess,
-}: DeleteLetterTemplateModalProps) {
+}: DeleteMailTemplateModalProps) {
   const handleDelete = async () => {
-    if (!letterTemplateToDelete) return;
+    if (!mailTemplateToDelete) return;
 
     try {
-      const result = await deleteLetterTemplate({ id: letterTemplateToDelete.id });
+      const result = await deleteMailTemplate({ id: mailTemplateToDelete.id });
       handleAction(result);
       notifications.show({
         title: 'Succès',
@@ -51,7 +51,7 @@ export function DeleteLetterTemplateModal({
       <Stack>
         <Text>
           Êtes-vous sûr de vouloir supprimer le template{' '}
-          <strong>{letterTemplateToDelete?.name}</strong> ?
+          <strong>{mailTemplateToDelete?.name}</strong> ?
         </Text>
         <Group justify="flex-end" mt="md">
           <Button variant="subtle" onClick={onClose}>

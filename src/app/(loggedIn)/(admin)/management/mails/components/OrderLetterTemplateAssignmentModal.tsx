@@ -10,7 +10,7 @@ import {
 import { handleAction } from '@/lib/action';
 import { notifications } from '@mantine/notifications';
 import type { OrderLetterTemplateAssignment, OrderType, OrderStatus } from '@prisma/client';
-import type { LetterTemplate } from '@/types/letterTemplates';
+import type { MailTemplate } from '@/types/mailTemplates';
 import { OrderTypeEnum } from '@/types/enum/orderType';
 import { OrderStatusEnum } from '@/types/enum/orderStatus';
 import { getOrderTypeLabel } from '@/types/enum/orderType';
@@ -27,7 +27,7 @@ interface OrderLetterTemplateAssignmentModalProps {
   opened: boolean;
   onClose: () => void;
   editingAssignment: OrderLetterTemplateAssignmentWithTemplate | null;
-  letterTemplates: LetterTemplate[];
+  mailTemplates: MailTemplate[];
   onSuccess: () => void;
 }
 
@@ -35,7 +35,7 @@ export function OrderLetterTemplateAssignmentModal({
   opened,
   onClose,
   editingAssignment,
-  letterTemplates,
+  mailTemplates,
   onSuccess,
 }: OrderLetterTemplateAssignmentModalProps) {
   const form = useForm({
@@ -47,7 +47,7 @@ export function OrderLetterTemplateAssignmentModal({
     validate: {
       orderType: (value) => (!value ? 'Le type de commande est requis' : null),
       orderStatus: (value) => (!value ? 'Le statut de commande est requis' : null),
-      letterTemplateId: (value) => (!value ? 'Le template de lettre est requis' : null),
+      letterTemplateId: (value) => (!value ? 'Le modèle de courrier est requis' : null),
     },
   });
 
@@ -115,7 +115,7 @@ export function OrderLetterTemplateAssignmentModal({
     { value: OrderStatusEnum.CANCELLED, label: getOrderStatusLabel(OrderStatusEnum.CANCELLED) },
   ];
 
-  const letterTemplateOptions = letterTemplates.map((template) => ({
+  const mailTemplateOptions = mailTemplates.map((template) => ({
     value: template.id,
     label: template.name,
   }));
@@ -149,9 +149,9 @@ export function OrderLetterTemplateAssignmentModal({
             {...form.getInputProps('orderStatus')}
           />
           <Select
-            label="Template de lettre"
-            placeholder="Sélectionner un template"
-            data={letterTemplateOptions}
+            label="Modèle de courrier"
+            placeholder="Sélectionner un modèle"
+            data={mailTemplateOptions}
             required
             searchable
             {...form.getInputProps('letterTemplateId')}

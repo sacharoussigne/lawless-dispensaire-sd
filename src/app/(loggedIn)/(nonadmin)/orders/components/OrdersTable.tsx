@@ -160,7 +160,7 @@ export function OrdersTable({
                       variant="light"
                       color="violet"
                       onClick={() => onPreviewLetter(order)}
-                      title="Aperçu de la lettre"
+                      title="Aperçu du courrier"
                     >
                       <IconMail size={16} />
                     </ActionIcon>
