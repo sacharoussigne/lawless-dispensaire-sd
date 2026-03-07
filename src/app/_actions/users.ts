@@ -5,6 +5,7 @@ import { headers } from 'next/headers';
 import { z } from 'zod';
 import prisma from '@/lib/prisma';
 import { checkRolePermission } from '@/lib/auth/permissions';
+import { Role } from '@/types/enum/roles';
 
 const roleEnum = z.enum(['user', 'admin', 'employee', 'inventory_manager', 'inventory_viewer', 'private_practitioner']);
 
@@ -155,13 +156,18 @@ export async function updateUser(data: z.infer<typeof updateUserSchema>) {
         userId: validated.id,
         data: {
           name: validated.name,
-          role: validated.roles && validated.roles.length > 0
-            ? validated.roles.join(',')
-            : undefined,
         }
       },
       headers: await headers(),
     });
+
+    await auth.api.setRole({
+      body: {
+        userId: validated.id,
+        role: validated.roles as Role[],
+      },
+      headers: await headers(),
+    })
 
     return {
       status: 200,
