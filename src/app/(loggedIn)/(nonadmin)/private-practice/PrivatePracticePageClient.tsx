@@ -105,6 +105,7 @@ export default function PrivatePracticePageClient({
     order?: number;
   } | null>(null);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [amountForCashRegisterManuallyModified, setAmountForCashRegisterManuallyModified] = useState(false);
 
   const existingTypes = useMemo(() => {
     const types = new Set<string>();
@@ -271,6 +272,7 @@ export default function PrivatePracticePageClient({
           await loadWeek(week.weekStart);
           await loadWeeks();
           setEditingPatient(null);
+          setAmountForCashRegisterManuallyModified(false);
         }
       } else {
         if (!patient.date || !patient.type || !patient.identity) {
@@ -305,6 +307,7 @@ export default function PrivatePracticePageClient({
           await loadWeek(week.weekStart);
           await loadWeeks();
           setNewPatient(null);
+          setAmountForCashRegisterManuallyModified(false);
         }
       }
     } catch (error: any) {
@@ -480,7 +483,7 @@ export default function PrivatePracticePageClient({
               </Paper>
               <Paper p="md" withBorder radius="md" style={{ background: 'var(--mantine-color-gray-0)' }}>
                 <Stack gap={4}>
-                  <Text size="xs" c="dimmed" fw={500}>Total autres</Text>
+                  <Text size="xs" c="dimmed" fw={500}>Total autres ventes</Text>
                   <Text size="xl" fw={700}>
                     {totalOther.toFixed(2)} $
                   </Text>
@@ -488,7 +491,7 @@ export default function PrivatePracticePageClient({
               </Paper>
               <Paper p="md" withBorder radius="md" style={{ background: 'var(--mantine-color-gray-0)' }}>
                 <Stack gap={4}>
-                  <Text size="xs" c="dimmed" fw={500}>Total caisse</Text>
+                  <Text size="xs" c="dimmed" fw={500}>Total déposé en caisse</Text>
                   <Text size="xl" fw={700}>
                     {totalAmountForCashRegister.toFixed(2)} $
                   </Text>
@@ -526,6 +529,7 @@ export default function PrivatePracticePageClient({
                 <Button
                   leftSection={<IconPlus size={18} />}
                   onClick={() => {
+                    setAmountForCashRegisterManuallyModified(false);
                     setNewPatient({
                       date: new Date(),
                       type: PatientTypeEnum.CIVIL,
@@ -719,7 +723,7 @@ export default function PrivatePracticePageClient({
                 },
                 {
                   accessor: 'consultationPrice',
-                  title: 'Prix consultation',
+                  title: 'Consultation ($)',
                   textAlign: 'right',
                   render: (patient: any) => {
                     const isNew = patient.isNew;
@@ -731,7 +735,15 @@ export default function PrivatePracticePageClient({
                           value={newPatient?.consultationPrice}
                           onChange={(value) => {
                             if (newPatient) {
-                              setNewPatient({ ...newPatient, consultationPrice: value ? Number(value) : 0 });
+                              const consultationPrice = value ? Number(value) : 0;
+                              const newAmountForCashRegister = !amountForCashRegisterManuallyModified 
+                                ? Math.round((consultationPrice * 0.5) * 100) / 100 
+                                : newPatient.amountForCashRegister;
+                              setNewPatient({ 
+                                ...newPatient, 
+                                consultationPrice,
+                                amountForCashRegister: newAmountForCashRegister,
+                              });
                             }
                           }}
                           size="xs"
@@ -749,7 +761,18 @@ export default function PrivatePracticePageClient({
                           value={editingPatientData?.consultationPrice !== undefined ? Number(editingPatientData.consultationPrice) : Number(patient.consultationPrice)}
                           onChange={(value) => {
                             if (editingPatientData) {
-                              setEditingPatientData({ ...editingPatientData, consultationPrice: value ? Number(value) : 0 });
+                              const consultationPrice = value ? Number(value) : 0;
+                              const currentAmountForCashRegister = editingPatientData.amountForCashRegister !== undefined 
+                                ? editingPatientData.amountForCashRegister 
+                                : Number(patient.amountForCashRegister);
+                              const newAmountForCashRegister = !amountForCashRegisterManuallyModified 
+                                ? Math.round((consultationPrice * 0.5) * 100) / 100 
+                                : currentAmountForCashRegister;
+                              setEditingPatientData({ 
+                                ...editingPatientData, 
+                                consultationPrice,
+                                amountForCashRegister: newAmountForCashRegister,
+                              });
                             }
                           }}
                           size="xs"
@@ -765,7 +788,7 @@ export default function PrivatePracticePageClient({
                 },
                 {
                   accessor: 'otherPrice',
-                  title: 'Prix autre',
+                  title: 'Autre ($)',
                   textAlign: 'right',
                   render: (patient: any) => {
                     const isNew = patient.isNew;
@@ -811,7 +834,7 @@ export default function PrivatePracticePageClient({
                 },
                 {
                   accessor: 'amountForCashRegister',
-                  title: 'Montant caisse',
+                  title: 'Caisse ($)',
                   textAlign: 'right',
                   render: (patient: any) => {
                     const isNew = patient.isNew;
@@ -823,6 +846,7 @@ export default function PrivatePracticePageClient({
                           value={newPatient?.amountForCashRegister}
                           onChange={(value) => {
                             if (newPatient) {
+                              setAmountForCashRegisterManuallyModified(true);
                               setNewPatient({ ...newPatient, amountForCashRegister: value ? Number(value) : 0 });
                             }
                           }}
@@ -841,6 +865,7 @@ export default function PrivatePracticePageClient({
                           value={editingPatientData?.amountForCashRegister !== undefined ? Number(editingPatientData.amountForCashRegister) : Number(patient.amountForCashRegister)}
                           onChange={(value) => {
                             if (editingPatientData) {
+                              setAmountForCashRegisterManuallyModified(true);
                               setEditingPatientData({ ...editingPatientData, amountForCashRegister: value ? Number(value) : 0 });
                             }
                           }}
@@ -857,7 +882,7 @@ export default function PrivatePracticePageClient({
                 },
                 {
                   accessor: 'depositedInCashRegister',
-                  title: 'Déposé en caisse',
+                  title: 'Déposé',
                   textAlign: 'center',
                   render: (patient: any) => {
                     const isNew = patient.isNew;
@@ -887,7 +912,7 @@ export default function PrivatePracticePageClient({
                 },
                 {
                   accessor: 'retrievedFromCashRegister',
-                  title: 'Récupéré de la caisse',
+                  title: 'Récupéré',
                   textAlign: 'center',
                   render: (patient: any) => {
                     const isNew = patient.isNew;
@@ -981,9 +1006,10 @@ export default function PrivatePracticePageClient({
                             color="gray"
                             variant="light"
                             onClick={() => {
-                              setEditingPatient(null);
-                              setEditingPatientData(null);
-                            }}
+                            setEditingPatient(null);
+                            setEditingPatientData(null);
+                            setAmountForCashRegisterManuallyModified(false);
+                          }}
                           >
                             <IconX size={16} />
                           </ActionIcon>
@@ -1040,6 +1066,7 @@ export default function PrivatePracticePageClient({
                           size="sm"
                           color="blue"
                           onClick={() => {
+                            setAmountForCashRegisterManuallyModified(false);
                             setEditingPatient(patient.id);
                             setEditingPatientData({
                               date: patient.date,
