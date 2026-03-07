@@ -7,8 +7,10 @@ import {
   Group,
   Button,
   Paper,
+  Stack,
+  Text,
 } from '@mantine/core';
-import { IconPlus } from '@tabler/icons-react';
+import { IconPlus, IconBuildingBank } from '@tabler/icons-react';
 import { getBankAccounts } from '@/app/_actions/bankAccounts';
 import { handleAction } from '@/lib/action';
 import { notifications } from '@mantine/notifications';
@@ -100,88 +102,97 @@ export default function BankPageClient({
       </Group>
 
       <Paper shadow="sm" withBorder>
-        <DataTable
-          records={accounts}
-          columns={[
-            {
-              accessor: 'name',
-              title: 'Nom',
-              sortable: true,
-            },
-            {
-              accessor: 'owner.name',
-              title: 'Propriétaire',
-              sortable: true,
-            },
-            {
-              accessor: 'accesses',
-              title: 'Accès partagés',
-              render: (account: BankAccountWithRelations) => {
-                if (account.accesses.length === 0) {
-                  return '-';
-                }
-                return `${account.accesses.length} utilisateur${account.accesses.length > 1 ? 's' : ''}`;
+        {accounts.length === 0 && !loading ? (
+          <Stack align="center" gap="xs" py="xl">
+            <IconBuildingBank size={48} stroke={1.5} style={{ color: 'var(--mantine-color-dimmed)' }} />
+            <Text size="sm" c="dimmed" fw={500}>
+              Aucun compte bancaire trouvé
+            </Text>
+          </Stack>
+        ) : (
+          <DataTable
+            records={accounts}
+            columns={[
+              {
+                accessor: 'name',
+                title: 'Nom',
+                sortable: true,
               },
-            },
-            {
-              accessor: 'createdAt',
-              title: 'Date de création',
-              render: (account: BankAccountWithRelations) =>
-                new Date(account.createdAt).toLocaleDateString('fr-FR', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                }),
-              sortable: true,
-            },
-            {
-              accessor: 'actions',
-              title: 'Actions',
-              render: (account: BankAccountWithRelations) => {
-                const isOwner = currentUserId === account.ownerId;
-                return (
-                  <Group gap="xs" wrap="nowrap" justify="flex-end">
-                    <Button
-                      variant="light"
-                      size="xs"
-                      onClick={() => handleView(account)}
-                    >
-                      Ouvrir
-                    </Button>
-                    {isOwner && (
-                      <>
-                        <Button
-                          variant="light"
-                          size="xs"
-                          onClick={() => handleEdit(account)}
-                        >
-                          Modifier
-                        </Button>
-                        <Button
-                          variant="light"
-                          size="xs"
-                          onClick={() => handleManageAccess(account)}
-                        >
-                          Accès
-                        </Button>
-                        <Button
-                          variant="light"
-                          color="red"
-                          size="xs"
-                          onClick={() => handleDelete(account)}
-                        >
-                          Supprimer
-                        </Button>
-                      </>
-                    )}
-                  </Group>
-                );
+              {
+                accessor: 'owner.name',
+                title: 'Propriétaire',
+                sortable: true,
               },
-            },
-          ]}
-          fetching={loading}
-          noRecordsText="Aucun compte bancaire trouvé"
-        />
+              {
+                accessor: 'accesses',
+                title: 'Accès partagés',
+                render: (account: BankAccountWithRelations) => {
+                  if (account.accesses.length === 0) {
+                    return '-';
+                  }
+                  return `${account.accesses.length} utilisateur${account.accesses.length > 1 ? 's' : ''}`;
+                },
+              },
+              {
+                accessor: 'createdAt',
+                title: 'Date de création',
+                render: (account: BankAccountWithRelations) =>
+                  new Date(account.createdAt).toLocaleDateString('fr-FR', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  }),
+                sortable: true,
+              },
+              {
+                accessor: 'actions',
+                title: 'Actions',
+                render: (account: BankAccountWithRelations) => {
+                  const isOwner = currentUserId === account.ownerId;
+                  return (
+                    <Group gap="xs" wrap="nowrap" justify="flex-end">
+                      <Button
+                        variant="light"
+                        size="xs"
+                        onClick={() => handleView(account)}
+                      >
+                        Ouvrir
+                      </Button>
+                      {isOwner && (
+                        <>
+                          <Button
+                            variant="light"
+                            size="xs"
+                            onClick={() => handleEdit(account)}
+                          >
+                            Modifier
+                          </Button>
+                          <Button
+                            variant="light"
+                            size="xs"
+                            onClick={() => handleManageAccess(account)}
+                          >
+                            Accès
+                          </Button>
+                          <Button
+                            variant="light"
+                            color="red"
+                            size="xs"
+                            onClick={() => handleDelete(account)}
+                          >
+                            Supprimer
+                          </Button>
+                        </>
+                      )}
+                    </Group>
+                  );
+                },
+              },
+            ]}
+            fetching={loading}
+            noRecordsText=""
+          />
+        )}
       </Paper>
 
       <CreateBankAccountModal
