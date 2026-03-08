@@ -6,6 +6,7 @@ import {
   IconSearch,
   IconBuildingBank,
   IconUserHeart,
+  IconMail,
 } from '@tabler/icons-react';
 import { getAuthSession } from '@/lib/auth';
 import { calculatePermissions } from '@/lib/auth/calculatePermissions';
@@ -61,6 +62,15 @@ export default async function EmployeePage() {
       href: '/private-practice',
       hasAccess: checkRolePermission(role, 'private_practice', 'access'),
       color: 'pink',
+    },
+    {
+      title: 'Templates de courriers',
+      description:
+        'Créez et gérez vos propres modèles de courriers personnalisés.',
+      icon: IconMail,
+      href: routes.employee.mails,
+      hasAccess: checkRolePermission(role, 'mails', 'access'),
+      color: 'violet',
     },
   ] as const;
 

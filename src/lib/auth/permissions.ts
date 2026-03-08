@@ -9,6 +9,7 @@ const defaultApplicationPermissions = {
     bank: ["access"],
     private_practice: ["access"],
     application: ["access", "management"],
+    mails: ["access"],
 };
 export const statement = {
     ...defaultStatements, // Les permissions par défaut (user, session)
@@ -28,7 +29,8 @@ const user = ac.newRole({
     search: [],
     bank: [],
     private_practice: [],
-    application: []
+    application: [],
+    mails: [],
 });
 
 const admin = ac.newRole({
@@ -42,6 +44,7 @@ const employee = ac.newRole({
     private_practice: [],
     bank: ["access"],
     application: ["access"],
+    mails: ["access"],
 });
 
 const inventory_manager = ac.newRole({
@@ -52,6 +55,7 @@ const inventory_manager = ac.newRole({
     bank: ["access"],
     private_practice: [],
     application: ["access", "management"],
+    mails: ["access"],
 });
 
 const inventory_viewer = ac.newRole({
@@ -62,6 +66,7 @@ const inventory_viewer = ac.newRole({
     bank: ["access"],
     private_practice: [],
     application: ["access"],
+    mails: [],
 });
 
 const private_practitioner = ac.newRole({
@@ -70,6 +75,7 @@ const private_practitioner = ac.newRole({
     private_practice: ["access"],
     bank: ["access"],
     application: ["access"],
+    mails: [],
 });
 
 // Map des rôles pour faciliter l'accès

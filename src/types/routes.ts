@@ -39,6 +39,7 @@ export const routes = {
   },
   employee: {
     index: '/employee',
+    mails: '/employee/mails',
   },
   auth: {
     index: '/auth',

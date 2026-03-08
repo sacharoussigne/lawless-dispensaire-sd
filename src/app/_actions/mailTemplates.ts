@@ -4,6 +4,7 @@ import { z } from 'zod/v3';
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
 import { getAuthSession } from '@/lib/auth';
+import { checkRolePermission } from '@/lib/auth/permissions';
 
 const createMailTemplateSchema = z.object({
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
@@ -39,6 +40,7 @@ export async function createMailTemplate(data: {
       data: {
         name: validatedData.name,
         content: validatedData.content,
+        userId: null,
       },
     });
 
@@ -62,6 +64,9 @@ export async function getMailTemplates() {
     }
 
     const mailTemplates = await prisma.mailTemplate.findMany({
+      where: {
+        userId: null,
+      },
       orderBy: {
         createdAt: 'desc',
       },
@@ -91,6 +96,26 @@ export async function updateMailTemplate(data: {
     }
 
     const validatedData = updateMailTemplateSchema.parse(data);
+
+    const existingTemplate = await prisma.mailTemplate.findUnique({
+      where: {
+        id: validatedData.id,
+      },
+    });
+
+    if (!existingTemplate) {
+      return {
+        status: 404,
+        error: 'Template introuvable',
+      };
+    }
+
+    if (existingTemplate.userId !== null) {
+      return {
+        status: 403,
+        error: 'Ce template est un template personnel et ne peut pas être modifié depuis le panneau management',
+      };
+    }
 
     const mailTemplate = await prisma.mailTemplate.update({
       where: {
@@ -122,6 +147,26 @@ export async function deleteMailTemplate(data: { id: string }) {
     }
 
     const validatedData = deleteMailTemplateSchema.parse(data);
+
+    const existingTemplate = await prisma.mailTemplate.findUnique({
+      where: {
+        id: validatedData.id,
+      },
+    });
+
+    if (!existingTemplate) {
+      return {
+        status: 404,
+        error: 'Template introuvable',
+      };
+    }
+
+    if (existingTemplate.userId !== null) {
+      return {
+        status: 403,
+        error: 'Ce template est un template personnel et ne peut pas être supprimé depuis le panneau management',
+      };
+    }
 
     await prisma.mailTemplate.delete({
       where: {
@@ -257,5 +302,187 @@ export async function generateOrderMailPreview(data: {
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la génération de l\'aperçu du courrier');
+  }
+}
+
+export async function getUserMailTemplates() {
+  try {
+    const session = await getAuthSession();
+    if (!session) {
+      return {
+        status: 401,
+        error: 'Non autorisé',
+      };
+    }
+
+    const mailTemplates = await prisma.mailTemplate.findMany({
+      where: {
+        userId: session.user.id,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return {
+      status: 200,
+      data: mailTemplates,
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de la récupération des modèles de courriers');
+  }
+}
+
+export async function createUserMailTemplate(data: {
+  name: string;
+  content: string;
+}) {
+  try {
+    const session = await getAuthSession();
+    if (!session) {
+      return {
+        status: 401,
+        error: 'Non autorisé',
+      };
+    }
+
+    const validatedData = createMailTemplateSchema.parse(data);
+
+    const mailTemplate = await prisma.mailTemplate.create({
+      data: {
+        name: validatedData.name,
+        content: validatedData.content,
+        userId: session.user.id,
+      },
+    });
+
+    return {
+      status: 201,
+      data: mailTemplate,
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de la création du modèle de courrier');
+  }
+}
+
+export async function updateUserMailTemplate(data: {
+  id: string;
+  name: string;
+  content: string;
+}) {
+  try {
+    const session = await getAuthSession();
+    if (!session) {
+      return {
+        status: 401,
+        error: 'Non autorisé',
+      };
+    }
+
+    const validatedData = updateMailTemplateSchema.parse(data);
+
+    const existingTemplate = await prisma.mailTemplate.findUnique({
+      where: {
+        id: validatedData.id,
+      },
+    });
+
+    if (!existingTemplate) {
+      return {
+        status: 404,
+        error: 'Template introuvable',
+      };
+    }
+
+    if (existingTemplate.userId !== null && existingTemplate.userId !== session.user.id) {
+      return {
+        status: 403,
+        error: 'Vous n\'êtes pas autorisé à modifier ce template',
+      };
+    }
+
+    if (existingTemplate.userId === null) {
+      const hasManagementPermission = checkRolePermission(session.user.role, 'application', 'management');
+      if (!hasManagementPermission) {
+        return {
+          status: 403,
+          error: 'Vous n\'êtes pas autorisé à modifier un template global',
+        };
+      }
+    }
+
+    const mailTemplate = await prisma.mailTemplate.update({
+      where: {
+        id: validatedData.id,
+      },
+      data: {
+        name: validatedData.name,
+        content: validatedData.content,
+      },
+    });
+
+    return {
+      status: 200,
+      data: mailTemplate,
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de la modification du modèle de courrier');
+  }
+}
+
+export async function deleteUserMailTemplate(data: { id: string }) {
+  try {
+    const session = await getAuthSession();
+    if (!session) {
+      return {
+        status: 401,
+        error: 'Non autorisé',
+      };
+    }
+
+    const validatedData = deleteMailTemplateSchema.parse(data);
+
+    const existingTemplate = await prisma.mailTemplate.findUnique({
+      where: {
+        id: validatedData.id,
+      },
+    });
+
+    if (!existingTemplate) {
+      return {
+        status: 404,
+        error: 'Template introuvable',
+      };
+    }
+
+    if (existingTemplate.userId !== null && existingTemplate.userId !== session.user.id) {
+      return {
+        status: 403,
+        error: 'Vous n\'êtes pas autorisé à supprimer ce template',
+      };
+    }
+
+    if (existingTemplate.userId === null) {
+      const hasManagementPermission = checkRolePermission(session.user.role, 'application', 'management');
+      if (!hasManagementPermission) {
+        return {
+          status: 403,
+          error: 'Vous n\'êtes pas autorisé à supprimer un template global',
+        };
+      }
+    }
+
+    await prisma.mailTemplate.delete({
+      where: {
+        id: validatedData.id,
+      },
+    });
+
+    return {
+      status: 200,
+      data: { success: true },
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de la suppression du modèle de courrier');
   }
 }
