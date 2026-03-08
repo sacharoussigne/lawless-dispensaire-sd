@@ -8,7 +8,6 @@ import { getUserMailTemplates } from '@/app/_actions/mailTemplates';
 import { getMails } from '@/app/_actions/mails';
 import { handleAction } from '@/lib/action';
 import { notifications } from '@mantine/notifications';
-import { UserMailTemplateModal } from './components/UserMailTemplateModal';
 import { DeleteUserMailTemplateModal } from './components/DeleteUserMailTemplateModal';
 import { DeleteMailModal } from './components/DeleteMailModal';
 import { ViewMailModal } from './components/ViewMailModal';
@@ -40,8 +39,6 @@ export default function UserMailTemplatesPageClient({
   const [mails, setMails] = useState<Mail[]>(initialMails);
   const [loading, setLoading] = useState(false);
   const [mailsLoading, setMailsLoading] = useState(false);
-  const [modalOpened, setModalOpened] = useState(false);
-  const [editingMailTemplate, setEditingMailTemplate] = useState<MailTemplate | null>(null);
   const [deleteModalOpened, setDeleteModalOpened] = useState(false);
   const [mailTemplateToDelete, setMailTemplateToDelete] = useState<MailTemplate | null>(null);
   const [deleteMailModalOpened, setDeleteMailModalOpened] = useState(false);
@@ -95,13 +92,11 @@ export default function UserMailTemplatesPageClient({
   };
 
   const handleEdit = (mailTemplate: MailTemplate) => {
-    setEditingMailTemplate(mailTemplate);
-    setModalOpened(true);
+    router.push(routes.employee.editTemplate(mailTemplate.id));
   };
 
   const openCreateModal = () => {
-    setEditingMailTemplate(null);
-    setModalOpened(true);
+    router.push(routes.employee.newTemplate);
   };
 
   const handleTest = (mailTemplate: MailTemplate) => {
@@ -263,16 +258,6 @@ export default function UserMailTemplatesPageClient({
           </Stack>
         </Tabs.Panel>
       </Tabs>
-
-      <UserMailTemplateModal
-        opened={modalOpened}
-        onClose={() => {
-          setModalOpened(false);
-          setEditingMailTemplate(null);
-        }}
-        editingMailTemplate={editingMailTemplate}
-        onSuccess={loadMailTemplates}
-      />
 
       <DeleteUserMailTemplateModal
         opened={deleteModalOpened}

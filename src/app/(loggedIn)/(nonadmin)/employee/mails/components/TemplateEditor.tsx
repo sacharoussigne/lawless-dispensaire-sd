@@ -1,9 +1,9 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Textarea, Badge, Stack, Text, Group, Paper, Code } from '@mantine/core';
-import { IconCode, IconForms } from '@tabler/icons-react';
-import { parseTemplateParameters, extractInputs, extractJsCode } from '@/lib/mailTemplate/parser';
+import { Textarea, Stack, Text, Paper } from '@mantine/core';
+import { parseTemplateParameters } from '@/lib/mailTemplate/parser';
+import { DetectedParameters } from './DetectedParameters';
 
 interface TemplateEditorProps {
   value: string;
@@ -12,6 +12,8 @@ interface TemplateEditorProps {
   placeholder?: string;
   required?: boolean;
   minRows?: number;
+  hideParameters?: boolean;
+  fixedHeight?: boolean;
 }
 
 export function TemplateEditor({
@@ -21,10 +23,14 @@ export function TemplateEditor({
   placeholder,
   required,
   minRows = 10,
+  hideParameters = false,
+  fixedHeight = false,
 }: TemplateEditorProps) {
-  const parameters = useMemo(() => parseTemplateParameters(value), [value]);
-  const inputs = useMemo(() => extractInputs(value), [value]);
-  const jsCodes = useMemo(() => extractJsCode(value), [value]);
+  const hasParameters = useMemo(() => {
+    if (hideParameters) return false;
+    const parameters = parseTemplateParameters(value);
+    return parameters.length > 0;
+  }, [value, hideParameters]);
 
   return (
     <Stack gap="sm">
@@ -32,61 +38,33 @@ export function TemplateEditor({
         label={label}
         placeholder={placeholder}
         required={required}
-        minRows={minRows}
-        autosize
+        minRows={fixedHeight ? undefined : minRows}
+        autosize={!fixedHeight}
         value={value}
         onChange={(e) => onChange(e.currentTarget.value)}
+        styles={fixedHeight ? {
+          input: {
+            border: 'none',
+            padding: 0,
+            minHeight: '500px',
+            resize: 'none',
+          },
+          wrapper: {
+            border: 'none',
+          },
+          label: {
+            display: 'none',
+          },
+        } : undefined}
       />
 
-      {(parameters.length > 0 || inputs.length > 0 || jsCodes.length > 0) && (
+      {!hideParameters && hasParameters && (
         <Paper p="md" withBorder>
           <Stack gap="xs">
             <Text size="sm" fw={600}>
               Paramètres détectés
             </Text>
-
-            {jsCodes.length > 0 && (
-              <Stack gap="xs">
-                <Group gap="xs">
-                  <IconCode size={16} />
-                  <Text size="sm" fw={500}>
-                    Code JavaScript ({jsCodes.length})
-                  </Text>
-                </Group>
-                {jsCodes.map((code, index) => (
-                  <Code key={index} block>
-                    {code}
-                  </Code>
-                ))}
-              </Stack>
-            )}
-
-            {inputs.length > 0 && (
-              <Stack gap="xs">
-                <Group gap="xs">
-                  <IconForms size={16} />
-                  <Text size="sm" fw={500}>
-                    Inputs ({inputs.length})
-                  </Text>
-                </Group>
-                {inputs.map((input, index) => (
-                  <Group key={index} gap="xs">
-                    <Badge variant="light" color="blue">
-                      {input.name}
-                    </Badge>
-                    <Text size="xs" c="dimmed">
-                      {input.label} ({input.type})
-                      {input.required && (
-                        <Badge size="xs" color="red" variant="dot" ml="xs">
-                          Requis
-                        </Badge>
-                      )}
-                    </Text>
-                  </Group>
-                ))}
-              </Stack>
-            )}
-
+            <DetectedParameters content={value} />
             <Text size="xs" c="dimmed" mt="xs">
               <strong>Syntaxe :</strong>
               <br />
