@@ -100,7 +100,7 @@ export function UserMailTemplateModal({
         form.reset();
       }}
       title={editingMailTemplate ? 'Modifier le modèle' : 'Créer un modèle'}
-      size="lg"
+      size="70%"
     >
       <form onSubmit={form.onSubmit(handleSubmit)}>
         <Stack>

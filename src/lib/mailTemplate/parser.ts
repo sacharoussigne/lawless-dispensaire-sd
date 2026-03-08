@@ -26,11 +26,14 @@ function parseInputAttributes(attributesString: string): TemplateInput {
     label: '',
   };
 
-  const attributePattern = /(\w+)="([^"]*)"/g;
+  // Pattern pour accepter à la fois key="value" et key=value (avec ou sans guillemets)
+  const attributePattern = /(\w+)=(?:"([^"]*)"|([^\]]*?)(?=\]|\[))/g;
   let match;
 
   while ((match = attributePattern.exec(attributesString)) !== null) {
-    const [, key, value] = match;
+    const [, key, quotedValue, unquotedValue] = match;
+    const value = quotedValue !== undefined ? quotedValue : (unquotedValue || '').trim();
+    
     switch (key) {
       case 'type':
         input.type = value || 'text';
@@ -48,6 +51,9 @@ function parseInputAttributes(attributesString: string): TemplateInput {
         input.required = value === 'true' || value === '1';
         break;
       case 'defaultValue':
+        input.defaultValue = value;
+        break;
+      case 'default':
         input.defaultValue = value;
         break;
     }

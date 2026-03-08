@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { Stack, TextInput, Textarea, NumberInput, Select, Switch, Button, Group, Text } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { extractInputs, TemplateInput } from '@/lib/mailTemplate/parser';
@@ -8,14 +8,16 @@ import { renderTemplate, RenderContext } from '@/lib/mailTemplate/renderer';
 
 interface TemplateFormGeneratorProps {
   template: string;
-  onSubmit: (renderedContent: string) => void;
+  onSubmit?: (renderedContent: string) => void;
   onCancel?: () => void;
+  onChange?: (renderedContent: string) => void;
 }
 
 export function TemplateFormGenerator({
   template,
   onSubmit,
   onCancel,
+  onChange,
 }: TemplateFormGeneratorProps) {
   const inputs = useMemo(() => extractInputs(template), [template]);
 
@@ -30,16 +32,42 @@ export function TemplateFormGenerator({
     }, {} as Record<string, string | number | undefined>),
   });
 
-  const handleSubmit = (values: Record<string, string | number | undefined>) => {
+  const renderContent = (values: Record<string, string | number | undefined>) => {
     const context: RenderContext = {
       inputs: Object.entries(values).reduce((acc, [key, value]) => {
         acc[key] = value !== null && value !== undefined ? String(value) : '';
         return acc;
       }, {} as Record<string, string>),
     };
-    const renderedContent = renderTemplate(template, context);
-    onSubmit(renderedContent);
+    return renderTemplate(template, context);
   };
+
+  const handleSubmit = (values: Record<string, string | number | undefined>) => {
+    const renderedContent = renderContent(values);
+    if (onSubmit) {
+      onSubmit(renderedContent);
+    }
+  };
+
+  const handleChange = () => {
+    if (onChange) {
+      const renderedContent = renderContent(form.values);
+      onChange(renderedContent);
+    }
+  };
+
+  useEffect(() => {
+    if (onChange) {
+      const context: RenderContext = {
+        inputs: Object.entries(form.values).reduce((acc, [key, value]) => {
+          acc[key] = value !== null && value !== undefined ? String(value) : '';
+          return acc;
+        }, {} as Record<string, string>),
+      };
+      const renderedContent = renderTemplate(template, context);
+      onChange(renderedContent);
+    }
+  }, [form.values, template]);
 
   const renderInput = (input: TemplateInput) => {
     const commonProps = {
@@ -106,16 +134,18 @@ export function TemplateFormGenerator({
         ) : (
           inputs.map((input) => renderInput(input))
         )}
-        <Group justify="flex-end" mt="md">
-          {onCancel && (
-            <Button variant="subtle" onClick={onCancel}>
-              Annuler
+        {onSubmit && (
+          <Group justify="flex-end" mt="md">
+            {onCancel && (
+              <Button variant="subtle" onClick={onCancel}>
+                Annuler
+              </Button>
+            )}
+            <Button type="submit">
+              Générer le courrier
             </Button>
-          )}
-          <Button type="submit">
-            Générer le courrier
-          </Button>
-        </Group>
+          </Group>
+        )}
       </Stack>
     </form>
   );

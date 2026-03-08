@@ -2,7 +2,7 @@
 
 import { Paper, TextInput } from '@mantine/core';
 import { DataTable } from 'mantine-datatable';
-import { IconEdit, IconTrash } from '@tabler/icons-react';
+import { IconEdit, IconTrash, IconFlask } from '@tabler/icons-react';
 import { Group, ActionIcon } from '@mantine/core';
 import type { MailTemplate } from '@/types/mailTemplates';
 
@@ -17,6 +17,7 @@ interface MailTemplatesTableProps {
   onPageChange: (page: number) => void;
   onEdit: (mailTemplate: MailTemplate) => void;
   onDelete: (mailTemplate: MailTemplate) => void;
+  onTest?: (mailTemplate: MailTemplate) => void;
 }
 
 export function MailTemplatesTable({
@@ -30,6 +31,7 @@ export function MailTemplatesTable({
   onPageChange,
   onEdit,
   onDelete,
+  onTest,
 }: MailTemplatesTableProps) {
   return (
     <Paper shadow="sm" p="md" withBorder>
@@ -63,10 +65,21 @@ export function MailTemplatesTable({
             title: 'Actions',
             render: (mailTemplate: MailTemplate) => (
               <Group gap="xs" wrap="nowrap" justify="flex-end">
+                {onTest && (
+                  <ActionIcon
+                    variant="light"
+                    color="green"
+                    onClick={() => onTest(mailTemplate)}
+                    title="Tester le template"
+                  >
+                    <IconFlask size={16} />
+                  </ActionIcon>
+                )}
                 <ActionIcon
                   variant="light"
                   color="blue"
                   onClick={() => onEdit(mailTemplate)}
+                  title="Modifier"
                 >
                   <IconEdit size={16} />
                 </ActionIcon>
@@ -74,6 +87,7 @@ export function MailTemplatesTable({
                   variant="light"
                   color="red"
                   onClick={() => onDelete(mailTemplate)}
+                  title="Supprimer"
                 >
                   <IconTrash size={16} />
                 </ActionIcon>

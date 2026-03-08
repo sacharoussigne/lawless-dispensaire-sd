@@ -8,6 +8,7 @@ import { handleAction } from '@/lib/action';
 import { notifications } from '@mantine/notifications';
 import { UserMailTemplateModal } from './components/UserMailTemplateModal';
 import { DeleteUserMailTemplateModal } from './components/DeleteUserMailTemplateModal';
+import { TestTemplateModal } from './components/TestTemplateModal';
 import { ActiveFilters } from '@/app/_components/ActiveFilters/ActiveFilters';
 import { MailTemplatesTable } from '@/app/(loggedIn)/(admin)/management/mails/components/MailTemplatesTable';
 import type { MailTemplate } from '@/types/mailTemplates';
@@ -32,6 +33,8 @@ export default function UserMailTemplatesPageClient({
   const [editingMailTemplate, setEditingMailTemplate] = useState<MailTemplate | null>(null);
   const [deleteModalOpened, setDeleteModalOpened] = useState(false);
   const [mailTemplateToDelete, setMailTemplateToDelete] = useState<MailTemplate | null>(null);
+  const [testModalOpened, setTestModalOpened] = useState(false);
+  const [templateToTest, setTemplateToTest] = useState<MailTemplate | null>(null);
 
   const [nameFilter, setNameFilter] = useState<string>('');
   const [page, setPage] = useState(1);
@@ -64,6 +67,11 @@ export default function UserMailTemplatesPageClient({
   const openCreateModal = () => {
     setEditingMailTemplate(null);
     setModalOpened(true);
+  };
+
+  const handleTest = (mailTemplate: MailTemplate) => {
+    setTemplateToTest(mailTemplate);
+    setTestModalOpened(true);
   };
 
   const filteredMailTemplates = mailTemplates.filter((mailTemplate) => {
@@ -123,6 +131,7 @@ export default function UserMailTemplatesPageClient({
             setMailTemplateToDelete(mailTemplate);
             setDeleteModalOpened(true);
           }}
+          onTest={handleTest}
         />
       </Stack>
 
@@ -144,6 +153,15 @@ export default function UserMailTemplatesPageClient({
         }}
         mailTemplateToDelete={mailTemplateToDelete}
         onSuccess={loadMailTemplates}
+      />
+
+      <TestTemplateModal
+        opened={testModalOpened}
+        onClose={() => {
+          setTestModalOpened(false);
+          setTemplateToTest(null);
+        }}
+        template={templateToTest}
       />
     </Container>
   );
