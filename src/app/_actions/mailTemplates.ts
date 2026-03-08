@@ -8,12 +8,14 @@ import { checkRolePermission } from '@/lib/auth/permissions';
 
 const createMailTemplateSchema = z.object({
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
+  description: z.string().optional(),
   content: z.string().min(1, 'Le contenu est requis'),
 });
 
 const updateMailTemplateSchema = z.object({
   id: z.string().uuid('ID invalide'),
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
+  description: z.string().optional(),
   content: z.string().min(1, 'Le contenu est requis'),
 });
 
@@ -23,6 +25,7 @@ const deleteMailTemplateSchema = z.object({
 
 export async function createMailTemplate(data: {
   name: string;
+  description?: string;
   content: string;
 }) {
   try {
@@ -39,6 +42,7 @@ export async function createMailTemplate(data: {
     const mailTemplate = await prisma.mailTemplate.create({
       data: {
         name: validatedData.name,
+        description: validatedData.description,
         content: validatedData.content,
         userId: null,
       },
@@ -84,6 +88,7 @@ export async function getMailTemplates() {
 export async function updateMailTemplate(data: {
   id: string;
   name: string;
+  description?: string;
   content: string;
 }) {
   try {
@@ -123,6 +128,7 @@ export async function updateMailTemplate(data: {
       },
       data: {
         name: validatedData.name,
+        description: validatedData.description,
         content: validatedData.content,
       },
     });
@@ -335,6 +341,7 @@ export async function getUserMailTemplates() {
 
 export async function createUserMailTemplate(data: {
   name: string;
+  description?: string;
   content: string;
 }) {
   try {
@@ -351,6 +358,7 @@ export async function createUserMailTemplate(data: {
     const mailTemplate = await prisma.mailTemplate.create({
       data: {
         name: validatedData.name,
+        description: validatedData.description,
         content: validatedData.content,
         userId: session.user.id,
       },
@@ -368,6 +376,7 @@ export async function createUserMailTemplate(data: {
 export async function updateUserMailTemplate(data: {
   id: string;
   name: string;
+  description?: string;
   content: string;
 }) {
   try {
@@ -417,6 +426,7 @@ export async function updateUserMailTemplate(data: {
       },
       data: {
         name: validatedData.name,
+        description: validatedData.description,
         content: validatedData.content,
       },
     });

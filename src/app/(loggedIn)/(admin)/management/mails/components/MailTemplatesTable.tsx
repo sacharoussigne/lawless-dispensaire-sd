@@ -51,18 +51,22 @@ export function MailTemplatesTable({
             ),
           },
           {
-            accessor: 'content',
-            title: 'Contenu',
+            accessor: 'description',
+            title: 'Description',
             render: (mailTemplate: MailTemplate) => {
-              const preview = mailTemplate.content.length > 100
-                ? mailTemplate.content.substring(0, 100) + '...'
-                : mailTemplate.content;
-              return <span title={mailTemplate.content}>{preview}</span>;
+              if (!mailTemplate.description) {
+                return <span style={{ color: 'var(--mantine-color-dimmed)' }}>—</span>;
+              }
+              const preview = mailTemplate.description.length > 100
+                ? mailTemplate.description.substring(0, 100) + '...'
+                : mailTemplate.description;
+              return <span title={mailTemplate.description}>{preview}</span>;
             },
           },
           {
             accessor: 'actions',
             title: 'Actions',
+            width: 120,
             render: (mailTemplate: MailTemplate) => (
               <Group gap="xs" wrap="nowrap" justify="flex-end">
                 {onTest && (

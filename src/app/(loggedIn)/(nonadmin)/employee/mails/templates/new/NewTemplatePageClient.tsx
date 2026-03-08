@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Container, Title, Stack, TextInput } from '@mantine/core';
+import { Container, Title, Stack, TextInput, Grid } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { createUserMailTemplate } from '@/app/_actions/mailTemplates';
@@ -21,6 +21,7 @@ export default function NewTemplatePageClient() {
   const form = useForm({
     initialValues: {
       name: '',
+      description: '',
       content: '',
     },
     validate: {
@@ -55,6 +56,7 @@ export default function NewTemplatePageClient() {
       setLoading(true);
       const result = await createUserMailTemplate({
         name: values.name,
+        description: values.description || undefined,
         content: values.content,
       });
 
@@ -96,12 +98,23 @@ export default function NewTemplatePageClient() {
 
         <form id="template-form" onSubmit={form.onSubmit(handleSubmit)}>
           <Stack gap="md">
-            <TextInput
-              label="Nom"
-              placeholder="Nom du modèle"
-              required
-              {...form.getInputProps('name')}
-            />
+            <Grid gutter="xl">
+              <Grid.Col span={6}>
+                <TextInput
+                  label="Nom"
+                  placeholder="Nom du modèle"
+                  required
+                  {...form.getInputProps('name')}
+                />
+              </Grid.Col>
+              <Grid.Col span={6}>
+                <TextInput
+                  label="Description"
+                  placeholder="Description du modèle (optionnel)"
+                  {...form.getInputProps('description')}
+                />
+              </Grid.Col>
+            </Grid>
 
             <TemplateEditorLayout
               content={form.values.content}

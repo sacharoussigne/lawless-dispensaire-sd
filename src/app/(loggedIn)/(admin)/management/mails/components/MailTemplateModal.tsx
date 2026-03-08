@@ -33,6 +33,7 @@ export function MailTemplateModal({
   const form = useForm({
     initialValues: {
       name: '',
+      description: '',
       content: '',
     },
     validate: {
@@ -45,6 +46,7 @@ export function MailTemplateModal({
     if (editingMailTemplate) {
       form.setValues({
         name: editingMailTemplate.name,
+        description: editingMailTemplate.description || '',
         content: editingMailTemplate.content,
       });
     } else {
@@ -59,11 +61,13 @@ export function MailTemplateModal({
         result = await updateMailTemplate({
           id: editingMailTemplate.id,
           name: values.name,
+          description: values.description || undefined,
           content: values.content,
         });
       } else {
         result = await createMailTemplate({
           name: values.name,
+          description: values.description || undefined,
           content: values.content,
         });
       }
@@ -109,6 +113,13 @@ export function MailTemplateModal({
             placeholder="Nom du template"
             required
             {...form.getInputProps('name')}
+          />
+          <Textarea
+            label="Description"
+            placeholder="Description du template (optionnel)"
+            minRows={3}
+            autosize
+            {...form.getInputProps('description')}
           />
           <Textarea
             label="Contenu"
