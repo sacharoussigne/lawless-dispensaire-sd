@@ -16,8 +16,80 @@ export interface TemplateParameter {
   input?: TemplateInput;
 }
 
-const JS_PATTERN = /\{js:([^}]+)\}/g;
+const JS_PATTERN_START = /\{js:/g;
 const INPUT_PATTERN = /\{input:\[(.*?)\]\}/g;
+
+/**
+ * Parse un bloc JS en gérant les accolades imbriquées
+ */
+function parseJsBlock(content: string, startIndex: number): { jsCode: string; endIndex: number } | null {
+  // On commence après "{js:" (4 caractères)
+  let i = startIndex + 4; // longueur de "{js:"
+  let braceCount = 1; // On a déjà une accolade ouvrante du "{js:"
+  let jsCode = '';
+  let inString = false;
+  let stringChar = '';
+  let escapeNext = false;
+
+  while (i < content.length) {
+    const char = content[i];
+
+    // Gérer l'échappement
+    if (escapeNext) {
+      jsCode += char;
+      escapeNext = false;
+      i++;
+      continue;
+    }
+
+    if (char === '\\') {
+      escapeNext = true;
+      jsCode += char;
+      i++;
+      continue;
+    }
+
+    // Gérer les chaînes de caractères (pour ignorer les accolades dans les strings)
+    if (!inString && (char === '"' || char === "'" || char === '`')) {
+      inString = true;
+      stringChar = char;
+      jsCode += char;
+      i++;
+      continue;
+    }
+
+    if (inString) {
+      jsCode += char;
+      // Fin de la chaîne (si ce n'est pas échappé)
+      if (char === stringChar) {
+        inString = false;
+        stringChar = '';
+      }
+      i++;
+      continue;
+    }
+
+    // Compter les accolades (seulement si on n'est pas dans une string)
+    if (char === '{') {
+      braceCount++;
+      jsCode += char;
+    } else if (char === '}') {
+      braceCount--;
+      if (braceCount === 0) {
+        // On a trouvé la fin du bloc JS
+        return { jsCode, endIndex: i + 1 };
+      }
+      jsCode += char;
+    } else {
+      jsCode += char;
+    }
+
+    i++;
+  }
+
+  // Si on arrive ici, le bloc n'est pas fermé
+  return null;
+}
 
 function parseInputAttributes(attributesString: string): TemplateInput {
   const input: TemplateInput = {
@@ -72,16 +144,23 @@ function parseInputAttributes(attributesString: string): TemplateInput {
 export function parseTemplateParameters(content: string): TemplateParameter[] {
   const parameters: TemplateParameter[] = [];
 
+  // Parser les blocs JS avec gestion des accolades imbriquées
   let match;
-
-  while ((match = JS_PATTERN.exec(content)) !== null) {
-    parameters.push({
-      type: 'js',
-      raw: match[0],
-      startIndex: match.index,
-      endIndex: match.index + match[0].length,
-      jsCode: match[1],
-    });
+  JS_PATTERN_START.lastIndex = 0; // Reset pour être sûr
+  
+  while ((match = JS_PATTERN_START.exec(content)) !== null) {
+    const startIndex = match.index;
+    const jsBlock = parseJsBlock(content, startIndex);
+    
+    if (jsBlock) {
+      parameters.push({
+        type: 'js',
+        raw: content.substring(startIndex, jsBlock.endIndex),
+        startIndex,
+        endIndex: jsBlock.endIndex,
+        jsCode: jsBlock.jsCode,
+      });
+    }
   }
 
   while ((match = INPUT_PATTERN.exec(content)) !== null) {
