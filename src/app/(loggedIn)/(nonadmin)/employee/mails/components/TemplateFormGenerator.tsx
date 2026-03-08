@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useEffect } from 'react';
-import { Stack, TextInput, Textarea, NumberInput, Select, Switch, Button, Group, Text } from '@mantine/core';
+import { Stack, TextInput, Textarea, NumberInput, Select, Switch, Button, Group, Text, Grid } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { extractInputs, TemplateInput } from '@/lib/mailTemplate/parser';
 import { renderTemplate, RenderContext, resolveJsValue } from '@/lib/mailTemplate/renderer';
@@ -127,16 +127,62 @@ export function TemplateFormGenerator({
     }
   };
 
+  const canBeInRow = (input: TemplateInput) => {
+    return input.type !== 'textarea' && input.type !== 'switch';
+  };
+
+  const renderInputs = () => {
+    if (inputs.length === 0) {
+      return (
+        <Text c="dimmed" size="sm">
+          Ce template ne contient pas d'inputs personnalisés. Le contenu sera généré automatiquement.
+        </Text>
+      );
+    }
+
+    const rows: (TemplateInput | TemplateInput[])[] = [];
+    let i = 0;
+
+    while (i < inputs.length) {
+      const current = inputs[i];
+      
+      if (!canBeInRow(current)) {
+        rows.push(current);
+        i++;
+      } else {
+        const next = inputs[i + 1];
+        if (next && canBeInRow(next)) {
+          rows.push([current, next]);
+          i += 2;
+        } else {
+          rows.push(current);
+          i++;
+        }
+      }
+    }
+
+    return rows.map((row, index) => {
+      if (Array.isArray(row)) {
+        return (
+          <Grid key={`row-${index}`} gutter="md">
+            <Grid.Col span={6}>
+              {renderInput(row[0])}
+            </Grid.Col>
+            <Grid.Col span={6}>
+              {renderInput(row[1])}
+            </Grid.Col>
+          </Grid>
+        );
+      } else {
+        return <div key={`input-${row.name}`}>{renderInput(row)}</div>;
+      }
+    });
+  };
+
   return (
     <form onSubmit={form.onSubmit(handleSubmit)}>
       <Stack gap="md">
-        {inputs.length === 0 ? (
-          <Text c="dimmed" size="sm">
-            Ce template ne contient pas d'inputs personnalisés. Le contenu sera généré automatiquement.
-          </Text>
-        ) : (
-          inputs.map((input) => renderInput(input))
-        )}
+        {renderInputs()}
         {onSubmit && (
           <Group justify="flex-end" mt="md">
             {onCancel && (

@@ -120,7 +120,7 @@ export function TestTemplateModal({
                 Aperçu
               </Text>
               <Paper p="md" withBorder style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-                <ScrollArea style={{ flex: 1, height: '100%' }}>
+                <ScrollArea style={{ flex: 1, height: 500 }}>
                   <Text style={{ whiteSpace: 'pre-wrap' }}>
                     {renderedContent || 'Remplissez le formulaire pour voir l\'aperçu...'}
                   </Text>

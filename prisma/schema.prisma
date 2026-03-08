@@ -24,6 +24,7 @@ model User {
   bankAccounts  BankAccount[]
   bankAccountAccesses BankAccountAccess[]
   mailTemplates MailTemplate[]
+  mails        Mail[]
 
   @@unique([email])
   @@map("user")
@@ -287,6 +288,21 @@ model OrderMailTemplateAssignment {
   @@index([mailTemplateId])
   @@index([orderType, orderStatus])
   @@map("order_mail_template_assignment")
+}
+
+model Mail {
+  id        String   @id @default(uuid())
+  senderId  String
+  sender    User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  name      String
+  receiver  String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([senderId])
+  @@index([createdAt])
+  @@map("mail")
 }
 
 enum BankAccountAccessType {

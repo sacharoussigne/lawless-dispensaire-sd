@@ -1,20 +1,27 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Container, Title, Group, Button, Stack } from '@mantine/core';
-import { IconPlus } from '@tabler/icons-react';
+import { useRouter } from 'next/navigation';
+import { Container, Title, Group, Button, Stack, Tabs } from '@mantine/core';
+import { IconPlus, IconTemplate, IconMail } from '@tabler/icons-react';
 import { getUserMailTemplates } from '@/app/_actions/mailTemplates';
+import { getMails } from '@/app/_actions/mails';
 import { handleAction } from '@/lib/action';
 import { notifications } from '@mantine/notifications';
 import { UserMailTemplateModal } from './components/UserMailTemplateModal';
 import { DeleteUserMailTemplateModal } from './components/DeleteUserMailTemplateModal';
-import { TestTemplateModal } from './components/TestTemplateModal';
+import { DeleteMailModal } from './components/DeleteMailModal';
+import { ViewMailModal } from './components/ViewMailModal';
 import { ActiveFilters } from '@/app/_components/ActiveFilters/ActiveFilters';
 import { MailTemplatesTable } from '@/app/(loggedIn)/(admin)/management/mails/components/MailTemplatesTable';
+import { MailsTable } from './components/MailsTable';
 import type { MailTemplate } from '@/types/mailTemplates';
+import type { Mail } from '@prisma/client';
+import { routes } from '@/types/routes';
 
 interface UserMailTemplatesPageClientProps {
   initialMailTemplates: MailTemplate[];
+  initialMails: Mail[];
 }
 
 const normalizeString = (str: string): string => {
@@ -26,19 +33,28 @@ const normalizeString = (str: string): string => {
 
 export default function UserMailTemplatesPageClient({
   initialMailTemplates,
+  initialMails,
 }: UserMailTemplatesPageClientProps) {
+  const router = useRouter();
   const [mailTemplates, setMailTemplates] = useState<MailTemplate[]>(initialMailTemplates);
+  const [mails, setMails] = useState<Mail[]>(initialMails);
   const [loading, setLoading] = useState(false);
+  const [mailsLoading, setMailsLoading] = useState(false);
   const [modalOpened, setModalOpened] = useState(false);
   const [editingMailTemplate, setEditingMailTemplate] = useState<MailTemplate | null>(null);
   const [deleteModalOpened, setDeleteModalOpened] = useState(false);
   const [mailTemplateToDelete, setMailTemplateToDelete] = useState<MailTemplate | null>(null);
-  const [testModalOpened, setTestModalOpened] = useState(false);
-  const [templateToTest, setTemplateToTest] = useState<MailTemplate | null>(null);
+  const [deleteMailModalOpened, setDeleteMailModalOpened] = useState(false);
+  const [mailToDelete, setMailToDelete] = useState<Mail | null>(null);
+  const [viewMailModalOpened, setViewMailModalOpened] = useState(false);
+  const [mailToView, setMailToView] = useState<Mail | null>(null);
 
   const [nameFilter, setNameFilter] = useState<string>('');
   const [page, setPage] = useState(1);
   const [pageSize] = useState(10);
+  const [mailNameFilter, setMailNameFilter] = useState<string>('');
+  const [receiverFilter, setReceiverFilter] = useState<string>('');
+  const [mailPage, setMailPage] = useState(1);
 
   const loadMailTemplates = async () => {
     try {
@@ -59,6 +75,25 @@ export default function UserMailTemplatesPageClient({
     }
   };
 
+  const loadMails = async () => {
+    try {
+      setMailsLoading(true);
+      const result = await getMails();
+      const data = handleAction(result);
+      if (data) {
+        setMails(data);
+      }
+    } catch (error: any) {
+      notifications.show({
+        title: 'Erreur',
+        message: error.message || 'Erreur lors du chargement des courriers',
+        color: 'red',
+      });
+    } finally {
+      setMailsLoading(false);
+    }
+  };
+
   const handleEdit = (mailTemplate: MailTemplate) => {
     setEditingMailTemplate(mailTemplate);
     setModalOpened(true);
@@ -70,8 +105,20 @@ export default function UserMailTemplatesPageClient({
   };
 
   const handleTest = (mailTemplate: MailTemplate) => {
-    setTemplateToTest(mailTemplate);
-    setTestModalOpened(true);
+    router.push(routes.employee.testTemplate(mailTemplate.id));
+  };
+
+  const handleEditMail = (mail: Mail) => {
+    router.push(routes.employee.editMail(mail.id));
+  };
+
+  const openCreateMailModal = () => {
+    router.push(routes.employee.newMail);
+  };
+
+  const handleViewMail = (mail: Mail) => {
+    setMailToView(mail);
+    setViewMailModalOpened(true);
   };
 
   const filteredMailTemplates = mailTemplates.filter((mailTemplate) => {
@@ -91,49 +138,131 @@ export default function UserMailTemplatesPageClient({
     page * pageSize
   );
 
+  const filteredMails = mails.filter((mail) => {
+    const matchesName =
+      !mailNameFilter ||
+      normalizeString(mail.name).includes(normalizeString(mailNameFilter));
+    const matchesReceiver =
+      !receiverFilter ||
+      normalizeString(mail.receiver).includes(normalizeString(receiverFilter));
+    return matchesName && matchesReceiver;
+  });
+
+  const sortedMails = [...filteredMails].sort((a, b) => {
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+
+  const totalMailRecords = sortedMails.length;
+  const paginatedMails = sortedMails.slice(
+    (mailPage - 1) * pageSize,
+    mailPage * pageSize
+  );
+
   useEffect(() => {
     setPage(1);
   }, [nameFilter]);
 
+  useEffect(() => {
+    setMailPage(1);
+  }, [mailNameFilter, receiverFilter]);
+
   return (
     <Container size="xl" py="xl">
-      <Title order={1} mb="xl">Mes templates de courriers</Title>
+      <Title order={1} mb="xl">Courriers</Title>
 
-      <Stack gap="md">
-        <Group justify="space-between">
-          <Title order={2}>Gestion de mes modèles</Title>
-          <Button leftSection={<IconPlus size={16} />} onClick={openCreateModal}>
-            Créer un modèle
-          </Button>
-        </Group>
+      <Tabs defaultValue="templates">
+        <Tabs.List>
+          <Tabs.Tab value="templates" leftSection={<IconTemplate size={16} />}>
+            Templates
+          </Tabs.Tab>
+          <Tabs.Tab value="mails" leftSection={<IconMail size={16} />}>
+            Courriers envoyés
+          </Tabs.Tab>
+        </Tabs.List>
 
-        <ActiveFilters
-          filters={[
-            {
-              label: 'Nom',
-              value: nameFilter,
-              onRemove: () => setNameFilter(''),
-            },
-          ]}
-        />
+        <Tabs.Panel value="templates" pt="xl">
+          <Stack gap="md">
+            <Group justify="space-between">
+              <Title order={2}>Gestion de mes modèles</Title>
+              <Button leftSection={<IconPlus size={16} />} onClick={openCreateModal}>
+                Créer un modèle
+              </Button>
+            </Group>
 
-        <MailTemplatesTable
-          mailTemplates={paginatedMailTemplates}
-          loading={loading}
-          nameFilter={nameFilter}
-          page={page}
-          pageSize={pageSize}
-          totalRecords={totalRecords}
-          onNameFilterChange={(value) => setNameFilter(value)}
-          onPageChange={(p) => setPage(p)}
-          onEdit={handleEdit}
-          onDelete={(mailTemplate) => {
-            setMailTemplateToDelete(mailTemplate);
-            setDeleteModalOpened(true);
-          }}
-          onTest={handleTest}
-        />
-      </Stack>
+            <ActiveFilters
+              filters={[
+                {
+                  label: 'Nom',
+                  value: nameFilter,
+                  onRemove: () => setNameFilter(''),
+                },
+              ]}
+            />
+
+            <MailTemplatesTable
+              mailTemplates={paginatedMailTemplates}
+              loading={loading}
+              nameFilter={nameFilter}
+              page={page}
+              pageSize={pageSize}
+              totalRecords={totalRecords}
+              onNameFilterChange={(value) => setNameFilter(value)}
+              onPageChange={(p) => setPage(p)}
+              onEdit={handleEdit}
+              onDelete={(mailTemplate) => {
+                setMailTemplateToDelete(mailTemplate);
+                setDeleteModalOpened(true);
+              }}
+              onTest={handleTest}
+            />
+          </Stack>
+        </Tabs.Panel>
+
+        <Tabs.Panel value="mails" pt="xl">
+          <Stack gap="md">
+            <Group justify="space-between">
+              <Title order={2}>Mes courriers envoyés</Title>
+              <Button leftSection={<IconPlus size={16} />} onClick={openCreateMailModal}>
+                Créer un courrier
+              </Button>
+            </Group>
+
+            <ActiveFilters
+              filters={[
+                {
+                  label: 'Nom',
+                  value: mailNameFilter,
+                  onRemove: () => setMailNameFilter(''),
+                },
+                {
+                  label: 'Destinataire',
+                  value: receiverFilter,
+                  onRemove: () => setReceiverFilter(''),
+                },
+              ]}
+            />
+
+            <MailsTable
+              mails={paginatedMails}
+              loading={mailsLoading}
+              nameFilter={mailNameFilter}
+              receiverFilter={receiverFilter}
+              page={mailPage}
+              pageSize={pageSize}
+              totalRecords={totalMailRecords}
+              onNameFilterChange={(value) => setMailNameFilter(value)}
+              onReceiverFilterChange={(value) => setReceiverFilter(value)}
+              onPageChange={(p) => setMailPage(p)}
+              onEdit={handleEditMail}
+              onDelete={(mail) => {
+                setMailToDelete(mail);
+                setDeleteMailModalOpened(true);
+              }}
+              onView={handleViewMail}
+            />
+          </Stack>
+        </Tabs.Panel>
+      </Tabs>
 
       <UserMailTemplateModal
         opened={modalOpened}
@@ -155,13 +284,23 @@ export default function UserMailTemplatesPageClient({
         onSuccess={loadMailTemplates}
       />
 
-      <TestTemplateModal
-        opened={testModalOpened}
+      <DeleteMailModal
+        opened={deleteMailModalOpened}
         onClose={() => {
-          setTestModalOpened(false);
-          setTemplateToTest(null);
+          setDeleteMailModalOpened(false);
+          setMailToDelete(null);
         }}
-        template={templateToTest}
+        mailToDelete={mailToDelete}
+        onSuccess={loadMails}
+      />
+
+      <ViewMailModal
+        opened={viewMailModalOpened}
+        onClose={() => {
+          setViewMailModalOpened(false);
+          setMailToView(null);
+        }}
+        mail={mailToView}
       />
     </Container>
   );
