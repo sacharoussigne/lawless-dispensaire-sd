@@ -11,6 +11,7 @@ import { hasOrdersViewAccessMiddleware } from './middlewares/hasOrdersViewAccess
 import { hasSearchAccessMiddleware } from './middlewares/hasSearchAccessMiddleware';
 import { hasBankAccessMiddleware } from './middlewares/hasBankAccessMiddleware';
 import { hasPrivatePracticeAccessMiddleware } from './middlewares/hasPrivatePracticeAccessMiddleware';
+import { hasMailsAccessMiddleware } from './middlewares/hasMailsAccessMiddleware';
 import { chain } from './middlewares/chain';
 
 export async function middleware(req: NextRequest) {
@@ -66,6 +67,11 @@ export async function middleware(req: NextRequest) {
     middlewares.push(hasToBeLoggedInMiddleware);
     middlewares.push(hasApplicationAccessMiddleware);
     middlewares.push(hasPrivatePracticeAccessMiddleware);
+  } else if (pathname.startsWith(routes.employee.mails)) {
+    // For employee mails routes, check login, application access, then mails access
+    middlewares.push(hasToBeLoggedInMiddleware);
+    middlewares.push(hasApplicationAccessMiddleware);
+    middlewares.push(hasMailsAccessMiddleware);
   } else {
     // For other routes, first check login, then application access
     middlewares.push(hasToBeLoggedInMiddleware);

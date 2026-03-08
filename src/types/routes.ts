@@ -39,6 +39,12 @@ export const routes = {
   },
   employee: {
     index: '/employee',
+    mails: '/employee/mails',
+    newMail: '/employee/mails/new',
+    editMail: (id: string) => `/employee/mails/${id}/edit`,
+    newTemplate: '/employee/mails/templates/new',
+    editTemplate: (id: string) => `/employee/mails/templates/${id}/edit`,
+    testTemplate: (id: string) => `/employee/mails/templates/${id}/test`,
   },
   auth: {
     index: '/auth',
