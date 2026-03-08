@@ -165,14 +165,15 @@ export default function UserMailTemplatesPageClient({
     <Container size="xl" py="xl">
       <Title order={1} mb="xl">Courriers</Title>
 
-      <Tabs defaultValue="templates">
+      <Tabs defaultValue="mails">
         <Tabs.List>
-          <Tabs.Tab value="templates" leftSection={<IconTemplate size={16} />}>
-            Templates
-          </Tabs.Tab>
           <Tabs.Tab value="mails" leftSection={<IconMail size={16} />}>
             Courriers envoyés
           </Tabs.Tab>
+          <Tabs.Tab value="templates" leftSection={<IconTemplate size={16} />}>
+            Templates
+          </Tabs.Tab>
+
         </Tabs.List>
 
         <Tabs.Panel value="templates" pt="xl">
