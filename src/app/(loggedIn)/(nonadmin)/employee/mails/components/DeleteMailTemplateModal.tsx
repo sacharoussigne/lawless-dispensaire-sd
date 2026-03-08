@@ -6,19 +6,19 @@ import { deleteUserMailTemplate } from '@/app/_actions/mailTemplates';
 import { handleAction } from '@/lib/action';
 import type { MailTemplate } from '@/types/mailTemplates';
 
-interface DeleteUserMailTemplateModalProps {
+interface DeleteMailTemplateModalProps {
   opened: boolean;
   onClose: () => void;
   mailTemplateToDelete: MailTemplate | null;
   onSuccess: () => void;
 }
 
-export function DeleteUserMailTemplateModal({
+export function DeleteMailTemplateModal({
   opened,
   onClose,
   mailTemplateToDelete,
   onSuccess,
-}: DeleteUserMailTemplateModalProps) {
+}: DeleteMailTemplateModalProps) {
   const handleDelete = async () => {
     if (!mailTemplateToDelete) return;
 

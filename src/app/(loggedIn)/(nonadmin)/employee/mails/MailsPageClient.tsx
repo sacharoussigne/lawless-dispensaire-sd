@@ -1,14 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { Container, Title, Group, Button, Stack, Tabs } from '@mantine/core';
 import { IconPlus, IconTemplate, IconMail } from '@tabler/icons-react';
 import { getUserMailTemplates } from '@/app/_actions/mailTemplates';
 import { getMails } from '@/app/_actions/mails';
 import { handleAction } from '@/lib/action';
 import { notifications } from '@mantine/notifications';
-import { DeleteUserMailTemplateModal } from './components/DeleteUserMailTemplateModal';
+import { DeleteMailTemplateModal } from './components/DeleteMailTemplateModal';
 import { DeleteMailModal } from './components/DeleteMailModal';
 import { ViewMailModal } from './components/ViewMailModal';
 import { ActiveFilters } from '@/app/_components/ActiveFilters/ActiveFilters';
@@ -18,7 +18,7 @@ import type { MailTemplate } from '@/types/mailTemplates';
 import type { Mail } from '@prisma/client';
 import { routes } from '@/types/routes';
 
-interface UserMailTemplatesPageClientProps {
+interface MailsPageClientProps {
   initialMailTemplates: MailTemplate[];
   initialMails: Mail[];
 }
@@ -30,11 +30,13 @@ const normalizeString = (str: string): string => {
     .replace(/[\u0300-\u036f]/g, '');
 };
 
-export default function UserMailTemplatesPageClient({
+export default function MailsPageClient({
   initialMailTemplates,
   initialMails,
-}: UserMailTemplatesPageClientProps) {
+}: MailsPageClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
   const [mailTemplates, setMailTemplates] = useState<MailTemplate[]>(initialMailTemplates);
   const [mails, setMails] = useState<Mail[]>(initialMails);
   const [loading, setLoading] = useState(false);
@@ -52,6 +54,11 @@ export default function UserMailTemplatesPageClient({
   const [mailNameFilter, setMailNameFilter] = useState<string>('');
   const [receiverFilter, setReceiverFilter] = useState<string>('');
   const [mailPage, setMailPage] = useState(1);
+
+  const tabFromUrl = searchParams.get('tab');
+  const validTabs = ['mails', 'templates'];
+  const initialTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : 'mails';
+  const [activeTab, setActiveTab] = useState<string>(initialTab);
 
   const loadMailTemplates = async () => {
     try {
@@ -161,11 +168,26 @@ export default function UserMailTemplatesPageClient({
     setMailPage(1);
   }, [mailNameFilter, receiverFilter]);
 
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab && validTabs.includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (value: string | null) => {
+    if (!value) return;
+    setActiveTab(value);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', value);
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
   return (
     <Container size="xl" py="xl">
       <Title order={1} mb="xl">Courriers</Title>
 
-      <Tabs defaultValue="mails">
+      <Tabs value={activeTab} onChange={handleTabChange}>
         <Tabs.List>
           <Tabs.Tab value="mails" leftSection={<IconMail size={16} />}>
             Courriers envoyés
@@ -260,7 +282,7 @@ export default function UserMailTemplatesPageClient({
         </Tabs.Panel>
       </Tabs>
 
-      <DeleteUserMailTemplateModal
+      <DeleteMailTemplateModal
         opened={deleteModalOpened}
         onClose={() => {
           setDeleteModalOpened(false);

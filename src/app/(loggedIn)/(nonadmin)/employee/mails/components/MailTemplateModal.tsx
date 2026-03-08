@@ -17,19 +17,19 @@ import { ParsedZodError } from '@/lib/errors/ParsedZodError';
 import type { MailTemplate } from '@/types/mailTemplates';
 import { TemplateEditor } from './TemplateEditor';
 
-interface UserMailTemplateModalProps {
+interface MailTemplateModalProps {
   opened: boolean;
   onClose: () => void;
   editingMailTemplate: MailTemplate | null;
   onSuccess: () => void;
 }
 
-export function UserMailTemplateModal({
+export function MailTemplateModal({
   opened,
   onClose,
   editingMailTemplate,
   onSuccess,
-}: UserMailTemplateModalProps) {
+}: MailTemplateModalProps) {
   const form = useForm({
     initialValues: {
       name: '',

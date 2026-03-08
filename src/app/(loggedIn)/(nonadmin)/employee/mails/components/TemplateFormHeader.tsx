@@ -29,7 +29,7 @@ export function TemplateFormHeader({
       <Button
         variant="subtle"
         leftSection={<IconArrowLeft size={16} />}
-        onClick={() => router.push(routes.employee.mails)}
+        onClick={() => router.push(routes.employee.mails + '?tab=templates')}
       >
         Retour
       </Button>

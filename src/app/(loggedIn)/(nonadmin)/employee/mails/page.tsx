@@ -1,10 +1,10 @@
 import { getUserMailTemplates } from '@/app/_actions/mailTemplates';
 import { getMails } from '@/app/_actions/mails';
-import UserMailTemplatesPageClient from './UserMailTemplatesPageClient';
+import MailsPageClient from './MailsPageClient';
 import { SuspenseLoader } from '@/app/_components/SuspenseLoader/SuspenseLoader';
 import { getDataOrThrow } from '@/lib/response';
 
-async function UserMailTemplatesContent() {
+async function MailsContent() {
   const mailTemplatesResult = await getUserMailTemplates();
   const mailsResult = await getMails();
 
@@ -12,17 +12,17 @@ async function UserMailTemplatesContent() {
   const mails = getDataOrThrow(mailsResult, 'Erreur lors du chargement des courriers');
 
   return (
-    <UserMailTemplatesPageClient
+    <MailsPageClient
       initialMailTemplates={mailTemplates}
       initialMails={mails}
     />
   );
 }
 
-export default function UserMailTemplatesPage() {
+export default function MailsPage() {
   return (
     <SuspenseLoader>
-      <UserMailTemplatesContent />
+      <MailsContent />
     </SuspenseLoader>
   );
 }
