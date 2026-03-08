@@ -5,7 +5,6 @@ import {
   Modal,
   Stack,
   TextInput,
-  Textarea,
   Button,
   Group,
 } from '@mantine/core';
@@ -16,6 +15,7 @@ import { handleAction } from '@/lib/action';
 import { handleApiZodError } from '@/lib/services/zod';
 import { ParsedZodError } from '@/lib/errors/ParsedZodError';
 import type { MailTemplate } from '@/types/mailTemplates';
+import { TemplateEditor } from './TemplateEditor';
 
 interface UserMailTemplateModalProps {
   opened: boolean;
@@ -110,13 +110,13 @@ export function UserMailTemplateModal({
             required
             {...form.getInputProps('name')}
           />
-          <Textarea
+          <TemplateEditor
             label="Contenu"
             placeholder="Contenu du modèle de courrier"
             required
             minRows={10}
-            autosize
-            {...form.getInputProps('content')}
+            value={form.values.content}
+            onChange={(value) => form.setFieldValue('content', value)}
           />
           <Group justify="flex-end" mt="md">
             <Button
