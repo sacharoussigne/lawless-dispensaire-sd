@@ -193,7 +193,7 @@ export default function MailsPageClient({
             Courriers envoyés
           </Tabs.Tab>
           <Tabs.Tab value="templates" leftSection={<IconTemplate size={16} />}>
-            Templates
+            Modèles
           </Tabs.Tab>
 
         </Tabs.List>

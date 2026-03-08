@@ -64,9 +64,9 @@ export default async function EmployeePage() {
       color: 'pink',
     },
     {
-      title: 'Templates de courriers',
+      title: 'Courriers',
       description:
-        'Créez et gérez vos propres modèles de courriers personnalisés.',
+        'Gérez vos courriers envoyés et créez des modèles de courriers personnalisés.',
       icon: IconMail,
       href: routes.employee.mails,
       hasAccess: checkRolePermission(role, 'mails', 'access'),
