@@ -4,7 +4,7 @@ import { useMemo, useEffect } from 'react';
 import { Stack, TextInput, Textarea, NumberInput, Select, Switch, Button, Group, Text } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { extractInputs, TemplateInput } from '@/lib/mailTemplate/parser';
-import { renderTemplate, RenderContext } from '@/lib/mailTemplate/renderer';
+import { renderTemplate, RenderContext, resolveJsValue } from '@/lib/mailTemplate/renderer';
 
 interface TemplateFormGeneratorProps {
   template: string;
@@ -23,10 +23,13 @@ export function TemplateFormGenerator({
 
   const form = useForm({
     initialValues: inputs.reduce((acc, input) => {
+      // Résoudre la valeur par défaut (exécuter le JS si présent)
+      const resolvedValue = resolveJsValue(input.defaultValue);
+      
       if (input.type === 'number') {
-        acc[input.name] = input.defaultValue ? Number(input.defaultValue) : undefined;
+        acc[input.name] = resolvedValue ? Number(resolvedValue) : undefined;
       } else {
-        acc[input.name] = input.defaultValue || '';
+        acc[input.name] = resolvedValue || '';
       }
       return acc;
     }, {} as Record<string, string | number | undefined>),

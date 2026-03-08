@@ -90,9 +90,9 @@ export function TemplateEditor({
             <Text size="xs" c="dimmed" mt="xs">
               <strong>Syntaxe :</strong>
               <br />
-              JavaScript: {'{js:code}'}
+              JavaScript: {'{js:code:endjs}'}
               <br />
-              Input: {'{input:[type="text"][name="nom"][label="Label"][placeholder="..."][required="true"]}'}
+              Input: {'{input:[type="text"][name="nom"][label="Label"][placeholder="..."][required="true"][default="valeur" ou default={js:code:endjs}]}'}
             </Text>
           </Stack>
         </Paper>
