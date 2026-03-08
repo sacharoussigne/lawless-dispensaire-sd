@@ -1,6 +1,6 @@
 'use client';
 
-import { Modal, Paper, Text, ScrollArea, Button, Stack, Group } from '@mantine/core';
+import { Modal, Paper, Text, Button, Stack, Group, Grid } from '@mantine/core';
 import { IconCopy, IconCheck } from '@tabler/icons-react';
 import { useState } from 'react';
 import { notifications } from '@mantine/notifications';
@@ -50,40 +50,33 @@ export function ViewMailModal({
       size="70%"
     >
       <Stack gap="md">
-        <Paper p="md" withBorder>
-          <Text size="sm" fw={600} mb="xs">
-            Destinataire :
-          </Text>
-          <Text>{mail.receiver}</Text>
-        </Paper>
-
-        <Paper p="md" withBorder>
-          <Text size="sm" fw={600} mb="xs">
-            Contenu :
-          </Text>
-          <ScrollArea h={400}>
-            <Text style={{ whiteSpace: 'pre-wrap' }}>
-              {mail.content}
-            </Text>
-          </ScrollArea>
-        </Paper>
-
-        <Paper p="md" withBorder>
-          <Text size="sm" fw={600} mb="xs">
-            Date de création :
-          </Text>
-          <Text>
-            {new Date(mail.createdAt).toLocaleString('fr-FR', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-          </Text>
-        </Paper>
-
-        <Group justify="flex-end" mt="md">
+        <Group justify="space-between">
+          <div className="flex gap-4">
+            <Paper p="md" withBorder>
+              <div className="flex items-center gap-2">
+                <Text size="sm" fw={600}>
+                  Destinataire :
+                </Text>
+                <Text>{mail.receiver}</Text>
+              </div>
+            </Paper>
+            <Paper p="md" withBorder>
+              <div className="flex items-center gap-2">
+                <Text size="sm" fw={600}>
+                  Date de création :
+                </Text>
+                <Text>
+                  {new Date(mail.createdAt).toLocaleString('fr-FR', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </Text>
+              </div>
+            </Paper>
+          </div>
           <Button
             leftSection={copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
             onClick={handleCopy}
@@ -92,10 +85,17 @@ export function ViewMailModal({
           >
             {copied ? 'Copiée !' : 'Copier le contenu'}
           </Button>
-          <Button variant="subtle" onClick={onClose}>
-            Fermer
-          </Button>
+
         </Group>
+
+        <Paper p="md" withBorder>
+          <Text size="sm" fw={600} mb="xs">
+            Contenu :
+          </Text>
+          <Text style={{ whiteSpace: 'pre-wrap' }}>
+            {mail.content}
+          </Text>
+        </Paper>
       </Stack>
     </Modal>
   );
