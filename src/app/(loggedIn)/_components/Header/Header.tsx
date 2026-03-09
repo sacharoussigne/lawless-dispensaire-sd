@@ -17,7 +17,7 @@ import { AuthSession } from '@/types/session';
 import { routes } from '@/types/routes';
 import Link from 'next/link';
 import Image from 'next/image';
-import { IconLogout } from '@tabler/icons-react';
+import { IconLogout, IconSearch } from '@tabler/icons-react';
 import { usePermissions } from '@/app/_contexts/PermissionsContext';
 import { hasRole, checkRolePermission } from '@/lib/auth/permissions';
 import { Role } from '@/types/enum/roles';
@@ -72,7 +72,7 @@ export default function Header({
     <header className={`${classes.header} mb-10`}>
       <Container size={'xl'}>
         <div className={'flex justify-between items-center w-full h-[60px]'}>
-          <Link 
+          <Link
             href={isManagementSpace ? routes.management.index : routes.employee.index}
             className={classes.logoLink}
           >
@@ -139,30 +139,6 @@ export default function Header({
                   </Menu>
                 ) : (
                   <>
-                    {permissions?.stock.view && (
-                      <Link
-                        href={routes.stock.index}
-                        className={`${classes.link} ${isRouteActive(routes.stock.index) ? classes.linkActive : ''}`}
-                      >
-                        Stocks
-                      </Link>
-                    )}
-                    {permissions?.orders.view && (
-                      <Link
-                        href={routes.orders.index}
-                        className={`${classes.link} ${isRouteActive(routes.orders.index) ? classes.linkActive : ''}`}
-                      >
-                        Commandes
-                      </Link>
-                    )}
-                    {checkRolePermission(userRole, 'search', 'access') && (
-                      <Link
-                        href={routes.searchItems.index}
-                        className={`${classes.link} ${isRouteActive(routes.searchItems.index) ? classes.linkActive : ''}`}
-                      >
-                        Recherche
-                      </Link>
-                    )}
                     {checkRolePermission(userRole, 'bank', 'access') && (
                       <Link
                         href={routes.bank.index}
@@ -179,8 +155,35 @@ export default function Header({
                         Cabinet privé
                       </Link>
                     )}
+                    {checkRolePermission(userRole, 'orders', 'view') && (
+                      <Link
+                        href={routes.orders.index}
+                        className={`${classes.link} ${isRouteActive(routes.orders.index) ? classes.linkActive : ''}`}
+                      >
+                        Commandes
+                      </Link>
+                    )}
+                    {checkRolePermission(userRole, 'stock', 'view') && (
+                      <Link
+                        href={routes.stock.index}
+                        className={`${classes.link} ${isRouteActive(routes.stock.index) ? classes.linkActive : ''}`}
+                      >
+                        Stocks
+                      </Link>
+                    )}
                   </>
                 )}
+                {/* Search icon: only in employee space, before SegmentedControl */}
+                {!isAdminOrManagementSpace &&
+                  checkRolePermission(userRole, 'search', 'access') && (
+                    <Link
+                      href={routes.searchItems.index}
+                      className={`${classes.link} ${isRouteActive(routes.searchItems.index) ? classes.linkActive : ''}`}
+                      aria-label="Recherche"
+                    >
+                      <IconSearch size={20} />
+                    </Link>
+                  )}
                 {canSwitchSpaces && (
                   <SegmentedControl
                     value={isAdminOrManagementSpace ? 'management' : 'employee'}
