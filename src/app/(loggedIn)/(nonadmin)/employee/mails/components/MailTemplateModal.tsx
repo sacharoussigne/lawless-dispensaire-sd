@@ -5,17 +5,17 @@ import {
   Modal,
   Stack,
   TextInput,
-  Textarea,
   Button,
   Group,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
-import { createMailTemplate, updateMailTemplate } from '@/app/_actions/mailTemplates';
+import { createUserMailTemplate, updateUserMailTemplate } from '@/app/_actions/mailTemplates';
 import { handleAction } from '@/lib/action';
 import { handleApiZodError } from '@/lib/services/zod';
 import { ParsedZodError } from '@/lib/errors/ParsedZodError';
 import type { MailTemplate } from '@/types/mailTemplates';
+import { TemplateEditor } from './TemplateEditor';
 
 interface MailTemplateModalProps {
   opened: boolean;
@@ -33,7 +33,6 @@ export function MailTemplateModal({
   const form = useForm({
     initialValues: {
       name: '',
-      description: '',
       content: '',
     },
     validate: {
@@ -46,7 +45,6 @@ export function MailTemplateModal({
     if (editingMailTemplate) {
       form.setValues({
         name: editingMailTemplate.name,
-        description: editingMailTemplate.description || '',
         content: editingMailTemplate.content,
       });
     } else {
@@ -58,16 +56,14 @@ export function MailTemplateModal({
     try {
       let result;
       if (editingMailTemplate) {
-        result = await updateMailTemplate({
+        result = await updateUserMailTemplate({
           id: editingMailTemplate.id,
           name: values.name,
-          description: values.description || undefined,
           content: values.content,
         });
       } else {
-        result = await createMailTemplate({
+        result = await createUserMailTemplate({
           name: values.name,
-          description: values.description || undefined,
           content: values.content,
         });
       }
@@ -104,7 +100,7 @@ export function MailTemplateModal({
         form.reset();
       }}
       title={editingMailTemplate ? 'Modifier le modèle' : 'Créer un modèle'}
-      size="lg"
+      size="70%"
     >
       <form onSubmit={form.onSubmit(handleSubmit)}>
         <Stack>
@@ -114,20 +110,13 @@ export function MailTemplateModal({
             required
             {...form.getInputProps('name')}
           />
-          <Textarea
-            label="Description"
-            placeholder="Description du template (optionnel)"
-            minRows={3}
-            autosize
-            {...form.getInputProps('description')}
-          />
-          <Textarea
+          <TemplateEditor
             label="Contenu"
             placeholder="Contenu du modèle de courrier"
             required
             minRows={10}
-            autosize
-            {...form.getInputProps('content')}
+            value={form.values.content}
+            onChange={(value) => form.setFieldValue('content', value)}
           />
           <Group justify="flex-end" mt="md">
             <Button

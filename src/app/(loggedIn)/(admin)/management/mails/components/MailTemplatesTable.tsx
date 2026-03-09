@@ -2,7 +2,7 @@
 
 import { Paper, TextInput } from '@mantine/core';
 import { DataTable } from 'mantine-datatable';
-import { IconEdit, IconTrash } from '@tabler/icons-react';
+import { IconEdit, IconTrash, IconFlask } from '@tabler/icons-react';
 import { Group, ActionIcon } from '@mantine/core';
 import type { MailTemplate } from '@/types/mailTemplates';
 
@@ -17,6 +17,7 @@ interface MailTemplatesTableProps {
   onPageChange: (page: number) => void;
   onEdit: (mailTemplate: MailTemplate) => void;
   onDelete: (mailTemplate: MailTemplate) => void;
+  onTest?: (mailTemplate: MailTemplate) => void;
 }
 
 export function MailTemplatesTable({
@@ -30,6 +31,7 @@ export function MailTemplatesTable({
   onPageChange,
   onEdit,
   onDelete,
+  onTest,
 }: MailTemplatesTableProps) {
   return (
     <Paper shadow="sm" p="md" withBorder>
@@ -49,24 +51,39 @@ export function MailTemplatesTable({
             ),
           },
           {
-            accessor: 'content',
-            title: 'Contenu',
+            accessor: 'description',
+            title: 'Description',
             render: (mailTemplate: MailTemplate) => {
-              const preview = mailTemplate.content.length > 100
-                ? mailTemplate.content.substring(0, 100) + '...'
-                : mailTemplate.content;
-              return <span title={mailTemplate.content}>{preview}</span>;
+              if (!mailTemplate.description) {
+                return <span style={{ color: 'var(--mantine-color-dimmed)' }}>—</span>;
+              }
+              const preview = mailTemplate.description.length > 100
+                ? mailTemplate.description.substring(0, 100) + '...'
+                : mailTemplate.description;
+              return <span title={mailTemplate.description}>{preview}</span>;
             },
           },
           {
             accessor: 'actions',
             title: 'Actions',
+            width: 120,
             render: (mailTemplate: MailTemplate) => (
               <Group gap="xs" wrap="nowrap" justify="flex-end">
+                {onTest && (
+                  <ActionIcon
+                    variant="light"
+                    color="green"
+                    onClick={() => onTest(mailTemplate)}
+                    title="Tester le template"
+                  >
+                    <IconFlask size={16} />
+                  </ActionIcon>
+                )}
                 <ActionIcon
                   variant="light"
                   color="blue"
                   onClick={() => onEdit(mailTemplate)}
+                  title="Modifier"
                 >
                   <IconEdit size={16} />
                 </ActionIcon>
@@ -74,6 +91,7 @@ export function MailTemplatesTable({
                   variant="light"
                   color="red"
                   onClick={() => onDelete(mailTemplate)}
+                  title="Supprimer"
                 >
                   <IconTrash size={16} />
                 </ActionIcon>
