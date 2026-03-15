@@ -15,8 +15,9 @@ import {
   ActionIcon,
   Tooltip,
   Select,
+  Popover,
 } from '@mantine/core';
-import { IconEdit, IconCheck, IconX, IconClipboardCheck, IconTools, IconArrowsExchange } from '@tabler/icons-react';
+import { IconEdit, IconCheck, IconX, IconClipboardCheck, IconTools, IconArrowsExchange, IconScale } from '@tabler/icons-react';
 import { getItemsWithStock, updateStock, craftItem } from '@/app/_actions/stock';
 import { handleAction } from '@/lib/action';
 import { notifications } from '@mantine/notifications';
@@ -46,6 +47,10 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
 
   // State to store raw input values (with expressions)
   const [stockInputValues, setStockInputValues] = useState<Record<string, string>>({});
+  
+  // State for weight calculation popover
+  const [weightPopoverOpened, setWeightPopoverOpened] = useState<Record<string, boolean>>({});
+  const [weightInputValues, setWeightInputValues] = useState<Record<string, string>>({});
 
   const loadItems = async () => {
     try {
@@ -190,6 +195,80 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
         [itemId]: numValue,
       }));
     }
+  };
+
+  const handleWeightInputChange = (itemId: string, value: string) => {
+    setWeightInputValues((prev) => ({
+      ...prev,
+      [itemId]: value,
+    }));
+  };
+
+  const handleWeightCalculation = (item: ItemWithRelations) => {
+    const weightInput = weightInputValues[item.id] || '';
+    const trimmed = weightInput.trim();
+    
+    if (trimmed === '' || !item.weight || item.weight <= 0) {
+      return;
+    }
+
+    let weightInKg: number;
+    
+    if (/[\+\-\*\/]/.test(trimmed)) {
+      const result = evaluateExpression(trimmed);
+      if (result === '') {
+        notifications.show({
+          title: 'Erreur',
+          message: 'Expression invalide',
+          color: 'red',
+        });
+        return;
+      }
+      weightInKg = result;
+    } else {
+      const parsed = Number(trimmed);
+      if (isNaN(parsed)) {
+        notifications.show({
+          title: 'Erreur',
+          message: 'Valeur invalide',
+          color: 'red',
+        });
+        return;
+      }
+      weightInKg = parsed;
+    }
+
+    if (weightInKg <= 0) {
+      notifications.show({
+        title: 'Erreur',
+        message: 'Le poids doit être positif',
+        color: 'red',
+      });
+      return;
+    }
+
+    const numberOfItems = Math.round(weightInKg / item.weight);
+    
+    setStockInputValues((prev) => ({
+      ...prev,
+      [item.id]: String(numberOfItems),
+    }));
+    
+    setStockValues((prev) => ({
+      ...prev,
+      [item.id]: numberOfItems,
+    }));
+
+    setWeightPopoverOpened((prev) => ({
+      ...prev,
+      [item.id]: false,
+    }));
+
+    notifications.show({
+      title: 'Calcul effectué',
+      message: `${weightInKg} kg ÷ ${item.weight} kg = ${numberOfItems} objet(s)`,
+      color: 'green',
+    });
   };
 
   useEffect(() => {
@@ -489,14 +568,102 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
                                 }}
                                 placeholder="Quantité (ex: 30 + 45)"
                                 style={{ maxWidth: 150 }}
+                                rightSectionWidth={hasStockToday && item.weight != null && item.weight > 0 ? 60 : undefined}
                                 rightSection={
-                                  hasStockToday ? (
-                                    <Tooltip label="Mise à jour du stock existant">
-                                      <ActionIcon size="sm" variant="subtle" color="blue">
-                                        <IconEdit size={14} />
-                                      </ActionIcon>
-                                    </Tooltip>
-                                  ) : undefined
+                                  <Group gap={2} wrap="nowrap">
+                                    {hasStockToday && (
+                                      <Tooltip label="Mise à jour du stock existant">
+                                        <ActionIcon size="sm" variant="subtle" color="blue">
+                                          <IconEdit size={14} />
+                                        </ActionIcon>
+                                      </Tooltip>
+                                    )}
+                                    {item.weight != null && item.weight > 0 && (
+                                      <Popover
+                                        position="top"
+                                        withArrow
+                                        shadow="md"
+                                        opened={weightPopoverOpened[item.id] || false}
+                                        onChange={(opened) => setWeightPopoverOpened((prev) => ({ ...prev, [item.id]: opened }))}
+                                      >
+                                        <Popover.Target>
+                                          <Tooltip label="Calculer à partir du poids">
+                                            <ActionIcon
+                                              size="sm"
+                                              variant="subtle"
+                                              color="blue"
+                                              onClick={() => setWeightPopoverOpened((prev) => ({ ...prev, [item.id]: !prev[item.id] }))}
+                                            >
+                                              <IconScale size={14} />
+                                            </ActionIcon>
+                                          </Tooltip>
+                                        </Popover.Target>
+                                        <Popover.Dropdown>
+                                          <Stack gap="xs" p="xs">
+                                            <Text size="sm" fw={500}>
+                                              Calculer à partir du poids
+                                            </Text>
+                                            <Text size="xs" c="dimmed">
+                                              Poids unitaire: {item.weight} kg
+                                            </Text>
+                                            <TextInput
+                                              value={weightInputValues[item.id] || ''}
+                                              onChange={(e) => handleWeightInputChange(item.id, String(e.currentTarget.value))}
+                                              placeholder="Poids en kg (ex: 2.5 + 1.2)"
+                                              onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                  handleWeightCalculation(item);
+                                                }
+                                              }}
+                                              size="xs"
+                                              rightSection={
+                                                weightInputValues[item.id] && /[\+\-\*\/]/.test(weightInputValues[item.id]) ? (
+                                                  <ActionIcon
+                                                    size="xs"
+                                                    variant="subtle"
+                                                    color="blue"
+                                                    onClick={() => {
+                                                      const inputValue = weightInputValues[item.id] || '';
+                                                      const trimmed = inputValue.trim();
+                                                      if (trimmed && /[\+\-\*\/]/.test(trimmed)) {
+                                                        const result = evaluateExpression(trimmed);
+                                                        if (result !== '') {
+                                                          setWeightInputValues((prev) => ({
+                                                            ...prev,
+                                                            [item.id]: String(result),
+                                                          }));
+                                                        }
+                                                      }
+                                                    }}
+                                                  >
+                                                    <IconCheck size={12} />
+                                                  </ActionIcon>
+                                                ) : undefined
+                                              }
+                                            />
+                                            <Group gap="xs" justify="flex-end" mt="xs">
+                                              <Button
+                                                size="xs"
+                                                variant="subtle"
+                                                onClick={() => {
+                                                  setWeightPopoverOpened((prev) => ({ ...prev, [item.id]: false }));
+                                                  setWeightInputValues((prev) => ({ ...prev, [item.id]: '' }));
+                                                }}
+                                              >
+                                                Annuler
+                                              </Button>
+                                              <Button
+                                                size="xs"
+                                                onClick={() => handleWeightCalculation(item)}
+                                              >
+                                                Calculer
+                                              </Button>
+                                            </Group>
+                                          </Stack>
+                                        </Popover.Dropdown>
+                                      </Popover>
+                                    )}
+                                  </Group>
                                 }
                               />
                             </Table.Td>
