@@ -49,6 +49,7 @@ export function ItemModal({
       isEnabled: true,
       canBeSold: false,
       price: null as number | null,
+      weight: null as number | null,
       categoryId: '',
       companyGroupId: '',
     },
@@ -91,6 +92,7 @@ export function ItemModal({
         isEnabled: editingItem.isEnabled ?? true,
         canBeSold: editingItem.canBeSold ?? false,
         price: editingItem.price ? Number(editingItem.price) : null,
+        weight: editingItem.weight ?? null,
         categoryId: editingItem.categoryId || '',
         companyGroupId: editingItem.companyGroupId || '',
       });
@@ -119,6 +121,7 @@ export function ItemModal({
           isEnabled: values.isEnabled,
           canBeSold: values.canBeSold,
           price: priceToSave,
+          weight: values.weight,
           categoryId: values.categoryId,
           companyGroupId,
         });
@@ -131,6 +134,7 @@ export function ItemModal({
           isEnabled: values.isEnabled,
           canBeSold: values.canBeSold,
           price: priceToSave,
+          weight: values.weight,
           categoryId: values.categoryId,
           companyGroupId,
         });
@@ -237,6 +241,15 @@ export function ItemModal({
                 {...form.getInputProps('categoryId')}
               />
             </SimpleGrid>
+            <NumberInput
+              label="Poids (kg)"
+              placeholder="Poids (optionnel)"
+              min={0}
+              step={0.01}
+              decimalScale={2}
+              fixedDecimalScale
+              {...form.getInputProps('weight')}
+            />
 
             <Group grow align="flex-start" mt="xs">
               <Switch

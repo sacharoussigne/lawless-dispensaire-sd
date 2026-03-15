@@ -100,6 +100,7 @@ model Item {
   isEnabled      Boolean           @default(true)
   canBeSold      Boolean           @default(false)
   price          Decimal?           @db.Decimal(10, 2)
+  weight         Float?
   categoryId     String
   category       CategoryItem      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   companyGroupId String?

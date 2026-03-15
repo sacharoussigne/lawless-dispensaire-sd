@@ -6,6 +6,7 @@ export interface ItemWithRelations {
   isCraftable: boolean;
   canBeSold?: boolean;
   price?: number | string | null;
+  weight?: number | null;
   categoryId: string;
   companyGroupId: string | null;
   order: number;
