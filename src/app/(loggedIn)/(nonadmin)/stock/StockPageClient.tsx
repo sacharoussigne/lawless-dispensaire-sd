@@ -47,10 +47,11 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
 
   // State to store raw input values (with expressions)
   const [stockInputValues, setStockInputValues] = useState<Record<string, string>>({});
-  
+
   // State for weight calculation popover
   const [weightPopoverOpened, setWeightPopoverOpened] = useState<Record<string, boolean>>({});
   const [weightInputValues, setWeightInputValues] = useState<Record<string, string>>({});
+  const [initialStockValues, setInitialStockValues] = useState<Record<string, { input: string; value: number | '' }>>({});
 
   const loadItems = async () => {
     try {
@@ -197,23 +198,78 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
     }
   };
 
-  const handleWeightInputChange = (itemId: string, value: string) => {
+  const handleWeightInputChange = (itemId: string, value: string, item: ItemWithRelations) => {
     setWeightInputValues((prev) => ({
       ...prev,
       [itemId]: value,
+    }));
+
+    const trimmed = value.trim();
+
+    // Si l'input est vide, restaurer la valeur initiale
+    if (trimmed === '') {
+      const initial = initialStockValues[itemId];
+      if (initial) {
+        setStockInputValues((prev) => ({
+          ...prev,
+          [itemId]: initial.input,
+        }));
+        setStockValues((prev) => ({
+          ...prev,
+          [itemId]: initial.value,
+        }));
+      }
+      return;
+    }
+
+    if (!item.weight || item.weight <= 0) {
+      return;
+    }
+
+    let weightInKg: number;
+
+    if (/[\+\-\*\/]/.test(trimmed)) {
+      const result = evaluateExpression(trimmed);
+      if (result === '') {
+        return;
+      }
+      weightInKg = result;
+    } else {
+      const parsed = Number(trimmed);
+      if (isNaN(parsed) || parsed <= 0) {
+        return;
+      }
+      weightInKg = parsed;
+    }
+
+    const numberOfItems = Math.round(weightInKg / item.weight);
+
+    setStockInputValues((prev) => ({
+      ...prev,
+      [itemId]: String(numberOfItems),
+    }));
+
+    setStockValues((prev) => ({
+      ...prev,
+      [itemId]: numberOfItems,
     }));
   };
 
   const handleWeightCalculation = (item: ItemWithRelations) => {
     const weightInput = weightInputValues[item.id] || '';
     const trimmed = weightInput.trim();
-    
+
     if (trimmed === '' || !item.weight || item.weight <= 0) {
+      notifications.show({
+        title: 'Erreur',
+        message: 'Veuillez entrer un poids valide',
+        color: 'red',
+      });
       return;
     }
 
     let weightInKg: number;
-    
+
     if (/[\+\-\*\/]/.test(trimmed)) {
       const result = evaluateExpression(trimmed);
       if (result === '') {
@@ -248,16 +304,6 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
     }
 
     const numberOfItems = Math.round(weightInKg / item.weight);
-    
-    setStockInputValues((prev) => ({
-      ...prev,
-      [item.id]: String(numberOfItems),
-    }));
-    
-    setStockValues((prev) => ({
-      ...prev,
-      [item.id]: numberOfItems,
-    }));
 
     setWeightPopoverOpened((prev) => ({
       ...prev,
@@ -567,13 +613,13 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
                                   }
                                 }}
                                 placeholder="Quantité (ex: 30 + 45)"
-                                style={{ maxWidth: 150 }}
+                                style={{ maxWidth: 200 }}
                                 rightSectionWidth={hasStockToday && item.weight != null && item.weight > 0 ? 60 : undefined}
                                 rightSection={
                                   <Group gap={2} wrap="nowrap">
                                     {hasStockToday && (
                                       <Tooltip label="Mise à jour du stock existant">
-                                        <ActionIcon size="sm" variant="subtle" color="blue">
+                                        <ActionIcon size="sm" variant="subtle" color="blue" tabIndex={-1}>
                                           <IconEdit size={14} />
                                         </ActionIcon>
                                       </Tooltip>
@@ -592,7 +638,22 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
                                               size="sm"
                                               variant="subtle"
                                               color="blue"
-                                              onClick={() => setWeightPopoverOpened((prev) => ({ ...prev, [item.id]: !prev[item.id] }))}
+                                              tabIndex={-1}
+                                              onClick={() => {
+                                                const isOpening = !weightPopoverOpened[item.id];
+                                                setWeightPopoverOpened((prev) => ({ ...prev, [item.id]: isOpening }));
+
+                                                if (isOpening) {
+                                                  // Sauvegarder la valeur initiale
+                                                  setInitialStockValues((prev) => ({
+                                                    ...prev,
+                                                    [item.id]: {
+                                                      input: stockInputValues[item.id] ?? (item.stockToday !== null ? String(item.stockToday) : ''),
+                                                      value: stockValues[item.id] ?? (item.stockToday !== null ? item.stockToday : ''),
+                                                    },
+                                                  }));
+                                                }
+                                              }}
                                             >
                                               <IconScale size={14} />
                                             </ActionIcon>
@@ -608,7 +669,7 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
                                             </Text>
                                             <TextInput
                                               value={weightInputValues[item.id] || ''}
-                                              onChange={(e) => handleWeightInputChange(item.id, String(e.currentTarget.value))}
+                                              onChange={(e) => handleWeightInputChange(item.id, String(e.currentTarget.value), item)}
                                               placeholder="Poids en kg (ex: 2.5 + 1.2)"
                                               onKeyDown={(e) => {
                                                 if (e.key === 'Enter') {
@@ -617,28 +678,32 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
                                               }}
                                               size="xs"
                                               rightSection={
-                                                weightInputValues[item.id] && /[\+\-\*\/]/.test(weightInputValues[item.id]) ? (
-                                                  <ActionIcon
-                                                    size="xs"
-                                                    variant="subtle"
-                                                    color="blue"
-                                                    onClick={() => {
-                                                      const inputValue = weightInputValues[item.id] || '';
-                                                      const trimmed = inputValue.trim();
-                                                      if (trimmed && /[\+\-\*\/]/.test(trimmed)) {
-                                                        const result = evaluateExpression(trimmed);
-                                                        if (result !== '') {
-                                                          setWeightInputValues((prev) => ({
-                                                            ...prev,
-                                                            [item.id]: String(result),
-                                                          }));
+                                                <Group gap={2} wrap="nowrap" pr={16}>
+                                                  <Text size="xs" c="dimmed">KG</Text>
+                                                  {weightInputValues[item.id] && /[\+\-\*\/]/.test(weightInputValues[item.id]) ? (
+                                                    <ActionIcon
+                                                      size="xs"
+                                                      variant="subtle"
+                                                      color="blue"
+                                                      onClick={() => {
+                                                        const inputValue = weightInputValues[item.id] || '';
+                                                        const trimmed = inputValue.trim();
+                                                        if (trimmed && /[\+\-\*\/]/.test(trimmed)) {
+                                                          const result = evaluateExpression(trimmed);
+                                                          if (result !== '') {
+                                                            setWeightInputValues((prev) => ({
+                                                              ...prev,
+                                                              [item.id]: String(result),
+                                                            }));
+                                                          }
                                                         }
-                                                      }
-                                                    }}
-                                                  >
-                                                    <IconCheck size={12} />
-                                                  </ActionIcon>
-                                                ) : undefined
+                                                      }}
+                                                    >
+                                                      <IconCheck size={12} />
+                                                    </ActionIcon>
+                                                  ) : undefined}
+                                                </Group>
+
                                               }
                                             />
                                             <Group gap="xs" justify="flex-end" mt="xs">
@@ -646,6 +711,18 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
                                                 size="xs"
                                                 variant="subtle"
                                                 onClick={() => {
+                                                  // Restaurer la valeur initiale
+                                                  const initial = initialStockValues[item.id];
+                                                  if (initial) {
+                                                    setStockInputValues((prev) => ({
+                                                      ...prev,
+                                                      [item.id]: initial.input,
+                                                    }));
+                                                    setStockValues((prev) => ({
+                                                      ...prev,
+                                                      [item.id]: initial.value,
+                                                    }));
+                                                  }
                                                   setWeightPopoverOpened((prev) => ({ ...prev, [item.id]: false }));
                                                   setWeightInputValues((prev) => ({ ...prev, [item.id]: '' }));
                                                 }}
