@@ -151,21 +151,8 @@ export function ItemsTable({
             ),
           },
           {
-            accessor: 'description',
-            title: 'Description',
-            render: (item: ItemWithRelations) => item.description || '-',
-            filter: (
-              <TextInput
-                placeholder="Rechercher une description..."
-                value={descriptionFilter}
-                onChange={(e) => onDescriptionFilterChange(e.currentTarget.value)}
-                style={{ minWidth: 200 }}
-              />
-            ),
-          },
-          {
             accessor: 'idealQuantity',
-            title: 'Quantité minimale',
+            title: 'Qty min.',
             render: (item: ItemWithRelations) => item.idealQuantity,
           },
           {
@@ -243,8 +230,14 @@ export function ItemsTable({
             },
           },
           {
+            accessor: 'weight',
+            title: 'Poids (kg)',
+            render: (item: ItemWithRelations) =>
+              item.weight != null ? item.weight.toFixed(2) : '-',
+          },
+          {
             accessor: 'companyGroup.name',
-            title: "Groupe d'entreprises",
+            title: "Groupe",
             render: (item: ItemWithRelations) => item.companyGroup?.name || '-',
             filter: (
               <Select
