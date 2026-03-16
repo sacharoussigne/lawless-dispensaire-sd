@@ -14,6 +14,7 @@ const createItemSchema = z.object({
   isEnabled: z.boolean().default(true),
   canBeSold: z.boolean().default(false),
   price: z.number().positive('Le prix doit être positif').optional().nullable(),
+  weight: z.number().positive('Le poids doit être positif').optional().nullable(),
   categoryId: z.string().uuid('ID de catégorie invalide').min(1, 'La catégorie est requise'),
   companyGroupId: z.string().uuid('ID de groupe d\'entreprise invalide').optional(),
 });
@@ -28,6 +29,7 @@ const updateItemSchema = z.object({
   isEnabled: z.boolean().default(true),
   canBeSold: z.boolean().default(false),
   price: z.number().positive('Le prix doit être positif').optional().nullable(),
+  weight: z.number().positive('Le poids doit être positif').optional().nullable(),
   categoryId: z.string().uuid('ID de catégorie invalide').min(1, 'La catégorie est requise'),
   companyGroupId: z.string().uuid('ID de groupe d\'entreprise invalide').optional(),
 });
@@ -48,6 +50,7 @@ export async function createItem(data: {
   isEnabled?: boolean;
   canBeSold?: boolean;
   price?: number | null;
+  weight?: number | null;
   categoryId: string;
   companyGroupId?: string;
 }) {
@@ -86,6 +89,7 @@ export async function createItem(data: {
         isEnabled: validatedData.isEnabled ?? true,
         canBeSold: validatedData.canBeSold ?? false,
         price: validatedData.price !== undefined && validatedData.price !== null ? validatedData.price : null,
+        weight: validatedData.weight !== undefined && validatedData.weight !== null ? validatedData.weight : null,
         categoryId: validatedData.categoryId,
         companyGroupId: validatedData.companyGroupId,
         order: newOrder,
@@ -177,6 +181,7 @@ export async function updateItem(data: {
   isEnabled?: boolean;
   canBeSold?: boolean;
   price?: number | null;
+  weight?: number | null;
   categoryId: string;
   companyGroupId?: string;
 }) {
@@ -203,6 +208,7 @@ export async function updateItem(data: {
         isEnabled: validatedData.isEnabled ?? true,
         canBeSold: validatedData.canBeSold ?? false,
         price: validatedData.price !== undefined && validatedData.price !== null ? validatedData.price : null,
+        weight: validatedData.weight !== undefined && validatedData.weight !== null ? validatedData.weight : null,
         categoryId: validatedData.categoryId,
         companyGroupId: validatedData.companyGroupId,
       },
