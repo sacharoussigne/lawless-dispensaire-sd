@@ -386,11 +386,20 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
     return categories;
   }, [itemsByCategory]);
 
-  const { itemsWithStockToday, totalItems } = useMemo(() => {
+  const { itemsWithStockToday, totalItems, totalWeightToday } = useMemo(() => {
     const withStock = items.filter((item) => item.stockToday !== null).length;
+
+    const totalWeight = items.reduce((sum, item) => {
+      if (item.stockToday === null || item.weight == null) {
+        return sum;
+      }
+      return sum + item.stockToday * item.weight;
+    }, 0);
+
     return {
       itemsWithStockToday: withStock,
       totalItems: items.length,
+      totalWeightToday: totalWeight,
     };
   }, [items]);
 
@@ -476,7 +485,7 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
         </Group>
       </Group>
 
-      <div className='flex justify-start mb-2'>
+      <div className='flex justify-start items-center mb-2 gap-4'>
         <Select
           placeholder="Sélectionner un coffre"
           data={chestOptions}
@@ -486,6 +495,12 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
           disabled={isEditing}
           style={{ minWidth: 200 }}
         />
+
+        {totalWeightToday > 0 && (
+          <Badge color="blue" variant="light" size="lg">
+            Poids {selectedChestId === null ? 'total' : ''} (aujourd'hui) : {totalWeightToday.toFixed(2)} kg
+          </Badge>
+        )}
       </div>
 
       {loading ? (
@@ -496,22 +511,36 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
         <Stack gap="xl">
           {sortedCategories.map((categoryData) => {
             const textColor = getTextColor(categoryData.category.color);
+            const categoryTotalWeight = categoryData.items.reduce((sum, item) => {
+              if (item.stockToday === null || item.weight == null) {
+                return sum;
+              }
+              return sum + item.stockToday * item.weight;
+            }, 0);
+
             return (
               <Paper key={categoryData.category.id} shadow="sm" p="md" withBorder>
-                <Group mb="md">
-                  <Badge
-                    style={{
-                      backgroundColor: categoryData.category.color,
-                      color: textColor,
-                    }}
-                    variant="filled"
-                    size="lg"
-                  >
-                    {categoryData.category.name}
-                  </Badge>
-                  <Text c="dimmed" size="sm">
-                    {categoryData.items.length} objet(s)
-                  </Text>
+                <Group mb="md" justify="space-between" align="center">
+                  <Group gap="xs" align="center">
+                    <Badge
+                      style={{
+                        backgroundColor: categoryData.category.color,
+                        color: textColor,
+                      }}
+                      variant="filled"
+                      size="lg"
+                    >
+                      {categoryData.category.name}
+                    </Badge>
+                    <Text c="dimmed" size="sm">
+                      {categoryData.items.length} objet(s)
+                    </Text>
+                  </Group>
+                  {categoryTotalWeight > 0 && (
+                    <Text size="sm" fw={600} c={categoryData.category.color}>
+                      {categoryTotalWeight.toFixed(2)} kg
+                    </Text>
+                  )}
                 </Group>
                 <Table striped highlightOnHover>
                   <Table.Thead>
