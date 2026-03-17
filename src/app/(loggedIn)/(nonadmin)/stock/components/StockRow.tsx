@@ -13,6 +13,7 @@ interface StockRowProps {
   isEditing: boolean;
   canStockUpdate: boolean;
   isCategoryCheckEnabled: (categoryId: string) => boolean;
+  shouldShowMinimalQuantity: boolean;
   getTextColor: (backgroundColor: string) => string;
   onCommitQuantity: (itemId: string, quantity: number | null) => void;
   evaluateIntegerExpression: (expression: string) => EvalResult;
@@ -25,6 +26,7 @@ export const StockRow = memo(function StockRow({
   isEditing,
   canStockUpdate,
   isCategoryCheckEnabled,
+  shouldShowMinimalQuantity,
   onCommitQuantity,
   evaluateIntegerExpression,
   evaluateDecimalExpression,
@@ -62,7 +64,13 @@ export const StockRow = memo(function StockRow({
           )}
         </Group>
       </Table.Td>
-      <Table.Td>{item.minimalQuantity}</Table.Td>
+      <Table.Td>
+        {shouldShowMinimalQuantity ? (
+          item.minimalQuantity
+        ) : (
+          <span style={{ visibility: 'hidden' }}>{item.minimalQuantity}</span>
+        )}
+      </Table.Td>
       <Table.Td>
         {item.stockYesterday !== null ? <Text>{item.stockYesterday}</Text> : <Text c="dimmed">?</Text>}
       </Table.Td>

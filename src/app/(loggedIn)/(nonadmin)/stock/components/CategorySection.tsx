@@ -32,6 +32,7 @@ export const CategorySection = memo(function CategorySection({
   evaluateDecimalExpression,
 }: CategorySectionProps) {
   const textColor = getTextColor(categoryData.category.color);
+  const shouldShowMinimalQuantity = !(selectedChestId !== null && !isCategoryCheckEnabled(categoryData.category.id));
 
   const categoryTotalWeight = categoryData.items.reduce((sum, item) => {
     if (item.stockToday === null || item.weight == null) return sum;
@@ -66,7 +67,13 @@ export const CategorySection = memo(function CategorySection({
         <Table.Thead>
           <Table.Tr>
             <Table.Th>Nom</Table.Th>
-            <Table.Th>Quantité minimale</Table.Th>
+            <Table.Th>
+              {shouldShowMinimalQuantity ? (
+                'Quantité minimale'
+              ) : (
+                <span style={{ visibility: 'hidden' }}>Quantité minimale</span>
+              )}
+            </Table.Th>
             <Table.Th>Stock J-1</Table.Th>
             <Table.Th>Stock aujourd'hui</Table.Th>
             {isEditing && canStockUpdate && <Table.Th>Nouveau stock</Table.Th>}
@@ -81,6 +88,7 @@ export const CategorySection = memo(function CategorySection({
               isEditing={isEditing}
               canStockUpdate={canStockUpdate}
               isCategoryCheckEnabled={isCategoryCheckEnabled}
+              shouldShowMinimalQuantity={shouldShowMinimalQuantity}
               getTextColor={getTextColor}
               onCommitQuantity={onCommitQuantity}
               evaluateIntegerExpression={evaluateIntegerExpression}
