@@ -91,16 +91,35 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
     try {
       setSaving(true);
 
+      // Normalize empty inputs to 0 so validation always persists explicit zeros
+      const normalizedStockValues: Record<string, number> = Object.fromEntries(
+        Object.entries(stockValues).map(([itemId, value]) => [itemId, value === '' ? 0 : value]),
+      );
+
+      setStockValues((prev) => {
+        const next: Record<string, number | ''> = { ...prev };
+        Object.keys(next).forEach((itemId) => {
+          if (next[itemId] === '') next[itemId] = 0;
+        });
+        return next;
+      });
+
+      setStockInputValues((prev) => {
+        const next: Record<string, string> = { ...prev };
+        Object.keys(next).forEach((itemId) => {
+          if ((next[itemId] ?? '').trim() === '') next[itemId] = '0';
+        });
+        return next;
+      });
+
       // If no chest is selected, use "foure tout" chest by default
       // This ensures we always modify a specific chest
       const targetChestId = selectedChestId || null;
 
-      const stockData = Object.entries(stockValues)
-        .filter(([_, value]) => value !== '' && value !== null)
-        .map(([itemId, quantity]) => ({
-          itemId,
-          quantity: typeof quantity === 'number' ? quantity : 0,
-        }));
+      const stockData = Object.entries(normalizedStockValues).map(([itemId, quantity]) => ({
+        itemId,
+        quantity,
+      }));
 
       if (stockData.length === 0) {
         notifications.show({
