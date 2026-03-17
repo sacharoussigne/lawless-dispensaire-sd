@@ -151,9 +151,9 @@ export function ItemsTable({
             ),
           },
           {
-            accessor: 'idealQuantity',
+            accessor: 'minimalQuantity',
             title: 'Qty min.',
-            render: (item: ItemWithRelations) => item.idealQuantity,
+            render: (item: ItemWithRelations) => item.minimalQuantity,
           },
           {
             accessor: 'isCraftable',

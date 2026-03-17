@@ -1,8 +1,8 @@
 'use client';
 
-import { Paper, TextInput, Group, ActionIcon, Badge } from '@mantine/core';
+import { Paper, TextInput, Group, ActionIcon, Badge, Tooltip } from '@mantine/core';
 import { DataTable } from 'mantine-datatable';
-import { IconEdit, IconTrash } from '@tabler/icons-react';
+import { IconEdit, IconTrash, IconChecklist } from '@tabler/icons-react';
 import type { ChestWithStockHistory } from '@/types/chests';
 
 interface ChestsTableProps {
@@ -17,6 +17,7 @@ interface ChestsTableProps {
   onPageChange: (page: number) => void;
   onEdit: (chest: ChestWithStockHistory) => void;
   onDelete: (chest: ChestWithStockHistory) => void;
+  onConfigureStockChecks: (chest: ChestWithStockHistory) => void;
 }
 
 export function ChestsTable({
@@ -31,6 +32,7 @@ export function ChestsTable({
   onPageChange,
   onEdit,
   onDelete,
+  onConfigureStockChecks,
 }: ChestsTableProps) {
   const isLastChest = totalChests <= 1;
   return (
@@ -78,6 +80,15 @@ export function ChestsTable({
             title: 'Actions',
             render: (chest: ChestWithStockHistory) => (
               <Group gap="xs" wrap="nowrap" justify="flex-end">
+                <Tooltip label="Vérifications de stock">
+                  <ActionIcon
+                    variant="light"
+                    color="grape"
+                    onClick={() => onConfigureStockChecks(chest)}
+                  >
+                    <IconChecklist size={16} />
+                  </ActionIcon>
+                </Tooltip>
                 <ActionIcon
                   variant="light"
                   color="blue"

@@ -6,14 +6,17 @@ import { IconClipboardCheck } from '@tabler/icons-react';
 import type { ItemWithRelations } from '@/types/stock';
 import { EditableStockCell } from './EditableStockCell';
 import type { EvalResult } from '@/lib/stock/expression';
+import type { StockUiPreferences } from '@/types/stockUiPreferences';
 
 interface StockRowProps {
   item: ItemWithRelations;
   editedQuantity: number | null;
   isEditing: boolean;
   canStockUpdate: boolean;
-  selectedChestId: string | null;
+  isCategoryCheckEnabled: (categoryId: string) => boolean;
+  shouldShowMinimalQuantity: boolean;
   getTextColor: (backgroundColor: string) => string;
+  stockUiPreferences: StockUiPreferences;
   onCommitQuantity: (itemId: string, quantity: number | null) => void;
   evaluateIntegerExpression: (expression: string) => EvalResult;
   evaluateDecimalExpression: (expression: string) => EvalResult;
@@ -24,7 +27,10 @@ export const StockRow = memo(function StockRow({
   editedQuantity,
   isEditing,
   canStockUpdate,
-  selectedChestId,
+  isCategoryCheckEnabled,
+  shouldShowMinimalQuantity,
+  getTextColor,
+  stockUiPreferences,
   onCommitQuantity,
   evaluateIntegerExpression,
   evaluateDecimalExpression,
@@ -34,13 +40,21 @@ export const StockRow = memo(function StockRow({
   const currentStock =
     item.stockToday !== null ? item.stockToday : item.stockYesterday !== null ? item.stockYesterday : null;
 
-  const isStockLow = selectedChestId === null && currentStock !== null && currentStock < item.idealQuantity;
+  const shouldCheck = isCategoryCheckEnabled(item.categoryId);
+  const isStockLow = shouldCheck && currentStock !== null && currentStock < item.minimalQuantity;
 
   let backgroundColor: string | undefined = undefined;
   if (isStockLow) {
-    if (item.isCraftable || item.companyGroupId === null) backgroundColor = '#fff3cd';
-    else backgroundColor = '#f8d7da';
+    if (item.isCraftable || item.companyGroupId === null) backgroundColor = stockUiPreferences.lowStockCraftableBg;
+    else backgroundColor = stockUiPreferences.lowStockNormalBg;
+  } else if (currentStock === null) {
+    backgroundColor = stockUiPreferences.unknownStockBg ?? undefined;
+  } else if (shouldCheck && currentStock >= item.minimalQuantity) {
+    backgroundColor = stockUiPreferences.okStockBg ?? undefined;
   }
+
+  const doneTodayBadgeBg = stockUiPreferences.doneTodayBadgeBg;
+  const doneTodayTextColor = doneTodayBadgeBg ? getTextColor(doneTodayBadgeBg) : undefined;
 
   return (
     <Table.Tr key={item.id} style={{ backgroundColor }}>
@@ -49,19 +63,36 @@ export const StockRow = memo(function StockRow({
           <Text fw={500}>{item.name}</Text>
           {hasStockToday && (
             <Tooltip label="Stock déjà fait aujourd'hui">
-              <Badge
-                color="green"
-                variant="light"
-                size="sm"
-                leftSection={<IconClipboardCheck size={12} />}
-              >
-                Fait
-              </Badge>
+              {doneTodayBadgeBg ? (
+                <Badge
+                  variant="filled"
+                  size="sm"
+                  leftSection={<IconClipboardCheck size={12} />}
+                  style={{ backgroundColor: doneTodayBadgeBg, color: doneTodayTextColor }}
+                >
+                  Fait
+                </Badge>
+              ) : (
+                <Badge
+                  color="green"
+                  variant="light"
+                  size="sm"
+                  leftSection={<IconClipboardCheck size={12} />}
+                >
+                  Fait
+                </Badge>
+              )}
             </Tooltip>
           )}
         </Group>
       </Table.Td>
-      <Table.Td>{item.idealQuantity}</Table.Td>
+      <Table.Td>
+        {shouldShowMinimalQuantity ? (
+          item.minimalQuantity
+        ) : (
+          <span style={{ visibility: 'hidden' }}>{item.minimalQuantity}</span>
+        )}
+      </Table.Td>
       <Table.Td>
         {item.stockYesterday !== null ? <Text>{item.stockYesterday}</Text> : <Text c="dimmed">?</Text>}
       </Table.Td>

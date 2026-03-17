@@ -22,7 +22,7 @@ interface Item {
   id: string;
   name: string;
   description: string | null;
-  idealQuantity: number;
+  minimalQuantity: number;
   isCraftable: boolean;
   canBeSold: boolean;
   price: number | null;
@@ -42,7 +42,7 @@ interface ItemWithDetailedStock {
   id: string;
   name: string;
   description: string | null;
-  idealQuantity: number;
+  minimalQuantity: number;
   isCraftable: boolean;
   canBeSold: boolean;
   price: number | null;
@@ -180,7 +180,7 @@ export default function SearchItemsPageClient({
                               <Text span fw={500}>
                                 Quantité minimale :
                               </Text>{' '}
-                              {item.idealQuantity}
+                              {item.minimalQuantity}
                             </Text>
                             {item.price !== null && (
                               <Text size="sm">

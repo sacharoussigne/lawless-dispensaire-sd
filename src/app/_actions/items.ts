@@ -9,7 +9,7 @@ import { getAuthSession } from '@/lib/auth';
 const createItemSchema = z.object({
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
   description: z.string().max(1000, 'La description est trop longue').optional(),
-  idealQuantity: z.number().int().min(0, 'La quantité minimale doit être positive'),
+  minimalQuantity: z.number().int().min(0, 'La quantité minimale doit être positive'),
   isCraftable: z.boolean().default(false),
   isEnabled: z.boolean().default(true),
   canBeSold: z.boolean().default(false),
@@ -24,7 +24,7 @@ const updateItemSchema = z.object({
   id: z.string().uuid('ID invalide'),
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
   description: z.string().max(1000, 'La description est trop longue').optional(),
-  idealQuantity: z.number().int().min(0, 'La quantité minimale doit être positive'),
+  minimalQuantity: z.number().int().min(0, 'La quantité minimale doit être positive'),
   isCraftable: z.boolean().default(false),
   isEnabled: z.boolean().default(true),
   canBeSold: z.boolean().default(false),
@@ -45,7 +45,7 @@ const deleteItemSchema = z.object({
 export async function createItem(data: {
   name: string;
   description?: string;
-  idealQuantity: number;
+  minimalQuantity: number;
   isCraftable?: boolean;
   isEnabled?: boolean;
   canBeSold?: boolean;
@@ -84,7 +84,7 @@ export async function createItem(data: {
       data: {
         name: validatedData.name,
         description: validatedData.description,
-        idealQuantity: validatedData.idealQuantity,
+        minimalQuantity: validatedData.minimalQuantity,
         isCraftable: validatedData.isCraftable ?? false,
         isEnabled: validatedData.isEnabled ?? true,
         canBeSold: validatedData.canBeSold ?? false,
@@ -176,7 +176,7 @@ export async function updateItem(data: {
   id: string;
   name: string;
   description?: string;
-  idealQuantity: number;
+  minimalQuantity: number;
   isCraftable?: boolean;
   isEnabled?: boolean;
   canBeSold?: boolean;
@@ -203,7 +203,7 @@ export async function updateItem(data: {
       data: {
         name: validatedData.name,
         description: validatedData.description,
-        idealQuantity: validatedData.idealQuantity,
+        minimalQuantity: validatedData.minimalQuantity,
         isCraftable: validatedData.isCraftable ?? false,
         isEnabled: validatedData.isEnabled ?? true,
         canBeSold: validatedData.canBeSold ?? false,

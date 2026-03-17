@@ -11,6 +11,7 @@ import { DeleteChestModal } from './components/DeleteChestModal';
 import { ReorderChestsModal } from './components/ReorderChestsModal';
 import { ActiveFilters } from '@/app/_components/ActiveFilters/ActiveFilters';
 import { ChestsTable } from './components/ChestsTable';
+import { StockChecksModal } from './components/StockChecksModal';
 import type { ChestWithStockHistory } from '@/types/chests';
 import { ManagementSectionThemeProvider } from '../ManagementSectionThemeProvider';
 
@@ -36,6 +37,8 @@ export default function ChestsPageClient({
   const [deleteModalOpened, setDeleteModalOpened] = useState(false);
   const [chestToDelete, setChestToDelete] = useState<ChestWithStockHistory | null>(null);
   const [reorderModalOpened, setReorderModalOpened] = useState(false);
+  const [stockChecksModalOpened, setStockChecksModalOpened] = useState(false);
+  const [chestForStockChecks, setChestForStockChecks] = useState<ChestWithStockHistory | null>(null);
 
   const [nameFilter, setNameFilter] = useState<string>('');
   const [page, setPage] = useState(1);
@@ -63,6 +66,11 @@ export default function ChestsPageClient({
   const handleEdit = (chest: ChestWithStockHistory) => {
     setEditingChest(chest);
     setModalOpened(true);
+  };
+
+  const handleConfigureStockChecks = (chest: ChestWithStockHistory) => {
+    setChestForStockChecks(chest);
+    setStockChecksModalOpened(true);
   };
 
   const openCreateModal = () => {
@@ -134,6 +142,7 @@ export default function ChestsPageClient({
         onNameFilterChange={(value: string) => setNameFilter(value)}
         onPageChange={(p: number) => setPage(p)}
         onEdit={handleEdit}
+        onConfigureStockChecks={handleConfigureStockChecks}
         onDelete={(chest: ChestWithStockHistory) => {
           setChestToDelete(chest);
           setDeleteModalOpened(true);
@@ -166,6 +175,15 @@ export default function ChestsPageClient({
         onClose={() => setReorderModalOpened(false)}
         chests={chests}
         onSuccess={loadChests}
+      />
+
+      <StockChecksModal
+        opened={stockChecksModalOpened}
+        chest={chestForStockChecks}
+        onClose={() => {
+          setStockChecksModalOpened(false);
+          setChestForStockChecks(null);
+        }}
       />
       </Container>
     </ManagementSectionThemeProvider>
