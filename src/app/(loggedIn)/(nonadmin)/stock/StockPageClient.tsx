@@ -328,7 +328,7 @@ export default function StockPageClient({ initialItems, initialChests, stockUiPr
                 message: 'Vous n\'avez pas la permission d\'effectuer un craft.',
                 color: 'red',
               });
-              return;
+              return { ok: false as const };
             }
             try {
               const result = await craftItem({
@@ -346,8 +346,8 @@ export default function StockPageClient({ initialItems, initialChests, stockUiPr
                   message: `Craft effectué avec succès ! ${result.data.quantityProduced} objet(s) produit(s).`,
                   color: 'green',
                 });
-                setCraftModalOpened(false);
                 await loadItems(); // Recharger les items pour mettre à jour les stocks
+                return { ok: true as const, quantityProduced: result.data.quantityProduced as number };
               } else {
                 const errorMessage = 'error' in result
                   ? (typeof result.error === 'string' ? result.error : 'Erreur lors du craft')
@@ -357,6 +357,7 @@ export default function StockPageClient({ initialItems, initialChests, stockUiPr
                   message: errorMessage,
                   color: 'red',
                 });
+                return { ok: false as const };
               }
             } catch (error: any) {
               notifications.show({
@@ -364,6 +365,7 @@ export default function StockPageClient({ initialItems, initialChests, stockUiPr
                 message: error.message || 'Erreur lors du craft',
                 color: 'red',
               });
+              return { ok: false as const };
             }
           }}
         />

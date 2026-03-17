@@ -9,10 +9,7 @@ import {
   Text,
   Button,
   Group,
-  Paper,
   Alert,
-  Badge,
-  Table,
   ScrollArea,
   Divider,
   SimpleGrid,
@@ -24,6 +21,17 @@ import { handleAction } from '@/lib/action';
 import { notifications } from '@mantine/notifications';
 import type { ItemWithRelations } from '@/types/stock';
 import type { ChestWithStockHistory } from '@/types/chests';
+import {
+  type CraftContextV1,
+  loadCraftNavStack,
+  pushCraftNavStack,
+  popCraftNavStack,
+  clearCraftNavStack,
+  getLastRecipeIdForItem,
+  setLastRecipeIdForItem,
+} from './craftNavStorage';
+import { CraftNavigationBar } from './components/CraftNavigationBar';
+import { CraftIngredientsTable, type CraftIngredientRow } from './components/CraftIngredientsTable';
 
 interface CraftRecipeWithIngredients {
   id: string;
@@ -54,7 +62,7 @@ interface CraftModalProps {
     sourceChestId: string | null,
     ingredientChests: { ingredientId: string; chestId: string }[],
     destinationChestId: string | null
-  ) => void;
+  ) => Promise<{ ok: true; quantityProduced?: number } | { ok: false }>;
   initialChestId?: string | null;
   chests?: ChestWithStockHistory[];
 }
@@ -78,15 +86,18 @@ export default function CraftModal({
   const [ingredientChests, setIngredientChests] = useState<Record<string, string>>({});
   const [itemsWithStockByChest, setItemsWithStockByChest] = useState<Record<string, ItemWithRelations[]>>({});
   const [loadingItems, setLoadingItems] = useState(false);
+  const [navStack, setNavStack] = useState<CraftContextV1[]>([]);
   const cacheRef = useRef<Record<string, ItemWithRelations[]>>({});
   const loadingChestsRef = useRef<Set<string>>(new Set());
 
-  const loadChestItemsIfNeeded = useCallback(async (chestId: string | null) => {
+  const loadChestItemsIfNeeded = useCallback(async (chestId: string | null, opts?: { force?: boolean }) => {
     if (!chestId) {
       return;
     }
 
-    if (cacheRef.current[chestId]) {
+    const force = opts?.force ?? false;
+
+    if (!force && cacheRef.current[chestId]) {
       return;
     }
 
@@ -119,6 +130,12 @@ export default function CraftModal({
     }
   }, []);
 
+  const refreshChests = useCallback(async (chestIds: Array<string | null | undefined>) => {
+    const unique = Array.from(new Set(chestIds.filter(Boolean))) as string[];
+    if (unique.length === 0) return;
+    await Promise.all(unique.map((id) => loadChestItemsIfNeeded(id, { force: true })));
+  }, [loadChestItemsIfNeeded]);
+
   useEffect(() => {
     cacheRef.current = itemsWithStockByChest;
   }, [itemsWithStockByChest]);
@@ -132,6 +149,11 @@ export default function CraftModal({
       setDestinationChestId(null);
     }
   }, [opened, initialChestId]);
+
+  useEffect(() => {
+    if (!opened) return;
+    setNavStack(loadCraftNavStack());
+  }, [opened]);
 
   useEffect(() => {
     if (opened && sourceChestId) {
@@ -149,6 +171,7 @@ export default function CraftModal({
       setCraftRecipes([]);
       setDestinationChestId(null);
       setIngredientChests({});
+      setNavStack([]);
     }
   }, [opened]);
 
@@ -181,19 +204,42 @@ export default function CraftModal({
     }
   }, [selectedRecipe]);
 
-  const handleItemChange = async (value: string | null) => {
+  const loadRecipesForItem = useCallback(async (itemId: string) => {
+    setLoadingRecipes(true);
+    try {
+      const result = await getCraftRecipesByItemId(itemId, true);
+      const data = handleAction(result);
+      return (data ?? []) as CraftRecipeWithIngredients[];
+    } finally {
+      setLoadingRecipes(false);
+    }
+  }, []);
+
+  const handleItemChange = async (value: string | null, opts?: { preselectRecipeId?: string | null }) => {
     setSelectedCraftItem(value);
     setSelectedRecipe(null);
     if (value) {
-      setLoadingRecipes(true);
       try {
-        const result = await getCraftRecipesByItemId(value, true);
-        const data = handleAction(result);
-        if (data) {
-          setCraftRecipes(data);
-          if (data.length === 1) {
-            setSelectedRecipe(data[0].id);
-          }
+        const data = await loadRecipesForItem(value);
+        setCraftRecipes(data);
+
+        const preselect = opts?.preselectRecipeId ?? null;
+        if (preselect && data.some((r) => r.id === preselect)) {
+          setSelectedRecipe(preselect);
+          setLastRecipeIdForItem(value, preselect);
+          return;
+        }
+
+        if (data.length === 1) {
+          setSelectedRecipe(data[0].id);
+          setLastRecipeIdForItem(value, data[0].id);
+          return;
+        }
+
+        const last = getLastRecipeIdForItem(value);
+        if (last && data.some((r) => r.id === last)) {
+          setSelectedRecipe(last);
+          return;
         }
       } catch (error: any) {
         notifications.show({
@@ -202,7 +248,6 @@ export default function CraftModal({
           color: 'red',
         });
       } finally {
-        setLoadingRecipes(false);
       }
     } else {
       setCraftRecipes([]);
@@ -216,8 +261,36 @@ export default function CraftModal({
     setCraftRecipes([]);
     setDestinationChestId(null);
     setIngredientChests({});
+    clearCraftNavStack();
+    setNavStack([]);
     onClose();
   };
+
+  const applyContext = useCallback(async (ctx: CraftContextV1) => {
+    setSourceChestId(ctx.sourceChestId);
+    setDestinationChestId(ctx.destinationChestId);
+    setIngredientChests(ctx.ingredientChests || {});
+    setCraftQuantity(ctx.times || 1);
+
+    if (ctx.craftedItemId) {
+      await handleItemChange(ctx.craftedItemId, { preselectRecipeId: ctx.recipeId });
+    } else {
+      await handleItemChange(null);
+    }
+  }, [handleItemChange]);
+
+  const handleBack = useCallback(async () => {
+    const { stack, popped } = popCraftNavStack();
+    setNavStack(stack);
+    if (popped) {
+      await applyContext(popped);
+    }
+  }, [applyContext]);
+
+  const handleResetNavigation = useCallback(() => {
+    clearCraftNavStack();
+    setNavStack([]);
+  }, []);
 
   const handleIngredientChestChange = useCallback(async (ingredientId: string, chestId: string | null) => {
     if (chestId) {
@@ -248,7 +321,7 @@ export default function CraftModal({
       chestId: ingredientChests[ingredient.id] || sourceChestId,
     }));
 
-    await onCraft(
+    const result = await onCraft(
       selectedCraftItem,
       selectedRecipe,
       craftQuantity,
@@ -256,6 +329,23 @@ export default function CraftModal({
       ingredientChestsArray,
       destinationChestId
     );
+
+    if (!result.ok) {
+      return;
+    }
+
+    await refreshChests([
+      sourceChestId,
+      destinationChestId,
+      ...ingredientChestsArray.map((c) => c.chestId),
+    ]);
+
+    if (navStack.length > 0) {
+      await handleBack();
+      return;
+    }
+
+    handleClose();
   };
 
   // Helper to get available stock of an item in a specific chest
@@ -351,6 +441,61 @@ export default function CraftModal({
   const selectedRecipeData = craftRecipes.find((r) => r.id === selectedRecipe) || craftRecipes[0];
   const totalQuantityProduced = selectedRecipeData ? selectedRecipeData.quantity * craftQuantity : 0;
 
+  const getCurrentContext = useCallback((): CraftContextV1 => {
+    return {
+      craftedItemId: selectedCraftItem,
+      recipeId: selectedRecipe,
+      times: craftQuantity,
+      sourceChestId,
+      destinationChestId,
+      ingredientChests,
+    };
+  }, [craftQuantity, destinationChestId, ingredientChests, selectedCraftItem, selectedRecipe, sourceChestId]);
+
+  const handleDrillDownToIngredient = useCallback(async (ingredient: CraftRecipeWithIngredients['ingredients'][number], requiredQuantity: number, stockInfo: { stock: number | null; isToday: boolean }) => {
+    const ingredientItemId = ingredient.usedItemId;
+
+    const recipes = await loadRecipesForItem(ingredientItemId);
+    if (!recipes || recipes.length === 0) {
+      notifications.show({
+        title: 'Impossible',
+        message: 'Aucune recette disponible pour cet ingrédient',
+        color: 'yellow',
+      });
+      return;
+    }
+
+    const last = getLastRecipeIdForItem(ingredientItemId);
+    const preferred = last && recipes.some((r) => r.id === last) ? last : (recipes[0]?.id ?? null);
+    const recipe = recipes.find((r) => r.id === preferred) ?? recipes[0];
+    if (!recipe) return;
+
+    const available = stockInfo.isToday && stockInfo.stock != null ? stockInfo.stock : 0;
+    const missing = Math.max(0, requiredQuantity - available);
+    const yieldPerCraft = Math.max(1, recipe.quantity);
+    const timesNeeded = Math.max(1, Math.ceil(missing / yieldPerCraft));
+
+    const nextCtx: CraftContextV1 = {
+      craftedItemId: ingredientItemId,
+      recipeId: recipe.id,
+      times: timesNeeded,
+      sourceChestId,
+      destinationChestId,
+      ingredientChests: {},
+    };
+
+    const currentCtx = getCurrentContext();
+    const nextStack = pushCraftNavStack(currentCtx);
+    setNavStack(nextStack);
+
+    setCraftRecipes(recipes);
+    setSelectedCraftItem(ingredientItemId);
+    setSelectedRecipe(recipe.id);
+    setLastRecipeIdForItem(ingredientItemId, recipe.id);
+    setCraftQuantity(timesNeeded);
+    setIngredientChests({});
+  }, [destinationChestId, getCurrentContext, loadRecipesForItem, sourceChestId]);
+
   return (
     <Modal
       opened={opened}
@@ -361,6 +506,7 @@ export default function CraftModal({
       scrollAreaComponent={ScrollArea.Autosize}
     >
       <Stack gap="lg">
+        <CraftNavigationBar depth={navStack.length} onBack={handleBack} onReset={handleResetNavigation} />
         <Stack gap="sm">
           <Text fw={600} size="xs" c="dimmed" tt="uppercase">
             Coffres
@@ -410,7 +556,7 @@ export default function CraftModal({
                 label: item.name,
               }))}
             value={selectedCraftItem}
-            onChange={handleItemChange}
+            onChange={(value) => handleItemChange(value)}
             searchable
             required
             disabled={loadingItems}
@@ -427,7 +573,12 @@ export default function CraftModal({
                   label: recipe.name,
                 }))}
                 value={selectedRecipe}
-                onChange={(value) => setSelectedRecipe(value)}
+                onChange={(value) => {
+                  setSelectedRecipe(value);
+                  if (selectedCraftItem && value) {
+                    setLastRecipeIdForItem(selectedCraftItem, value);
+                  }
+                }}
                 required
                 renderOption={({ option }) => {
                   const recipe = craftRecipes.find((r) => r.id === option.value);
@@ -470,85 +621,38 @@ export default function CraftModal({
 
                 <Divider />
 
-                <Paper withBorder shadow="xs" p="sm">
-                  <Stack gap="sm">
-                    <Text size="xs" c="dimmed" fw={600} tt="uppercase">
-                      Ingrédients nécessaires
-                    </Text>
-                    <Table striped highlightOnHover>
-                      <Table.Thead>
-                        <Table.Tr>
-                          <Table.Th>Ingrédient</Table.Th>
-                          <Table.Th style={{ width: 180 }}>Coffre source</Table.Th>
-                          <Table.Th style={{ width: 120 }}>Stock</Table.Th>
-                          <Table.Th style={{ width: 100 }}>Requis</Table.Th>
-                          <Table.Th style={{ width: 60 }}>Statut</Table.Th>
-                        </Table.Tr>
-                      </Table.Thead>
-                      <Table.Tbody>
-                        {selectedRecipeData.ingredients.map((ingredient) => {
-                          const requiredQuantity = ingredient.quantity * craftQuantity;
-                          const ingredientChestId = ingredientChests[ingredient.id] || sourceChestId;
-                          const stockInfo = getItemStockInChest(ingredient.usedItemId, ingredientChestId);
-                          const hasEnough = stockInfo.isToday && stockInfo.stock !== null && stockInfo.stock >= requiredQuantity;
+                <CraftIngredientsTable
+                  rows={selectedRecipeData.ingredients.map((ingredient): CraftIngredientRow => {
+                    const requiredQuantity = ingredient.quantity * craftQuantity;
+                    const ingredientChestId = ingredientChests[ingredient.id] || sourceChestId;
+                    const stockInfo = getItemStockInChest(ingredient.usedItemId, ingredientChestId);
+                    const hasEnough = stockInfo.isToday && stockInfo.stock !== null && stockInfo.stock >= requiredQuantity;
+                    const isActionableMissing = stockInfo.stock === null || !stockInfo.isToday || !hasEnough;
 
-                          return (
-                            <Table.Tr key={ingredient.id}>
-                              <Table.Td>
-                                <Text fw={500}>{ingredient.usedItem.name}</Text>
-                              </Table.Td>
-                              <Table.Td>
-                                <Select
-                                  data={chestOptions}
-                                  value={ingredientChestId}
-                                  onChange={(value) => handleIngredientChestChange(ingredient.id, value)}
-                                  size="xs"
-                                  disabled={!sourceChestId}
-                                />
-                              </Table.Td>
-                              <Table.Td>
-                                {stockInfo.stock !== null ? (
-                                  <Badge
-                                    color={stockInfo.isToday ? 'blue' : 'orange'}
-                                    variant="light"
-                                  >
-                                    {stockInfo.stock} {stockInfo.isToday ? '' : '(hier)'}
-                                  </Badge>
-                                ) : (
-                                  <Text size="xs" c="red">
-                                    Aucun stock
-                                  </Text>
-                                )}
-                              </Table.Td>
-                              <Table.Td>
-                                <Text size="sm" fw={500}>
-                                  {requiredQuantity}
-                                </Text>
-                              </Table.Td>
-                              <Table.Td>
-                                {stockInfo.stock !== null ? (
-                                  hasEnough ? (
-                                    <Badge color="green" size="sm">
-                                      ✓
-                                    </Badge>
-                                  ) : (
-                                    <Badge color={stockInfo.isToday ? 'red' : 'orange'} size="sm">
-                                      ✗
-                                    </Badge>
-                                  )
-                                ) : (
-                                  <Badge color="red" size="sm">
-                                    ✗
-                                  </Badge>
-                                )}
-                              </Table.Td>
-                            </Table.Tr>
-                          );
-                        })}
-                      </Table.Tbody>
-                    </Table>
-                  </Stack>
-                </Paper>
+                    return {
+                      id: ingredient.id,
+                      usedItemId: ingredient.usedItemId,
+                      usedItemName: ingredient.usedItem.name,
+                      requiredQuantity,
+                      ingredientChestId,
+                      stockInfo,
+                      hasEnough,
+                      isActionableMissing,
+                    };
+                  })}
+                  chestOptions={chestOptions}
+                  disabled={!sourceChestId}
+                  onChangeIngredientChest={handleIngredientChestChange}
+                  onDrillDown={(ingredientId) => {
+                    const ingredient = selectedRecipeData.ingredients.find((i) => i.id === ingredientId);
+                    if (!ingredient) return;
+
+                    const requiredQuantity = ingredient.quantity * craftQuantity;
+                    const ingredientChestId = ingredientChests[ingredient.id] || sourceChestId;
+                    const stockInfo = getItemStockInChest(ingredient.usedItemId, ingredientChestId);
+                    handleDrillDownToIngredient(ingredient, requiredQuantity, stockInfo);
+                  }}
+                />
               </>
             )}
           </>
