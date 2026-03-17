@@ -143,8 +143,25 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
     setStockValues({});
   };
 
-  // Function to safely evaluate a simple mathematical expression
-  const evaluateExpression = (expression: string): number | '' => {
+  const truncateToDecimals = (value: number, decimals: number): number => {
+    const factor = 10 ** decimals;
+    return Math.trunc(value * factor) / factor;
+  };
+
+  const formatTruncated = (value: number, minDecimals = 1, maxDecimals = 2): string => {
+    const truncated = truncateToDecimals(value, maxDecimals);
+    const [intPart, rawFrac = ''] = String(truncated).split('.');
+    const frac = rawFrac.slice(0, maxDecimals);
+
+    if (maxDecimals <= 0) return intPart;
+
+    const padded = frac.padEnd(minDecimals, '0');
+    const trimmed = padded.length > minDecimals ? padded.replace(/0+$/, '') : padded;
+    return `${intPart}.${trimmed}`;
+  };
+
+  // Function to safely evaluate a simple mathematical expression (integer result)
+  const evaluateIntegerExpression = (expression: string): number | '' => {
     if (!expression || expression.trim() === '') return '';
 
     // Clean expression: remove spaces
@@ -161,7 +178,33 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
       // Limited to basic mathematical calculations
       const result = new Function('return ' + cleaned)();
       if (typeof result === 'number' && !isNaN(result) && isFinite(result)) {
-        return Math.round(result); // Arrondir pour les entiers
+        return Math.round(result);
+      }
+      return '';
+    } catch {
+      return '';
+    }
+  };
+
+  // Function to safely evaluate a simple mathematical expression (decimal result, no rounding)
+  const evaluateDecimalExpression = (expression: string): number | '' => {
+    if (!expression || expression.trim() === '') return '';
+
+    // Clean expression: remove spaces
+    const cleaned = expression.replace(/\s/g, '');
+
+    // Check that expression contains only allowed characters
+    // Allow digits, +, -, *, /, (, ), and decimal point
+    if (!/^[\d+\-*/().]+$/.test(cleaned)) {
+      return '';
+    }
+
+    try {
+      // Use Function constructor to evaluate more safely than eval()
+      // Limited to basic mathematical calculations
+      const result = new Function('return ' + cleaned)();
+      if (typeof result === 'number' && !isNaN(result) && isFinite(result)) {
+        return result;
       }
       return '';
     } catch {
@@ -183,7 +226,7 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
       }));
     } else if (/[\+\-\*\/]/.test(trimmed)) {
       // Contains mathematical operators, evaluate expression
-      const result = evaluateExpression(trimmed);
+      const result = evaluateIntegerExpression(trimmed);
       setStockValues((prev) => ({
         ...prev,
         [itemId]: result,
@@ -229,7 +272,7 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
     let weightInKg: number;
 
     if (/[\+\-\*\/]/.test(trimmed)) {
-      const result = evaluateExpression(trimmed);
+      const result = evaluateDecimalExpression(trimmed);
       if (result === '') {
         return;
       }
@@ -271,7 +314,7 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
     let weightInKg: number;
 
     if (/[\+\-\*\/]/.test(trimmed)) {
-      const result = evaluateExpression(trimmed);
+      const result = evaluateDecimalExpression(trimmed);
       if (result === '') {
         notifications.show({
           title: 'Erreur',
@@ -303,18 +346,10 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
       return;
     }
 
-    const numberOfItems = Math.round(weightInKg / item.weight);
-
     setWeightPopoverOpened((prev) => ({
       ...prev,
       [item.id]: false,
     }));
-
-    notifications.show({
-      title: 'Calcul effectué',
-      message: `${weightInKg} kg ÷ ${item.weight} kg = ${numberOfItems} objet(s)`,
-      color: 'green',
-    });
   };
 
   useEffect(() => {
@@ -632,7 +667,7 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
                                       [item.id]: '',
                                     }));
                                   } else if (/[\+\-\*\/]/.test(inputValue)) {
-                                    const result = evaluateExpression(inputValue);
+                                    const result = evaluateIntegerExpression(inputValue);
                                     if (result !== '') {
                                       setStockInputValues((prev) => ({
                                         ...prev,
@@ -718,7 +753,7 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
                                                         const inputValue = weightInputValues[item.id] || '';
                                                         const trimmed = inputValue.trim();
                                                         if (trimmed && /[\+\-\*\/]/.test(trimmed)) {
-                                                          const result = evaluateExpression(trimmed);
+                                                          const result = evaluateDecimalExpression(trimmed);
                                                           if (result !== '') {
                                                             setWeightInputValues((prev) => ({
                                                               ...prev,
@@ -762,7 +797,7 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
                                                 size="xs"
                                                 onClick={() => handleWeightCalculation(item)}
                                               >
-                                                Calculer
+                                                Valider
                                               </Button>
                                             </Group>
                                           </Stack>
