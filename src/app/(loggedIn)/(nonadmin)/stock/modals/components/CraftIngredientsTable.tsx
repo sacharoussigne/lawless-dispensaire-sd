@@ -50,8 +50,23 @@ export function CraftIngredientsTable(props: {
                       <Button
                         variant="subtle"
                         size="xs"
-                        p={0}
-                        styles={{ root: { height: 'auto' } }}
+                        fullWidth
+                        justify="flex-start"
+                        px="xs"
+                        py={6}
+                        styles={{
+                          root: {
+                            height: 'auto',
+                          },
+                          inner: {
+                            justifyContent: 'flex-start',
+                          },
+                          label: {
+                            width: '100%',
+                            textAlign: 'left',
+                            whiteSpace: 'normal',
+                          },
+                        }}
                         onClick={() => onDrillDown(row.id)}
                       >
                         {row.usedItemName}
