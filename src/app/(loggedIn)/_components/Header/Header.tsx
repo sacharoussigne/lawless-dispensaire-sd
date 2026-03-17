@@ -17,7 +17,7 @@ import { AuthSession } from '@/types/session';
 import { routes } from '@/types/routes';
 import Link from 'next/link';
 import Image from 'next/image';
-import { IconLogout, IconSearch } from '@tabler/icons-react';
+import { IconLogout, IconSearch, IconSettings } from '@tabler/icons-react';
 import { usePermissions } from '@/app/_contexts/PermissionsContext';
 import { hasRole, checkRolePermission } from '@/lib/auth/permissions';
 import { Role } from '@/types/enum/roles';
@@ -233,6 +233,11 @@ export default function Header({
                         <Menu.Divider />
                       </>
                     )}
+                    <Link href={routes.settings.index}>
+                      <Menu.Item leftSection={<IconSettings size={16} stroke={1.5} />}>
+                        Paramètres
+                      </Menu.Item>
+                    </Link>
                     <Menu.Item
                       leftSection={<IconLogout size={16} stroke={1.5} />}
                       onClick={handleLogout}
