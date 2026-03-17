@@ -15,6 +15,8 @@ import { ChestSelectorBar } from './components/ChestSelectorBar';
 import { CategorySection } from './components/CategorySection';
 import { evaluateDecimalExpression, evaluateIntegerExpression } from '@/lib/stock/expression';
 import { normalizeQuantity } from '@/lib/stock/stockEditing';
+import { getStockChecksSummary } from '@/app/_actions/stockChecks';
+import type { StockChecksSummary } from '@/app/_actions/stockChecks';
 
 interface StockPageClientProps {
   initialItems: ItemWithRelations[];
@@ -32,6 +34,17 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
   const [craftModalOpened, setCraftModalOpened] = useState(false);
   const [transferModalOpened, setTransferModalOpened] = useState(false);
   const [editedQuantitiesByItemId, setEditedQuantitiesByItemId] = useState<Record<string, number | null>>({});
+  const [stockChecksSummary, setStockChecksSummary] = useState<StockChecksSummary | null>(null);
+
+  const loadStockChecksSummary = async () => {
+    try {
+      const result = await getStockChecksSummary();
+      const data = handleAction(result);
+      if (data) setStockChecksSummary(data);
+    } catch {
+      setStockChecksSummary(null);
+    }
+  };
 
   const loadItems = async () => {
     try {
@@ -56,6 +69,11 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
     loadItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedChestId]);
+
+  useEffect(() => {
+    loadStockChecksSummary();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (isEditing && items.length > 0) {
@@ -193,6 +211,31 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
     }));
   }, [itemsByCategory]);
 
+  const isCategoryCheckEnabled = useCallback((categoryId: string): boolean => {
+    if (!stockChecksSummary) return true;
+
+    const isEnabledForChest = (chestId: string): boolean => {
+      const cfg = stockChecksSummary.configsByChestId[chestId];
+      if (!cfg) return true;
+      return cfg.isEnabled;
+    };
+
+    const isCategoryEnabledForChest = (chestId: string): boolean => {
+      const cfg = stockChecksSummary.configsByChestId[chestId];
+      if (!cfg) return true;
+      if (!cfg.isEnabled) return false;
+      if (cfg.categoryIds.length === 0) return true;
+      return cfg.categoryIds.includes(categoryId);
+    };
+
+    if (selectedChestId) {
+      if (!isEnabledForChest(selectedChestId)) return false;
+      return isCategoryEnabledForChest(selectedChestId);
+    }
+
+    return stockChecksSummary.enabledChestIds.some((chestId) => isCategoryEnabledForChest(chestId));
+  }, [selectedChestId, stockChecksSummary]);
+
   const { itemsWithStockToday, totalItems, totalWeightToday } = useMemo(() => {
     const withStock = items.filter((item) => item.stockToday !== null).length;
 
@@ -257,6 +300,7 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
               isEditing={isEditing}
               canStockUpdate={Boolean(permissions?.stock.update)}
               selectedChestId={selectedChestId}
+              isCategoryCheckEnabled={isCategoryCheckEnabled}
               getTextColor={getTextColor}
               onCommitQuantity={handleCommitQuantity}
               evaluateIntegerExpression={evaluateIntegerExpression}

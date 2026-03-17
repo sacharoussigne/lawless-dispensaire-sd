@@ -2,7 +2,7 @@ export interface ItemWithRelations {
   id: string;
   name: string;
   description: string | null;
-  idealQuantity: number;
+  minimalQuantity: number;
   isCraftable: boolean;
   canBeSold?: boolean;
   price?: number | string | null;

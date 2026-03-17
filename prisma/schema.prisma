@@ -87,6 +87,7 @@ model CategoryItem {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   items     Item[]
+  chestStockCheckCategories ChestStockCheckCategory[]
 
   @@map("category_item")
 }
@@ -95,7 +96,7 @@ model Item {
   id             String            @id @default(uuid())
   name           String
   description    String?
-  idealQuantity  Int
+  minimalQuantity  Int
   isCraftable    Boolean           @default(false)
   isEnabled      Boolean           @default(true)
   canBeSold      Boolean           @default(false)
@@ -127,8 +128,33 @@ model Chest {
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   stockHistory StockHistory[]
+  stockCheckConfig ChestStockCheckConfig?
 
   @@map("chest")
+}
+
+model ChestStockCheckConfig {
+  id        String   @id @default(uuid())
+  chestId   String   @unique
+  isEnabled Boolean  @default(true)
+  chest     Chest    @relation(fields: [chestId], references: [id], onDelete: Cascade)
+  categories ChestStockCheckCategory[]
+
+  @@index([chestId])
+  @@map("chest_stock_check_config")
+}
+
+model ChestStockCheckCategory {
+  id        String   @id @default(uuid())
+  configId  String
+  categoryId String
+  config    ChestStockCheckConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+  category  CategoryItem          @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([configId, categoryId])
+  @@index([configId])
+  @@index([categoryId])
+  @@map("chest_stock_check_category")
 }
 
 model StockHistory {

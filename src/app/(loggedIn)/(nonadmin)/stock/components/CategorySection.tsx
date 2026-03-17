@@ -12,6 +12,7 @@ interface CategorySectionProps {
   isEditing: boolean;
   canStockUpdate: boolean;
   selectedChestId: string | null;
+  isCategoryCheckEnabled: (categoryId: string) => boolean;
   getTextColor: (backgroundColor: string) => string;
   onCommitQuantity: (itemId: string, quantity: number | null) => void;
   evaluateIntegerExpression: (expression: string) => EvalResult;
@@ -24,6 +25,7 @@ export const CategorySection = memo(function CategorySection({
   isEditing,
   canStockUpdate,
   selectedChestId,
+  isCategoryCheckEnabled,
   getTextColor,
   onCommitQuantity,
   evaluateIntegerExpression,
@@ -78,7 +80,7 @@ export const CategorySection = memo(function CategorySection({
               editedQuantity={editedQuantitiesByItemId[item.id] ?? item.stockToday}
               isEditing={isEditing}
               canStockUpdate={canStockUpdate}
-              selectedChestId={selectedChestId}
+              isCategoryCheckEnabled={isCategoryCheckEnabled}
               getTextColor={getTextColor}
               onCommitQuantity={onCommitQuantity}
               evaluateIntegerExpression={evaluateIntegerExpression}

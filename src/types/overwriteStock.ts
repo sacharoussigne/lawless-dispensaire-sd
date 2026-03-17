@@ -2,7 +2,7 @@ export interface ItemWithStock {
   id: string;
   name: string;
   description: string | null;
-  idealQuantity: number;
+  minimalQuantity: number;
   isCraftable: boolean;
   categoryId: string;
   companyGroupId: string | null;

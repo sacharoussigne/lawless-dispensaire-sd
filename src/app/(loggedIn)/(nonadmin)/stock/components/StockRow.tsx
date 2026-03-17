@@ -12,7 +12,7 @@ interface StockRowProps {
   editedQuantity: number | null;
   isEditing: boolean;
   canStockUpdate: boolean;
-  selectedChestId: string | null;
+  isCategoryCheckEnabled: (categoryId: string) => boolean;
   getTextColor: (backgroundColor: string) => string;
   onCommitQuantity: (itemId: string, quantity: number | null) => void;
   evaluateIntegerExpression: (expression: string) => EvalResult;
@@ -24,7 +24,7 @@ export const StockRow = memo(function StockRow({
   editedQuantity,
   isEditing,
   canStockUpdate,
-  selectedChestId,
+  isCategoryCheckEnabled,
   onCommitQuantity,
   evaluateIntegerExpression,
   evaluateDecimalExpression,
@@ -34,7 +34,8 @@ export const StockRow = memo(function StockRow({
   const currentStock =
     item.stockToday !== null ? item.stockToday : item.stockYesterday !== null ? item.stockYesterday : null;
 
-  const isStockLow = selectedChestId === null && currentStock !== null && currentStock < item.idealQuantity;
+  const shouldCheck = isCategoryCheckEnabled(item.categoryId);
+  const isStockLow = shouldCheck && currentStock !== null && currentStock < item.minimalQuantity;
 
   let backgroundColor: string | undefined = undefined;
   if (isStockLow) {
@@ -61,7 +62,7 @@ export const StockRow = memo(function StockRow({
           )}
         </Group>
       </Table.Td>
-      <Table.Td>{item.idealQuantity}</Table.Td>
+      <Table.Td>{item.minimalQuantity}</Table.Td>
       <Table.Td>
         {item.stockYesterday !== null ? <Text>{item.stockYesterday}</Text> : <Text c="dimmed">?</Text>}
       </Table.Td>

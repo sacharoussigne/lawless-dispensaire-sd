@@ -44,7 +44,7 @@ export function ItemModal({
     initialValues: {
       name: '',
       description: '',
-      idealQuantity: 0,
+      minimalQuantity: 0,
       isCraftable: false,
       isEnabled: true,
       canBeSold: false,
@@ -55,7 +55,7 @@ export function ItemModal({
     },
     validate: {
       name: (value) => (value.length < 1 ? 'Le nom est requis' : null),
-      idealQuantity: (value) =>
+      minimalQuantity: (value) =>
         value < 0 ? 'La quantité minimale doit être positive' : null,
       categoryId: (value) => (!value ? 'La catégorie est requise' : null),
       price: (value, values) => {
@@ -87,7 +87,7 @@ export function ItemModal({
       form.setValues({
         name: editingItem.name,
         description: editingItem.description || '',
-        idealQuantity: editingItem.idealQuantity,
+        minimalQuantity: editingItem.minimalQuantity,
         isCraftable: editingItem.isCraftable,
         isEnabled: editingItem.isEnabled ?? true,
         canBeSold: editingItem.canBeSold ?? false,
@@ -116,7 +116,7 @@ export function ItemModal({
           id: editingItem.id,
           name: values.name,
           description: values.description || undefined,
-          idealQuantity: values.idealQuantity,
+          minimalQuantity: values.minimalQuantity,
           isCraftable: values.isCraftable,
           isEnabled: values.isEnabled,
           canBeSold: values.canBeSold,
@@ -129,7 +129,7 @@ export function ItemModal({
         result = await createItem({
           name: values.name,
           description: values.description || undefined,
-          idealQuantity: values.idealQuantity,
+          minimalQuantity: values.minimalQuantity,
           isCraftable: values.isCraftable,
           isEnabled: values.isEnabled,
           canBeSold: values.canBeSold,
@@ -230,7 +230,7 @@ export function ItemModal({
                 placeholder="Quantité minimale"
                 required
                 min={0}
-                {...form.getInputProps('idealQuantity')}
+                {...form.getInputProps('minimalQuantity')}
               />
               <Select
                 label="Catégorie"

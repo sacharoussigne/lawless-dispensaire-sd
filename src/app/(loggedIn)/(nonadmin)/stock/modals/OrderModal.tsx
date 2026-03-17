@@ -192,7 +192,7 @@ export default function OrderModal({
             !item.isCraftable &&
             item.companyGroupId === group.id &&
             item.stockToday !== null &&
-            item.stockToday < item.idealQuantity
+            item.stockToday < item.minimalQuantity
         );
       }
       
@@ -258,11 +258,11 @@ export default function OrderModal({
           !item.isCraftable &&
           item.companyGroupId === selectedCompanyGroupId &&
           item.stockToday !== null &&
-          item.stockToday < item.idealQuantity
+          item.stockToday < item.minimalQuantity
       );
 
       const initialOrderItems: OrderItem[] = itemsNeedingRestock.map((item) => {
-        const quantityNeeded = item.idealQuantity - (item.stockToday ?? 0);
+        const quantityNeeded = item.minimalQuantity - (item.stockToday ?? 0);
         return {
           itemId: item.id,
           quantity: quantityNeeded > 0 ? quantityNeeded : 1,
@@ -565,13 +565,13 @@ export default function OrderModal({
                         {hasStockInfo && (
                           <>
                             <Table.Td>
-                              <Badge color={stockToday < item.idealQuantity ? 'red' : 'green'}>
+                              <Badge color={stockToday < item.minimalQuantity ? 'red' : 'green'}>
                                 {stockToday}
                               </Badge>
                             </Table.Td>
-                            <Table.Td>{item.idealQuantity}</Table.Td>
+                            <Table.Td>{item.minimalQuantity}</Table.Td>
                             <Table.Td>
-                              <Badge color={finalQuantity >= item.idealQuantity ? 'green' : 'orange'}>
+                              <Badge color={finalQuantity >= item.minimalQuantity ? 'green' : 'orange'}>
                                 {finalQuantity}
                               </Badge>
                             </Table.Td>
