@@ -1,0 +1,93 @@
+'use client';
+
+import { memo } from 'react';
+import { Badge, Group, Paper, Table, Text } from '@mantine/core';
+import type { CategoryWithItems } from '@/types/stock';
+import { StockRow } from './StockRow';
+import type { EvalResult } from '@/lib/stock/expression';
+
+interface CategorySectionProps {
+  categoryData: CategoryWithItems;
+  editedQuantitiesByItemId: Record<string, number | null | undefined>;
+  isEditing: boolean;
+  canStockUpdate: boolean;
+  selectedChestId: string | null;
+  getTextColor: (backgroundColor: string) => string;
+  onCommitQuantity: (itemId: string, quantity: number | null) => void;
+  evaluateIntegerExpression: (expression: string) => EvalResult;
+  evaluateDecimalExpression: (expression: string) => EvalResult;
+}
+
+export const CategorySection = memo(function CategorySection({
+  categoryData,
+  editedQuantitiesByItemId,
+  isEditing,
+  canStockUpdate,
+  selectedChestId,
+  getTextColor,
+  onCommitQuantity,
+  evaluateIntegerExpression,
+  evaluateDecimalExpression,
+}: CategorySectionProps) {
+  const textColor = getTextColor(categoryData.category.color);
+
+  const categoryTotalWeight = categoryData.items.reduce((sum, item) => {
+    if (item.stockToday === null || item.weight == null) return sum;
+    return sum + item.stockToday * item.weight;
+  }, 0);
+
+  return (
+    <Paper key={categoryData.category.id} shadow="sm" p="md" withBorder>
+      <Group mb="md" justify="space-between" align="center">
+        <Group gap="xs" align="center">
+          <Badge
+            style={{
+              backgroundColor: categoryData.category.color,
+              color: textColor,
+            }}
+            variant="filled"
+            size="lg"
+          >
+            {categoryData.category.name}
+          </Badge>
+          <Text c="dimmed" size="sm">
+            {categoryData.items.length} objet(s)
+          </Text>
+        </Group>
+        {categoryTotalWeight > 0 && (
+          <Text size="sm" fw={600} c={categoryData.category.color}>
+            {categoryTotalWeight.toFixed(2)} kg
+          </Text>
+        )}
+      </Group>
+      <Table striped highlightOnHover>
+        <Table.Thead>
+          <Table.Tr>
+            <Table.Th>Nom</Table.Th>
+            <Table.Th>Quantité minimale</Table.Th>
+            <Table.Th>Stock J-1</Table.Th>
+            <Table.Th>Stock aujourd'hui</Table.Th>
+            {isEditing && canStockUpdate && <Table.Th>Nouveau stock</Table.Th>}
+          </Table.Tr>
+        </Table.Thead>
+        <Table.Tbody>
+          {categoryData.items.map((item) => (
+            <StockRow
+              key={item.id}
+              item={item}
+              editedQuantity={editedQuantitiesByItemId[item.id] ?? item.stockToday}
+              isEditing={isEditing}
+              canStockUpdate={canStockUpdate}
+              selectedChestId={selectedChestId}
+              getTextColor={getTextColor}
+              onCommitQuantity={onCommitQuantity}
+              evaluateIntegerExpression={evaluateIntegerExpression}
+              evaluateDecimalExpression={evaluateDecimalExpression}
+            />
+          ))}
+        </Table.Tbody>
+      </Table>
+    </Paper>
+  );
+});
+
