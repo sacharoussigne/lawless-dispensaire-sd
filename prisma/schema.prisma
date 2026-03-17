@@ -25,9 +25,31 @@ model User {
   bankAccountAccesses BankAccountAccess[]
   mailTemplates MailTemplate[]
   mails        Mail[]
+  uiPreferences UserUiPreferences?
 
   @@unique([email])
   @@map("user")
+}
+
+model UserUiPreferences {
+  id                   String   @id @default(uuid())
+  userId               String   @unique
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Stock table colors
+  lowStockCraftableBg  String   @default("#fff3cd")
+  lowStockNormalBg     String   @default("#f8d7da")
+  okStockBg            String?
+  unknownStockBg       String?
+
+  // Stock row badge "Fait"
+  doneTodayBadgeBg     String?
+
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([userId])
+  @@map("user_ui_preferences")
 }
 
 model Session {

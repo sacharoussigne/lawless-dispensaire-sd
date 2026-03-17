@@ -1,6 +1,8 @@
 import { getAuthSession } from '@/lib/auth';
 import SettingsPageClient from './SettingsPageClient';
 import prisma from '@/lib/prisma';
+import { getMyStockUiPreferences } from '@/app/_actions/stockUiPreferences';
+import { getDataOrThrow } from '@/lib/response';
 
 export default async function SettingsPage() {
   const session = await getAuthSession();
@@ -18,6 +20,9 @@ export default async function SettingsPage() {
       )
     : false;
 
+  const stockUiPreferencesResult = await getMyStockUiPreferences();
+  const stockUiPreferences = getDataOrThrow(stockUiPreferencesResult, 'Erreur lors du chargement des préférences');
+
   return (
     <SettingsPageClient
       initialUser={{
@@ -25,6 +30,7 @@ export default async function SettingsPage() {
         image: session?.user?.image ?? null,
       }}
       canChangePassword={canChangePassword}
+      initialStockUiPreferences={stockUiPreferences}
     />
   );
 }

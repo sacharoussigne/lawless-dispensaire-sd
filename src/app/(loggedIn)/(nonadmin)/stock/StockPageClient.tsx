@@ -17,13 +17,15 @@ import { evaluateDecimalExpression, evaluateIntegerExpression } from '@/lib/stoc
 import { normalizeQuantity } from '@/lib/stock/stockEditing';
 import { getStockChecksSummary } from '@/app/_actions/stockChecks';
 import type { StockChecksSummary } from '@/app/_actions/stockChecks';
+import type { StockUiPreferences } from '@/types/stockUiPreferences';
 
 interface StockPageClientProps {
   initialItems: ItemWithRelations[];
   initialChests: ChestWithStockHistory[];
+  stockUiPreferences: StockUiPreferences;
 }
 
-export default function StockPageClient({ initialItems, initialChests }: StockPageClientProps) {
+export default function StockPageClient({ initialItems, initialChests, stockUiPreferences }: StockPageClientProps) {
   const { permissions } = usePermissions();
   const [items, setItems] = useState<ItemWithRelations[]>(initialItems);
   const [chests] = useState<ChestWithStockHistory[]>(initialChests);
@@ -302,6 +304,7 @@ export default function StockPageClient({ initialItems, initialChests }: StockPa
               selectedChestId={selectedChestId}
               isCategoryCheckEnabled={isCategoryCheckEnabled}
               getTextColor={getTextColor}
+              stockUiPreferences={stockUiPreferences}
               onCommitQuantity={handleCommitQuantity}
               evaluateIntegerExpression={evaluateIntegerExpression}
               evaluateDecimalExpression={evaluateDecimalExpression}

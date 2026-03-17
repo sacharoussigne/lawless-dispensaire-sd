@@ -3,9 +3,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Avatar,
+  ActionIcon,
   Button,
   Card,
   Container,
+  ColorInput,
   Divider,
   FileInput,
   Group,
@@ -22,7 +24,11 @@ import { ParsedZodError } from '@/lib/errors/ParsedZodError';
 import { handleApiZodError } from '@/lib/services/zod';
 import { handleAction } from '@/lib/action';
 import { changeMyPassword, updateMyProfile } from '@/app/_actions/account';
+import { updateMyStockUiPreferences } from '@/app/_actions/stockUiPreferences';
 import { useRouter } from 'next/navigation';
+import type { StockUiPreferences } from '@/types/stockUiPreferences';
+import { STOCK_UI_DEFAULTS } from '@/types/stockUiPreferences';
+import { IconX } from '@tabler/icons-react';
 
 type SettingsImageMode = 'url' | 'upload';
 
@@ -47,10 +53,12 @@ function fileToDataUrl(file: File): Promise<string> {
 export default function SettingsPageClient(props: {
   initialUser: { name: string; image: string | null };
   canChangePassword: boolean;
+  initialStockUiPreferences: StockUiPreferences;
 }) {
   const router = useRouter();
   const [profileSaving, setProfileSaving] = useState(false);
   const [passwordSaving, setPasswordSaving] = useState(false);
+  const [stockUiSaving, setStockUiSaving] = useState(false);
   const [imageMode, setImageMode] = useState<SettingsImageMode>('url');
 
   const profileForm = useForm({
@@ -92,6 +100,23 @@ export default function SettingsPageClient(props: {
       newPassword: (value) => (value.length < 8 ? 'Le mot de passe doit contenir au moins 8 caractères' : null),
       confirmNewPassword: (value, values) =>
         value !== values.newPassword ? 'Les mots de passe ne correspondent pas' : null,
+    },
+  });
+
+  const stockUiForm = useForm({
+    initialValues: {
+      lowStockCraftableBg: props.initialStockUiPreferences.lowStockCraftableBg,
+      lowStockNormalBg: props.initialStockUiPreferences.lowStockNormalBg,
+      okStockBg: props.initialStockUiPreferences.okStockBg ?? '',
+      unknownStockBg: props.initialStockUiPreferences.unknownStockBg ?? '',
+      doneTodayBadgeBg: props.initialStockUiPreferences.doneTodayBadgeBg ?? '',
+    },
+    validate: {
+      lowStockCraftableBg: (value) => (!/^#[0-9a-fA-F]{6}$/.test(value) ? 'Couleur invalide (#RRGGBB)' : null),
+      lowStockNormalBg: (value) => (!/^#[0-9a-fA-F]{6}$/.test(value) ? 'Couleur invalide (#RRGGBB)' : null),
+      okStockBg: (value) => (value && !/^#[0-9a-fA-F]{6}$/.test(value) ? 'Couleur invalide (#RRGGBB)' : null),
+      unknownStockBg: (value) => (value && !/^#[0-9a-fA-F]{6}$/.test(value) ? 'Couleur invalide (#RRGGBB)' : null),
+      doneTodayBadgeBg: (value) => (value && !/^#[0-9a-fA-F]{6}$/.test(value) ? 'Couleur invalide (#RRGGBB)' : null),
     },
   });
 
@@ -205,6 +230,47 @@ export default function SettingsPageClient(props: {
     }
   };
 
+  const handleSaveStockUi = async () => {
+    try {
+      const validated = stockUiForm.validate();
+      if (validated.hasErrors) return;
+
+      setStockUiSaving(true);
+
+      const result = await updateMyStockUiPreferences({
+        lowStockCraftableBg: stockUiForm.values.lowStockCraftableBg,
+        lowStockNormalBg: stockUiForm.values.lowStockNormalBg,
+        okStockBg: stockUiForm.values.okStockBg ? stockUiForm.values.okStockBg : null,
+        unknownStockBg: stockUiForm.values.unknownStockBg ? stockUiForm.values.unknownStockBg : null,
+        doneTodayBadgeBg: stockUiForm.values.doneTodayBadgeBg ? stockUiForm.values.doneTodayBadgeBg : null,
+      });
+
+      handleAction(result);
+
+      notifications.show({
+        title: 'Succès',
+        message: 'Préférences de stock mises à jour',
+        color: 'green',
+      });
+
+      router.refresh();
+    } catch (error: any) {
+      if (error instanceof ParsedZodError) {
+        // Server-side Zod errors should not happen often here, but we keep parity with other forms.
+        // We map them to the form for a better UX.
+        handleApiZodError(error.error, stockUiForm as any);
+        return;
+      }
+      notifications.show({
+        title: 'Erreur',
+        message: error.message || 'Erreur lors de la mise à jour des préférences',
+        color: 'red',
+      });
+    } finally {
+      setStockUiSaving(false);
+    }
+  };
+
   return (
     <Container size="sm" py="xl">
       <Group justify="space-between" mb="xl">
@@ -302,6 +368,123 @@ export default function SettingsPageClient(props: {
             </Stack>
           </Card>
         )}
+
+        <Card withBorder shadow="sm" radius="md" padding="lg">
+          <Title order={3} mb="md">
+            Affichage du stock
+          </Title>
+          <Divider mb="md" />
+
+          <Stack gap="md">
+            <ColorInput
+              label="Stock bas (craftable ou sans groupe)"
+              format="hex"
+              required
+              rightSection={
+                stockUiForm.values.lowStockCraftableBg !== STOCK_UI_DEFAULTS.lowStockCraftableBg ? (
+                  <ActionIcon
+                    variant="subtle"
+                    color="gray"
+                    aria-label="Réinitialiser"
+                    onClick={() =>
+                      stockUiForm.setFieldValue('lowStockCraftableBg', STOCK_UI_DEFAULTS.lowStockCraftableBg)
+                    }
+                  >
+                    <IconX size={14} />
+                  </ActionIcon>
+                ) : null
+              }
+              rightSectionPointerEvents="all"
+              {...stockUiForm.getInputProps('lowStockCraftableBg')}
+            />
+
+            <ColorInput
+              label="Stock bas (non-craftable avec groupe)"
+              format="hex"
+              required
+              rightSection={
+                stockUiForm.values.lowStockNormalBg !== STOCK_UI_DEFAULTS.lowStockNormalBg ? (
+                  <ActionIcon
+                    variant="subtle"
+                    color="gray"
+                    aria-label="Réinitialiser"
+                    onClick={() => stockUiForm.setFieldValue('lowStockNormalBg', STOCK_UI_DEFAULTS.lowStockNormalBg)}
+                  >
+                    <IconX size={14} />
+                  </ActionIcon>
+                ) : null
+              }
+              rightSectionPointerEvents="all"
+              {...stockUiForm.getInputProps('lowStockNormalBg')}
+            />
+
+            <ColorInput
+              label="Stock OK (optionnel)"
+              description="Laisse vide pour ne pas colorer les lignes OK."
+              format="hex"
+              rightSection={
+                stockUiForm.values.okStockBg ? (
+                  <ActionIcon
+                    variant="subtle"
+                    color="gray"
+                    aria-label="Effacer"
+                    onClick={() => stockUiForm.setFieldValue('okStockBg', '')}
+                  >
+                    <IconX size={14} />
+                  </ActionIcon>
+                ) : null
+              }
+              rightSectionPointerEvents="all"
+              {...stockUiForm.getInputProps('okStockBg')}
+            />
+
+            <ColorInput
+              label="Stock inconnu (optionnel)"
+              description="Laisse vide pour ne pas colorer les lignes avec '?'."
+              format="hex"
+              rightSection={
+                stockUiForm.values.unknownStockBg ? (
+                  <ActionIcon
+                    variant="subtle"
+                    color="gray"
+                    aria-label="Effacer"
+                    onClick={() => stockUiForm.setFieldValue('unknownStockBg', '')}
+                  >
+                    <IconX size={14} />
+                  </ActionIcon>
+                ) : null
+              }
+              rightSectionPointerEvents="all"
+              {...stockUiForm.getInputProps('unknownStockBg')}
+            />
+
+            <ColorInput
+              label={'Badge "Fait" (optionnel)'}
+              description="Laisse vide pour revenir au vert par défaut."
+              format="hex"
+              rightSection={
+                stockUiForm.values.doneTodayBadgeBg ? (
+                  <ActionIcon
+                    variant="subtle"
+                    color="gray"
+                    aria-label="Effacer"
+                    onClick={() => stockUiForm.setFieldValue('doneTodayBadgeBg', '')}
+                  >
+                    <IconX size={14} />
+                  </ActionIcon>
+                ) : null
+              }
+              rightSectionPointerEvents="all"
+              {...stockUiForm.getInputProps('doneTodayBadgeBg')}
+            />
+
+            <Group justify="flex-end">
+              <Button onClick={handleSaveStockUi} loading={stockUiSaving}>
+                Enregistrer
+              </Button>
+            </Group>
+          </Stack>
+        </Card>
       </Stack>
     </Container>
   );
