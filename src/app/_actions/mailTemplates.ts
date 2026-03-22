@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
 import { getAuthSession } from '@/lib/auth';
 import { checkRolePermission } from '@/lib/auth/permissions';
+import { getAppFeatureActionBlock } from '@/lib/appSettings';
 
 const createMailTemplateSchema = z.object({
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
@@ -37,6 +38,9 @@ export async function createMailTemplate(data: {
       };
     }
 
+    const mailsFeatureBlock = await getAppFeatureActionBlock('mails');
+    if (mailsFeatureBlock) return mailsFeatureBlock;
+
     const validatedData = createMailTemplateSchema.parse(data);
 
     const mailTemplate = await prisma.mailTemplate.create({
@@ -66,6 +70,9 @@ export async function getMailTemplates() {
         error: 'Non autorisé',
       };
     }
+
+    const mailsFeatureBlock = await getAppFeatureActionBlock('mails');
+    if (mailsFeatureBlock) return mailsFeatureBlock;
 
     const mailTemplates = await prisma.mailTemplate.findMany({
       where: {
@@ -99,6 +106,9 @@ export async function updateMailTemplate(data: {
         error: 'Non autorisé',
       };
     }
+
+    const mailsFeatureBlock = await getAppFeatureActionBlock('mails');
+    if (mailsFeatureBlock) return mailsFeatureBlock;
 
     const validatedData = updateMailTemplateSchema.parse(data);
 
@@ -152,6 +162,9 @@ export async function deleteMailTemplate(data: { id: string }) {
       };
     }
 
+    const mailsFeatureBlock = await getAppFeatureActionBlock('mails');
+    if (mailsFeatureBlock) return mailsFeatureBlock;
+
     const validatedData = deleteMailTemplateSchema.parse(data);
 
     const existingTemplate = await prisma.mailTemplate.findUnique({
@@ -200,6 +213,9 @@ export async function generateOrderMailPreview(data: {
         error: 'Non autorisé',
       };
     }
+
+    const mailsFeatureBlock = await getAppFeatureActionBlock('mails');
+    if (mailsFeatureBlock) return mailsFeatureBlock;
 
     const order = await prisma.order.findUnique({
       where: { id: data.orderId },
@@ -321,6 +337,9 @@ export async function getUserMailTemplates() {
       };
     }
 
+    const mailsFeatureBlock = await getAppFeatureActionBlock('mails');
+    if (mailsFeatureBlock) return mailsFeatureBlock;
+
     const mailTemplates = await prisma.mailTemplate.findMany({
       where: {
         userId: session.user.id,
@@ -352,6 +371,9 @@ export async function createUserMailTemplate(data: {
         error: 'Non autorisé',
       };
     }
+
+    const mailsFeatureBlock = await getAppFeatureActionBlock('mails');
+    if (mailsFeatureBlock) return mailsFeatureBlock;
 
     const validatedData = createMailTemplateSchema.parse(data);
 
@@ -387,6 +409,9 @@ export async function updateUserMailTemplate(data: {
         error: 'Non autorisé',
       };
     }
+
+    const mailsFeatureBlock = await getAppFeatureActionBlock('mails');
+    if (mailsFeatureBlock) return mailsFeatureBlock;
 
     const validatedData = updateMailTemplateSchema.parse(data);
 
@@ -449,6 +474,9 @@ export async function deleteUserMailTemplate(data: { id: string }) {
         error: 'Non autorisé',
       };
     }
+
+    const mailsFeatureBlock = await getAppFeatureActionBlock('mails');
+    if (mailsFeatureBlock) return mailsFeatureBlock;
 
     const validatedData = deleteMailTemplateSchema.parse(data);
 

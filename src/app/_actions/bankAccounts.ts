@@ -4,6 +4,7 @@ import { z } from 'zod/v3';
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
 import { getAuthSession } from '@/lib/auth';
+import { getAppFeatureActionBlock } from '@/lib/appSettings';
 import { startOfWeek, endOfWeek, parseISO } from 'date-fns';
 
 const createBankAccountSchema = z.object({
@@ -108,6 +109,9 @@ export async function createBankAccount(data: { name: string }) {
       };
     }
 
+    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
+    if (bankFeatureBlock) return bankFeatureBlock;
+
     const validatedData = createBankAccountSchema.parse(data);
 
     const account = await prisma.bankAccount.create({
@@ -158,6 +162,9 @@ export async function getBankAccounts() {
         error: 'Non autorisé',
       };
     }
+
+    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
+    if (bankFeatureBlock) return bankFeatureBlock;
 
     const accounts = await prisma.bankAccount.findMany({
       where: {
@@ -218,6 +225,9 @@ export async function getBankAccount(accountId: string) {
         error: 'Non autorisé',
       };
     }
+
+    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
+    if (bankFeatureBlock) return bankFeatureBlock;
 
     const accessCheck = await checkAccountAccess(accountId, session.user.id);
     if (!accessCheck.hasAccess) {
@@ -280,6 +290,9 @@ export async function updateBankAccount(data: { id: string; name: string }) {
       };
     }
 
+    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
+    if (bankFeatureBlock) return bankFeatureBlock;
+
     const validatedData = updateBankAccountSchema.parse(data);
 
     const accessCheck = await checkAccountAccess(validatedData.id, session.user.id, true);
@@ -339,6 +352,9 @@ export async function deleteBankAccount(data: { id: string }) {
       };
     }
 
+    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
+    if (bankFeatureBlock) return bankFeatureBlock;
+
     const validatedData = deleteBankAccountSchema.parse(data);
 
     // Seul le propriétaire peut supprimer
@@ -390,6 +406,9 @@ export async function createBankAccountAccess(data: {
         error: 'Non autorisé',
       };
     }
+
+    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
+    if (bankFeatureBlock) return bankFeatureBlock;
 
     const validatedData = createBankAccountAccessSchema.parse(data);
 
@@ -460,6 +479,9 @@ export async function deleteBankAccountAccess(data: { id: string }) {
       };
     }
 
+    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
+    if (bankFeatureBlock) return bankFeatureBlock;
+
     const validatedData = deleteBankAccountAccessSchema.parse(data);
 
     // Only the owner can delete access
@@ -511,6 +533,9 @@ export async function getOrCreateWeek(accountId: string, date: Date) {
         error: 'Non autorisé',
       };
     }
+
+    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
+    if (bankFeatureBlock) return bankFeatureBlock;
 
     const accessCheck = await checkAccountAccess(accountId, session.user.id);
     if (!accessCheck.hasAccess) {
@@ -604,6 +629,9 @@ export async function getAccountWeeks(accountId: string) {
       };
     }
 
+    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
+    if (bankFeatureBlock) return bankFeatureBlock;
+
     const accessCheck = await checkAccountAccess(accountId, session.user.id);
     if (!accessCheck.hasAccess) {
       return {
@@ -665,6 +693,9 @@ export async function createTransaction(data: {
         error: 'Non autorisé',
       };
     }
+
+    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
+    if (bankFeatureBlock) return bankFeatureBlock;
 
     const validatedData = createTransactionSchema.parse(data);
 
@@ -790,6 +821,9 @@ export async function updateTransaction(data: {
         error: 'Non autorisé',
       };
     }
+
+    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
+    if (bankFeatureBlock) return bankFeatureBlock;
 
     const validatedData = updateTransactionSchema.parse(data);
 
@@ -1005,6 +1039,9 @@ export async function deleteTransaction(data: { id: string }) {
       };
     }
 
+    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
+    if (bankFeatureBlock) return bankFeatureBlock;
+
     const validatedData = deleteTransactionSchema.parse(data);
 
     const transaction = await prisma.bankTransaction.findUnique({
@@ -1201,6 +1238,17 @@ async function recalculateWeekBalance(weekId: string) {
  */
 export async function getNameSuggestions() {
   try {
+    const session = await getAuthSession();
+    if (!session) {
+      return {
+        status: 401,
+        error: 'Non autorisé',
+      };
+    }
+
+    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
+    if (bankFeatureBlock) return bankFeatureBlock;
+
     const suggestions = await prisma.transactionNameSuggestion.findMany({
       orderBy: {
         createdAt: 'desc',
@@ -1222,6 +1270,17 @@ export async function getNameSuggestions() {
  */
 export async function getDescriptionSuggestions() {
   try {
+    const session = await getAuthSession();
+    if (!session) {
+      return {
+        status: 401,
+        error: 'Non autorisé',
+      };
+    }
+
+    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
+    if (bankFeatureBlock) return bankFeatureBlock;
+
     const suggestions = await prisma.transactionDescriptionSuggestion.findMany({
       orderBy: {
         createdAt: 'desc',
@@ -1250,6 +1309,9 @@ export async function addNameSuggestion(data: { value: string }) {
         error: 'Non autorisé',
       };
     }
+
+    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
+    if (bankFeatureBlock) return bankFeatureBlock;
 
     if (!data.value || data.value.trim().length === 0) {
       return {
@@ -1286,6 +1348,9 @@ export async function addDescriptionSuggestion(data: { value: string }) {
       };
     }
 
+    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
+    if (bankFeatureBlock) return bankFeatureBlock;
+
     if (!data.value || data.value.trim().length === 0) {
       return {
         status: 400,
@@ -1321,6 +1386,9 @@ export async function deleteNameSuggestion(data: { value: string }) {
       };
     }
 
+    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
+    if (bankFeatureBlock) return bankFeatureBlock;
+
     if (!data.value || data.value.trim().length === 0) {
       return {
         status: 400,
@@ -1353,6 +1421,9 @@ export async function deleteDescriptionSuggestion(data: { value: string }) {
         error: 'Non autorisé',
       };
     }
+
+    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
+    if (bankFeatureBlock) return bankFeatureBlock;
 
     if (!data.value || data.value.trim().length === 0) {
       return {

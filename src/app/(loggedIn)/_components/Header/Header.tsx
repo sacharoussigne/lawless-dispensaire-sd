@@ -19,6 +19,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { IconLogout, IconSearch, IconSettings } from '@tabler/icons-react';
 import { usePermissions } from '@/app/_contexts/PermissionsContext';
+import { dispensarySiteTitle } from '@/lib/appSettingsShared';
 import { hasRole, checkRolePermission } from '@/lib/auth/permissions';
 import { Role } from '@/types/enum/roles';
 
@@ -30,7 +31,7 @@ export default function Header({
   const router = useRouter();
   const pathname = usePathname();
   const [userMenuOpened, setUserMenuOpened] = useState(false);
-  const { permissions, userRole } = usePermissions();
+  const { permissions, userRole, appSettings } = usePermissions();
 
   const isAdminSpace = pathname?.startsWith(routes.admin.index) || false;
   const isManagementSpace = pathname?.startsWith(routes.management.index) || false;
@@ -78,7 +79,7 @@ export default function Header({
           >
             <Image
               src="/logo_dispensaire.png"
-              alt="Dispensaire Saint-Denis"
+              alt={dispensarySiteTitle(appSettings)}
               width={50}
               height={50}
               className="rounded-full"
@@ -130,16 +131,19 @@ export default function Header({
                           Entreprises
                         </Menu.Item>
                       </Link>
-                      <Link href={routes.management.mails}>
-                        <Menu.Item>
-                          Courriers
-                        </Menu.Item>
-                      </Link>
+                      {appSettings.featureMailsEnabled && (
+                        <Link href={routes.management.mails}>
+                          <Menu.Item>
+                            Courriers
+                          </Menu.Item>
+                        </Link>
+                      )}
                     </Menu.Dropdown>
                   </Menu>
                 ) : (
                   <>
-                    {checkRolePermission(userRole, 'bank', 'access') && (
+                    {appSettings.featureBankEnabled &&
+                      checkRolePermission(userRole, 'bank', 'access') && (
                       <Link
                         href={routes.bank.index}
                         className={`${classes.link} ${isRouteActive(routes.bank.index) ? classes.linkActive : ''}`}
@@ -147,7 +151,8 @@ export default function Header({
                         Banque
                       </Link>
                     )}
-                    {checkRolePermission(userRole, 'private_practice', 'access') && (
+                    {appSettings.featurePrivatePracticeEnabled &&
+                      checkRolePermission(userRole, 'private_practice', 'access') && (
                       <Link
                         href={routes.privatePractice.index}
                         className={`${classes.link} ${isRouteActive(routes.privatePractice.index) ? classes.linkActive : ''}`}
@@ -155,7 +160,8 @@ export default function Header({
                         Cabinet privé
                       </Link>
                     )}
-                    {checkRolePermission(userRole, 'orders', 'view') && (
+                    {appSettings.featureOrdersEnabled &&
+                      checkRolePermission(userRole, 'orders', 'view') && (
                       <Link
                         href={routes.orders.index}
                         className={`${classes.link} ${isRouteActive(routes.orders.index) ? classes.linkActive : ''}`}
@@ -163,7 +169,8 @@ export default function Header({
                         Commandes
                       </Link>
                     )}
-                    {checkRolePermission(userRole, 'stock', 'view') && (
+                    {appSettings.featureStockEnabled &&
+                      checkRolePermission(userRole, 'stock', 'view') && (
                       <Link
                         href={routes.stock.index}
                         className={`${classes.link} ${isRouteActive(routes.stock.index) ? classes.linkActive : ''}`}
@@ -175,6 +182,7 @@ export default function Header({
                 )}
                 {/* Search icon: only in employee space, before SegmentedControl */}
                 {!isAdminOrManagementSpace &&
+                  appSettings.featureSearchEnabled &&
                   checkRolePermission(userRole, 'search', 'access') && (
                     <Link
                       href={routes.searchItems.index}
@@ -225,9 +233,16 @@ export default function Header({
                             Gestion Utilisateur
                           </Menu.Item>
                         </Link>
-                        <Link href={routes.admin.overwriteStock}>
+                        {appSettings.featureStockEnabled && (
+                          <Link href={routes.admin.overwriteStock}>
+                            <Menu.Item>
+                              Écraser les stocks
+                            </Menu.Item>
+                          </Link>
+                        )}
+                        <Link href={routes.admin.settings}>
                           <Menu.Item>
-                            Écraser les stocks
+                            Paramètres application
                           </Menu.Item>
                         </Link>
                         <Menu.Divider />

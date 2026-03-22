@@ -5,6 +5,10 @@ import { actionErrorParser } from '@/lib/action';
 import { getAuthSession } from '@/lib/auth';
 import { checkRolePermission } from '@/lib/auth/permissions';
 import {
+  getAppFeatureActionBlock,
+  getAppFeaturesActionBlock,
+} from '@/lib/appSettings';
+import {
   getTodayStart,
   getYesterdayStart,
   getTomorrowStart,
@@ -41,6 +45,9 @@ export async function getItemsWithStock(chestId?: string | null) {
         error: 'Non autorisé',
       };
     }
+
+    const featureBlock = await getAppFeatureActionBlock('stock');
+    if (featureBlock) return featureBlock;
 
     const today = getTodayStart();
     const yesterday = getYesterdayStart();
@@ -201,6 +208,9 @@ export async function updateStock(data: { itemId: string; quantity: number }[], 
       };
     }
 
+    const featureBlock = await getAppFeatureActionBlock('stock');
+    if (featureBlock) return featureBlock;
+
     const userRole = session.user?.role;
     if (!checkRolePermission(userRole, 'stock', 'update')) {
       return {
@@ -294,6 +304,9 @@ export async function craftItem(data: {
         error: 'Non autorisé',
       };
     }
+
+    const featureBlock = await getAppFeatureActionBlock('stock');
+    if (featureBlock) return featureBlock;
 
     const userRole = session.user?.role;
     if (!checkRolePermission(userRole, 'stock', 'craft-write')) {
@@ -492,6 +505,9 @@ export async function addOrderItemsToStock(orderId: string, chestId?: string | n
       };
     }
 
+    const featureBlock = await getAppFeaturesActionBlock(['orders', 'stock']);
+    if (featureBlock) return featureBlock;
+
     const order = await prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -579,6 +595,9 @@ export async function getItemsWithStockForDate(date: Date, chestId?: string | nu
         error: 'Non autorisé',
       };
     }
+
+    const featureBlock = await getAppFeatureActionBlock('stock');
+    if (featureBlock) return featureBlock;
 
     const dayStart = getStartOfDay(date);
     const dayEnd = new Date(dayStart);
@@ -677,6 +696,9 @@ export async function overwriteStockForDate(data: {
       };
     }
 
+    const featureBlock = await getAppFeatureActionBlock('stock');
+    if (featureBlock) return featureBlock;
+
     const dayStart = getStartOfDay(data.date);
     const dayEnd = new Date(dayStart);
     dayEnd.setDate(dayEnd.getDate() + 1);
@@ -730,6 +752,9 @@ export async function getItemsWithDetailedStock(itemIds?: string[]) {
         error: 'Non autorisé',
       };
     }
+
+    const featureBlock = await getAppFeatureActionBlock('search');
+    if (featureBlock) return featureBlock;
 
     const today = getTodayStart();
     const yesterday = getYesterdayStart();
@@ -878,6 +903,9 @@ export async function checkOrderItemsStockToday(orderId: string, chestId?: strin
       };
     }
 
+    const featureBlock = await getAppFeaturesActionBlock(['orders', 'stock']);
+    if (featureBlock) return featureBlock;
+
     const order = await prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -955,6 +983,9 @@ export async function checkOrderItemsStockSufficient(orderId: string, chestId?: 
         error: 'Non autorisé',
       };
     }
+
+    const featureBlock = await getAppFeaturesActionBlock(['orders', 'stock']);
+    if (featureBlock) return featureBlock;
 
     const order = await prisma.order.findUnique({
       where: { id: orderId },
@@ -1044,6 +1075,9 @@ export async function removeOrderItemsFromStock(orderId: string, chestId?: strin
         error: 'Non autorisé',
       };
     }
+
+    const featureBlock = await getAppFeaturesActionBlock(['orders', 'stock']);
+    if (featureBlock) return featureBlock;
 
     const order = await prisma.order.findUnique({
       where: { id: orderId },
@@ -1181,6 +1215,9 @@ export async function transferStock(data: {
       };
     }
 
+    const featureBlock = await getAppFeatureActionBlock('stock');
+    if (featureBlock) return featureBlock;
+
     if (data.sourceChestId === data.destinationChestId) {
       return {
         status: 400,
@@ -1294,6 +1331,9 @@ export async function transferMultipleStock(data: {
         error: 'Non autorisé',
       };
     }
+
+    const featureBlock = await getAppFeatureActionBlock('stock');
+    if (featureBlock) return featureBlock;
 
     const { sourceChestId, destinationChestId, items } = data;
 
