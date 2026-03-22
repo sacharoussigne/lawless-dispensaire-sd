@@ -101,6 +101,21 @@ model Verification {
   @@map("verification")
 }
 
+model AppSettings {
+  id                           String   @id @default("default")
+  dispensaryName               String   @default("Saint-Denis")
+  featureStockEnabled          Boolean  @default(true)
+  featureBankEnabled           Boolean  @default(true)
+  featurePrivatePracticeEnabled Boolean @default(true)
+  featureOrdersEnabled         Boolean  @default(true)
+  featureSearchEnabled         Boolean  @default(true)
+  featureMailsEnabled          Boolean  @default(true)
+  createdAt                    DateTime @default(now())
+  updatedAt                    DateTime @updatedAt
+
+  @@map("app_settings")
+}
+
 model CategoryItem {
   id        String   @id @default(uuid())
   name      String

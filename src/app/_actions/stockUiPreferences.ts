@@ -3,6 +3,7 @@
 import { z } from 'zod/v3';
 import prisma from '@/lib/prisma';
 import { getAuthSession } from '@/lib/auth';
+import { getAppFeatureActionBlock } from '@/lib/appSettings';
 import { actionErrorParser } from '@/lib/action';
 import type { StockUiPreferences } from '@/types/stockUiPreferences';
 import { STOCK_UI_DEFAULTS } from '@/types/stockUiPreferences';
@@ -30,6 +31,9 @@ export async function getMyStockUiPreferences() {
     if (!session?.user?.id) {
       return { status: 401, error: 'Non autorisé' as const };
     }
+
+    const featureBlock = await getAppFeatureActionBlock('stock');
+    if (featureBlock) return featureBlock;
 
     const prefs = await prisma.userUiPreferences.findUnique({
       where: { userId: session.user.id },
@@ -62,6 +66,9 @@ export async function updateMyStockUiPreferences(input: z.infer<typeof updateMyS
     if (!session?.user?.id) {
       return { status: 401, error: 'Non autorisé' as const };
     }
+
+    const featureBlock = await getAppFeatureActionBlock('stock');
+    if (featureBlock) return featureBlock;
 
     const validated = updateMyStockUiPreferencesSchema.parse(input);
 

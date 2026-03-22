@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { dispensarySiteTitle, getAppSettings } from '@/lib/appSettings';
 import { Geist, Geist_Mono } from 'next/font/google';
 import {
   ColorSchemeScript,
@@ -26,13 +27,17 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
-export const metadata: Metadata = {
-  title: {
-    template: '%s | Dispensaire Saint-Denis',
-    default: 'Dispensaire Saint-Denis',
-    absolute: 'Dispensaire Saint-Denis',
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getAppSettings();
+  const title = dispensarySiteTitle(settings);
+  return {
+    title: {
+      template: `%s | ${title}`,
+      default: title,
+      absolute: title,
+    },
+  };
+}
 
 export default async function RootLayout({
   children,

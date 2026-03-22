@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
 import { getAuthSession } from '@/lib/auth';
 import { checkRolePermission } from '@/lib/auth/permissions';
+import { getAppFeatureActionBlock } from '@/lib/appSettings';
 import { startOfWeek, endOfWeek } from 'date-fns';
 import { PatientTypeEnumValues } from '@/types/enum/patientType';
 
@@ -52,6 +53,14 @@ async function checkPrivatePracticeAccess() {
     return {
       hasAccess: false,
       error: 'Non autorisé',
+    };
+  }
+
+  const featureBlock = await getAppFeatureActionBlock('privatePractice');
+  if (featureBlock) {
+    return {
+      hasAccess: false,
+      error: featureBlock.error,
     };
   }
 

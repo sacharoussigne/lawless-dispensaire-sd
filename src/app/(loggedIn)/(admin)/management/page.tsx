@@ -6,8 +6,13 @@ import {
   IconClipboardText,
   IconInbox,
   IconLayoutGrid,
+  IconSettings,
   IconUsersGroup,
 } from '@tabler/icons-react';
+import { getAuthSession } from '@/lib/auth';
+import { hasRole } from '@/lib/auth/permissions';
+import { Role } from '@/types/enum/roles';
+import { dispensarySiteTitle, getAppSettings } from '@/lib/appSettings';
 
 const managementSections = [
   {
@@ -60,7 +65,16 @@ const managementSections = [
   },
 ] as const;
 
-export default function ManagementPage() {
+export default async function ManagementPage() {
+  const session = await getAuthSession();
+  const settings = await getAppSettings();
+  const showAdminSettings = hasRole(session?.user?.role, Role.ADMIN);
+  const siteTitle = dispensarySiteTitle(settings);
+
+  const visibleSections = managementSections.filter(
+    (s) => s.href !== routes.management.mails || settings.featureMailsEnabled,
+  );
+
   return (
     <Container size="xl" py="xl">
       <Group justify="space-between" mb="xl">
@@ -68,7 +82,7 @@ export default function ManagementPage() {
           <Title order={1}>Espace gestion</Title>
           <Text c="dimmed" mt="xs">
             Retrouvez ici toutes les actions de configuration et d’administration
-            du Dispensaire Saint-Denis.
+            du {siteTitle}.
           </Text>
         </div>
       </Group>
@@ -77,7 +91,7 @@ export default function ManagementPage() {
         cols={{ base: 1, sm: 2, lg: 3 }}
         spacing="lg"
       >
-        {managementSections.map((section) => {
+        {visibleSections.map((section) => {
           const Icon = section.icon;
           return (
             <Card
@@ -112,6 +126,38 @@ export default function ManagementPage() {
             </Card>
           );
         })}
+        {showAdminSettings && (
+          <Card
+            key="admin-app-settings"
+            withBorder
+            shadow="sm"
+            radius="md"
+            padding="lg"
+          >
+            <Group mb="md" align="flex-start">
+              <div className="rounded-full p-2" style={{ backgroundColor: 'rgba(0,0,0,0.02)' }}>
+                <IconSettings size={24} stroke={1.8} />
+              </div>
+              <div>
+                <Text fw={600}>Paramètres application</Text>
+                <Text size="sm" c="dimmed" mt={4}>
+                  Nom du site, activation des modules employés (stock, banque, etc.).
+                </Text>
+              </div>
+            </Group>
+
+            <Group justify="flex-end" mt="md">
+              <Button
+                component="a"
+                href={routes.admin.settings}
+                variant="light"
+                color="gray"
+              >
+                Accéder
+              </Button>
+            </Group>
+          </Card>
+        )}
       </SimpleGrid>
     </Container>
   );

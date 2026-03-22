@@ -3,6 +3,7 @@ import { getAuthSession } from '@/lib/auth';
 import { Container } from '@mantine/core';
 import { PermissionsProvider } from '@/app/_contexts/PermissionsContext';
 import { calculatePermissions } from '@/lib/auth/calculatePermissions';
+import { getAppSettings } from '@/lib/appSettings';
 
 export default async function LanguageLayout({
   children,
@@ -14,9 +15,14 @@ export default async function LanguageLayout({
   const session = await getAuthSession();
   const role = session?.user?.role || null;
   const permissions = calculatePermissions(role);
+  const appSettings = await getAppSettings();
 
   return (
-    <PermissionsProvider initialPermissions={permissions} initialRole={role}>
+    <PermissionsProvider
+      initialPermissions={permissions}
+      initialRole={role}
+      initialAppSettings={appSettings}
+    >
       <Header session={session as any} />
 
       <Container size={"xl"} className={'flex-1 pb-[72px] sm:pb-0'}>

@@ -11,11 +11,13 @@ import {
 import { getAuthSession } from '@/lib/auth';
 import { calculatePermissions } from '@/lib/auth/calculatePermissions';
 import { checkRolePermission } from '@/lib/auth/permissions';
+import { getAppSettings } from '@/lib/appSettings';
 
 export default async function EmployeePage() {
   const session = await getAuthSession();
   const role = session?.user?.role || null;
   const permissions = calculatePermissions(role);
+  const appSettings = await getAppSettings();
 
   const employeeSections = [
     {
@@ -24,7 +26,8 @@ export default async function EmployeePage() {
         'Consultez et gérez le stock des objets disponibles dans les différents coffres.',
       icon: IconBox,
       href: routes.stock.index,
-      hasAccess: permissions?.stock.view ?? false,
+      hasAccess:
+        appSettings.featureStockEnabled && (permissions?.stock.view ?? false),
       color: 'blue',
     },
     {
@@ -33,7 +36,8 @@ export default async function EmployeePage() {
         'Gérez les commandes passées aux entreprises et suivez leur statut.',
       icon: IconClipboardList,
       href: routes.orders.index,
-      hasAccess: permissions?.orders.view ?? false,
+      hasAccess:
+        appSettings.featureOrdersEnabled && (permissions?.orders.view ?? false),
       color: 'green',
     },
     {
@@ -42,7 +46,9 @@ export default async function EmployeePage() {
         'Recherchez rapidement des objets dans le système avec des filtres avancés.',
       icon: IconSearch,
       href: routes.searchItems.index,
-      hasAccess: checkRolePermission(role, 'search', 'access'),
+      hasAccess:
+        appSettings.featureSearchEnabled &&
+        checkRolePermission(role, 'search', 'access'),
       color: 'orange',
     },
     {
@@ -51,7 +57,9 @@ export default async function EmployeePage() {
         'Consultez et gérez les comptes bancaires et les transactions financières.',
       icon: IconBuildingBank,
       href: routes.bank.index,
-      hasAccess: checkRolePermission(role, 'bank', 'access'),
+      hasAccess:
+        appSettings.featureBankEnabled &&
+        checkRolePermission(role, 'bank', 'access'),
       color: 'violet',
     },
     {
@@ -59,8 +67,10 @@ export default async function EmployeePage() {
       description:
         'Accédez à l\'espace dédié au cabinet privé et à ses fonctionnalités spécifiques.',
       icon: IconUserHeart,
-      href: '/private-practice',
-      hasAccess: checkRolePermission(role, 'private_practice', 'access'),
+      href: routes.privatePractice.index,
+      hasAccess:
+        appSettings.featurePrivatePracticeEnabled &&
+        checkRolePermission(role, 'private_practice', 'access'),
       color: 'pink',
     },
     {
@@ -69,7 +79,9 @@ export default async function EmployeePage() {
         'Gérez vos courriers envoyés et créez des modèles de courriers personnalisés.',
       icon: IconMail,
       href: routes.employee.mails,
-      hasAccess: checkRolePermission(role, 'mails', 'access'),
+      hasAccess:
+        appSettings.featureMailsEnabled &&
+        checkRolePermission(role, 'mails', 'access'),
       color: 'violet',
     },
   ] as const;

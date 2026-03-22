@@ -4,6 +4,7 @@ import { z } from 'zod/v3';
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
 import { getAuthSession } from '@/lib/auth';
+import { getAppFeatureActionBlock } from '@/lib/appSettings';
 
 const createMailSchema = z.object({
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
@@ -36,6 +37,9 @@ export async function createMail(data: {
       };
     }
 
+    const mailsFeatureBlock = await getAppFeatureActionBlock('mails');
+    if (mailsFeatureBlock) return mailsFeatureBlock;
+
     const validatedData = createMailSchema.parse(data);
 
     const mail = await prisma.mail.create({
@@ -65,6 +69,9 @@ export async function getMails() {
         error: 'Non autorisé',
       };
     }
+
+    const mailsFeatureBlock = await getAppFeatureActionBlock('mails');
+    if (mailsFeatureBlock) return mailsFeatureBlock;
 
     const mails = await prisma.mail.findMany({
       where: {
@@ -98,6 +105,9 @@ export async function updateMail(data: {
         error: 'Non autorisé',
       };
     }
+
+    const mailsFeatureBlock = await getAppFeatureActionBlock('mails');
+    if (mailsFeatureBlock) return mailsFeatureBlock;
 
     const validatedData = updateMailSchema.parse(data);
 
@@ -150,6 +160,9 @@ export async function deleteMail(data: { id: string }) {
         error: 'Non autorisé',
       };
     }
+
+    const mailsFeatureBlock = await getAppFeatureActionBlock('mails');
+    if (mailsFeatureBlock) return mailsFeatureBlock;
 
     const validatedData = deleteMailSchema.parse(data);
 

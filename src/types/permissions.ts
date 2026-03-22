@@ -1,3 +1,5 @@
+import type { AppSettingsDTO } from '@/lib/appSettingsShared';
+
 export interface Permissions {
   // Stock permissions
   stock: {
@@ -26,5 +28,6 @@ export interface PermissionsContextType {
   permissions: Permissions | null;
   userRole: string | null;
   loading: boolean;
+  appSettings: AppSettingsDTO;
 }
 

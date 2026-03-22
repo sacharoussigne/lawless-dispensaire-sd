@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
 import { getAuthSession } from '@/lib/auth';
 import { checkRolePermission } from '@/lib/auth/permissions';
+import { getAppFeatureActionBlock } from '@/lib/appSettings';
 import { addOrderItemsToStock, removeOrderItemsFromStock } from '@/app/_actions/stock';
 import type { OrderStatus } from '@prisma/client';
 
@@ -44,6 +45,9 @@ export async function createOrder(data: {
         error: 'Non autorisé',
       };
     }
+
+    const featureBlock = await getAppFeatureActionBlock('orders');
+    if (featureBlock) return featureBlock;
 
     const userRole = session.user?.role;
     if (!checkRolePermission(userRole, 'orders', 'create')) {
@@ -196,6 +200,9 @@ export async function getOrders() {
       };
     }
 
+    const featureBlock = await getAppFeatureActionBlock('orders');
+    if (featureBlock) return featureBlock;
+
     const userRole = session.user?.role;
     if (!checkRolePermission(userRole, 'orders', 'view')) {
       return {
@@ -273,6 +280,9 @@ export async function updateOrder(data: {
         error: 'Non autorisé',
       };
     }
+
+    const featureBlock = await getAppFeatureActionBlock('orders');
+    if (featureBlock) return featureBlock;
 
     const userRole = session.user?.role;
     if (!checkRolePermission(userRole, 'orders', 'update')) {
@@ -471,6 +481,9 @@ export async function deleteOrder(data: { id: string }) {
         error: 'Non autorisé',
       };
     }
+
+    const featureBlock = await getAppFeatureActionBlock('orders');
+    if (featureBlock) return featureBlock;
 
     const userRole = session.user?.role;
     if (!checkRolePermission(userRole, 'orders', 'delete')) {

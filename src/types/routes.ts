@@ -8,6 +8,7 @@ export const routes = {
     index: '/admin',
     users: '/admin/users',
     overwriteStock: '/admin/overwrite-stock',
+    settings: '/admin/settings',
   },
   management: {
     index: '/management',
