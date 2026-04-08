@@ -86,8 +86,7 @@ export default function PayrollNewPageClient() {
         </Title>
         <Text c="dimmed" size="sm" mb="lg">
           Choisissez un jour de la semaine concernée (le lundi sera déduit automatiquement), puis collez le HTML du
-          tableau des présences / caisses. Le contenu est parsé localement puis envoyé à GPT pour produire le JSON
-          final.
+          tableau des présences / caisses. Le contenu est parsé côté serveur et enregistré au format JSON attendu.
         </Text>
 
         <Stack gap="lg">
@@ -118,7 +117,7 @@ export default function PayrollNewPageClient() {
               Annuler
             </Button>
             <Button loading={submitting} onClick={handleSubmit}>
-              Parser et analyser
+              Enregistrer le rapport
             </Button>
           </Group>
         </Stack>

@@ -5,8 +5,7 @@ import { PayrollWeeklyReportStatus } from '@prisma/client';
 import { auth } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { checkRolePermission } from '@/lib/auth/permissions';
-import { refinePayrollReportWithGpt } from '@/lib/payroll/openai';
-import { parsePayrollHtmlTable } from '@/lib/payroll/parsePayrollHtmlTable';
+import { parsePayrollHtmlTable, parsedToPayrollReportResult } from '@/lib/payroll/parsePayrollHtmlTable';
 import { weekRangeFromIsoDate } from '@/lib/payroll/week';
 
 export const runtime = 'nodejs';
@@ -71,8 +70,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: msg }, { status: 400 });
   }
 
-  console.log('[payroll-reports] Parsed table (before GPT):\n', JSON.stringify(parsed, null, 2));
-
   if (parsed.employees.length === 0) {
     return NextResponse.json(
       {
@@ -104,7 +101,7 @@ export async function POST(request: Request) {
   });
 
   try {
-    const result = await refinePayrollReportWithGpt(parsed);
+    const result = parsedToPayrollReportResult(parsed);
 
     await prisma.payrollWeeklyReport.update({
       where: { id: reportId },
