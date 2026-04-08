@@ -1,6 +1,6 @@
 'use client';
 
-import { ActionIcon, Anchor, Badge, Group, Paper, Text, Tooltip } from '@mantine/core';
+import { ActionIcon, Anchor, Group, Paper, Text, Tooltip } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import { DataTable } from 'mantine-datatable';
@@ -10,30 +10,12 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { IconTrash } from '@tabler/icons-react';
 import { routes } from '@/types/routes';
-import type { PayrollWeeklyReportStatus } from '@prisma/client';
-
 export interface PayrollReportListItem {
   id: string;
   weekStart: string;
   weekEnd: string;
-  status: PayrollWeeklyReportStatus;
   createdAt: string;
   createdBy: { name: string; id: string };
-}
-
-function statusBadge(status: PayrollWeeklyReportStatus) {
-  switch (status) {
-    case 'READY':
-      return <Badge color="green">Prêt</Badge>;
-    case 'PROCESSING':
-      return <Badge color="yellow">En cours</Badge>;
-    case 'FAILED':
-      return <Badge color="red">Échec</Badge>;
-    case 'DRAFT':
-      return <Badge color="gray">Brouillon</Badge>;
-    default:
-      return <Badge>{status}</Badge>;
-  }
 }
 
 export default function PayrollReportsList({
@@ -90,11 +72,6 @@ export default function PayrollReportsList({
                 {format(new Date(r.weekEnd), 'd MMM yyyy', { locale: fr })}
               </Text>
             ),
-          },
-          {
-            accessor: 'status',
-            title: 'Statut',
-            render: (r) => statusBadge(r.status),
           },
           {
             accessor: 'createdBy',

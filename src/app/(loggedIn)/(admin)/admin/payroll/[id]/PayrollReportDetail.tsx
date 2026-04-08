@@ -3,7 +3,6 @@
 import {
   Alert,
   Anchor,
-  Badge,
   Button,
   Container,
   Group,
@@ -20,7 +19,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import type { PayrollWeeklyReportStatus, Prisma } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 import { payrollReportResultSchema } from '@/lib/payroll/schema';
 import { PAYROLL_CAISSE_USD } from '@/lib/payroll/constants';
 import { IconTrash } from '@tabler/icons-react';
@@ -36,21 +35,6 @@ const DAYS = [
   'dimanche',
 ] as const;
 
-function statusBadge(status: PayrollWeeklyReportStatus) {
-  switch (status) {
-    case 'READY':
-      return <Badge color="green">Prêt</Badge>;
-    case 'PROCESSING':
-      return <Badge color="yellow">En cours</Badge>;
-    case 'FAILED':
-      return <Badge color="red">Échec</Badge>;
-    case 'DRAFT':
-      return <Badge color="gray">Brouillon</Badge>;
-    default:
-      return <Badge>{status}</Badge>;
-  }
-}
-
 export default function PayrollReportDetail({
   canDelete,
   report,
@@ -60,7 +44,6 @@ export default function PayrollReportDetail({
     id: string;
     weekStart: string;
     weekEnd: string;
-    status: PayrollWeeklyReportStatus;
     resultJson: Prisma.JsonValue;
     errorMessage: string | null;
     createdAt: string;
@@ -128,17 +111,16 @@ export default function PayrollReportDetail({
               Supprimer
             </Button>
           )}
-          {statusBadge(report.status)}
         </Group>
       </Group>
 
-      {report.status === 'FAILED' && report.errorMessage && (
+      {report.errorMessage && (
         <Alert color="red" title="Échec d&apos;analyse" mb="lg">
           {report.errorMessage}
         </Alert>
       )}
 
-      {report.status === 'READY' && parsed.success && (
+      {!report.errorMessage && parsed.success && (
         <>
           <Paper shadow="sm" p="md" withBorder mb="lg">
             <Title order={4} mb="sm">
@@ -243,9 +225,15 @@ export default function PayrollReportDetail({
         </>
       )}
 
-      {report.status === 'READY' && !parsed.success && (
+      {!report.errorMessage && !parsed.success && report.resultJson != null && (
         <Alert color="orange" title="Données non reconnues">
           Le JSON enregistré ne correspond pas au format attendu.
+        </Alert>
+      )}
+
+      {!report.errorMessage && !parsed.success && report.resultJson == null && (
+        <Alert color="gray" title="Données indisponibles">
+          Ce rapport n&apos;a pas encore de résultat enregistré.
         </Alert>
       )}
 

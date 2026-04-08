@@ -26,7 +26,6 @@ export default async function PayrollReportsPage() {
       id: true,
       weekStart: true,
       weekEnd: true,
-      status: true,
       createdAt: true,
       createdBy: { select: { name: true, id: true } },
     },
@@ -36,7 +35,6 @@ export default async function PayrollReportsPage() {
     id: r.id,
     weekStart: r.weekStart.toISOString(),
     weekEnd: r.weekEnd.toISOString(),
-    status: r.status,
     createdAt: r.createdAt.toISOString(),
     createdBy: r.createdBy,
   }));

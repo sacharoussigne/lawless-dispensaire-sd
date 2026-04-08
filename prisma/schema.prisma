@@ -32,18 +32,10 @@ model User {
   @@map("user")
 }
 
-enum PayrollWeeklyReportStatus {
-  DRAFT
-  PROCESSING
-  READY
-  FAILED
-}
-
 model PayrollWeeklyReport {
-  id              String                    @id @default(uuid())
+  id              String   @id @default(uuid())
   weekStart       DateTime
   weekEnd         DateTime
-  status          PayrollWeeklyReportStatus @default(PROCESSING)
   resultJson      Json?
   errorMessage    String?
   createdById     String

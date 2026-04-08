@@ -1,7 +1,6 @@
 import { randomUUID } from 'crypto';
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { PayrollWeeklyReportStatus } from '@prisma/client';
 import { auth } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { checkRolePermission } from '@/lib/auth/permissions';
@@ -28,7 +27,6 @@ export async function GET() {
       id: true,
       weekStart: true,
       weekEnd: true,
-      status: true,
       createdAt: true,
       createdBy: { select: { name: true, id: true } },
     },
@@ -94,7 +92,6 @@ export async function POST(request: Request) {
       id: reportId,
       weekStart,
       weekEnd,
-      status: PayrollWeeklyReportStatus.PROCESSING,
       createdById: session.user.id,
     },
   });
@@ -106,7 +103,6 @@ export async function POST(request: Request) {
       where: { id: reportId },
       data: {
         resultJson: result as object,
-        status: PayrollWeeklyReportStatus.READY,
         errorMessage: null,
       },
     });
@@ -118,7 +114,6 @@ export async function POST(request: Request) {
     await prisma.payrollWeeklyReport.update({
       where: { id: reportId },
       data: {
-        status: PayrollWeeklyReportStatus.FAILED,
         errorMessage: msg,
       },
     });
