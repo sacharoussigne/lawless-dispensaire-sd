@@ -36,6 +36,7 @@ export const payrollReportResultSchema = z.object({
     total_employees: z.number(),
     total_caisses: z.number(),
     total_sherifs: z.number(),
+    total_palefreniers: z.number().default(0),
   }),
 });
 

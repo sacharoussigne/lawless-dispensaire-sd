@@ -119,6 +119,7 @@ export type ParsedPayrollTable = {
     total_employees: number;
     total_caisses: number;
     total_sherifs: number;
+    total_palefreniers: number;
   };
 };
 
@@ -171,6 +172,7 @@ export function parsePayrollHtmlTable(html: string): ParsedPayrollTable {
     total_employees: employees.length,
     total_caisses: employees.reduce((sum, e) => sum + e.stats.nombre_caisses, 0),
     total_sherifs: employees.reduce((sum, e) => sum + (e.stats.sherifs ?? 0), 0),
+    total_palefreniers: employees.reduce((sum, e) => sum + (e.stats.palefreniers ?? 0), 0),
   };
 
   return { employees, global_stats };

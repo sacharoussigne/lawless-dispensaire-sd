@@ -126,7 +126,7 @@ export default function PayrollReportDetail({
             <Title order={4} mb="sm">
               Totaux
             </Title>
-            <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
+            <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
               <div>
                 <Text size="sm" c="dimmed">
                   Employés
@@ -141,9 +141,15 @@ export default function PayrollReportDetail({
               </div>
               <div>
                 <Text size="sm" c="dimmed">
-                  Sheriffs (total)
+                  Shérifs soignés (total)
                 </Text>
                 <Text fw={600}>{parsed.data.global_stats.total_sherifs}</Text>
+              </div>
+              <div>
+                <Text size="sm" c="dimmed">
+                  Palefreniers (total)
+                </Text>
+                <Text fw={600}>{parsed.data.global_stats.total_palefreniers}</Text>
               </div>
             </SimpleGrid>
           </Paper>
@@ -195,13 +201,13 @@ export default function PayrollReportDetail({
                   <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="sm" mt="md">
                     <div>
                       <Text size="xs" c="dimmed">
-                        Sheriffs
+                        Shérifs soignés
                       </Text>
                       <Text>{emp.stats.sherifs ?? '—'}</Text>
                     </div>
                     <div>
                       <Text size="xs" c="dimmed">
-                        Palefreniers
+                        Palefreniers soignés
                       </Text>
                       <Text>{emp.stats.palefreniers ?? '—'}</Text>
                     </div>
