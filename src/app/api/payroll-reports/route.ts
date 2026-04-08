@@ -5,14 +5,13 @@ import { PayrollWeeklyReportStatus } from '@prisma/client';
 import { auth } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { checkRolePermission } from '@/lib/auth/permissions';
-import { analyzePayrollScreenshots } from '@/lib/payroll/openai';
-import { uploadPayrollScreenshots } from '@/lib/payroll/payrollS3Upload';
+import { refinePayrollReportWithGpt } from '@/lib/payroll/openai';
+import { parsePayrollHtmlTable } from '@/lib/payroll/parsePayrollHtmlTable';
 import { weekRangeFromIsoDate } from '@/lib/payroll/week';
 
 export const runtime = 'nodejs';
 
-const MAX_FILES = 12;
-const MAX_FILE_BYTES = 12 * 1024 * 1024;
+const MAX_HTML_CHARS = 600_000;
 
 export async function GET() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -51,22 +50,37 @@ export async function POST(request: Request) {
   const formData = await request.formData();
   const weekRef = formData.get('weekStart');
   const weekStartStr = typeof weekRef === 'string' ? weekRef : null;
-  const files = formData.getAll('files').filter((f): f is File => f instanceof File);
+  const htmlRaw = formData.get('tableHtml');
+  const tableHtml = typeof htmlRaw === 'string' ? htmlRaw : '';
 
   if (!weekStartStr || !/^\d{4}-\d{2}-\d{2}$/.test(weekStartStr)) {
     return NextResponse.json({ error: 'weekStart must be YYYY-MM-DD' }, { status: 400 });
   }
-  if (files.length === 0) {
-    return NextResponse.json({ error: 'At least one image is required' }, { status: 400 });
+  if (!tableHtml.trim()) {
+    return NextResponse.json({ error: 'Le contenu HTML du tableau est requis' }, { status: 400 });
   }
-  if (files.length > MAX_FILES) {
-    return NextResponse.json({ error: `At most ${MAX_FILES} images` }, { status: 400 });
+  if (tableHtml.length > MAX_HTML_CHARS) {
+    return NextResponse.json({ error: `Le HTML est trop long (max ${MAX_HTML_CHARS} caractères)` }, { status: 400 });
   }
 
-  for (const file of files) {
-    if (file.size > MAX_FILE_BYTES) {
-      return NextResponse.json({ error: 'Each file must be at most 12 MB' }, { status: 400 });
-    }
+  let parsed;
+  try {
+    parsed = parsePayrollHtmlTable(tableHtml);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Échec du parse HTML';
+    return NextResponse.json({ error: msg }, { status: 400 });
+  }
+
+  console.log('[payroll-reports] Parsed table (before GPT):\n', JSON.stringify(parsed, null, 2));
+
+  if (parsed.employees.length === 0) {
+    return NextResponse.json(
+      {
+        error:
+          'Aucune ligne employé détectée (attendu : cellule avec Médecin, Apprenti ou Infirmière). Vérifiez que le HTML contient bien le tableau.',
+      },
+      { status: 400 },
+    );
   }
 
   const { weekStart, weekEnd } = weekRangeFromIsoDate(weekStartStr);
@@ -77,16 +91,6 @@ export async function POST(request: Request) {
   }
 
   const reportId = randomUUID();
-  const buffers: { buffer: Buffer; contentType: string }[] = [];
-  const base64ForAi: { mime: string; data: string }[] = [];
-
-  for (const file of files) {
-    const ab = await file.arrayBuffer();
-    const buffer = Buffer.from(ab);
-    const contentType = file.type || 'image/png';
-    buffers.push({ buffer, contentType });
-    base64ForAi.push({ mime: contentType, data: buffer.toString('base64') });
-  }
 
   await prisma.payrollWeeklyReport.create({
     data: {
@@ -100,13 +104,11 @@ export async function POST(request: Request) {
   });
 
   try {
-    const keys = await uploadPayrollScreenshots(reportId, buffers);
-    const result = await analyzePayrollScreenshots(base64ForAi);
+    const result = await refinePayrollReportWithGpt(parsed);
 
     await prisma.payrollWeeklyReport.update({
       where: { id: reportId },
       data: {
-        screenshotKeys: keys,
         resultJson: result as object,
         status: PayrollWeeklyReportStatus.READY,
         errorMessage: null,
