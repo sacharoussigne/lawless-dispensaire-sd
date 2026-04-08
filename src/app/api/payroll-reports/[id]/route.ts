@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { checkRolePermission } from '@/lib/auth/permissions';
-import { deletePayrollScreenshotObjects } from '@/lib/payroll/s3';
+import { deletePayrollScreenshotObjects } from '@/lib/payroll/payrollS3Delete';
 
 export const runtime = 'nodejs';
 

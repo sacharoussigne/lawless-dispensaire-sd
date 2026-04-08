@@ -6,7 +6,7 @@ import { auth } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { checkRolePermission } from '@/lib/auth/permissions';
 import { analyzePayrollScreenshots } from '@/lib/payroll/openai';
-import { uploadPayrollScreenshots } from '@/lib/payroll/s3';
+import { uploadPayrollScreenshots } from '@/lib/payroll/payrollS3Upload';
 import { weekRangeFromIsoDate } from '@/lib/payroll/week';
 
 export const runtime = 'nodejs';
