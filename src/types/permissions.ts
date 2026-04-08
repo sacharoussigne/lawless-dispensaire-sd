@@ -22,6 +22,10 @@ export interface Permissions {
     access: boolean;
     management: boolean;
   };
+  payrollReports: {
+    view: boolean;
+    create: boolean;
+  };
 }
 
 export interface PermissionsContextType {

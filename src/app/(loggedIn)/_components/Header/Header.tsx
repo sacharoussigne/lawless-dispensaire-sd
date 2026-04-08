@@ -92,7 +92,7 @@ export default function Header({
           <Group>
             {session ? (
               <>
-                {isAdminOrManagementSpace ? (
+                {isAdminOrManagementSpace && permissions?.application.management ? (
                   <Menu
                     width={260}
                     position="bottom-start"
@@ -138,6 +138,13 @@ export default function Header({
                           </Menu.Item>
                         </Link>
                       )}
+                      {permissions?.payrollReports.view && (
+                        <Link href={routes.admin.payroll}>
+                          <Menu.Item>
+                            Rapports salaires
+                          </Menu.Item>
+                        </Link>
+                      )}
                     </Menu.Dropdown>
                   </Menu>
                 ) : (
@@ -178,10 +185,18 @@ export default function Header({
                         Stocks
                       </Link>
                     )}
+                    {permissions?.payrollReports.view && (
+                      <Link
+                        href={routes.admin.payroll}
+                        className={`${classes.link} ${isRouteActive(routes.admin.payroll) ? classes.linkActive : ''}`}
+                      >
+                        Rapports salaires
+                      </Link>
+                    )}
                   </>
                 )}
-                {/* Search icon: only in employee space, before SegmentedControl */}
-                {!isAdminOrManagementSpace &&
+                {/* Search icon: employee space or payroll-only (Direction) */}
+                {(!isAdminOrManagementSpace || !permissions?.application.management) &&
                   appSettings.featureSearchEnabled &&
                   checkRolePermission(userRole, 'search', 'access') && (
                     <Link
@@ -225,6 +240,13 @@ export default function Header({
                     </UnstyledButton>
                   </Menu.Target>
                   <Menu.Dropdown>
+                    {permissions?.payrollReports.view && (
+                      <Link href={routes.admin.payroll}>
+                        <Menu.Item>
+                          Rapports salaires
+                        </Menu.Item>
+                      </Link>
+                    )}
                     {hasRole(userRole, Role.ADMIN) && (
                       <>
                         <Menu.Label>Admin</Menu.Label>

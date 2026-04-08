@@ -26,9 +26,36 @@ model User {
   mailTemplates MailTemplate[]
   mails        Mail[]
   uiPreferences UserUiPreferences?
+  payrollWeeklyReports PayrollWeeklyReport[]
 
   @@unique([email])
   @@map("user")
+}
+
+enum PayrollWeeklyReportStatus {
+  DRAFT
+  PROCESSING
+  READY
+  FAILED
+}
+
+model PayrollWeeklyReport {
+  id              String                    @id @default(uuid())
+  weekStart       DateTime
+  weekEnd         DateTime
+  status          PayrollWeeklyReportStatus @default(PROCESSING)
+  resultJson      Json?
+  screenshotKeys  String[]                  @default([])
+  errorMessage    String?
+  createdById     String
+  createdBy       User                      @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  @@unique([weekStart])
+  @@index([createdById])
+  @@index([weekStart])
+  @@map("payroll_weekly_report")
 }
 
 model UserUiPreferences {
