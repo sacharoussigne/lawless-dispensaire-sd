@@ -49,9 +49,7 @@ export default function PayrollReportsList({
     modals.openConfirmModal({
       title: 'Supprimer ce rapport ?',
       children: (
-        <Text size="sm">
-          Les captures d&apos;écran seront supprimées du stockage S3. Cette action est irréversible.
-        </Text>
+        <Text size="sm">Cette action est irréversible.</Text>
       ),
       labels: { confirm: 'Supprimer', cancel: 'Annuler' },
       confirmProps: { color: 'red' },

@@ -62,7 +62,6 @@ export default function PayrollReportDetail({
     weekEnd: string;
     status: PayrollWeeklyReportStatus;
     resultJson: Prisma.JsonValue;
-    screenshotKeys: string[];
     errorMessage: string | null;
     createdAt: string;
     createdBy: { name: string; email: string };
@@ -75,9 +74,7 @@ export default function PayrollReportDetail({
     modals.openConfirmModal({
       title: 'Supprimer ce rapport ?',
       children: (
-        <Text size="sm">
-          Les captures d&apos;écran seront supprimées du stockage S3. Cette action est irréversible.
-        </Text>
+        <Text size="sm">Cette action est irréversible.</Text>
       ),
       labels: { confirm: 'Supprimer', cancel: 'Annuler' },
       confirmProps: { color: 'red' },
@@ -252,11 +249,6 @@ export default function PayrollReportDetail({
         </Alert>
       )}
 
-      {report.screenshotKeys.length > 0 && (
-        <Text size="sm" c="dimmed" mt="xl">
-          {report.screenshotKeys.length} fichier(s) stocké(s) sur S3.
-        </Text>
-      )}
     </Container>
   );
 }

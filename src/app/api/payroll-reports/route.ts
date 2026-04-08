@@ -95,7 +95,6 @@ export async function POST(request: Request) {
       weekStart,
       weekEnd,
       status: PayrollWeeklyReportStatus.PROCESSING,
-      screenshotKeys: [],
       createdById: session.user.id,
     },
   });

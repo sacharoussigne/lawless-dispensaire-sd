@@ -3,7 +3,6 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { checkRolePermission } from '@/lib/auth/permissions';
-import { deletePayrollScreenshotObjects } from '@/lib/payroll/payrollS3Delete';
 
 export const runtime = 'nodejs';
 
@@ -47,18 +46,11 @@ export async function DELETE(_request: Request, context: RouteContext) {
 
   const report = await prisma.payrollWeeklyReport.findUnique({
     where: { id },
-    select: { id: true, screenshotKeys: true },
+    select: { id: true },
   });
 
   if (!report) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
-
-  try {
-    await deletePayrollScreenshotObjects(report.screenshotKeys);
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : 'S3 delete failed';
-    return NextResponse.json({ error: msg }, { status: 500 });
   }
 
   await prisma.payrollWeeklyReport.delete({ where: { id: report.id } });
