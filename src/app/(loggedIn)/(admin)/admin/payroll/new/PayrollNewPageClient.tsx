@@ -108,7 +108,7 @@ export default function PayrollNewPageClient() {
             onChange={(e) => setTableHtml(e.currentTarget.value)}
             minRows={14}
             autosize
-            maxRows={40}
+            maxRows={18}
             styles={{ input: { fontFamily: 'var(--mantine-font-family-monospace)' } }}
           />
 

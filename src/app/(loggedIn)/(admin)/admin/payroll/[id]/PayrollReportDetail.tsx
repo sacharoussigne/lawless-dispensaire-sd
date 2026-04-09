@@ -53,7 +53,7 @@ const PRESENCE_OPTIONS = [
 ] as const;
 
 function wireTransferDescription(weekStart: Date, weekEnd: Date): string {
-  return `Salaire Semaine ${format(weekStart, 'd MMMM yyyy', { locale: fr })} au ${format(weekEnd, 'd MMMM yyyy', { locale: fr })} - N°${getISOWeek(weekStart)}`;
+  return `Salaire Semaine ${format(weekStart, 'dd MMMM yyyy', { locale: fr })} au ${format(weekEnd, 'dd MMMM yyyy', { locale: fr })} - N°${getISOWeek(weekStart)}`;
 }
 
 function CopyableCell({ value, children }: { value: string; children: ReactNode }) {
@@ -244,36 +244,14 @@ export default function PayrollReportDetail({
             ← Rapports salaires
           </Anchor>
           <Title order={2}>
-            Semaine du {format(weekStartDate, 'd MMMM yyyy', { locale: fr })} au{' '}
-            {format(weekEndDate, 'd MMMM yyyy', { locale: fr })}
+            Semaine du {format(weekStartDate, 'dd MMMM yyyy', { locale: fr })} au{' '}
+            {format(weekEndDate, 'dd MMMM yyyy', { locale: fr })}
           </Title>
           <Text size="sm" c="dimmed" mt={4}>
             Par {report.createdBy.name} — {format(new Date(report.createdAt), 'Pp', { locale: fr })}
           </Text>
         </div>
         <Group gap="sm">
-          {canEdit && draft && !isEditing && (
-            <Button leftSection={<IconEdit size={18} />} onClick={() => setIsEditing(true)} variant="light">
-              Modifier
-            </Button>
-          )}
-          {canEdit && draft && isEditing && (
-            <>
-              <Button leftSection={<IconX size={18} />} onClick={handleCancelEdit} variant="subtle" color="gray">
-                Annuler
-              </Button>
-              <Button
-                leftSection={<IconCheck size={18} />}
-                onClick={handleSave}
-                loading={saving}
-                disabled={!isDirty}
-                variant="filled"
-                color="green"
-              >
-                Sauvegarder
-              </Button>
-            </>
-          )}
           {canDelete && (
             <Button
               color="red"
@@ -390,6 +368,31 @@ export default function PayrollReportDetail({
               </Table.Tbody>
             </Table>
           </Paper>
+
+          <Group justify="end" mb="lg" align="flex-start">
+            {canEdit && draft && !isEditing && (
+              <Button leftSection={<IconEdit size={18} />} onClick={() => setIsEditing(true)} variant="light">
+                Modifier
+              </Button>
+            )}
+            {canEdit && draft && isEditing && (
+              <>
+                <Button leftSection={<IconX size={18} />} onClick={handleCancelEdit} variant="subtle" color="gray">
+                  Annuler
+                </Button>
+                <Button
+                  leftSection={<IconCheck size={18} />}
+                  onClick={handleSave}
+                  loading={saving}
+                  disabled={!isDirty}
+                  variant="filled"
+                  color="green"
+                >
+                  Sauvegarder
+                </Button>
+              </>
+            )}
+          </Group>
 
           <Stack gap="xl">
             {draft.employees.map((emp, i) => {
