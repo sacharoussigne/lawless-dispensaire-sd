@@ -16,6 +16,8 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { IconArrowLeft } from '@tabler/icons-react';
+import { createPayrollReportFromForm } from '@/app/_actions/payrollReports';
+import { handleAction } from '@/lib/action';
 import { PAYROLL_CAISSE_USD } from '@/lib/payroll/constants';
 import { routes } from '@/types/routes';
 
@@ -62,24 +64,15 @@ export default function PayrollNewPageClient() {
       fd.set('tableHtml', tableHtml);
       fd.set('caissePriceUsd', String(caissePriceUsd));
 
-      const res = await fetch('/api/payroll-reports', {
-        method: 'POST',
-        body: fd,
-        credentials: 'include',
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        throw new Error(typeof data.error === 'string' ? data.error : 'Échec de la création');
-      }
+      const result = await createPayrollReportFromForm(fd);
+      const data = handleAction(result);
 
       notifications.show({
         title: 'Rapport créé',
         message: 'Analyse terminée.',
         color: 'green',
       });
-      if (data.report?.id) {
+      if (data?.report?.id) {
         router.push(`${routes.admin.payroll}/${data.report.id}`);
       } else {
         router.push(routes.admin.payroll);

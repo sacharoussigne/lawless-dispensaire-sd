@@ -33,6 +33,11 @@ import {
   IconTrash,
   IconX,
 } from '@tabler/icons-react';
+import {
+  deletePayrollReport,
+  updatePayrollReportResultJson,
+} from '@/app/_actions/payrollReports';
+import { handleAction } from '@/lib/action';
 import { payrollReportResultSchema, type PayrollReportResult } from '@/lib/payroll/schema';
 import { recalculatePayrollResult } from '@/lib/payroll/recalculatePayrollResult';
 import { routes } from '@/types/routes';
@@ -189,16 +194,8 @@ export default function PayrollReportDetail({
     if (!draft || saving) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/payroll-reports/${report.id}`, {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resultJson: draft }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(typeof data.error === 'string' ? data.error : "Échec de l'enregistrement");
-      }
+      const result = await updatePayrollReportResultJson(report.id, draft);
+      handleAction(result);
       notifications.show({ title: 'Enregistré', message: '', color: 'green' });
       baselineJson.current = JSON.stringify(draft);
       setIsEditing(false);
@@ -222,14 +219,8 @@ export default function PayrollReportDetail({
       confirmProps: { color: 'red' },
       onConfirm: async () => {
         try {
-          const res = await fetch(`/api/payroll-reports/${report.id}`, {
-            method: 'DELETE',
-            credentials: 'include',
-          });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) {
-            throw new Error(typeof data.error === 'string' ? data.error : 'Échec de la suppression');
-          }
+          const result = await deletePayrollReport(report.id);
+          handleAction(result);
           notifications.show({ title: 'Rapport supprimé', message: '', color: 'green' });
           router.push(routes.admin.payroll);
           router.refresh();

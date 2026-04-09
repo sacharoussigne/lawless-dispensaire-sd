@@ -9,6 +9,8 @@ import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { IconEye, IconTrash } from '@tabler/icons-react';
+import { deletePayrollReport } from '@/app/_actions/payrollReports';
+import { handleAction } from '@/lib/action';
 import { routes } from '@/types/routes';
 export interface PayrollReportListItem {
   id: string;
@@ -37,14 +39,8 @@ export default function PayrollReportsList({
       confirmProps: { color: 'red' },
       onConfirm: async () => {
         try {
-          const res = await fetch(`/api/payroll-reports/${r.id}`, {
-            method: 'DELETE',
-            credentials: 'include',
-          });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) {
-            throw new Error(typeof data.error === 'string' ? data.error : 'Échec de la suppression');
-          }
+          const result = await deletePayrollReport(r.id);
+          handleAction(result);
           notifications.show({ title: 'Rapport supprimé', message: '', color: 'green' });
           router.refresh();
         } catch (e: unknown) {
