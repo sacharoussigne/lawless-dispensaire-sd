@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
+  Accordion,
   ActionIcon,
   Alert,
-  Anchor,
   Button,
   Container,
   CopyButton,
@@ -13,7 +13,6 @@ import {
   Paper,
   Select,
   SimpleGrid,
-  Stack,
   Table,
   Text,
   Title,
@@ -26,7 +25,14 @@ import { useRouter } from 'next/navigation';
 import { format, getISOWeek } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { Prisma } from '@prisma/client';
-import { IconCheck, IconCopy, IconEdit, IconTrash, IconX } from '@tabler/icons-react';
+import {
+  IconArrowLeft,
+  IconCheck,
+  IconCopy,
+  IconEdit,
+  IconTrash,
+  IconX,
+} from '@tabler/icons-react';
 import { payrollReportResultSchema, type PayrollReportResult } from '@/lib/payroll/schema';
 import { PAYROLL_CAISSE_USD } from '@/lib/payroll/constants';
 import { recalculatePayrollResult } from '@/lib/payroll/recalculatePayrollResult';
@@ -237,13 +243,21 @@ export default function PayrollReportDetail({
   const wireDescription = wireTransferDescription(weekStartDate, weekEndDate);
 
   return (
-    <Container size="xl">
-      <Group justify="space-between" mb="lg" align="flex-start">
+    <Container size="xl" py="xl">
+      <Group justify="space-between" mb="xl" align="flex-start" wrap="wrap">
         <div>
-          <Anchor component={Link} href={routes.admin.payroll} size="sm" mb={4}>
-            ← Rapports salaires
-          </Anchor>
-          <Title order={2}>
+          <Button
+            component={Link}
+            href={routes.admin.payroll}
+            variant="subtle"
+            color="gray"
+            size="sm"
+            leftSection={<IconArrowLeft size={16} stroke={1.5} />}
+            mb="xs"
+          >
+            Rapports salaires
+          </Button>
+          <Title order={1}>
             Semaine du {format(weekStartDate, 'dd MMMM yyyy', { locale: fr })} au{' '}
             {format(weekEndDate, 'dd MMMM yyyy', { locale: fr })}
           </Title>
@@ -251,7 +265,7 @@ export default function PayrollReportDetail({
             Par {report.createdBy.name} — {format(new Date(report.createdAt), 'Pp', { locale: fr })}
           </Text>
         </div>
-        <Group gap="sm">
+        <Group gap="sm" justify="flex-end">
           {canDelete && (
             <Button
               color="red"
@@ -371,7 +385,11 @@ export default function PayrollReportDetail({
 
           <Group justify="end" mb="lg" align="flex-start">
             {canEdit && draft && !isEditing && (
-              <Button leftSection={<IconEdit size={18} />} onClick={() => setIsEditing(true)} variant="light">
+              <Button
+                leftSection={<IconEdit size={18} />}
+                onClick={() => setIsEditing(true)}
+                variant="light"
+              >
                 Modifier
               </Button>
             )}
@@ -394,132 +412,141 @@ export default function PayrollReportDetail({
             )}
           </Group>
 
-          <Stack gap="xl">
+          <Accordion
+            variant="separated"
+            radius="md"
+            multiple
+            mb="xl"
+            defaultValue={draft.employees.length > 0 ? ['emp-0'] : undefined}
+          >
             {draft.employees.map((emp, i) => {
               const caisses = emp.stats.nombre_caisses ?? 0;
               const pay = caisses * PAYROLL_CAISSE_USD;
               return (
-                <Paper key={`${emp.name}-${emp.id ?? i}`} shadow="sm" p="md" withBorder>
-                  <Group justify="space-between" mb="sm">
-                    <div>
-                      <Text fw={600}>{emp.name}</Text>
-                      <Text size="sm" c="dimmed">
-                        {emp.role}
-                        {emp.id != null ? ` — Compte ${emp.id}` : ''}
-                      </Text>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <Text size="sm" c="dimmed">
-                        Estimation caisses × {PAYROLL_CAISSE_USD} $
-                      </Text>
-                      <Text fw={700}>{pay.toFixed(2)} $</Text>
-                    </div>
-                  </Group>
-
-                  <Text size="sm" fw={500} mb={6}>
-                    Planning
-                  </Text>
-                  <Table striped highlightOnHover withTableBorder>
-                    <Table.Thead>
-                      <Table.Tr>
-                        <Table.Th>Jour</Table.Th>
-                        <Table.Th>Caisse</Table.Th>
-                        <Table.Th>Présence soins</Table.Th>
-                      </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                      {DAYS.map((day) => (
-                        <Table.Tr key={day}>
-                          <Table.Td style={{ textTransform: 'capitalize' }}>{day}</Table.Td>
-                          <Table.Td>
-                            {canEdit && isEditing ? (
-                              <Select
-                                size="xs"
-                                data={[...CAISSE_OPTIONS]}
-                                value={emp.schedule[day].caisse ?? ''}
-                                onChange={(v) => updateSchedule(i, day, 'caisse', v)}
-                                w={72}
-                              />
-                            ) : (
-                              emp.schedule[day]?.caisse ?? '—'
-                            )}
-                          </Table.Td>
-                          <Table.Td>
-                            {canEdit && isEditing ? (
-                              <Select
-                                size="xs"
-                                data={[...PRESENCE_OPTIONS]}
-                                value={emp.schedule[day].presence ?? ''}
-                                onChange={(v) => updateSchedule(i, day, 'presence', v)}
-                                w={72}
-                              />
-                            ) : (
-                              emp.schedule[day]?.presence ?? '—'
-                            )}
-                          </Table.Td>
+                <Accordion.Item key={`${emp.name}-${emp.id ?? i}`} value={`emp-${i}`}>
+                  <Accordion.Control>
+                    <Group justify="space-between" wrap="nowrap" gap="md" pr="xs">
+                      <div>
+                        <Text fw={600}>{emp.name}</Text>
+                        <Text size="sm" c="dimmed">
+                          {emp.role}
+                          {emp.id != null ? ` — Compte ${emp.id}` : ''}
+                        </Text>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <Text size="xs" c="dimmed">
+                          Caisses × {PAYROLL_CAISSE_USD} $
+                        </Text>
+                        <Text fw={700}>{pay.toFixed(2)} $</Text>
+                      </div>
+                    </Group>
+                  </Accordion.Control>
+                  <Accordion.Panel>
+                    <Text size="sm" fw={500} mb={6}>
+                      Planning
+                    </Text>
+                    <Table striped highlightOnHover withTableBorder>
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th>Jour</Table.Th>
+                          <Table.Th>Caisse</Table.Th>
+                          <Table.Th>Présence soins</Table.Th>
                         </Table.Tr>
-                      ))}
-                    </Table.Tbody>
-                  </Table>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {DAYS.map((day) => (
+                          <Table.Tr key={day}>
+                            <Table.Td style={{ textTransform: 'capitalize' }}>{day}</Table.Td>
+                            <Table.Td>
+                              {canEdit && isEditing ? (
+                                <Select
+                                  size="xs"
+                                  data={[...CAISSE_OPTIONS]}
+                                  value={emp.schedule[day].caisse ?? ''}
+                                  onChange={(v) => updateSchedule(i, day, 'caisse', v)}
+                                  w={72}
+                                />
+                              ) : (
+                                emp.schedule[day]?.caisse ?? '—'
+                              )}
+                            </Table.Td>
+                            <Table.Td>
+                              {canEdit && isEditing ? (
+                                <Select
+                                  size="xs"
+                                  data={[...PRESENCE_OPTIONS]}
+                                  value={emp.schedule[day].presence ?? ''}
+                                  onChange={(v) => updateSchedule(i, day, 'presence', v)}
+                                  w={72}
+                                />
+                              ) : (
+                                emp.schedule[day]?.presence ?? '—'
+                              )}
+                            </Table.Td>
+                          </Table.Tr>
+                        ))}
+                      </Table.Tbody>
+                    </Table>
 
-                  <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="sm" mt="md">
-                    <div>
-                      <Text size="xs" c="dimmed" mb={4}>
-                        Shérifs soignés
-                      </Text>
-                      {canEdit && isEditing ? (
-                        <NumberInput
-                          size="xs"
-                          min={0}
-                          allowDecimal={false}
-                          value={emp.stats.sherifs ?? ''}
-                          onChange={(v) =>
-                            patchEmployeeStats(i, {
-                              sherifs: v === '' || v === undefined ? null : Number(v),
-                            })
-                          }
-                        />
-                      ) : (
-                        <Text>{emp.stats.sherifs ?? '—'}</Text>
-                      )}
-                    </div>
-                    <div>
-                      <Text size="xs" c="dimmed" mb={4}>
-                        Palefreniers soignés
-                      </Text>
-                      {canEdit && isEditing ? (
-                        <NumberInput
-                          size="xs"
-                          min={0}
-                          allowDecimal={false}
-                          value={emp.stats.palefreniers ?? ''}
-                          onChange={(v) =>
-                            patchEmployeeStats(i, {
-                              palefreniers: v === '' || v === undefined ? null : Number(v),
-                            })
-                          }
-                        />
-                      ) : (
-                        <Text>{emp.stats.palefreniers ?? '—'}</Text>
-                      )}
-                    </div>
-                    <div>
-                      <Text size="xs" c="dimmed">
-                        Caisses
-                      </Text>
-                      <Text>{emp.stats.nombre_caisses ?? '—'}</Text>
-                    </div>
-                    <div>
-                      <Text size="xs" c="dimmed">
-                        Présences
-                      </Text>
-                      <Text>{emp.stats.nombre_presences ?? '—'}</Text>
-                    </div>
-                  </SimpleGrid>
-                </Paper>
+                    <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="sm" mt="md">
+                      <div>
+                        <Text size="xs" c="dimmed" mb={4}>
+                          Shérifs soignés
+                        </Text>
+                        {canEdit && isEditing ? (
+                          <NumberInput
+                            size="xs"
+                            min={0}
+                            allowDecimal={false}
+                            value={emp.stats.sherifs ?? ''}
+                            onChange={(v) =>
+                              patchEmployeeStats(i, {
+                                sherifs: v === '' || v === undefined ? null : Number(v),
+                              })
+                            }
+                          />
+                        ) : (
+                          <Text>{emp.stats.sherifs ?? '—'}</Text>
+                        )}
+                      </div>
+                      <div>
+                        <Text size="xs" c="dimmed" mb={4}>
+                          Palefreniers soignés
+                        </Text>
+                        {canEdit && isEditing ? (
+                          <NumberInput
+                            size="xs"
+                            min={0}
+                            allowDecimal={false}
+                            value={emp.stats.palefreniers ?? ''}
+                            onChange={(v) =>
+                              patchEmployeeStats(i, {
+                                palefreniers: v === '' || v === undefined ? null : Number(v),
+                              })
+                            }
+                          />
+                        ) : (
+                          <Text>{emp.stats.palefreniers ?? '—'}</Text>
+                        )}
+                      </div>
+                      <div>
+                        <Text size="xs" c="dimmed">
+                          Caisses
+                        </Text>
+                        <Text>{emp.stats.nombre_caisses ?? '—'}</Text>
+                      </div>
+                      <div>
+                        <Text size="xs" c="dimmed">
+                          Présences
+                        </Text>
+                        <Text>{emp.stats.nombre_presences ?? '—'}</Text>
+                      </div>
+                    </SimpleGrid>
+                  </Accordion.Panel>
+                </Accordion.Item>
               );
             })}
-          </Stack>
+          </Accordion>
         </>
       )}
 

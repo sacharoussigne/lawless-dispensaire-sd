@@ -106,6 +106,13 @@ export default function Header({
                     </Menu.Target>
                     <Menu.Dropdown>
                       <Menu.Label>Gestion</Menu.Label>
+                      {appSettings.featurePayrollEnabled && permissions?.payrollReports.view && (
+                        <Link href={routes.admin.payroll}>
+                          <Menu.Item>
+                            Rapports salaires
+                          </Menu.Item>
+                        </Link>
+                      )}
                       <Link href={routes.management.categoryItems}>
                         <Menu.Item>
                           Catégories d'objets
@@ -138,61 +145,46 @@ export default function Header({
                           </Menu.Item>
                         </Link>
                       )}
-                      {permissions?.payrollReports.view && (
-                        <Link href={routes.admin.payroll}>
-                          <Menu.Item>
-                            Rapports salaires
-                          </Menu.Item>
-                        </Link>
-                      )}
                     </Menu.Dropdown>
                   </Menu>
                 ) : (
                   <>
                     {appSettings.featureBankEnabled &&
                       checkRolePermission(userRole, 'bank', 'access') && (
-                      <Link
-                        href={routes.bank.index}
-                        className={`${classes.link} ${isRouteActive(routes.bank.index) ? classes.linkActive : ''}`}
-                      >
-                        Banque
-                      </Link>
-                    )}
+                        <Link
+                          href={routes.bank.index}
+                          className={`${classes.link} ${isRouteActive(routes.bank.index) ? classes.linkActive : ''}`}
+                        >
+                          Banque
+                        </Link>
+                      )}
                     {appSettings.featurePrivatePracticeEnabled &&
                       checkRolePermission(userRole, 'private_practice', 'access') && (
-                      <Link
-                        href={routes.privatePractice.index}
-                        className={`${classes.link} ${isRouteActive(routes.privatePractice.index) ? classes.linkActive : ''}`}
-                      >
-                        Cabinet privé
-                      </Link>
-                    )}
+                        <Link
+                          href={routes.privatePractice.index}
+                          className={`${classes.link} ${isRouteActive(routes.privatePractice.index) ? classes.linkActive : ''}`}
+                        >
+                          Cabinet privé
+                        </Link>
+                      )}
                     {appSettings.featureOrdersEnabled &&
                       checkRolePermission(userRole, 'orders', 'view') && (
-                      <Link
-                        href={routes.orders.index}
-                        className={`${classes.link} ${isRouteActive(routes.orders.index) ? classes.linkActive : ''}`}
-                      >
-                        Commandes
-                      </Link>
-                    )}
+                        <Link
+                          href={routes.orders.index}
+                          className={`${classes.link} ${isRouteActive(routes.orders.index) ? classes.linkActive : ''}`}
+                        >
+                          Commandes
+                        </Link>
+                      )}
                     {appSettings.featureStockEnabled &&
                       checkRolePermission(userRole, 'stock', 'view') && (
-                      <Link
-                        href={routes.stock.index}
-                        className={`${classes.link} ${isRouteActive(routes.stock.index) ? classes.linkActive : ''}`}
-                      >
-                        Stocks
-                      </Link>
-                    )}
-                    {permissions?.payrollReports.view && (
-                      <Link
-                        href={routes.admin.payroll}
-                        className={`${classes.link} ${isRouteActive(routes.admin.payroll) ? classes.linkActive : ''}`}
-                      >
-                        Rapports salaires
-                      </Link>
-                    )}
+                        <Link
+                          href={routes.stock.index}
+                          className={`${classes.link} ${isRouteActive(routes.stock.index) ? classes.linkActive : ''}`}
+                        >
+                          Stocks
+                        </Link>
+                      )}
                   </>
                 )}
                 {/* Search icon: employee space or payroll-only (Direction) */}
@@ -240,13 +232,6 @@ export default function Header({
                     </UnstyledButton>
                   </Menu.Target>
                   <Menu.Dropdown>
-                    {permissions?.payrollReports.view && (
-                      <Link href={routes.admin.payroll}>
-                        <Menu.Item>
-                          Rapports salaires
-                        </Menu.Item>
-                      </Link>
-                    )}
                     {hasRole(userRole, Role.ADMIN) && (
                       <>
                         <Menu.Label>Admin</Menu.Label>

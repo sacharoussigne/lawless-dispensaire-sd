@@ -4,6 +4,7 @@ import {
   Button,
   Container,
   Group,
+  Paper,
   Stack,
   Text,
   Textarea,
@@ -15,6 +16,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { format } from 'date-fns';
+import { IconArrowLeft } from '@tabler/icons-react';
 import { routes } from '@/types/routes';
 
 export default function PayrollNewPageClient() {
@@ -80,14 +82,28 @@ export default function PayrollNewPageClient() {
 
   return (
     <DatesProvider settings={{ locale: 'fr' }}>
-      <Container size="md">
-        <Title order={2} mb="md">
+      <Container size="md" py="xl">
+        <Button
+          component={Link}
+          href={routes.admin.payroll}
+          variant="subtle"
+          color="gray"
+          size="sm"
+          leftSection={<IconArrowLeft size={16} stroke={1.5} />}
+          mb="xs"
+        >
+          Rapports salaires
+        </Button>
+        <Title order={1} mb="md">
           Nouveau rapport
         </Title>
-        <Text c="dimmed" size="sm" mb="lg">
-          Choisissez un jour de la semaine concernée (le lundi sera déduit automatiquement), puis collez le HTML du
-          tableau des présences / caisses. Le contenu est parsé côté serveur et enregistré au format JSON attendu.
-        </Text>
+        <Paper withBorder p="md" radius="md" mb="lg" bg="var(--mantine-color-body)">
+          <Text size="sm" c="dimmed">
+            Choisissez un jour de la semaine concernée (le lundi sera déduit automatiquement), puis collez le HTML du
+            tableau des présences et caisses. Le contenu est parsé côté serveur et enregistré au format JSON attendu
+            (limite {600_000} caractères côté API).
+          </Text>
+        </Paper>
 
         <Stack gap="lg">
           <DateInput

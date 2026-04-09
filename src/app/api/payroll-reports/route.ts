@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { checkRolePermission } from '@/lib/auth/permissions';
+import { getAppFeatureActionBlock } from '@/lib/appSettings';
 import { parsePayrollHtmlTable, parsedToPayrollReportResult } from '@/lib/payroll/parsePayrollHtmlTable';
 import { weekRangeFromIsoDate } from '@/lib/payroll/week';
 
@@ -18,6 +19,11 @@ export async function GET() {
   }
   if (!checkRolePermission(session.user.role, 'payroll_reports', 'view')) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const payrollFeatureBlock = await getAppFeatureActionBlock('payroll');
+  if (payrollFeatureBlock) {
+    return NextResponse.json({ error: payrollFeatureBlock.error }, { status: 403 });
   }
 
   const reports = await prisma.payrollWeeklyReport.findMany({
@@ -42,6 +48,11 @@ export async function POST(request: Request) {
   }
   if (!checkRolePermission(session.user.role, 'payroll_reports', 'create')) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const payrollFeatureBlock = await getAppFeatureActionBlock('payroll');
+  if (payrollFeatureBlock) {
+    return NextResponse.json({ error: payrollFeatureBlock.error }, { status: 403 });
   }
 
   const formData = await request.formData();
@@ -82,7 +93,10 @@ export async function POST(request: Request) {
 
   const existing = await prisma.payrollWeeklyReport.findUnique({ where: { weekStart } });
   if (existing) {
-    return NextResponse.json({ error: 'A report already exists for this week' }, { status: 409 });
+    return NextResponse.json(
+      { error: 'Un rapport existe déjà pour cette semaine.' },
+      { status: 409 },
+    );
   }
 
   const reportId = randomUUID();

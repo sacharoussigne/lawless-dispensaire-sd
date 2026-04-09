@@ -41,6 +41,9 @@ export async function middleware(req: NextRequest) {
       pathname === routes.admin.payroll || pathname.startsWith(`${routes.admin.payroll}/`);
     if (isPayrollRoute) {
       middlewares.push(hasPayrollReportsAccessMiddleware);
+      middlewares.push((request: NextRequest, session: unknown) =>
+        assertAppFeatureEnabledMiddleware(request, session, 'payroll'),
+      );
     } else {
       middlewares.push(hasManagementAccessMiddleware);
       if (

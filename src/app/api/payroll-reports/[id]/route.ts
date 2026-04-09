@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { checkRolePermission } from '@/lib/auth/permissions';
+import { getAppFeatureActionBlock } from '@/lib/appSettings';
 import { payrollReportResultSchema } from '@/lib/payroll/schema';
 import { recalculatePayrollResult } from '@/lib/payroll/recalculatePayrollResult';
 
@@ -17,6 +18,11 @@ export async function GET(_request: Request, context: RouteContext) {
   }
   if (!checkRolePermission(session.user.role, 'payroll_reports', 'view')) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const payrollFeatureBlock = await getAppFeatureActionBlock('payroll');
+  if (payrollFeatureBlock) {
+    return NextResponse.json({ error: payrollFeatureBlock.error }, { status: 403 });
   }
 
   const { id } = await context.params;
@@ -42,6 +48,11 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
   if (!checkRolePermission(session.user.role, 'payroll_reports', 'create')) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const payrollFeatureBlock = await getAppFeatureActionBlock('payroll');
+  if (payrollFeatureBlock) {
+    return NextResponse.json({ error: payrollFeatureBlock.error }, { status: 403 });
   }
 
   const { id } = await context.params;
@@ -98,6 +109,11 @@ export async function DELETE(_request: Request, context: RouteContext) {
   }
   if (!checkRolePermission(session.user.role, 'payroll_reports', 'create')) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const payrollFeatureBlock = await getAppFeatureActionBlock('payroll');
+  if (payrollFeatureBlock) {
+    return NextResponse.json({ error: payrollFeatureBlock.error }, { status: 403 });
   }
 
   const { id } = await context.params;

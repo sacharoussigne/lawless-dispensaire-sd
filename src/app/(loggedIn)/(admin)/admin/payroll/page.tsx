@@ -1,11 +1,10 @@
-import { Button, Container, Group, Title } from '@mantine/core';
-import Link from 'next/link';
+import { Container, Group, Text, Title } from '@mantine/core';
 import { redirect } from 'next/navigation';
-import { IconPlus } from '@tabler/icons-react';
 import { getAuthSession } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { checkRolePermission } from '@/lib/auth/permissions';
 import { routes } from '@/types/routes';
+import PayrollNewReportButton from './PayrollNewReportButton';
 import PayrollReportsList from './PayrollReportsList';
 
 export default async function PayrollReportsPage() {
@@ -40,14 +39,15 @@ export default async function PayrollReportsPage() {
   }));
 
   return (
-    <Container size="xl">
-      <Group justify="space-between" mb="lg">
-        <Title order={2}>Rapports salaires hebdomadaires</Title>
-        {canCreate && (
-          <Link href={`${routes.admin.payroll}/new`} style={{ textDecoration: 'none' }}>
-            <Button leftSection={<IconPlus size={18} />}>Nouveau rapport</Button>
-          </Link>
-        )}
+    <Container size="xl" py="xl">
+      <Group justify="space-between" mb="xl" align="flex-start">
+        <div>
+          <Title order={1}>Rapports salaires hebdomadaires</Title>
+          <Text c="dimmed" mt="xs">
+            Historique des analyses de présences et caisses, avec montants pour virements.
+          </Text>
+        </div>
+        {canCreate && <PayrollNewReportButton />}
       </Group>
       <PayrollReportsList reports={reports} canDelete={canCreate} />
     </Container>

@@ -128,6 +128,7 @@ model AppSettings {
   featureOrdersEnabled         Boolean  @default(true)
   featureSearchEnabled         Boolean  @default(true)
   featureMailsEnabled          Boolean  @default(true)
+  featurePayrollEnabled        Boolean  @default(true)
   createdAt                    DateTime @default(now())
   updatedAt                    DateTime @updatedAt
 

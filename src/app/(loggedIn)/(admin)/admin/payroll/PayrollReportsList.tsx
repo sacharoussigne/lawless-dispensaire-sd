@@ -1,6 +1,6 @@
 'use client';
 
-import { ActionIcon, Anchor, Group, Paper, Text, Tooltip } from '@mantine/core';
+import { ActionIcon, Button, Group, Paper, Text, Tooltip } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import { DataTable } from 'mantine-datatable';
@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { IconTrash } from '@tabler/icons-react';
+import { IconEye, IconTrash } from '@tabler/icons-react';
 import { routes } from '@/types/routes';
 export interface PayrollReportListItem {
   id: string;
@@ -88,9 +88,15 @@ export default function PayrollReportsList({
             title: '',
             render: (r) => (
               <Group gap="xs" wrap="nowrap" justify="flex-end">
-                <Anchor component={Link} href={`${routes.admin.payroll}/${r.id}`} size="sm">
-                  Voir
-                </Anchor>
+                <Tooltip label="Voir">
+                  <Link  href={`${routes.admin.payroll}/${r.id}`}>
+                    <ActionIcon
+                      variant="subtle"
+                      aria-label="Voir"
+                    >
+                      <IconEye size={18} />
+                    </ActionIcon></Link>
+                </Tooltip>
                 {canDelete && (
                   <Tooltip label="Supprimer">
                     <ActionIcon
