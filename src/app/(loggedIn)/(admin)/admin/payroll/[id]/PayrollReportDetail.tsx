@@ -5,7 +5,9 @@ import {
   Accordion,
   ActionIcon,
   Alert,
+  Box,
   Button,
+  Code,
   Container,
   CopyButton,
   Group,
@@ -62,18 +64,38 @@ const PRESENCE_OPTIONS = [
   { value: 'P', label: 'P' },
 ] as const;
 
+const BANDAGE_EXPORT_DEPOSIT_MOTIF = "Caisse d'exportation Bandage";
+
 function wireTransferDescription(weekStart: Date, weekEnd: Date): string {
   return `Salaire Semaine ${format(weekStart, 'dd MMMM yyyy', { locale: fr })} au ${format(weekEnd, 'dd MMMM yyyy', { locale: fr })} - N°${getISOWeek(weekStart)}`;
 }
 
-function CopyableCell({ value, children }: { value: string; children: ReactNode }) {
+function CopyableCell({
+  value,
+  children,
+  copyFaded,
+}: {
+  value: string;
+  children: ReactNode;
+  /** When true, copy control is de-emphasized until the row is hovered. */
+  copyFaded?: boolean;
+}) {
   return (
     <Group gap={6} wrap="nowrap" align="flex-start">
       <div style={{ minWidth: 0, flex: 1 }}>{children}</div>
       <CopyButton value={value}>
         {({ copied, copy }) => (
-          <Tooltip label={copied ? 'Copié' : 'Copier'} withArrow>
-            <ActionIcon variant="subtle" size="sm" onClick={copy} aria-label="Copier">
+          <Tooltip label={copied ? 'Copié' : 'Copier'} withArrow openDelay={100}>
+            <ActionIcon
+              variant="subtle"
+              size="sm"
+              onClick={copy}
+              aria-label="Copier"
+              style={{
+                opacity: copyFaded ? 0.2 : 1,
+                transition: 'opacity 120ms ease',
+              }}
+            >
               {copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
             </ActionIcon>
           </Tooltip>
@@ -105,6 +127,7 @@ export default function PayrollReportDetail({
   const [draft, setDraft] = useState<PayrollReportResult | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [hoveredVirementRow, setHoveredVirementRow] = useState<number | null>(null);
   const baselineJson = useRef('');
 
   const resultFingerprint = JSON.stringify(report.resultJson ?? null);
@@ -361,11 +384,39 @@ export default function PayrollReportDetail({
             <Title order={4}>
               Virements
             </Title>
-            <Text size="sm" c="dimmed" mb="md">
-              Informations pour les virements (montant = caisses × prix caisse du rapport).
-              {canEdit &&
-                ' En mode « Modifier planning », vous pouvez ajuster le prix caisse dans Totaux ainsi que le tableau de présence et les compteurs soins.'}
+            <Text size="sm" c="dimmed" mb="sm">
+              Montants et libellés à utiliser pour les virements bancaires.
             </Text>
+            <Box
+              mb="sm"
+              pl="xs"
+              ml={2}
+              style={{ borderLeft: '2px solid var(--mantine-color-gray-3)' }}
+            >
+              <Text size="xs" c="dimmed" lh={1.45} mb={4}>
+                Dépôt des caisses d&apos;export de bandage — motif à indiquer&nbsp;:
+              </Text>
+              <Group gap={6} align="center" wrap="wrap">
+                <Code fz="xs" fw={500} px={6} py={2}>
+                  {BANDAGE_EXPORT_DEPOSIT_MOTIF}
+                </Code>
+                <CopyButton value={BANDAGE_EXPORT_DEPOSIT_MOTIF}>
+                  {({ copied, copy }) => (
+                    <Tooltip label={copied ? 'Copié' : 'Copier le motif'} withArrow>
+                      <ActionIcon
+                        variant="subtle"
+                        color="gray"
+                        size="xs"
+                        onClick={copy}
+                        aria-label="Copier le motif"
+                      >
+                        {copied ? <IconCheck size={12} stroke={1.5} /> : <IconCopy size={12} stroke={1.5} />}
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+                </CopyButton>
+              </Group>
+            </Box>
             <Table striped highlightOnHover withTableBorder layout="fixed">
               <Table.Thead>
                 <Table.Tr>
@@ -376,7 +427,7 @@ export default function PayrollReportDetail({
                   <Table.Th style={{ width: '16%' }}>Montant</Table.Th>
                 </Table.Tr>
               </Table.Thead>
-              <Table.Tbody>
+              <Table.Tbody onMouseLeave={() => setHoveredVirementRow(null)}>
                 {draft.employees.map((emp, rowIdx) => {
                   const caisses = emp.stats.nombre_caisses ?? 0;
                   const unit = draft.caisse_price_usd;
@@ -386,32 +437,36 @@ export default function PayrollReportDetail({
                   const idDisplay = emp.id != null ? String(emp.id) : '—';
                   const idCopy = idDisplay;
                   const presences = String(emp.stats.nombre_presences ?? 0);
+                  const copyFaded = hoveredVirementRow !== rowIdx;
                   return (
-                    <Table.Tr key={`${emp.name}-${emp.id ?? rowIdx}`}>
+                    <Table.Tr
+                      key={`${emp.name}-${emp.id ?? rowIdx}`}
+                      onMouseEnter={() => setHoveredVirementRow(rowIdx)}
+                    >
                       <Table.Td>
-                        <CopyableCell value={emp.name}>
+                        <CopyableCell value={emp.name} copyFaded={copyFaded}>
                           <Text size="sm">{emp.name}</Text>
                         </CopyableCell>
                       </Table.Td>
                       <Table.Td>
-                        <CopyableCell value={idCopy}>
+                        <CopyableCell value={idCopy} copyFaded={copyFaded}>
                           <Text size="sm">{idDisplay}</Text>
                         </CopyableCell>
                       </Table.Td>
                       <Table.Td>
-                        <CopyableCell value={presences}>
+                        <CopyableCell value={presences} copyFaded={copyFaded}>
                           <Text size="sm">{presences}</Text>
                         </CopyableCell>
                       </Table.Td>
                       <Table.Td>
-                        <CopyableCell value={wireDescription}>
+                        <CopyableCell value={wireDescription} copyFaded={copyFaded}>
                           <Text size="sm" style={{ wordBreak: 'break-word' }}>
                             {wireDescription}
                           </Text>
                         </CopyableCell>
                       </Table.Td>
                       <Table.Td>
-                        <CopyableCell value={payCopyValue}>
+                        <CopyableCell value={payCopyValue} copyFaded={copyFaded}>
                           <Text size="sm" fw={500}>
                             {payStr}
                           </Text>
