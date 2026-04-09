@@ -136,7 +136,7 @@ export function parsePayrollHtmlTable(html: string): ParsedPayrollTable {
 
     const firstCellText = cleanText($(cells[0]).text());
 
-    if (firstCellText.match(/(Médecin|Apprenti|Infirmière)/i)) {
+    if (firstCellText.match(/(Médecin|Apprenti|Infirmière|Infirmier|Directeur|Co-Directeur|Co-Directrice)/i)) {
       const employeeInfo = parseEmployeeCell(firstCellText);
 
       const rawCells: string[] = [];

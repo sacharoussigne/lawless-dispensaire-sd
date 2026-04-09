@@ -31,6 +31,7 @@ export default async function PayrollReportByIdPage({ params }: PageProps) {
   return (
     <PayrollReportDetail
       canDelete={canDelete}
+      canEdit={canDelete}
       report={{
         id: report.id,
         weekStart: report.weekStart.toISOString(),
