@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { PAYROLL_CAISSE_USD } from './constants';
 import type { PayrollReportResult } from './schema';
 import { recalculatePayrollResult } from './recalculatePayrollResult';
 
@@ -30,29 +31,38 @@ function baseEmployee(
   };
 }
 
+function baseReport(
+  employees: PayrollReportResult['employees'],
+  overrides: Partial<Pick<PayrollReportResult, 'caisse_price_usd' | 'global_stats'>> = {},
+): PayrollReportResult {
+  return {
+    caisse_price_usd: PAYROLL_CAISSE_USD,
+    employees,
+    global_stats: {
+      total_employees: 0,
+      total_caisses: 0,
+      total_sherifs: 0,
+      total_palefreniers: 0,
+    },
+    ...overrides,
+  };
+}
+
 describe('recalculatePayrollResult', () => {
   it('recomputes caisse and presence counts from schedule', () => {
-    const data: PayrollReportResult = {
-      employees: [
-        baseEmployee({
-          schedule: {
-            lundi: { caisse: 'X', presence: null },
-            mardi: { caisse: null, presence: 'P' },
-            mercredi: { caisse: 'X', presence: 'P' },
-            jeudi: { ...emptyDay },
-            vendredi: { ...emptyDay },
-            samedi: { ...emptyDay },
-            dimanche: { ...emptyDay },
-          },
-        }),
-      ],
-      global_stats: {
-        total_employees: 0,
-        total_caisses: 0,
-        total_sherifs: 0,
-        total_palefreniers: 0,
-      },
-    };
+    const data = baseReport([
+      baseEmployee({
+        schedule: {
+          lundi: { caisse: 'X', presence: null },
+          mardi: { caisse: null, presence: 'P' },
+          mercredi: { caisse: 'X', presence: 'P' },
+          jeudi: { ...emptyDay },
+          vendredi: { ...emptyDay },
+          samedi: { ...emptyDay },
+          dimanche: { ...emptyDay },
+        },
+      }),
+    ]);
 
     const out = recalculatePayrollResult(data);
     expect(out.employees[0].stats.nombre_caisses).toBe(2);
@@ -62,34 +72,26 @@ describe('recalculatePayrollResult', () => {
   });
 
   it('aggregates sherifs and palefreniers into global_stats', () => {
-    const data: PayrollReportResult = {
-      employees: [
-        baseEmployee({
-          stats: {
-            sherifs: 3,
-            palefreniers: 2,
-            nombre_caisses: 0,
-            nombre_presences: 0,
-          },
-        }),
-        baseEmployee({
-          name: 'B',
-          id: 2,
-          stats: {
-            sherifs: 1,
-            palefreniers: null,
-            nombre_caisses: 0,
-            nombre_presences: 0,
-          },
-        }),
-      ],
-      global_stats: {
-        total_employees: 0,
-        total_caisses: 0,
-        total_sherifs: 0,
-        total_palefreniers: 0,
-      },
-    };
+    const data = baseReport([
+      baseEmployee({
+        stats: {
+          sherifs: 3,
+          palefreniers: 2,
+          nombre_caisses: 0,
+          nombre_presences: 0,
+        },
+      }),
+      baseEmployee({
+        name: 'B',
+        id: 2,
+        stats: {
+          sherifs: 1,
+          palefreniers: null,
+          nombre_caisses: 0,
+          nombre_presences: 0,
+        },
+      }),
+    ]);
 
     const out = recalculatePayrollResult(data);
     expect(out.global_stats.total_sherifs).toBe(4);
@@ -97,27 +99,28 @@ describe('recalculatePayrollResult', () => {
   });
 
   it('preserves sherifs and palefreniers on employees', () => {
-    const data: PayrollReportResult = {
-      employees: [
-        baseEmployee({
-          stats: {
-            sherifs: 5,
-            palefreniers: 7,
-            nombre_caisses: 1,
-            nombre_presences: 1,
-          },
-        }),
-      ],
-      global_stats: {
-        total_employees: 1,
-        total_caisses: 1,
-        total_sherifs: 5,
-        total_palefreniers: 7,
-      },
-    };
+    const data = baseReport([
+      baseEmployee({
+        stats: {
+          sherifs: 5,
+          palefreniers: 7,
+          nombre_caisses: 1,
+          nombre_presences: 1,
+        },
+      }),
+    ]);
 
     const out = recalculatePayrollResult(data);
     expect(out.employees[0].stats.sherifs).toBe(5);
     expect(out.employees[0].stats.palefreniers).toBe(7);
+  });
+
+  it('preserves caisse_price_usd on the report', () => {
+    const data = baseReport([baseEmployee(), baseEmployee({ name: 'B', id: 2 })], {
+      caisse_price_usd: 8.25,
+    });
+
+    const out = recalculatePayrollResult(data);
+    expect(out.caisse_price_usd).toBe(8.25);
   });
 });

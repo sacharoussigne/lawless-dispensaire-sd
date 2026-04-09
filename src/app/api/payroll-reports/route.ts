@@ -5,8 +5,12 @@ import { auth } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { checkRolePermission } from '@/lib/auth/permissions';
 import { getAppFeatureActionBlock } from '@/lib/appSettings';
+import { PAYROLL_CAISSE_USD } from '@/lib/payroll/constants';
 import { parsePayrollHtmlTable, parsedToPayrollReportResult } from '@/lib/payroll/parsePayrollHtmlTable';
+import { payrollReportResultSchema } from '@/lib/payroll/schema';
 import { weekRangeFromIsoDate } from '@/lib/payroll/week';
+
+const MAX_CAISSE_PRICE_USD = 1_000_000;
 
 export const runtime = 'nodejs';
 
@@ -60,6 +64,18 @@ export async function POST(request: Request) {
   const weekStartStr = typeof weekRef === 'string' ? weekRef : null;
   const htmlRaw = formData.get('tableHtml');
   const tableHtml = typeof htmlRaw === 'string' ? htmlRaw : '';
+  const caisseRaw = formData.get('caissePriceUsd');
+  let caissePriceUsd = PAYROLL_CAISSE_USD;
+  if (caisseRaw != null && String(caisseRaw).trim() !== '') {
+    const n = Number(String(caisseRaw).trim().replace(',', '.'));
+    if (!Number.isFinite(n) || n <= 0 || n > MAX_CAISSE_PRICE_USD) {
+      return NextResponse.json(
+        { error: 'Prix caisse invalide (entre 0,01 et 1 000 000 $).' },
+        { status: 400 },
+      );
+    }
+    caissePriceUsd = n;
+  }
 
   if (!weekStartStr || !/^\d{4}-\d{2}-\d{2}$/.test(weekStartStr)) {
     return NextResponse.json({ error: 'weekStart must be YYYY-MM-DD' }, { status: 400 });
@@ -111,7 +127,11 @@ export async function POST(request: Request) {
   });
 
   try {
-    const result = parsedToPayrollReportResult(parsed);
+    const parsedResult = parsedToPayrollReportResult(parsed);
+    const result = payrollReportResultSchema.parse({
+      ...parsedResult,
+      caisse_price_usd: caissePriceUsd,
+    });
 
     await prisma.payrollWeeklyReport.update({
       where: { id: reportId },

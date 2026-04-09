@@ -4,9 +4,8 @@ import {
   Button,
   Container,
   Group,
-  Paper,
+  NumberInput,
   Stack,
-  Text,
   Textarea,
   Title,
 } from '@mantine/core';
@@ -17,11 +16,15 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { IconArrowLeft } from '@tabler/icons-react';
+import { PAYROLL_CAISSE_USD } from '@/lib/payroll/constants';
 import { routes } from '@/types/routes';
+
+const MAX_CAISSE_PRICE_USD = 1_000_000;
 
 export default function PayrollNewPageClient() {
   const router = useRouter();
   const [weekDate, setWeekDate] = useState<string | null>(format(new Date(), 'yyyy-MM-dd'));
+  const [caissePriceUsd, setCaissePriceUsd] = useState<number>(PAYROLL_CAISSE_USD);
   const [tableHtml, setTableHtml] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -39,12 +42,25 @@ export default function PayrollNewPageClient() {
       });
       return;
     }
+    if (
+      !Number.isFinite(caissePriceUsd) ||
+      caissePriceUsd <= 0 ||
+      caissePriceUsd > MAX_CAISSE_PRICE_USD
+    ) {
+      notifications.show({
+        title: 'Prix caisse invalide',
+        message: `Indiquez un montant entre 0,01 et ${MAX_CAISSE_PRICE_USD.toLocaleString('fr-FR')} $.`,
+        color: 'red',
+      });
+      return;
+    }
 
     setSubmitting(true);
     try {
       const fd = new FormData();
       fd.set('weekStart', weekStart);
       fd.set('tableHtml', tableHtml);
+      fd.set('caissePriceUsd', String(caissePriceUsd));
 
       const res = await fetch('/api/payroll-reports', {
         method: 'POST',
@@ -97,14 +113,6 @@ export default function PayrollNewPageClient() {
         <Title order={1} mb="md">
           Nouveau rapport
         </Title>
-        <Paper withBorder p="md" radius="md" mb="lg" bg="var(--mantine-color-body)">
-          <Text size="sm" c="dimmed">
-            Choisissez un jour de la semaine concernée (le lundi sera déduit automatiquement), puis collez le HTML du
-            tableau des présences et caisses. Le contenu est parsé côté serveur et enregistré au format JSON attendu
-            (limite {600_000} caractères côté API).
-          </Text>
-        </Paper>
-
         <Stack gap="lg">
           <DateInput
             label="Semaine (référence)"
@@ -116,6 +124,21 @@ export default function PayrollNewPageClient() {
             required
           />
 
+          <NumberInput
+            label="Prix caisse ($)"
+            description={`Montant unitaire pour tout le rapport.`}
+            min={0.01}
+            max={MAX_CAISSE_PRICE_USD}
+            step={0.5}
+            decimalScale={2}
+            value={caissePriceUsd}
+            onChange={(v) => {
+              if (v === '' || v === undefined) return;
+              const n = typeof v === 'number' ? v : Number(String(v).replace(',', '.'));
+              if (Number.isFinite(n) && n > 0) setCaissePriceUsd(n);
+            }}
+          />
+
           <Textarea
             label="HTML du tableau"
             description="Collez la source HTML (balise table et contenu) telle qu’exportée ou copiée."
@@ -124,7 +147,7 @@ export default function PayrollNewPageClient() {
             onChange={(e) => setTableHtml(e.currentTarget.value)}
             minRows={14}
             autosize
-            maxRows={18}
+            maxRows={14}
             styles={{ input: { fontFamily: 'var(--mantine-font-family-monospace)' } }}
           />
 

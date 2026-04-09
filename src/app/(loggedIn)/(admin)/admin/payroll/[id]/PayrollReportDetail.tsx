@@ -34,7 +34,6 @@ import {
   IconX,
 } from '@tabler/icons-react';
 import { payrollReportResultSchema, type PayrollReportResult } from '@/lib/payroll/schema';
-import { PAYROLL_CAISSE_USD } from '@/lib/payroll/constants';
 import { recalculatePayrollResult } from '@/lib/payroll/recalculatePayrollResult';
 import { routes } from '@/types/routes';
 
@@ -164,6 +163,13 @@ export default function PayrollReportDetail({
     [],
   );
 
+  const patchReportCaissePrice = useCallback((value: number | string) => {
+    if (value === '' || value === undefined) return;
+    const n = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(n) || n <= 0) return;
+    setDraft((prev) => (prev ? { ...prev, caisse_price_usd: n } : prev));
+  }, []);
+
   const handleCancelEdit = () => {
     const raw = baselineJson.current;
     if (raw) {
@@ -265,7 +271,29 @@ export default function PayrollReportDetail({
             Par {report.createdBy.name} — {format(new Date(report.createdAt), 'Pp', { locale: fr })}
           </Text>
         </div>
-        <Group gap="sm" justify="flex-end">
+        <Group gap="sm" justify="flex-end" wrap="wrap">
+          {canEdit && !isEditing && !isDirty && (
+            <Button leftSection={<IconEdit size={18} />} onClick={() => setIsEditing(true)} variant="light">
+              Modifier
+            </Button>
+          )}
+          {canEdit && (isDirty || isEditing) && (
+            <Button leftSection={<IconX size={18} />} onClick={handleCancelEdit} variant="subtle" color="gray">
+              Annuler
+            </Button>
+          )}
+          {canEdit && (isDirty || isEditing) && (
+            <Button
+              leftSection={<IconCheck size={18} />}
+              onClick={handleSave}
+              disabled={!isDirty}
+              loading={saving}
+              variant="filled"
+              color="green"
+            >
+              Sauvegarder
+            </Button>
+          )}
           {canDelete && (
             <Button
               color="red"
@@ -291,7 +319,7 @@ export default function PayrollReportDetail({
             <Title order={4} mb="sm">
               Totaux
             </Title>
-            <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
+            <SimpleGrid cols={{ base: 1, sm: 2, md: 5 }} spacing="md">
               <div>
                 <Text size="sm" c="dimmed">
                   Employés
@@ -303,6 +331,25 @@ export default function PayrollReportDetail({
                   Caisses (total)
                 </Text>
                 <Text fw={600}>{draft.global_stats.total_caisses}</Text>
+              </div>
+              <div>
+                <Text size="sm" c="dimmed" mb={4}>
+                  Prix caisse ($)
+                </Text>
+                {canEdit && isEditing ? (
+                  <NumberInput
+                    size="xs"
+                    min={0.01}
+                    max={1_000_000}
+                    step={0.5}
+                    decimalScale={2}
+                    value={draft.caisse_price_usd}
+                    onChange={(v) => patchReportCaissePrice(v)}
+                    w={110}
+                  />
+                ) : (
+                  <Text fw={600}>{draft.caisse_price_usd.toFixed(2)}</Text>
+                )}
               </div>
               <div>
                 <Text size="sm" c="dimmed">
@@ -324,7 +371,9 @@ export default function PayrollReportDetail({
               Virements
             </Title>
             <Text size="sm" c="dimmed" mb="md">
-              Informations pour les virements
+              Informations pour les virements (montant = caisses × prix caisse du rapport).
+              {canEdit &&
+                ' En mode « Modifier planning », vous pouvez ajuster le prix caisse dans Totaux ainsi que le tableau de présence et les compteurs soins.'}
             </Text>
             <Table striped highlightOnHover withTableBorder layout="fixed">
               <Table.Thead>
@@ -332,14 +381,15 @@ export default function PayrollReportDetail({
                   <Table.Th style={{ width: '18%' }}>Nom</Table.Th>
                   <Table.Th style={{ width: '12%' }}>N° compte</Table.Th>
                   <Table.Th style={{ width: '10%' }}>Présences</Table.Th>
-                  <Table.Th style={{ width: '38%' }}>Description</Table.Th>
-                  <Table.Th style={{ width: '14%' }}>Montant</Table.Th>
+                  <Table.Th style={{ width: '40%' }}>Description</Table.Th>
+                  <Table.Th style={{ width: '16%' }}>Montant</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
                 {draft.employees.map((emp, rowIdx) => {
                   const caisses = emp.stats.nombre_caisses ?? 0;
-                  const pay = caisses * PAYROLL_CAISSE_USD;
+                  const unit = draft.caisse_price_usd;
+                  const pay = caisses * unit;
                   const payStr = `${pay.toFixed(2)} $`;
                   const payCopyValue = pay.toFixed(2);
                   const idDisplay = emp.id != null ? String(emp.id) : '—';
@@ -383,35 +433,6 @@ export default function PayrollReportDetail({
             </Table>
           </Paper>
 
-          <Group justify="end" mb="lg" align="flex-start">
-            {canEdit && draft && !isEditing && (
-              <Button
-                leftSection={<IconEdit size={18} />}
-                onClick={() => setIsEditing(true)}
-                variant="light"
-              >
-                Modifier
-              </Button>
-            )}
-            {canEdit && draft && isEditing && (
-              <>
-                <Button leftSection={<IconX size={18} />} onClick={handleCancelEdit} variant="subtle" color="gray">
-                  Annuler
-                </Button>
-                <Button
-                  leftSection={<IconCheck size={18} />}
-                  onClick={handleSave}
-                  loading={saving}
-                  disabled={!isDirty}
-                  variant="filled"
-                  color="green"
-                >
-                  Sauvegarder
-                </Button>
-              </>
-            )}
-          </Group>
-
           <Accordion
             variant="separated"
             radius="md"
@@ -421,7 +442,8 @@ export default function PayrollReportDetail({
           >
             {draft.employees.map((emp, i) => {
               const caisses = emp.stats.nombre_caisses ?? 0;
-              const pay = caisses * PAYROLL_CAISSE_USD;
+              const unit = draft.caisse_price_usd;
+              const pay = caisses * unit;
               return (
                 <Accordion.Item key={`${emp.name}-${emp.id ?? i}`} value={`emp-${i}`}>
                   <Accordion.Control>
@@ -435,7 +457,7 @@ export default function PayrollReportDetail({
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <Text size="xs" c="dimmed">
-                          Caisses × {PAYROLL_CAISSE_USD} $
+                          Caisses × {unit.toFixed(2)} $
                         </Text>
                         <Text fw={700}>{pay.toFixed(2)} $</Text>
                       </div>
