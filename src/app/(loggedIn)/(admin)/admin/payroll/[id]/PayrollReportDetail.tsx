@@ -26,7 +26,7 @@ import { useRouter } from 'next/navigation';
 import { format, getISOWeek } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { Prisma } from '@prisma/client';
-import { IconCheck, IconDeviceFloppy, IconCopy, IconTrash } from '@tabler/icons-react';
+import { IconCheck, IconCopy, IconEdit, IconTrash, IconX } from '@tabler/icons-react';
 import { payrollReportResultSchema, type PayrollReportResult } from '@/lib/payroll/schema';
 import { PAYROLL_CAISSE_USD } from '@/lib/payroll/constants';
 import { recalculatePayrollResult } from '@/lib/payroll/recalculatePayrollResult';
@@ -93,12 +93,14 @@ export default function PayrollReportDetail({
   const router = useRouter();
   const parsed = payrollReportResultSchema.safeParse(report.resultJson);
   const [draft, setDraft] = useState<PayrollReportResult | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const baselineJson = useRef('');
 
   const resultFingerprint = JSON.stringify(report.resultJson ?? null);
 
   useEffect(() => {
+    setIsEditing(false);
     if (report.errorMessage) {
       setDraft(null);
       return;
@@ -156,6 +158,21 @@ export default function PayrollReportDetail({
     [],
   );
 
+  const handleCancelEdit = () => {
+    const raw = baselineJson.current;
+    if (raw) {
+      try {
+        const p = payrollReportResultSchema.safeParse(JSON.parse(raw) as unknown);
+        if (p.success) {
+          setDraft(recalculatePayrollResult(p.data));
+        }
+      } catch {
+        // keep current draft if baseline is invalid
+      }
+    }
+    setIsEditing(false);
+  };
+
   const handleSave = async () => {
     if (!draft || saving) return;
     setSaving(true);
@@ -172,6 +189,7 @@ export default function PayrollReportDetail({
       }
       notifications.show({ title: 'Enregistré', message: '', color: 'green' });
       baselineJson.current = JSON.stringify(draft);
+      setIsEditing(false);
       router.refresh();
     } catch (e: unknown) {
       notifications.show({
@@ -234,15 +252,27 @@ export default function PayrollReportDetail({
           </Text>
         </div>
         <Group gap="sm">
-          {canEdit && draft && (
-            <Button
-              leftSection={<IconDeviceFloppy size={18} />}
-              onClick={handleSave}
-              loading={saving}
-              disabled={!isDirty}
-            >
-              Enregistrer
+          {canEdit && draft && !isEditing && (
+            <Button leftSection={<IconEdit size={18} />} onClick={() => setIsEditing(true)} variant="light">
+              Modifier
             </Button>
+          )}
+          {canEdit && draft && isEditing && (
+            <>
+              <Button leftSection={<IconX size={18} />} onClick={handleCancelEdit} variant="subtle" color="gray">
+                Annuler
+              </Button>
+              <Button
+                leftSection={<IconCheck size={18} />}
+                onClick={handleSave}
+                loading={saving}
+                disabled={!isDirty}
+                variant="filled"
+                color="green"
+              >
+                Sauvegarder
+              </Button>
+            </>
           )}
           {canDelete && (
             <Button
@@ -298,17 +328,17 @@ export default function PayrollReportDetail({
           </Paper>
 
           <Paper shadow="sm" p="md" withBorder mb="lg">
-            <Title order={4} mb="sm">
+            <Title order={4}>
               Virements
             </Title>
             <Text size="sm" c="dimmed" mb="md">
-              Informations pour les virements — chaque champ peut être copié.
+              Informations pour les virements
             </Text>
             <Table striped highlightOnHover withTableBorder layout="fixed">
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th style={{ width: '18%' }}>Nom</Table.Th>
-                  <Table.Th style={{ width: '12%' }}>N° compte (ID)</Table.Th>
+                  <Table.Th style={{ width: '12%' }}>N° compte</Table.Th>
                   <Table.Th style={{ width: '10%' }}>Présences</Table.Th>
                   <Table.Th style={{ width: '38%' }}>Description</Table.Th>
                   <Table.Th style={{ width: '14%' }}>Montant</Table.Th>
@@ -319,6 +349,7 @@ export default function PayrollReportDetail({
                   const caisses = emp.stats.nombre_caisses ?? 0;
                   const pay = caisses * PAYROLL_CAISSE_USD;
                   const payStr = `${pay.toFixed(2)} $`;
+                  const payCopyValue = pay.toFixed(2);
                   const idDisplay = emp.id != null ? String(emp.id) : '—';
                   const idCopy = idDisplay;
                   const presences = String(emp.stats.nombre_presences ?? 0);
@@ -347,7 +378,7 @@ export default function PayrollReportDetail({
                         </CopyableCell>
                       </Table.Td>
                       <Table.Td>
-                        <CopyableCell value={payStr}>
+                        <CopyableCell value={payCopyValue}>
                           <Text size="sm" fw={500}>
                             {payStr}
                           </Text>
@@ -371,7 +402,7 @@ export default function PayrollReportDetail({
                       <Text fw={600}>{emp.name}</Text>
                       <Text size="sm" c="dimmed">
                         {emp.role}
-                        {emp.id != null ? ` — ID ${emp.id}` : ''}
+                        {emp.id != null ? ` — Compte ${emp.id}` : ''}
                       </Text>
                     </div>
                     <div style={{ textAlign: 'right' }}>
@@ -398,7 +429,7 @@ export default function PayrollReportDetail({
                         <Table.Tr key={day}>
                           <Table.Td style={{ textTransform: 'capitalize' }}>{day}</Table.Td>
                           <Table.Td>
-                            {canEdit ? (
+                            {canEdit && isEditing ? (
                               <Select
                                 size="xs"
                                 data={[...CAISSE_OPTIONS]}
@@ -411,7 +442,7 @@ export default function PayrollReportDetail({
                             )}
                           </Table.Td>
                           <Table.Td>
-                            {canEdit ? (
+                            {canEdit && isEditing ? (
                               <Select
                                 size="xs"
                                 data={[...PRESENCE_OPTIONS]}
@@ -433,7 +464,7 @@ export default function PayrollReportDetail({
                       <Text size="xs" c="dimmed" mb={4}>
                         Shérifs soignés
                       </Text>
-                      {canEdit ? (
+                      {canEdit && isEditing ? (
                         <NumberInput
                           size="xs"
                           min={0}
@@ -453,7 +484,7 @@ export default function PayrollReportDetail({
                       <Text size="xs" c="dimmed" mb={4}>
                         Palefreniers soignés
                       </Text>
-                      {canEdit ? (
+                      {canEdit && isEditing ? (
                         <NumberInput
                           size="xs"
                           min={0}
