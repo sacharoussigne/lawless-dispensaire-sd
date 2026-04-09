@@ -33,6 +33,7 @@ const roleOptions = [
   { value: 'inventory_manager', label: rolesAsString(Role.INVENTORY_MANAGER) },
   { value: 'inventory_viewer', label: rolesAsString(Role.INVENTORY_VIEWER) },
   { value: 'private_practitioner', label: rolesAsString(Role.PRIVATE_PRACTITIONER) },
+  { value: 'direction', label: rolesAsString(Role.DIRECTION) },
 ];
 
 export function UserModal({
@@ -77,14 +78,14 @@ export function UserModal({
             .split(',')
             .map((r) => r.trim())
             .filter((r) =>
-              [Role.USER, Role.ADMIN, Role.EMPLOYEE, Role.INVENTORY_MANAGER, Role.INVENTORY_VIEWER, Role.PRIVATE_PRACTITIONER].includes(r as Role)
+              [Role.USER, Role.ADMIN, Role.EMPLOYEE, Role.INVENTORY_MANAGER, Role.INVENTORY_VIEWER, Role.PRIVATE_PRACTITIONER, Role.DIRECTION].includes(r as Role)
             ) as Role[]
         ).length > 0
           ? (editingUser.role ?? 'user')
               .split(',')
               .map((r) => r.trim())
               .filter((r) =>
-                [Role.USER, Role.ADMIN, Role.EMPLOYEE, Role.INVENTORY_MANAGER, Role.INVENTORY_VIEWER, Role.PRIVATE_PRACTITIONER].includes(r as Role)
+                [Role.USER, Role.ADMIN, Role.EMPLOYEE, Role.INVENTORY_MANAGER, Role.INVENTORY_VIEWER, Role.PRIVATE_PRACTITIONER, Role.DIRECTION].includes(r as Role)
               ) as Role[]
           : [Role.USER],
       });

@@ -7,6 +7,7 @@ import {
   IconBuildingBank,
   IconUserHeart,
   IconMail,
+  IconReportMoney,
 } from '@tabler/icons-react';
 import { getAuthSession } from '@/lib/auth';
 import { calculatePermissions } from '@/lib/auth/calculatePermissions';
@@ -41,17 +42,6 @@ export default async function EmployeePage() {
       color: 'green',
     },
     {
-      title: 'Recherche',
-      description:
-        'Recherchez rapidement des objets dans le système avec des filtres avancés.',
-      icon: IconSearch,
-      href: routes.searchItems.index,
-      hasAccess:
-        appSettings.featureSearchEnabled &&
-        checkRolePermission(role, 'search', 'access'),
-      color: 'orange',
-    },
-    {
       title: 'Banque',
       description:
         'Consultez et gérez les comptes bancaires et les transactions financières.',
@@ -83,6 +73,16 @@ export default async function EmployeePage() {
         appSettings.featureMailsEnabled &&
         checkRolePermission(role, 'mails', 'access'),
       color: 'violet',
+    },
+    {
+      title: 'Rapports salaires',
+      description:
+        'Consultez et gérez les rapports de salaires hebdomadaires et les virements associés.',
+      icon: IconReportMoney,
+      href: routes.admin.payroll,
+      hasAccess:
+        appSettings.featurePayrollEnabled && (permissions?.payrollReports.view ?? false),
+      color: 'teal',
     },
   ] as const;
 

@@ -30,6 +30,10 @@ export function calculatePermissions(role: string | null | undefined): Permissio
       access: checkRolePermission(role, 'application', 'access'),
       management: checkRolePermission(role, 'application', 'management'),
     },
+    payrollReports: {
+      view: checkRolePermission(role, 'payroll_reports', 'view'),
+      create: checkRolePermission(role, 'payroll_reports', 'create'),
+    },
   };
 }
 

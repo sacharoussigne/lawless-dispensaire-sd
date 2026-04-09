@@ -6,6 +6,7 @@ import { hasToBeLoggedInMiddleware } from './middlewares/hasToBeLoggedInMiddlewa
 import { hasApplicationAccessMiddleware } from './middlewares/hasApplicationAccessMiddleware';
 import { hasManagementAccessMiddleware } from './middlewares/hasManagementAccessMiddleware';
 import { hasAdminRoleMiddleware } from './middlewares/hasAdminRoleMiddleware';
+import { hasPayrollReportsAccessMiddleware } from './middlewares/hasPayrollReportsAccessMiddleware';
 import { hasStockViewAccessMiddleware } from './middlewares/hasStockViewAccessMiddleware';
 import { hasOrdersViewAccessMiddleware } from './middlewares/hasOrdersViewAccessMiddleware';
 import { hasSearchAccessMiddleware } from './middlewares/hasSearchAccessMiddleware';
@@ -34,18 +35,24 @@ export async function middleware(req: NextRequest) {
     middlewares.push(hasApplicationAccessMiddleware);
     middlewares.push(hasManagementAccessMiddleware);
   } else if (pathname.startsWith(routes.admin.index)) {
-    // For admin routes, check login, application access, then management access
     middlewares.push(hasToBeLoggedInMiddleware);
     middlewares.push(hasApplicationAccessMiddleware);
-    middlewares.push(hasManagementAccessMiddleware);
-    
-    // For users page, also check that user has admin role
-    if (
-      pathname === routes.admin.users ||
-      pathname === routes.admin.overwriteStock ||
-      pathname === routes.admin.settings
-    ) {
-      middlewares.push(hasAdminRoleMiddleware);
+    const isPayrollRoute =
+      pathname === routes.admin.payroll || pathname.startsWith(`${routes.admin.payroll}/`);
+    if (isPayrollRoute) {
+      middlewares.push(hasPayrollReportsAccessMiddleware);
+      middlewares.push((request: NextRequest, session: unknown) =>
+        assertAppFeatureEnabledMiddleware(request, session, 'payroll'),
+      );
+    } else {
+      middlewares.push(hasManagementAccessMiddleware);
+      if (
+        pathname === routes.admin.users ||
+        pathname === routes.admin.overwriteStock ||
+        pathname === routes.admin.settings
+      ) {
+        middlewares.push(hasAdminRoleMiddleware);
+      }
     }
   } else if (pathname.startsWith(routes.stock.index)) {
     // For stock routes, check login, application access, then stock view access

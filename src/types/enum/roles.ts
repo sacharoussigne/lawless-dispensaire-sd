@@ -5,6 +5,7 @@ export enum Role {
     INVENTORY_MANAGER = "inventory_manager",
     INVENTORY_VIEWER = "inventory_viewer",
     PRIVATE_PRACTITIONER = "private_practitioner",
+    DIRECTION = "direction",
 }
 
 export const rolesAsString = (role: Role): string => {
@@ -21,5 +22,7 @@ export const rolesAsString = (role: Role): string => {
             return "Consultant de stock";
         case Role.PRIVATE_PRACTITIONER:
             return "Praticien privé";
+        case Role.DIRECTION:
+            return "Direction";
     }
 };

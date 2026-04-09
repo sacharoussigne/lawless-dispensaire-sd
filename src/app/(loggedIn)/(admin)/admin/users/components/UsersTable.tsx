@@ -33,6 +33,7 @@ const roleOptions = [
   { value: 'admin', label: rolesAsString(Role.ADMIN) },
   { value: 'employee', label: rolesAsString(Role.EMPLOYEE) },
   { value: 'inventory_manager', label: rolesAsString(Role.INVENTORY_MANAGER) },
+  { value: 'direction', label: rolesAsString(Role.DIRECTION) },
 ];
 
 export function UsersTable({
@@ -138,6 +139,10 @@ export function UsersTable({
                       case Role.PRIVATE_PRACTITIONER:
                         color = 'purple';
                         label = rolesAsString(Role.PRIVATE_PRACTITIONER);
+                        break;
+                      case Role.DIRECTION:
+                        color = 'orange';
+                        label = rolesAsString(Role.DIRECTION);
                         break;
                       default:
                         color = 'gray';

@@ -92,7 +92,7 @@ export default function Header({
           <Group>
             {session ? (
               <>
-                {isAdminOrManagementSpace ? (
+                {isAdminOrManagementSpace && permissions?.application.management ? (
                   <Menu
                     width={260}
                     position="bottom-start"
@@ -106,6 +106,13 @@ export default function Header({
                     </Menu.Target>
                     <Menu.Dropdown>
                       <Menu.Label>Gestion</Menu.Label>
+                      {appSettings.featurePayrollEnabled && permissions?.payrollReports.view && (
+                        <Link href={routes.admin.payroll}>
+                          <Menu.Item>
+                            Rapports salaires
+                          </Menu.Item>
+                        </Link>
+                      )}
                       <Link href={routes.management.categoryItems}>
                         <Menu.Item>
                           Catégories d'objets
@@ -144,44 +151,44 @@ export default function Header({
                   <>
                     {appSettings.featureBankEnabled &&
                       checkRolePermission(userRole, 'bank', 'access') && (
-                      <Link
-                        href={routes.bank.index}
-                        className={`${classes.link} ${isRouteActive(routes.bank.index) ? classes.linkActive : ''}`}
-                      >
-                        Banque
-                      </Link>
-                    )}
+                        <Link
+                          href={routes.bank.index}
+                          className={`${classes.link} ${isRouteActive(routes.bank.index) ? classes.linkActive : ''}`}
+                        >
+                          Banque
+                        </Link>
+                      )}
                     {appSettings.featurePrivatePracticeEnabled &&
                       checkRolePermission(userRole, 'private_practice', 'access') && (
-                      <Link
-                        href={routes.privatePractice.index}
-                        className={`${classes.link} ${isRouteActive(routes.privatePractice.index) ? classes.linkActive : ''}`}
-                      >
-                        Cabinet privé
-                      </Link>
-                    )}
+                        <Link
+                          href={routes.privatePractice.index}
+                          className={`${classes.link} ${isRouteActive(routes.privatePractice.index) ? classes.linkActive : ''}`}
+                        >
+                          Cabinet privé
+                        </Link>
+                      )}
                     {appSettings.featureOrdersEnabled &&
                       checkRolePermission(userRole, 'orders', 'view') && (
-                      <Link
-                        href={routes.orders.index}
-                        className={`${classes.link} ${isRouteActive(routes.orders.index) ? classes.linkActive : ''}`}
-                      >
-                        Commandes
-                      </Link>
-                    )}
+                        <Link
+                          href={routes.orders.index}
+                          className={`${classes.link} ${isRouteActive(routes.orders.index) ? classes.linkActive : ''}`}
+                        >
+                          Commandes
+                        </Link>
+                      )}
                     {appSettings.featureStockEnabled &&
                       checkRolePermission(userRole, 'stock', 'view') && (
-                      <Link
-                        href={routes.stock.index}
-                        className={`${classes.link} ${isRouteActive(routes.stock.index) ? classes.linkActive : ''}`}
-                      >
-                        Stocks
-                      </Link>
-                    )}
+                        <Link
+                          href={routes.stock.index}
+                          className={`${classes.link} ${isRouteActive(routes.stock.index) ? classes.linkActive : ''}`}
+                        >
+                          Stocks
+                        </Link>
+                      )}
                   </>
                 )}
-                {/* Search icon: only in employee space, before SegmentedControl */}
-                {!isAdminOrManagementSpace &&
+                {/* Search icon: employee space or payroll-only (Direction) */}
+                {(!isAdminOrManagementSpace || !permissions?.application.management) &&
                   appSettings.featureSearchEnabled &&
                   checkRolePermission(userRole, 'search', 'access') && (
                     <Link

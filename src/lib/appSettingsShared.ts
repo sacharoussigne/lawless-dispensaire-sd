@@ -6,7 +6,8 @@ export type AppFeatureKey =
   | 'privatePractice'
   | 'orders'
   | 'search'
-  | 'mails';
+  | 'mails'
+  | 'payroll';
 
 export type AppSettingsDTO = {
   dispensaryName: string;
@@ -16,6 +17,7 @@ export type AppSettingsDTO = {
   featureOrdersEnabled: boolean;
   featureSearchEnabled: boolean;
   featureMailsEnabled: boolean;
+  featurePayrollEnabled: boolean;
 };
 
 export const APP_SETTINGS_DEFAULTS: AppSettingsDTO = {
@@ -26,6 +28,7 @@ export const APP_SETTINGS_DEFAULTS: AppSettingsDTO = {
   featureOrdersEnabled: true,
   featureSearchEnabled: true,
   featureMailsEnabled: true,
+  featurePayrollEnabled: true,
 };
 
 export function isAppFeatureEnabled(
@@ -45,6 +48,8 @@ export function isAppFeatureEnabled(
       return settings.featureSearchEnabled;
     case 'mails':
       return settings.featureMailsEnabled;
+    case 'payroll':
+      return settings.featurePayrollEnabled;
     default: {
       const _exhaustive: never = feature;
       return _exhaustive;

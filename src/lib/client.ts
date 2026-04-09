@@ -1,6 +1,15 @@
 import { createAuthClient } from 'better-auth/client';
 import { adminClient } from "better-auth/client/plugins"
-import { ac, admin, user, employee, inventory_manager } from './auth/permissions';
+import {
+  ac,
+  admin,
+  user,
+  employee,
+  inventory_manager,
+  inventory_viewer,
+  private_practitioner,
+  direction,
+} from './auth/permissions';
 
 export const authClient = createAuthClient({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
@@ -12,6 +21,9 @@ export const authClient = createAuthClient({
         user,
         employee,
         inventory_manager,
+        inventory_viewer,
+        private_practitioner,
+        direction,
       }
     })
   ]

@@ -9,7 +9,7 @@ import { checkRolePermission } from '@/lib/auth/permissions';
 import { Role } from '@/types/enum/roles';
 import { actionErrorParser } from '@/lib/action';
 
-const roleEnum = z.enum(['user', 'admin', 'employee', 'inventory_manager', 'inventory_viewer', 'private_practitioner']);
+const roleEnum = z.enum(['user', 'admin', 'employee', 'inventory_manager', 'inventory_viewer', 'private_practitioner', 'direction']);
 
 const createUserSchema = z.object({
   email: z.string().email(),
