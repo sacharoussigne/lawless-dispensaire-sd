@@ -40,6 +40,9 @@ export default function AppSettingsPageClient({
   const [featureMailsEnabled, setFeatureMailsEnabled] = useState(
     initial.featureMailsEnabled,
   );
+  const [featurePayrollEnabled, setFeaturePayrollEnabled] = useState(
+    initial.featurePayrollEnabled,
+  );
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async () => {
@@ -52,6 +55,7 @@ export default function AppSettingsPageClient({
       featureOrdersEnabled,
       featureSearchEnabled,
       featureMailsEnabled,
+      featurePayrollEnabled,
     });
     setSubmitting(false);
 
@@ -141,6 +145,15 @@ export default function AppSettingsPageClient({
                 checked={featureMailsEnabled}
                 onChange={(e) =>
                   setFeatureMailsEnabled(e.currentTarget.checked)
+                }
+              />
+            </Paper>
+            <Paper withBorder p="md" radius="md" bg="var(--mantine-color-body)">
+              <Switch
+                label="Rapports salaires"
+                checked={featurePayrollEnabled}
+                onChange={(e) =>
+                  setFeaturePayrollEnabled(e.currentTarget.checked)
                 }
               />
             </Paper>

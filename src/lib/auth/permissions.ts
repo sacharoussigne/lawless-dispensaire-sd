@@ -10,6 +10,7 @@ const defaultApplicationPermissions = {
     private_practice: ["access"],
     application: ["access", "management"],
     mails: ["access"],
+    payroll_reports: ["view", "create"],
 };
 export const statement = {
     ...defaultStatements, // Les permissions par défaut (user, session)
@@ -31,6 +32,7 @@ const user = ac.newRole({
     private_practice: [],
     application: [],
     mails: [],
+    payroll_reports: [],
 });
 
 const admin = ac.newRole({
@@ -45,6 +47,7 @@ const employee = ac.newRole({
     bank: ["access"],
     application: ["access"],
     mails: ["access"],
+    payroll_reports: [],
 });
 
 const inventory_manager = ac.newRole({
@@ -56,6 +59,7 @@ const inventory_manager = ac.newRole({
     private_practice: [],
     application: ["access", "management"],
     mails: ["access"],
+    payroll_reports: [],
 });
 
 const inventory_viewer = ac.newRole({
@@ -67,6 +71,7 @@ const inventory_viewer = ac.newRole({
     private_practice: [],
     application: ["access"],
     mails: [],
+    payroll_reports: [],
 });
 
 const private_practitioner = ac.newRole({
@@ -76,6 +81,19 @@ const private_practitioner = ac.newRole({
     bank: ["access"],
     application: ["access"],
     mails: [],
+    payroll_reports: [],
+});
+
+const direction = ac.newRole({
+    ...userAc.statements,
+    stock: [],
+    orders: [],
+    search: [],
+    bank: [],
+    private_practice: [],
+    application: ["access"],
+    mails: [],
+    payroll_reports: ["view", "create"],
 });
 
 // Map des rôles pour faciliter l'accès
@@ -86,6 +104,7 @@ const rolesMap = {
     inventory_manager,
     inventory_viewer,
     private_practitioner,
+    direction,
 } as const;
 
 /**
@@ -140,4 +159,4 @@ export function hasRole(
     return roles.includes(target);
 }
 
-export { ac, user, admin, employee, inventory_manager, inventory_viewer, private_practitioner };
+export { ac, user, admin, employee, inventory_manager, inventory_viewer, private_practitioner, direction };
