@@ -10,6 +10,31 @@ export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: 'postgresql',
   }),
+  databaseHooks: {
+    user: {
+      create: {
+        after: async (user) => {
+          const total = await prisma.user.count();
+          if (total === 1) {
+            await prisma.user.update({
+              where: { id: user.id },
+              data: { role: 'admin' },
+            });
+            return;
+          }
+          const accessOnCreate =
+            process.env.ACCESS_ON_CREATE === 'true' ||
+            process.env.ACCESS_ON_CREATE === '1';
+          if (accessOnCreate) {
+            await prisma.user.update({
+              where: { id: user.id },
+              data: { role: 'employee' },
+            });
+          }
+        },
+      },
+    },
+  },
   emailAndPassword: {
     enabled: true,
   },
