@@ -63,6 +63,10 @@ You can use **pnpm** or **yarn** instead of npm if you prefer.
 
 There is no bundled database seed script; users are created through the auth UI unless you insert rows manually. On an empty database, the **first** user created (email or Discord) is automatically assigned the **`admin`** role. See [User roles](#user-roles) for optional auto-assignment of **`employee`** to later sign-ups.
 
+### Docker
+
+For a container image, example `Dockerfile`, and notes on PostgreSQL and migrations, see [README.Docker.md](README.Docker.md).
+
 ## Environment variables
 
 Copy [.env.example](.env.example) to `.env` and configure at least:
@@ -139,3 +143,7 @@ Uses [Vitest](https://vitest.dev/).
 - [Mantine](https://mantine.dev/) UI
 - [Prisma](https://www.prisma.io/) + PostgreSQL
 - [Better Auth](https://www.better-auth.com/) for authentication
+
+## License
+
+This project is released under the [MIT License](LICENSE). You may use, change, and redistribute it freely. You must keep the copyright and permission notice from the `LICENSE` file in copies or derivatives so the original project is credited.
