@@ -5,7 +5,7 @@ import { getAuthSession } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { checkRolePermission } from '@/lib/auth/permissions';
 import { getAppFeatureActionBlock } from '@/lib/appSettings';
-import { PAYROLL_CAISSE_USD } from '@/lib/payroll/constants';
+import { PAYROLL_CAISSE_SALE_USD, PAYROLL_CAISSE_USD } from '@/lib/payroll/constants';
 import { parsePayrollHtmlTable, parsedToPayrollReportResult } from '@/lib/payroll/parsePayrollHtmlTable';
 import { payrollReportResultSchema } from '@/lib/payroll/schema';
 import { weekRangeFromIsoDate } from '@/lib/payroll/week';
@@ -39,10 +39,23 @@ export async function createPayrollReportFromForm(formData: FormData) {
     if (!Number.isFinite(n) || n <= 0 || n > MAX_CAISSE_PRICE_USD) {
       return {
         status: 400,
-        error: 'Prix caisse invalide (entre 0,01 et 1 000 000 $).',
+        error: 'Montant reversé employé invalide (entre 0,01 et 1 000 000 $).',
       };
     }
     caissePriceUsd = n;
+  }
+
+  const caisseSaleRaw = formData.get('caisseSalePriceUsd');
+  let caisseSalePriceUsd = PAYROLL_CAISSE_SALE_USD;
+  if (caisseSaleRaw != null && String(caisseSaleRaw).trim() !== '') {
+    const n = Number(String(caisseSaleRaw).trim().replace(',', '.'));
+    if (!Number.isFinite(n) || n <= 0 || n > MAX_CAISSE_PRICE_USD) {
+      return {
+        status: 400,
+        error: 'Prix de vente dispensaire invalide (entre 0,01 et 1 000 000 $).',
+      };
+    }
+    caisseSalePriceUsd = n;
   }
 
   if (!weekStartStr || !/^\d{4}-\d{2}-\d{2}$/.test(weekStartStr)) {
@@ -91,10 +104,13 @@ export async function createPayrollReportFromForm(formData: FormData) {
 
   try {
     const parsedResult = parsedToPayrollReportResult(parsed);
-    const result = payrollReportResultSchema.parse({
-      ...parsedResult,
-      caisse_price_usd: caissePriceUsd,
-    });
+    const result = recalculatePayrollResult(
+      payrollReportResultSchema.parse({
+        ...parsedResult,
+        caisse_price_usd: caissePriceUsd,
+        caisse_sale_price_usd: caisseSalePriceUsd,
+      }),
+    );
 
     await prisma.payrollWeeklyReport.update({
       where: { id: reportId },

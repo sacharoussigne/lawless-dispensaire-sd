@@ -33,11 +33,16 @@ export function recalculatePayrollResult(data: PayrollReportResult): PayrollRepo
     };
   });
 
+  const unitBenefitUsd = data.caisse_sale_price_usd - data.caisse_price_usd;
   const global_stats = {
     total_employees: employees.length,
     total_caisses: employees.reduce((sum, e) => sum + e.stats.nombre_caisses, 0),
     total_sherifs: employees.reduce((sum, e) => sum + (e.stats.sherifs ?? 0), 0),
     total_palefreniers: employees.reduce((sum, e) => sum + (e.stats.palefreniers ?? 0), 0),
+    total_benefit_usd: employees.reduce(
+      (sum, e) => sum + e.stats.nombre_caisses * unitBenefitUsd,
+      0,
+    ),
   };
 
   return { ...data, employees, global_stats };
