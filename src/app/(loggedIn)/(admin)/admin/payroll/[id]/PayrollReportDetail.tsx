@@ -24,7 +24,7 @@ import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { format, getISOWeek } from 'date-fns';
+import { format, getISOWeek, subYears } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { Prisma } from '@prisma/client';
 import {
@@ -66,8 +66,17 @@ const PRESENCE_OPTIONS = [
 
 const BANDAGE_EXPORT_DEPOSIT_MOTIF = "Caisse d'exportation Bandage";
 
+/** Display-only: RP calendar is 136 years before real dates (DB unchanged). */
+const PAYROLL_RP_DISPLAY_YEAR_OFFSET = 136;
+
+function payrollRpDisplayDate(d: Date): Date {
+  return subYears(d, PAYROLL_RP_DISPLAY_YEAR_OFFSET);
+}
+
 function wireTransferDescription(weekStart: Date, weekEnd: Date): string {
-  return `Salaire Semaine ${format(weekStart, 'dd MMMM yyyy', { locale: fr })} au ${format(weekEnd, 'dd MMMM yyyy', { locale: fr })} - N°${getISOWeek(weekStart)}`;
+  const displayStart = payrollRpDisplayDate(weekStart);
+  const displayEnd = payrollRpDisplayDate(weekEnd);
+  return `Salaire Semaine ${format(displayStart, 'dd MMMM yyyy', { locale: fr })} au ${format(displayEnd, 'dd MMMM yyyy', { locale: fr })} - N°${getISOWeek(weekStart)}`;
 }
 
 function CopyableCell({
@@ -278,8 +287,8 @@ export default function PayrollReportDetail({
             Rapports salaires
           </Button>
           <Title order={1}>
-            Semaine du {format(weekStartDate, 'dd MMMM yyyy', { locale: fr })} au{' '}
-            {format(weekEndDate, 'dd MMMM yyyy', { locale: fr })}
+            Semaine du {format(payrollRpDisplayDate(weekStartDate), 'dd MMMM yyyy', { locale: fr })} au{' '}
+            {format(payrollRpDisplayDate(weekEndDate), 'dd MMMM yyyy', { locale: fr })}
           </Title>
           <Text size="sm" c="dimmed" mt={4}>
             Par {report.createdBy.name} — {format(new Date(report.createdAt), 'Pp', { locale: fr })}
