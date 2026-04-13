@@ -18,7 +18,7 @@ import { format } from 'date-fns';
 import { IconArrowLeft } from '@tabler/icons-react';
 import { createPayrollReportFromForm } from '@/app/_actions/payrollReports';
 import { handleAction } from '@/lib/action';
-import { PAYROLL_CAISSE_USD } from '@/lib/payroll/constants';
+import { PAYROLL_CAISSE_SALE_USD, PAYROLL_CAISSE_USD } from '@/lib/payroll/constants';
 import { routes } from '@/types/routes';
 
 const MAX_CAISSE_PRICE_USD = 1_000_000;
@@ -26,6 +26,7 @@ const MAX_CAISSE_PRICE_USD = 1_000_000;
 export default function PayrollNewPageClient() {
   const router = useRouter();
   const [weekDate, setWeekDate] = useState<string | null>(format(new Date(), 'yyyy-MM-dd'));
+  const [caisseSalePriceUsd, setCaisseSalePriceUsd] = useState<number>(PAYROLL_CAISSE_SALE_USD);
   const [caissePriceUsd, setCaissePriceUsd] = useState<number>(PAYROLL_CAISSE_USD);
   const [tableHtml, setTableHtml] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -50,7 +51,19 @@ export default function PayrollNewPageClient() {
       caissePriceUsd > MAX_CAISSE_PRICE_USD
     ) {
       notifications.show({
-        title: 'Prix caisse invalide',
+        title: 'Montant reversé invalide',
+        message: `Indiquez un montant entre 0,01 et ${MAX_CAISSE_PRICE_USD.toLocaleString('fr-FR')} $.`,
+        color: 'red',
+      });
+      return;
+    }
+    if (
+      !Number.isFinite(caisseSalePriceUsd) ||
+      caisseSalePriceUsd <= 0 ||
+      caisseSalePriceUsd > MAX_CAISSE_PRICE_USD
+    ) {
+      notifications.show({
+        title: 'Prix de vente invalide',
         message: `Indiquez un montant entre 0,01 et ${MAX_CAISSE_PRICE_USD.toLocaleString('fr-FR')} $.`,
         color: 'red',
       });
@@ -63,6 +76,7 @@ export default function PayrollNewPageClient() {
       fd.set('weekStart', weekStart);
       fd.set('tableHtml', tableHtml);
       fd.set('caissePriceUsd', String(caissePriceUsd));
+      fd.set('caisseSalePriceUsd', String(caisseSalePriceUsd));
 
       const result = await createPayrollReportFromForm(fd);
       const data = handleAction(result);
@@ -118,8 +132,23 @@ export default function PayrollNewPageClient() {
           />
 
           <NumberInput
-            label="Prix caisse ($)"
-            description={`Montant unitaire pour tout le rapport.`}
+            label="Prix de vente dispensaire ($)"
+            description="Prix unitaire auquel le dispensaire vend chaque caisse."
+            min={0.01}
+            max={MAX_CAISSE_PRICE_USD}
+            step={0.5}
+            decimalScale={2}
+            value={caisseSalePriceUsd}
+            onChange={(v) => {
+              if (v === '' || v === undefined) return;
+              const n = typeof v === 'number' ? v : Number(String(v).replace(',', '.'));
+              if (Number.isFinite(n) && n > 0) setCaisseSalePriceUsd(n);
+            }}
+          />
+
+          <NumberInput
+            label="Montant reversé à l&apos;employé ($)"
+            description="Montant unitaire versé à chaque employé par caisse (virements)."
             min={0.01}
             max={MAX_CAISSE_PRICE_USD}
             step={0.5}

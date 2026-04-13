@@ -204,7 +204,14 @@ export default function PayrollReportDetail({
     if (value === '' || value === undefined) return;
     const n = typeof value === 'number' ? value : Number(value);
     if (!Number.isFinite(n) || n <= 0) return;
-    setDraft((prev) => (prev ? { ...prev, caisse_price_usd: n } : prev));
+    setDraft((prev) => (prev ? recalculatePayrollResult({ ...prev, caisse_price_usd: n }) : prev));
+  }, []);
+
+  const patchReportCaisseSalePrice = useCallback((value: number | string) => {
+    if (value === '' || value === undefined) return;
+    const n = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(n) || n <= 0) return;
+    setDraft((prev) => (prev ? recalculatePayrollResult({ ...prev, caisse_sale_price_usd: n }) : prev));
   }, []);
 
   const handleCancelEdit = () => {
@@ -342,7 +349,7 @@ export default function PayrollReportDetail({
             <Title order={4} mb="sm">
               Totaux
             </Title>
-            <SimpleGrid cols={{ base: 1, sm: 2, md: 5 }} spacing="md">
+            <SimpleGrid cols={{ base: 1, sm: 2, md: 2, lg: 4 }} spacing="md">
               <div>
                 <Text size="sm" c="dimmed">
                   Employés
@@ -357,7 +364,26 @@ export default function PayrollReportDetail({
               </div>
               <div>
                 <Text size="sm" c="dimmed" mb={4}>
-                  Prix caisse ($)
+                  Prix vente dispensaire ($)
+                </Text>
+                {canEdit && isEditing ? (
+                  <NumberInput
+                    size="xs"
+                    min={0.01}
+                    max={1_000_000}
+                    step={0.5}
+                    decimalScale={2}
+                    value={draft.caisse_sale_price_usd}
+                    onChange={(v) => patchReportCaisseSalePrice(v)}
+                    w={110}
+                  />
+                ) : (
+                  <Text fw={600}>{draft.caisse_sale_price_usd.toFixed(2)}</Text>
+                )}
+              </div>
+              <div>
+                <Text size="sm" c="dimmed" mb={4}>
+                  Reversé employé ($)
                 </Text>
                 {canEdit && isEditing ? (
                   <NumberInput
@@ -373,6 +399,20 @@ export default function PayrollReportDetail({
                 ) : (
                   <Text fw={600}>{draft.caisse_price_usd.toFixed(2)}</Text>
                 )}
+              </div>
+              <div>
+                <Text size="sm" c="dimmed">
+                  Total salaires ($)
+                </Text>
+                <Text fw={600}>
+                  {(draft.global_stats.total_caisses * draft.caisse_price_usd).toFixed(2)} $
+                </Text>
+              </div>
+              <div>
+                <Text size="sm" c="dimmed">
+                  Bénéfice ($)
+                </Text>
+                <Text fw={600}>{draft.global_stats.total_benefit_usd.toFixed(2)} $</Text>
               </div>
               <div>
                 <Text size="sm" c="dimmed">
