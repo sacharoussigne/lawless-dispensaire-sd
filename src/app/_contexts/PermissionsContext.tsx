@@ -19,11 +19,6 @@ interface PermissionsProviderProps {
   initialAppSettings: AppSettingsDTO;
 }
 
-/**
- * Provider pour les permissions de l'utilisateur.
- * Les permissions sont calculées côté serveur dans les layouts et passées ici.
- * Ce contexte ne fait que les exposer aux composants clients.
- */
 export function PermissionsProvider({
   children,
   initialPermissions,

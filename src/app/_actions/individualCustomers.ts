@@ -3,9 +3,7 @@
 import { z } from 'zod/v3';
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
-import { getAuthSession } from '@/lib/auth';
-import { checkRolePermission } from '@/lib/auth/permissions';
-import { getAppFeatureActionBlock } from '@/lib/appSettings';
+import { requireServerActionContext } from '@/lib/serverActionAuth';
 
 const createIndividualCustomerSchema = z.object({
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
@@ -17,24 +15,11 @@ const deleteIndividualCustomerByNameSchema = z.object({
 
 export async function getIndividualCustomers() {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const featureBlock = await getAppFeatureActionBlock('orders');
-    if (featureBlock) return featureBlock;
-
-    const userRole = session.user?.role;
-    if (!checkRolePermission(userRole, 'orders', 'view')) {
-      return {
-        status: 403,
-        error: 'Permission refusée',
-      };
-    }
+    const ctx = await requireServerActionContext({
+      feature: 'orders',
+      permission: { resource: 'orders', action: 'view' },
+    });
+    if (!ctx.ok) return ctx.response;
 
     const customers = await prisma.individualCustomer.findMany({
       orderBy: { name: 'asc' },
@@ -57,24 +42,11 @@ export async function getIndividualCustomers() {
 
 export async function createIndividualCustomer(data: { name: string }) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const featureBlock = await getAppFeatureActionBlock('orders');
-    if (featureBlock) return featureBlock;
-
-    const userRole = session.user?.role;
-    if (!checkRolePermission(userRole, 'orders', 'create')) {
-      return {
-        status: 403,
-        error: 'Permission refusée',
-      };
-    }
+    const ctx = await requireServerActionContext({
+      feature: 'orders',
+      permission: { resource: 'orders', action: 'create' },
+    });
+    if (!ctx.ok) return ctx.response;
 
     const validated = createIndividualCustomerSchema.parse(data);
 
@@ -99,24 +71,11 @@ export async function createIndividualCustomer(data: { name: string }) {
 
 export async function deleteIndividualCustomerByName(data: { name: string }) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const featureBlock = await getAppFeatureActionBlock('orders');
-    if (featureBlock) return featureBlock;
-
-    const userRole = session.user?.role;
-    if (!checkRolePermission(userRole, 'orders', 'delete')) {
-      return {
-        status: 403,
-        error: 'Permission refusée',
-      };
-    }
+    const ctx = await requireServerActionContext({
+      feature: 'orders',
+      permission: { resource: 'orders', action: 'delete' },
+    });
+    if (!ctx.ok) return ctx.response;
 
     const validated = deleteIndividualCustomerByNameSchema.parse(data);
     const trimmed = validated.name.trim();

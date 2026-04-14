@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRolePermission } from "@/lib/auth/permissions";
 import { routes } from "@/types/routes";
+import type { AppMiddlewareSession } from "@/types/middlewareSession";
 
 export async function hasStockViewAccessMiddleware(
   request: NextRequest,
-  session: any,
+  session: AppMiddlewareSession,
 ) {
   if (!session) {
     return NextResponse.next();

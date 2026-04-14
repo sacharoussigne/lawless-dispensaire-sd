@@ -74,7 +74,7 @@ export default function StockPageClient({ initialItems, initialChests, stockUiPr
 
   useEffect(() => {
     loadStockChecksSummary();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, []);
 
   useEffect(() => {

@@ -154,7 +154,7 @@ export default function OrdersPageClient({
 
   useEffect(() => {
     loadAssignments();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, []);
 
   return (
