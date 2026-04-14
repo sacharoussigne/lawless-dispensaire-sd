@@ -9,7 +9,7 @@ import {
   getOrderTypeLabel,
   getOrderTypeColor,
 } from '@/types/enum/orderType';
-import type { OrderWithRelations } from '@/types/orders';
+import { getOrderClientDisplayName, type OrderWithRelations } from '@/types/orders';
 
 interface OrderDetailsModalProps {
   opened: boolean;
@@ -44,9 +44,9 @@ export function OrderDetailsModal({
               </Stack>
               <Stack gap={2}>
                 <Text size="xs" c="dimmed">
-                  Entreprise
+                  Client
                 </Text>
-                <Text fw={500}>{viewingOrder.company.name}</Text>
+                <Text fw={500}>{getOrderClientDisplayName(viewingOrder)}</Text>
               </Stack>
             </SimpleGrid>
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg">

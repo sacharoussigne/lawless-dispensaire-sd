@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Modal,
   Select,
@@ -15,12 +15,19 @@ import {
   Text,
   Badge,
   Alert,
+  SegmentedControl,
 } from '@mantine/core';
 import { IconTrash, IconAlertTriangle } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { getCompanyGroups } from '@/app/_actions/companyGroups';
 import { getItems } from '@/app/_actions/items';
 import { getOrders, createOrder } from '@/app/_actions/orders';
+import {
+  getIndividualCustomers,
+  createIndividualCustomer,
+  deleteIndividualCustomerByName,
+} from '@/app/_actions/individualCustomers';
+import { SuggestionAutocomplete } from '@/app/_components/SuggestionAutocomplete/SuggestionAutocomplete';
 import { handleAction } from '@/lib/action';
 import type { ItemWithRelations } from '@/types/stock';
 import {
@@ -52,10 +59,15 @@ interface ExistingOrder {
   id: string;
   name: string;
   status: string;
+  companyGroupId?: string | null;
   company: {
     id: string;
     name: string;
-  };
+  } | null;
+  individualCustomer?: {
+    id: string;
+    name: string;
+  } | null;
   items: Array<{
     itemId: string;
     quantity: number;
@@ -73,6 +85,12 @@ const normalizePrice = (price: unknown): number | null => {
   const numPrice = Number(price);
   return isNaN(numPrice) ? null : numPrice;
 };
+
+function orderClientLabel(order: ExistingOrder): string {
+  return order.individualCustomer?.name ?? order.company?.name ?? '—';
+}
+
+type ClientMode = 'company' | 'individual';
 
 export default function OrderModal({ 
   opened, 
@@ -92,6 +110,14 @@ export default function OrderModal({
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
   const [existingOrders, setExistingOrders] = useState<ExistingOrder[]>([]);
+  const [clientMode, setClientMode] = useState<ClientMode>('company');
+  const [individualCustomers, setIndividualCustomers] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+  const [selectedIndividualCustomerId, setSelectedIndividualCustomerId] = useState<string | null>(
+    null
+  );
+  const [individualCustomerInput, setIndividualCustomerInput] = useState('');
 
   // Charger les groupes d'entreprises et les entreprises
   useEffect(() => {
@@ -103,10 +129,11 @@ export default function OrderModal({
   const loadData = async () => {
     try {
       setLoadingData(true);
-      const [groupsResult, itemsResult] = await Promise.all([
+      const [groupsResult, itemsResult, individualsResult] = await Promise.all([
         getCompanyGroups(),
         // Si on n'a pas d'items fournis (depuis la page orders), les charger
         items.length === 0 ? getItems() : Promise.resolve({ status: 200, data: [] }),
+        getIndividualCustomers(),
       ]);
 
       const groupsData = handleAction(groupsResult);
@@ -147,6 +174,11 @@ export default function OrderModal({
           }))
         );
       }
+
+      const individualsData = handleAction(individualsResult);
+      if (individualsData) {
+        setIndividualCustomers(individualsData);
+      }
     } catch (error: any) {
       notifications.show({
         title: 'Erreur',
@@ -162,6 +194,14 @@ export default function OrderModal({
   const itemsToUse = useMemo(() => {
     return items.length > 0 ? items : allItems;
   }, [items, allItems]);
+
+  const individualCustomerNames = useMemo(
+    () =>
+      [...new Set(individualCustomers.map((c) => c.name))].sort((a, b) =>
+        a.localeCompare(b, 'fr', { sensitivity: 'base' })
+      ),
+    [individualCustomers]
+  );
 
   // Filtrer les groupes d'entreprises selon le type de commande
   const companyGroups = useMemo(() => {
@@ -220,8 +260,12 @@ export default function OrderModal({
           // Filtrer les commandes : non terminées/annulées et appartenant au groupe
           const activeOrders = ordersData.filter((order: ExistingOrder) => {
             const isActive = order.status !== 'COMPLETED' && order.status !== 'CANCELLED';
-            const belongsToGroup = companyIds.includes(order.company.id);
-            return isActive && belongsToGroup;
+            const inGroupByCompany =
+              order.company?.id != null && companyIds.includes(order.company.id);
+            const inGroupByStored =
+              order.companyGroupId != null &&
+              order.companyGroupId === selectedCompanyGroupId;
+            return isActive && (inGroupByCompany || inGroupByStored);
           });
           
           setExistingOrders(activeOrders);
@@ -239,12 +283,28 @@ export default function OrderModal({
   useEffect(() => {
     setSelectedCompanyGroupId(null);
     setSelectedCompanyId(null);
+    setSelectedIndividualCustomerId(null);
+    setIndividualCustomerInput('');
+    setClientMode('company');
     setOrderItems([]);
     setOrderPrice('');
   }, [orderType]);
 
+  useEffect(() => {
+    setSelectedCompanyId(null);
+    setSelectedIndividualCustomerId(null);
+    setIndividualCustomerInput('');
+    if (orderType === OrderTypeEnum.OUTGOING && clientMode === 'individual') {
+      setSelectedCompanyGroupId(null);
+    }
+  }, [clientMode, orderType]);
+
   // Quand un groupe d'entreprise est sélectionné, initialiser les items qui ont besoin d'être restockés (si prefillItemsNeedingRestock est true)
   useEffect(() => {
+    if (orderType === OrderTypeEnum.OUTGOING && clientMode === 'individual') {
+      return;
+    }
+
     if (!selectedCompanyGroupId) {
       setOrderItems([]);
       setSelectedCompanyId(null);
@@ -278,7 +338,7 @@ export default function OrderModal({
     
     // Réinitialiser la sélection d'entreprise quand on change de groupe
     setSelectedCompanyId(null);
-  }, [selectedCompanyGroupId, prefillItemsNeedingRestock, itemsToUse, orderType]);
+  }, [selectedCompanyGroupId, prefillItemsNeedingRestock, itemsToUse, orderType, clientMode]);
 
   // Calculer le prix total pour les commandes sortantes
   const calculatedPrice = useMemo(() => {
@@ -301,6 +361,9 @@ export default function OrderModal({
     if (!opened) {
       setSelectedCompanyGroupId(null);
       setSelectedCompanyId(null);
+      setSelectedIndividualCustomerId(null);
+      setClientMode('company');
+      setIndividualCustomerInput('');
       setOrderType(OrderTypeEnum.INCOMING);
       setOrderDetails('');
       setOrderPrice('');
@@ -352,9 +415,103 @@ export default function OrderModal({
     );
   };
 
+  const clientSelected =
+    orderType === OrderTypeEnum.INCOMING
+      ? Boolean(selectedCompanyId)
+      : clientMode === 'company'
+        ? Boolean(selectedCompanyId)
+        : Boolean(selectedIndividualCustomerId);
+
+  const canShowItems = useMemo(() => {
+    if (orderType === OrderTypeEnum.INCOMING) {
+      return Boolean(selectedCompanyGroupId && selectedCompanyId);
+    }
+    if (clientMode === 'individual') {
+      return Boolean(selectedIndividualCustomerId);
+    }
+    return Boolean(selectedCompanyGroupId && selectedCompanyId);
+  }, [
+    orderType,
+    clientMode,
+    selectedCompanyGroupId,
+    selectedCompanyId,
+    selectedIndividualCustomerId,
+  ]);
+
+  const resolveIndividualCustomerIdFromInput = useCallback(
+    (text: string): string | null => {
+      const t = text.trim();
+      if (!t) return null;
+      const lower = t.toLowerCase();
+      const match = individualCustomers.find((c) => c.name.trim().toLowerCase() === lower);
+      return match?.id ?? null;
+    },
+    [individualCustomers]
+  );
+
+  const handleAddIndividualCustomerSuggestion = async (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    try {
+      const result = await createIndividualCustomer({ name: trimmed });
+      const data = handleAction(result);
+      if (data) {
+        setIndividualCustomers((prev) =>
+          [...prev, data].sort((a, b) =>
+            a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' })
+          )
+        );
+        setSelectedIndividualCustomerId(data.id);
+        setIndividualCustomerInput(data.name);
+        notifications.show({
+          title: 'Succès',
+          message: 'Particulier créé',
+          color: 'green',
+        });
+      }
+    } catch (error: any) {
+      notifications.show({
+        title: 'Erreur',
+        message: error.message || 'Erreur lors de la création',
+        color: 'red',
+      });
+    }
+  };
+
+  const handleDeleteIndividualCustomerSuggestion = async (value: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    const match = individualCustomers.find(
+      (c) => c.name.trim().toLowerCase() === trimmed.toLowerCase()
+    );
+    try {
+      const result = await deleteIndividualCustomerByName({ name: trimmed });
+      handleAction(result);
+      setIndividualCustomers((prev) =>
+        prev.filter((c) => c.name.trim().toLowerCase() !== trimmed.toLowerCase())
+      );
+      if (match && selectedIndividualCustomerId === match.id) {
+        setSelectedIndividualCustomerId(null);
+        setIndividualCustomerInput('');
+      }
+      notifications.show({
+        title: 'Succès',
+        message: 'Particulier supprimé',
+        color: 'green',
+      });
+    } catch (error: any) {
+      notifications.show({
+        title: 'Erreur',
+        message: error.message || 'Erreur lors de la suppression',
+        color: 'red',
+      });
+    }
+  };
+
   // Créer la commande
   const handleCreateOrder = async () => {
-    if (!selectedCompanyGroupId || !selectedCompanyId || orderItems.length === 0) {
+    if (orderItems.length === 0) {
       notifications.show({
         title: 'Erreur',
         message: 'Veuillez remplir tous les champs requis',
@@ -363,13 +520,45 @@ export default function OrderModal({
       return;
     }
 
+    if (orderType === OrderTypeEnum.INCOMING) {
+      if (!selectedCompanyGroupId || !selectedCompanyId) {
+        notifications.show({
+          title: 'Erreur',
+          message: 'Veuillez remplir tous les champs requis',
+          color: 'red',
+        });
+        return;
+      }
+    } else if (orderType === OrderTypeEnum.OUTGOING) {
+      if (clientMode === 'company') {
+        if (!selectedCompanyGroupId || !selectedCompanyId) {
+          notifications.show({
+            title: 'Erreur',
+            message: 'Veuillez remplir tous les champs requis',
+            color: 'red',
+          });
+          return;
+        }
+      } else if (!selectedIndividualCustomerId) {
+        notifications.show({
+          title: 'Erreur',
+          message: 'Veuillez remplir tous les champs requis',
+          color: 'red',
+        });
+        return;
+      }
+    }
+
     try {
       setLoading(true);
       const result = await createOrder({
         type: orderType,
         details: orderDetails || undefined,
         price: orderType === OrderTypeEnum.INCOMING && orderPrice !== '' ? Number(orderPrice) : undefined,
-        companyId: selectedCompanyId,
+        ...(selectedCompanyGroupId ? { companyGroupId: selectedCompanyGroupId } : {}),
+        ...(orderType === OrderTypeEnum.INCOMING || clientMode === 'company'
+          ? { companyId: selectedCompanyId! }
+          : { individualCustomerId: selectedIndividualCustomerId! }),
         items: orderItems.map((oi) => ({
           itemId: oi.itemId,
           quantity: oi.quantity,
@@ -417,11 +606,6 @@ export default function OrderModal({
     });
   }, [orderItems, existingOrders]);
 
-  // Déterminer si on peut afficher la section des items
-  const canShowItems = 
-    (orderType === OrderTypeEnum.INCOMING && selectedCompanyGroupId) ||
-    (orderType === OrderTypeEnum.OUTGOING && selectedCompanyId);
-
   return (
     <Modal
       opened={opened}
@@ -443,38 +627,74 @@ export default function OrderModal({
           disabled={loadingData}
         />
 
-        <Group grow>
-          <Select
-            label="Groupe d'entreprises"
-            placeholder="Sélectionner un groupe d'entreprises"
-            data={companyGroups.map((g) => ({ value: g.id, label: g.name }))}
-            value={selectedCompanyGroupId}
-            onChange={(value) => setSelectedCompanyGroupId(value)}
-            required
-            searchable
+        {orderType === OrderTypeEnum.OUTGOING && (
+          <SegmentedControl
+            fullWidth
+            value={clientMode}
+            onChange={(v) => setClientMode(v as ClientMode)}
+            data={[
+              { label: 'Entreprise', value: 'company' },
+              { label: 'Particulier', value: 'individual' },
+            ]}
             disabled={loadingData}
           />
+        )}
 
-          <Select
-            label="Entreprise"
-            placeholder="Sélectionner une entreprise"
-            data={
-              selectedCompanyGroupId
-                ? companyGroups
-                    .find((g) => g.id === selectedCompanyGroupId)
-                    ?.companies.map((c) => ({
-                      value: c.company.id,
-                      label: c.company.name,
-                    })) || []
-                : []
-            }
-            value={selectedCompanyId}
-            onChange={(value) => setSelectedCompanyId(value)}
-            required
-            searchable
-            disabled={loadingData || !selectedCompanyGroupId}
-          />
-        </Group>
+        {(orderType === OrderTypeEnum.INCOMING ||
+          (orderType === OrderTypeEnum.OUTGOING && clientMode === 'company')) && (
+          <Group grow>
+            <Select
+              label="Groupe d'entreprises"
+              placeholder="Sélectionner un groupe d'entreprises"
+              data={companyGroups.map((g) => ({ value: g.id, label: g.name }))}
+              value={selectedCompanyGroupId}
+              onChange={(value) => setSelectedCompanyGroupId(value)}
+              required
+              searchable
+              disabled={loadingData}
+            />
+
+            <Select
+              label="Entreprise"
+              placeholder="Sélectionner une entreprise"
+              data={
+                selectedCompanyGroupId
+                  ? companyGroups
+                      .find((g) => g.id === selectedCompanyGroupId)
+                      ?.companies.map((c) => ({
+                        value: c.company.id,
+                        label: c.company.name,
+                      })) || []
+                  : []
+              }
+              value={selectedCompanyId}
+              onChange={(value) => setSelectedCompanyId(value)}
+              required
+              searchable
+              disabled={loadingData || !selectedCompanyGroupId}
+            />
+          </Group>
+        )}
+
+        {orderType === OrderTypeEnum.OUTGOING && clientMode === 'individual' && (
+          <Stack gap="xs">
+            <Text size="sm" fw={500}>
+              Particulier
+            </Text>
+            <SuggestionAutocomplete
+              value={individualCustomerInput}
+              onChange={(v) => {
+                setIndividualCustomerInput(v);
+                setSelectedIndividualCustomerId(resolveIndividualCustomerIdFromInput(v));
+              }}
+              suggestions={individualCustomerNames}
+              onAddSuggestion={handleAddIndividualCustomerSuggestion}
+              onDeleteSuggestion={handleDeleteIndividualCustomerSuggestion}
+              placeholder="Rechercher ou créer un particulier"
+              size="sm"
+            />
+          </Stack>
+        )}
 
         {canShowItems && (
           <>
@@ -494,7 +714,8 @@ export default function OrderModal({
                     );
                     return (
                       <Text key={order.id} size="sm" fw={500}>
-                        • {order.name} ({order.company.name}) : {conflictingItems.map((item) => item.item.name).join(', ')}
+                        • {order.name} ({orderClientLabel(order)}) :{' '}
+                        {conflictingItems.map((item) => item.item.name).join(', ')}
                       </Text>
                     );
                   })}
@@ -605,7 +826,7 @@ export default function OrderModal({
               </Text>
             )}
 
-            {selectedCompanyId && (
+            {clientSelected && (
               <Select
                 label="Ajouter un objet"
                 placeholder={
@@ -647,9 +868,13 @@ export default function OrderModal({
             onClick={handleCreateOrder}
             loading={loading}
             disabled={
-              !selectedCompanyGroupId ||
-              !selectedCompanyId ||
-              orderItems.length === 0
+              orderItems.length === 0 ||
+              (orderType === OrderTypeEnum.INCOMING &&
+                (!selectedCompanyGroupId || !selectedCompanyId)) ||
+              (orderType === OrderTypeEnum.OUTGOING &&
+                (clientMode === 'company'
+                  ? !selectedCompanyGroupId || !selectedCompanyId
+                  : !selectedIndividualCustomerId))
             }
           >
             Créer la commande
