@@ -12,7 +12,7 @@ import {
   getOrderTypeLabel,
   getOrderTypeColor,
 } from '@/types/enum/orderType';
-import type { OrderWithRelations } from '@/types/orders';
+import { getOrderClientDisplayName, type OrderWithRelations } from '@/types/orders';
 
 interface OrdersTableProps {
   orders: OrderWithRelations[];
@@ -124,9 +124,10 @@ export function OrdersTable({
           //   ),
           // },
           {
-            accessor: 'company.name',
-            title: 'Entreprise',
-            sortable: true,
+            accessor: 'client',
+            title: 'Client',
+            render: (order: OrderWithRelations) => getOrderClientDisplayName(order),
+            sortable: false,
           },
           {
             accessor: 'price',

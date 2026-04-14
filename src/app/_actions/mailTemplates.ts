@@ -226,6 +226,12 @@ export async function generateOrderMailPreview(data: {
             name: true,
           },
         },
+        individualCustomer: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         items: {
           include: {
             item: {
@@ -281,7 +287,9 @@ export async function generateOrderMailPreview(data: {
     const username = session.user.name || 'Utilisateur';
 
     let preview = template.content;
-    preview = preview.replace(/\${name}/g, order.company.name);
+    const clientName =
+      order.individualCustomer?.name ?? order.company?.name ?? 'Client';
+    preview = preview.replace(/\${name}/g, clientName);
     preview = preview.replace(/\${items}/g, itemsText);
     preview = preview.replace(/\${price}/g, priceText);
     preview = preview.replace(/\${username}/g, username);

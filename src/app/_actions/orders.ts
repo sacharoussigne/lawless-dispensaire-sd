@@ -9,21 +9,44 @@ import { getAppFeatureActionBlock } from '@/lib/appSettings';
 import { addOrderItemsToStock, removeOrderItemsFromStock } from '@/app/_actions/stock';
 import type { OrderStatus } from '@prisma/client';
 
+function slugifyOrderNameSegment(name: string): string {
+  const slug = name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return slug || 'commande';
+}
+
 // Schéma de validation pour créer une commande
-const createOrderSchema = z.object({
-  name: z.string().max(255, 'Le nom est trop long').optional(),
-  status: z.enum(['DRAFT', 'LETTER_SENT', 'PROCESSING', 'READY', 'COMPLETED', 'CANCELLED']).default('DRAFT'),
-  type: z.enum(['INCOMING', 'OUTGOING']).default('INCOMING'),
-  details: z.string().max(1000, 'Les détails sont trop longs').optional(),
-  price: z.number().positive('Le prix doit être positif').optional(),
-  companyId: z.string().uuid('ID d\'entreprise invalide'),
-  items: z.array(
-    z.object({
-      itemId: z.string().uuid('ID d\'item invalide'),
-      quantity: z.number().int().min(1, 'La quantité doit être au moins 1'),
-    })
-  ).min(1, 'Au moins un objet est requis'),
-});
+const createOrderSchema = z
+  .object({
+    name: z.string().max(255, 'Le nom est trop long').optional(),
+    status: z
+      .enum(['DRAFT', 'LETTER_SENT', 'PROCESSING', 'READY', 'COMPLETED', 'CANCELLED'])
+      .default('DRAFT'),
+    type: z.enum(['INCOMING', 'OUTGOING']).default('INCOMING'),
+    details: z.string().max(1000, 'Les détails sont trop longs').optional(),
+    price: z.number().positive('Le prix doit être positif').optional(),
+    companyId: z.string().uuid('ID d\'entreprise invalide').optional(),
+    individualCustomerId: z.string().uuid('ID de particulier invalide').optional(),
+    companyGroupId: z.string().uuid('ID de groupe invalide').optional().nullable(),
+    items: z
+      .array(
+        z.object({
+          itemId: z.string().uuid('ID d\'item invalide'),
+          quantity: z.number().int().min(1, 'La quantité doit être au moins 1'),
+        })
+      )
+      .min(1, 'Au moins un objet est requis'),
+  })
+  .refine(
+    (d) =>
+      (Boolean(d.companyId) && !d.individualCustomerId) ||
+      (!d.companyId && Boolean(d.individualCustomerId)),
+    { message: 'Indiquez une entreprise ou un particulier', path: ['companyId'] }
+  );
 
 /**
  * Crée une nouvelle commande
@@ -34,7 +57,9 @@ export async function createOrder(data: {
   type?: 'INCOMING' | 'OUTGOING';
   details?: string;
   price?: number;
-  companyId: string;
+  companyId?: string;
+  individualCustomerId?: string;
+  companyGroupId?: string | null;
   items: { itemId: string; quantity: number }[];
 }) {
   try {
@@ -62,33 +87,45 @@ export async function createOrder(data: {
     // Générer le nom automatiquement si non fourni
     let orderName = validatedData.name;
     if (!orderName) {
-      const company = await prisma.company.findUnique({
-        where: { id: validatedData.companyId },
-        select: { name: true },
-      });
+      if (validatedData.companyId) {
+        const company = await prisma.company.findUnique({
+          where: { id: validatedData.companyId },
+          select: { name: true },
+        });
 
-      if (!company) {
-        return {
-          status: 404,
-          error: 'Entreprise introuvable',
-        };
+        if (!company) {
+          return {
+            status: 404,
+            error: 'Entreprise introuvable',
+          };
+        }
+
+        const orderCount = await prisma.order.count({
+          where: { companyId: validatedData.companyId },
+        });
+
+        const sequentialNumber = String(orderCount + 1).padStart(4, '0');
+        orderName = `${slugifyOrderNameSegment(company.name)}-${sequentialNumber}`;
+      } else if (validatedData.individualCustomerId) {
+        const customer = await prisma.individualCustomer.findUnique({
+          where: { id: validatedData.individualCustomerId },
+          select: { name: true },
+        });
+
+        if (!customer) {
+          return {
+            status: 404,
+            error: 'Particulier introuvable',
+          };
+        }
+
+        const orderCount = await prisma.order.count({
+          where: { individualCustomerId: validatedData.individualCustomerId },
+        });
+
+        const sequentialNumber = String(orderCount + 1).padStart(4, '0');
+        orderName = `${slugifyOrderNameSegment(customer.name)}-${sequentialNumber}`;
       }
-
-      // Compter le nombre de commandes existantes pour cette entreprise
-      const orderCount = await prisma.order.count({
-        where: { companyId: validatedData.companyId },
-      });
-
-      // Générer le nom : nom-entreprise en minuscules avec tirets + numéro séquentiel
-      const companyNameSlug = company.name
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-
-      const sequentialNumber = String(orderCount + 1).padStart(4, '0');
-      orderName = `${companyNameSlug}-${sequentialNumber}`;
     }
 
     // Calculer le prix selon le type de commande
@@ -121,6 +158,13 @@ export async function createOrder(data: {
       orderPrice = validatedData.price ?? null;
     }
 
+    if (!orderName) {
+      return {
+        status: 400,
+        error: 'Le nom de la commande est requis',
+      };
+    }
+
     const order = await prisma.order.create({
       data: {
         name: orderName,
@@ -128,7 +172,9 @@ export async function createOrder(data: {
         type: validatedData.type,
         details: validatedData.details,
         ...(orderPrice !== null && { price: orderPrice }),
-        companyId: validatedData.companyId,
+        companyId: validatedData.companyId ?? null,
+        individualCustomerId: validatedData.individualCustomerId ?? null,
+        companyGroupId: validatedData.companyGroupId ?? null,
         items: {
           create: validatedData.items.map((item) => ({
             itemId: item.itemId,
@@ -148,6 +194,12 @@ export async function createOrder(data: {
           },
         },
         company: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        individualCustomer: {
           select: {
             id: true,
             name: true,
@@ -217,6 +269,12 @@ export async function getOrders() {
       },
       include: {
         company: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        individualCustomer: {
           select: {
             id: true,
             name: true,
@@ -397,6 +455,12 @@ export async function updateOrder(data: {
       data: updateData,
       include: {
         company: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        individualCustomer: {
           select: {
             id: true,
             name: true,

@@ -16,7 +16,16 @@ export interface OrderWithRelations extends Omit<Order, 'price'> {
   company: {
     id: string;
     name: string;
-  };
+  } | null;
+  individualCustomer: {
+    id: string;
+    name: string;
+  } | null;
   items: OrderItem[];
 }
 
+export function getOrderClientDisplayName(
+  order: Pick<OrderWithRelations, 'company' | 'individualCustomer'>
+): string {
+  return order.individualCustomer?.name ?? order.company?.name ?? '—';
+}
