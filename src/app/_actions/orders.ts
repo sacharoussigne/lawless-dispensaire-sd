@@ -8,6 +8,7 @@ import { checkRolePermission } from '@/lib/auth/permissions';
 import { getAppFeatureActionBlock } from '@/lib/appSettings';
 import { addOrderItemsToStock, removeOrderItemsFromStock } from '@/app/_actions/stock';
 import type { OrderStatus } from '@prisma/client';
+import type { OrderWithRelations } from '@/types/orders';
 
 function slugifyOrderNameSegment(name: string): string {
   const slug = name
@@ -22,7 +23,7 @@ function slugifyOrderNameSegment(name: string): string {
 function serializeOrderForClient(order: {
   price: unknown;
   items: Array<{ item: { price?: unknown } & Record<string, unknown> } & Record<string, unknown>>;
-} & Record<string, unknown>) {
+} & Record<string, unknown>): OrderWithRelations {
   return {
     ...order,
     price: order.price != null ? Number(order.price as number) : null,
@@ -36,7 +37,7 @@ function serializeOrderForClient(order: {
             : null,
       },
     })),
-  };
+  } as OrderWithRelations;
 }
 
 // Schéma de validation pour créer une commande
