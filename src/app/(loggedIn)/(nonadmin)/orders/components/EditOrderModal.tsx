@@ -10,7 +10,6 @@ import {
   Button,
   Group,
   Text,
-  Checkbox,
   NumberInput,
   Table,
   ActionIcon,
@@ -33,11 +32,8 @@ import {
   getOrderTypeLabel,
   OrderTypeEnum,
 } from '@/types/enum/orderType';
-import { checkOrderItemsStockToday, checkOrderItemsStockSufficient } from '@/app/_actions/stock';
-import { getChests } from '@/app/_actions/chests';
 import type { OrderWithRelations } from '@/types/orders';
 import type { ItemWithRelations } from '@/types/stock';
-import type { ChestWithStockHistory } from '@/types/chests';
 
 interface OrderItem {
   itemId: string;
@@ -88,25 +84,9 @@ export function EditOrderModal({
   editingOrder,
   onSuccess,
 }: EditOrderModalProps) {
-  const [addToStock, setAddToStock] = useState(false);
-  const [stockCheckResult, setStockCheckResult] = useState<{
-    allHaveStockToday: boolean;
-    allHaveEnoughStock?: boolean;
-    items: Array<{ 
-      itemId: string; 
-      itemName: string; 
-      hasStockToday: boolean;
-      currentStock?: number;
-      requiredQuantity?: number;
-      hasEnoughStock?: boolean;
-    }>;
-  } | null>(null);
-  const [checkingStock, setCheckingStock] = useState(false);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [allItems, setAllItems] = useState<ItemWithRelations[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
-  const [chests, setChests] = useState<ChestWithStockHistory[]>([]);
-  const [selectedChestId, setSelectedChestId] = useState<string | null>(null);
 
   // Utility function to convert price to number
   const normalizePrice = (price: unknown): number | null => {
@@ -134,11 +114,7 @@ export function EditOrderModal({
       const loadItems = async () => {
         try {
           setLoadingItems(true);
-          const [itemsResult, chestsResult] = await Promise.all([
-            getItems(),
-            getChests(true),
-          ]);
-          
+          const itemsResult = await getItems();
           const itemsData = handleAction(itemsResult);
           if (itemsData) {
             setAllItems(
@@ -150,18 +126,6 @@ export function EditOrderModal({
                 canBeSold: item.canBeSold ?? false,
               }))
             );
-          }
-          
-          const chestsData = handleAction(chestsResult);
-          if (chestsData) {
-            setChests(chestsData);
-            // Select "Foure tout" chest by default if it exists
-            const defaultChest = chestsData.find((c: ChestWithStockHistory) => c.name === 'Foure tout');
-            if (defaultChest) {
-              setSelectedChestId(defaultChest.id);
-            } else if (chestsData.length > 0) {
-              setSelectedChestId(chestsData[0].id);
-            }
           }
         } catch (error: any) {
           notifications.show({
@@ -218,8 +182,6 @@ export function EditOrderModal({
         details: editingOrder.details || '',
         price: editingOrder.price != null ? editingOrder.price : '',
       });
-      setAddToStock(false);
-      setStockCheckResult(null);
     }
   }, [editingOrder, opened]);
 
@@ -285,96 +247,6 @@ export function EditOrderModal({
     }
   };
 
-  const handleStatusChange = async (status: OrderStatusEnum) => {
-    form.setFieldValue('status', status);
-
-    if (status === OrderStatusEnum.COMPLETED && editingOrder) {
-      setCheckingStock(true);
-      try {
-        const orderType = form.values.type || (editingOrder.type as OrderTypeEnum);
-        const chestIdToCheck =
-          chests.length > 1
-            ? selectedChestId
-            : (chests.length === 1 ? chests[0].id : null);
-        
-        // For outgoing orders, check if there's enough stock
-        if (orderType === OrderTypeEnum.OUTGOING) {
-          const result = await checkOrderItemsStockSufficient(editingOrder.id, chestIdToCheck);
-          const data = handleAction(result);
-          if (data) {
-            setStockCheckResult(data);
-            // For outgoing orders, cannot complete if there's not enough stock
-            setAddToStock(false); // Pas de checkbox pour les commandes sortantes
-          }
-        } else {
-          // For incoming orders, check if today's stock exists
-          const result = await checkOrderItemsStockToday(editingOrder.id, chestIdToCheck);
-          const data = handleAction(result);
-          if (data) {
-            setStockCheckResult(data);
-            if (data.allHaveStockToday) {
-              setAddToStock(true);
-            } else {
-              setAddToStock(false);
-            }
-          }
-        }
-      } catch (error: any) {
-        notifications.show({
-          title: 'Erreur',
-          message: error.message || 'Erreur lors de la vérification du stock',
-          color: 'red',
-        });
-      } finally {
-        setCheckingStock(false);
-      }
-    } else {
-      setStockCheckResult(null);
-      setAddToStock(false);
-    }
-  };
-
-  // Re-run verification when changing chest (if transitioning to COMPLETED)
-  useEffect(() => {
-    if (!opened || !editingOrder) return;
-    if (form.values.status !== OrderStatusEnum.COMPLETED) return;
-    if (chests.length <= 1) return;
-    if (!selectedChestId) return;
-
-    const run = async () => {
-      setCheckingStock(true);
-      try {
-        const orderType = form.values.type || (editingOrder.type as OrderTypeEnum);
-        if (orderType === OrderTypeEnum.OUTGOING) {
-          const result = await checkOrderItemsStockSufficient(editingOrder.id, selectedChestId);
-          const data = handleAction(result);
-          if (data) {
-            setStockCheckResult(data);
-            setAddToStock(false);
-          }
-        } else {
-          const result = await checkOrderItemsStockToday(editingOrder.id, selectedChestId);
-          const data = handleAction(result);
-          if (data) {
-            setStockCheckResult(data);
-            setAddToStock(data.allHaveStockToday);
-          }
-        }
-      } catch (error: any) {
-        notifications.show({
-          title: 'Erreur',
-          message: error.message || 'Erreur lors de la vérification du stock',
-          color: 'red',
-        });
-      } finally {
-        setCheckingStock(false);
-      }
-    };
-
-    run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedChestId]);
-
   const handleSubmit = async (values: typeof form.values) => {
     if (!editingOrder) return;
 
@@ -399,41 +271,17 @@ export function EditOrderModal({
           itemId: oi.itemId,
           quantity: oi.quantity,
         })),
-        addToStock:
-          values.status === OrderStatusEnum.COMPLETED ? addToStock : undefined,
-        chestId: values.status === OrderStatusEnum.COMPLETED 
-          ? (chests.length > 1 ? selectedChestId : (chests.length === 1 ? chests[0].id : null))
-          : undefined,
       });
 
       handleAction(result);
 
-      let message = 'Commande modifiée avec succès';
-      const orderType = values.type || (editingOrder.type as OrderTypeEnum);
-      
-      if (values.status === OrderStatusEnum.COMPLETED) {
-        if (orderType === OrderTypeEnum.OUTGOING) {
-          if (stockCheckResult?.allHaveEnoughStock) {
-            message += '. Les objets ont été retirés du stock.';
-          } else {
-            message += ". Les objets n'ont pas pu être retirés du stock (stock insuffisant ou non fait).";
-          }
-        } else if (addToStock) {
-          message += '. Les objets ont été ajoutés au stock.';
-        } else if (stockCheckResult?.allHaveStockToday) {
-          message += ". Les objets n'ont pas été ajoutés au stock.";
-        }
-      }
-
       notifications.show({
         title: 'Succès',
-        message,
+        message: 'Commande modifiée avec succès',
         color: 'green',
       });
       onClose();
       form.reset();
-      setAddToStock(false);
-      setStockCheckResult(null);
       setOrderItems([]);
       onSuccess();
     } catch (error: any) {
@@ -457,8 +305,6 @@ export function EditOrderModal({
       onClose={() => {
         onClose();
         form.reset();
-        setAddToStock(false);
-        setStockCheckResult(null);
         setOrderItems([]);
       }}
       title={editingOrder ? 'Modifier la commande' : 'Créer une commande'}
@@ -494,7 +340,9 @@ export function EditOrderModal({
                 data={statusOptions}
                 required
                 value={form.values.status}
-                onChange={(value) => handleStatusChange(value as OrderStatusEnum)}
+                onChange={(value) =>
+                  value && form.setFieldValue('status', value as OrderStatusEnum)
+                }
                 disabled={isCompleted}
               />
               {form.values.type === OrderTypeEnum.INCOMING ? (
@@ -525,106 +373,6 @@ export function EditOrderModal({
               {...form.getInputProps('details')}
               disabled={isCompleted}
             />
-          </Stack>
-
-          <Stack gap="sm" mt="xs">
-            <Text fw={600} size="xs" c="dimmed" tt="uppercase">
-              Stock et exécution
-            </Text>
-            {form.values.status === OrderStatusEnum.COMPLETED && chests.length > 1 && (
-              <Select
-                label="Coffre"
-                placeholder="Sélectionner un coffre"
-                description={
-                  form.values.type === OrderTypeEnum.INCOMING
-                    ? 'Coffre où ajouter les items'
-                    : 'Coffre d\'où retirer les items'
-                }
-                data={chests.map((chest) => ({
-                  value: chest.id,
-                  label: chest.name,
-                }))}
-                value={selectedChestId || ''}
-                onChange={(value) => setSelectedChestId(value || null)}
-                required
-                searchable
-              />
-            )}
-            {form.values.status === OrderStatusEnum.COMPLETED && (
-              <Stack gap="xs">
-                {checkingStock ? (
-                  <Text size="sm" c="dimmed">
-                    Vérification du stock...
-                  </Text>
-                ) : stockCheckResult ? (
-                  <>
-                    {(() => {
-                      const orderType = form.values.type || (editingOrder?.type as OrderTypeEnum);
-                      
-                      // For outgoing orders
-                      if (orderType === OrderTypeEnum.OUTGOING) {
-                        if (!stockCheckResult.allHaveStockToday) {
-                          return (
-                            <Text size="sm" c="orange" fw={500}>
-                              ⚠️ Le stock d'aujourd'hui n'est pas fait pour certains objets. Les
-                              objets ne peuvent pas être retirés du stock.
-                            </Text>
-                          );
-                        }
-                        if (!stockCheckResult.allHaveEnoughStock) {
-                          const insufficientItems = stockCheckResult.items
-                            .filter((item) => !item.hasEnoughStock)
-                            .map((item) => `${item.itemName} (stock: ${item.currentStock}, requis: ${item.requiredQuantity})`);
-                          return (
-                            <>
-                              <Text size="sm" c="red" fw={500}>
-                                ⚠️ Stock insuffisant pour certains objets. Les objets ne peuvent pas être retirés du stock.
-                              </Text>
-                              <Text size="xs" c="dimmed" mt="xs">
-                                Objets avec stock insuffisant : {insufficientItems.join(', ')}
-                              </Text>
-                            </>
-                          );
-                        }
-                        return (
-                          <Text size="sm" c="green" fw={500}>
-                            ✓ Stock suffisant. Les objets seront automatiquement retirés du stock lors de la sauvegarde.
-                          </Text>
-                        );
-                      }
-                      
-                      // For incoming orders
-                      if (!stockCheckResult.allHaveStockToday) {
-                        return (
-                          <Text size="sm" c="orange" fw={500}>
-                            ⚠️ Le stock d'aujourd'hui n'est pas fait pour certains objets. Les
-                            objets ne peuvent pas être ajoutés automatiquement au stock.
-                          </Text>
-                        );
-                      }
-                      return (
-                        <Checkbox
-                          label="Ajouter automatiquement les objets au stock d'aujourd'hui"
-                          checked={addToStock}
-                          onChange={(event) =>
-                            setAddToStock(event.currentTarget.checked)
-                          }
-                        />
-                      );
-                    })()}
-                    {stockCheckResult.items.some((item) => !item.hasStockToday) && (
-                      <Text size="xs" c="dimmed" mt="xs">
-                        Objets sans stock d'aujourd'hui :{' '}
-                        {stockCheckResult.items
-                          .filter((item) => !item.hasStockToday)
-                          .map((item) => item.itemName)
-                          .join(', ')}
-                      </Text>
-                    )}
-                  </>
-                ) : null}
-              </Stack>
-            )}
           </Stack>
 
           <Divider />
@@ -713,8 +461,6 @@ export function EditOrderModal({
               onClick={() => {
                 onClose();
                 form.reset();
-                setAddToStock(false);
-                setStockCheckResult(null);
               }}
             >
               Annuler

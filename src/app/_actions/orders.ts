@@ -6,7 +6,6 @@ import { actionErrorParser } from '@/lib/action';
 import { getAuthSession } from '@/lib/auth';
 import { checkRolePermission } from '@/lib/auth/permissions';
 import { getAppFeatureActionBlock } from '@/lib/appSettings';
-import { addOrderItemsToStock, removeOrderItemsFromStock } from '@/app/_actions/stock';
 import type { OrderStatus } from '@prisma/client';
 import type { OrderWithRelations } from '@/types/orders';
 
@@ -252,7 +251,6 @@ const updateOrderSchema = z.object({
       quantity: z.number().int().min(1, 'La quantité doit être au moins 1'),
     })
   ).min(1, 'Au moins un objet est requis').optional(),
-  chestId: z.string().uuid('ID de coffre invalide').optional().nullable(),
 });
 
 // Schéma pour supprimer une commande
@@ -335,8 +333,6 @@ export async function updateOrder(data: {
   details?: string;
   price?: number;
   items?: { itemId: string; quantity: number }[];
-  addToStock?: boolean;
-  chestId?: string | null;
 }) {
   try {
     const session = await getAuthSession();
@@ -489,37 +485,6 @@ export async function updateOrder(data: {
     });
 
     const serializedOrder = serializeOrderForClient(order);
-
-    // Si le statut passe à COMPLETED
-    if (
-      oldOrder.status !== ('COMPLETED' as OrderStatus) &&
-      validatedData.status === 'COMPLETED'
-    ) {
-      // Pour les commandes entrantes (INCOMING), ajouter au stock si demandé
-      if (orderType === 'INCOMING' && data.addToStock === true) {
-        const stockResult = await addOrderItemsToStock(validatedData.id, data.chestId);
-        if (stockResult.status !== 200) {
-          return {
-            status: 200,
-            data: serializedOrder,
-            warning: 'La commande a été mise à jour mais l\'ajout au stock a échoué',
-          };
-        }
-      }
-      
-      // Pour les commandes sortantes (OUTGOING), retirer du stock automatiquement
-      if (orderType === 'OUTGOING') {
-        const stockResult = await removeOrderItemsFromStock(validatedData.id, data.chestId);
-        if (stockResult.status !== 200) {
-          const errorMessage = 'error' in stockResult ? stockResult.error : 'La commande a été mise à jour mais le retrait du stock a échoué';
-          return {
-            status: 200,
-            data: serializedOrder,
-            warning: errorMessage,
-          };
-        }
-      }
-    }
 
     return {
       status: 200,
