@@ -1,11 +1,8 @@
-import { startOfWeek, endOfWeek } from 'date-fns';
 import prisma from '@/lib/prisma';
+import { getBankWeekBounds } from '@/lib/bankWeek';
 
-// Utility function to get Monday and Sunday of a week
 export function getWeekBounds(date: Date) {
-  const start = startOfWeek(date, { weekStartsOn: 1 });
-  const end = endOfWeek(date, { weekStartsOn: 1 });
-  return { start, end };
+  return getBankWeekBounds(date);
 }
 
 /**

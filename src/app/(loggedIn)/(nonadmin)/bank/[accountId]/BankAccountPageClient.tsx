@@ -45,7 +45,8 @@ import {
   deleteDescriptionSuggestion,
 } from '@/app/_actions/bankAccounts';
 import { handleAction } from '@/lib/action';
-import { format, addWeeks, subWeeks } from 'date-fns';
+import { addParisWeeks } from '@/lib/bankWeek';
+import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { BankAccountWithRelations } from '@/types/bankAccounts';
 import type { BankAccountWeek, BankTransaction } from '@prisma/client';
@@ -60,6 +61,26 @@ type SerializedBankAccountWeek = Omit<BankAccountWeek, 'balance'> & {
   balance: number;
   transactions: Array<Omit<BankTransaction, 'amount'> & { amount: number }>;
 };
+
+function toDate(value: Date | string | number): Date {
+  return value instanceof Date ? value : new Date(value);
+}
+
+function normalizeSerializedWeek(week: SerializedBankAccountWeek): SerializedBankAccountWeek {
+  return {
+    ...week,
+    weekStart: toDate(week.weekStart as Date | string | number),
+    weekEnd: toDate(week.weekEnd as Date | string | number),
+    createdAt: toDate(week.createdAt as Date | string | number),
+    updatedAt: toDate(week.updatedAt as Date | string | number),
+    transactions: week.transactions.map((t) => ({
+      ...t,
+      date: toDate(t.date as Date | string | number),
+      createdAt: toDate(t.createdAt as Date | string | number),
+      updatedAt: toDate(t.updatedAt as Date | string | number),
+    })),
+  };
+}
 
 interface BankAccountPageClientProps {
   account: BankAccountWithRelations;
@@ -82,12 +103,14 @@ export default function BankAccountPageClient({
   initialWeek,
 }: BankAccountPageClientProps) {
   const router = useRouter();
-  const [week, setWeek] = useState<SerializedBankAccountWeek>(initialWeek);
+  const [week, setWeek] = useState<SerializedBankAccountWeek>(() => normalizeSerializedWeek(initialWeek));
   const [weeks, setWeeks] = useState<SerializedBankAccountWeek[]>([]);
   const [loading, setLoading] = useState(false);
   const [nameSuggestions, setNameSuggestions] = useState<string[]>([]);
   const [descriptionSuggestions, setDescriptionSuggestions] = useState<string[]>([]);
-  const [weekDateValue, setWeekDateValue] = useState<Date | null>(new Date(initialWeek.weekStart));
+  const [weekDateValue, setWeekDateValue] = useState<Date | null>(() =>
+    new Date(normalizeSerializedWeek(initialWeek).weekStart),
+  );
   const [editingTransaction, setEditingTransaction] = useState<string | null>(null);
   const [editingTransactionData, setEditingTransactionData] = useState<{
     date?: Date | string;
@@ -228,7 +251,7 @@ export default function BankAccountPageClient({
       const result = await getAccountWeeks(account.id);
       const data = handleAction(result);
       if (data) {
-        setWeeks(data);
+        setWeeks(data.map(normalizeSerializedWeek));
       }
     } catch (error) {
       // Error handled by handleAction
@@ -241,8 +264,15 @@ export default function BankAccountPageClient({
       const result = await getOrCreateWeek(account.id, date);
       const data = handleAction(result);
       if (data) {
-        setWeek(data);
-        setWeekDateValue(new Date(data.weekStart));
+        const normalized = normalizeSerializedWeek(data);
+        setWeek(normalized);
+        setWeekDateValue(new Date(normalized.weekStart));
+      } else {
+        notifications.show({
+          title: 'Erreur',
+          message: 'Impossible de charger cette semaine.',
+          color: 'red',
+        });
       }
     } catch (error: any) {
       notifications.show({
@@ -256,13 +286,11 @@ export default function BankAccountPageClient({
   };
 
   const handlePreviousWeek = () => {
-    const newDate = subWeeks(week.weekStart, 1);
-    loadWeek(newDate);
+    loadWeek(addParisWeeks(week.weekStart, -1));
   };
 
   const handleNextWeek = () => {
-    const newDate = addWeeks(week.weekStart, 1);
-    loadWeek(newDate);
+    loadWeek(addParisWeeks(week.weekStart, 1));
   };
 
   const handleWeekChange = async (date: Date | null) => {
@@ -273,9 +301,10 @@ export default function BankAccountPageClient({
 
   // Calculate previous week balance
   const previousWeek = useMemo(() => {
+    const currentStart = toDate(week.weekStart).getTime();
     return weeks
-      .filter((w) => w.weekStart < week.weekStart)
-      .sort((a, b) => b.weekStart.getTime() - a.weekStart.getTime())[0];
+      .filter((w) => toDate(w.weekStart).getTime() < currentStart)
+      .sort((a, b) => toDate(b.weekStart).getTime() - toDate(a.weekStart).getTime())[0];
   }, [weeks, week.weekStart]);
 
   const previousBalance = previousWeek ? Number(previousWeek.balance) : 0;

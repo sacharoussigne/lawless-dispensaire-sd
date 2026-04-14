@@ -30,14 +30,17 @@ export async function getOrCreateWeek(accountId: string, date: Date) {
 
     const { start, end } = getWeekBounds(date);
 
-    // Find existing week
-    let week = await prisma.bankAccountWeek.findUnique({
+    // Range lookup: weekStart must fall in the Paris calendar week [start, end].
+    // Older rows may use a different instant for "Monday" (e.g. UTC startOfWeek) but still lie in this window.
+    let week = await prisma.bankAccountWeek.findFirst({
       where: {
-        accountId_weekStart: {
-          accountId,
-          weekStart: start,
+        accountId,
+        weekStart: {
+          gte: start,
+          lte: end,
         },
       },
+      orderBy: { weekStart: 'asc' },
       include: {
         transactions: {
           orderBy: [
