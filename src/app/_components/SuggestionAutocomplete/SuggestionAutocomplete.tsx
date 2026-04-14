@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { ActionIcon, Autocomplete, Group, Popover, Stack, Text, Button } from '@mantine/core';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
 
@@ -8,7 +9,7 @@ interface SuggestionAutocompleteProps {
   onChange: (value: string) => void;
   suggestions: string[];
   onAddSuggestion: (value: string) => Promise<void>;
-  onDeleteSuggestion: (value: string, e: React.MouseEvent) => Promise<void>;
+  onDeleteSuggestion: (value: string, e?: React.MouseEvent) => Promise<void>;
   placeholder?: string;
   size?: 'xs' | 'sm' | 'md' | 'lg';
 }
@@ -22,6 +23,8 @@ export function SuggestionAutocomplete({
   placeholder = '',
   size = 'xs',
 }: SuggestionAutocompleteProps) {
+  const [deleteMenuForValue, setDeleteMenuForValue] = useState<string | null>(null);
+
   const canAddSuggestion =
     value &&
     value.trim().length > 0 &&
@@ -39,13 +42,32 @@ export function SuggestionAutocomplete({
           <Text size="xs" style={{ flex: 1 }}>
             {option.value}
           </Text>
-          <Popover position="top" withArrow shadow="md" withinPortal>
+          <Popover
+            position="top"
+            withArrow
+            shadow="md"
+            withinPortal
+            opened={deleteMenuForValue === option.value}
+            onChange={(opened) => {
+              if (!opened) setDeleteMenuForValue(null);
+            }}
+          >
             <Popover.Target>
               <ActionIcon
                 size="xs"
                 variant="subtle"
                 color="red"
-                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setDeleteMenuForValue((v) =>
+                    v === option.value ? null : option.value,
+                  );
+                }}
               >
                 <IconTrash size={12} />
               </ActionIcon>
@@ -62,8 +84,14 @@ export function SuggestionAutocomplete({
                   <Button
                     size="xs"
                     variant="subtle"
-                    onClick={(e) => {
+                    onMouseDown={(e) => {
+                      e.preventDefault();
                       e.stopPropagation();
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setDeleteMenuForValue(null);
                     }}
                   >
                     Annuler
@@ -71,9 +99,17 @@ export function SuggestionAutocomplete({
                   <Button
                     size="xs"
                     color="red"
-                    onClick={(e) => {
+                    onMouseDown={(e) => {
+                      e.preventDefault();
                       e.stopPropagation();
-                      onDeleteSuggestion(option.value, e);
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      void (async () => {
+                        await onDeleteSuggestion(option.value, e);
+                        setDeleteMenuForValue(null);
+                      })();
                     }}
                   >
                     Supprimer
@@ -91,7 +127,7 @@ export function SuggestionAutocomplete({
             size="sm"
             variant="subtle"
             onClick={(e) => {
-              e.stopPropagation();
+              e?.stopPropagation();
               onAddSuggestion(value);
             }}
           >

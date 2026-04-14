@@ -175,8 +175,8 @@ export default function BankAccountPageClient({
     }
   };
 
-  const handleDeleteNameSuggestion = async (value: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDeleteNameSuggestion = async (value: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (!value || value.trim().length === 0) return;
     
     try {
@@ -199,8 +199,8 @@ export default function BankAccountPageClient({
     }
   };
 
-  const handleDeleteDescriptionSuggestion = async (value: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDeleteDescriptionSuggestion = async (value: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (!value || value.trim().length === 0) return;
     
     try {

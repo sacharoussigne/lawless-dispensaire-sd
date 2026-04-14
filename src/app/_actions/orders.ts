@@ -19,6 +19,26 @@ function slugifyOrderNameSegment(name: string): string {
   return slug || 'commande';
 }
 
+function serializeOrderForClient(order: {
+  price: unknown;
+  items: Array<{ item: { price?: unknown } & Record<string, unknown> } & Record<string, unknown>>;
+} & Record<string, unknown>) {
+  return {
+    ...order,
+    price: order.price != null ? Number(order.price as number) : null,
+    items: order.items.map((orderItem) => ({
+      ...orderItem,
+      item: {
+        ...orderItem.item,
+        price:
+          orderItem.item?.price != null
+            ? Number(orderItem.item.price as number)
+            : null,
+      },
+    })),
+  };
+}
+
 // Schéma de validation pour créer une commande
 const createOrderSchema = z
   .object({
@@ -210,7 +230,7 @@ export async function createOrder(data: {
 
     return {
       status: 201,
-      data: order,
+      data: serializeOrderForClient(order),
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la création de la commande');
@@ -294,22 +314,9 @@ export async function getOrders() {
       },
     });
 
-    // Convertir les Decimal en number pour la sérialisation
-    const serializedOrders = orders.map((order: any) => ({
-      ...order,
-      price: order.price ? Number(order.price) : null,
-      items: order.items.map((orderItem: any) => ({
-        ...orderItem,
-        item: {
-          ...orderItem.item,
-          price: orderItem.item.price ? Number(orderItem.item.price) : null,
-        },
-      })),
-    }));
-
     return {
       status: 200,
-      data: serializedOrders,
+      data: orders.map((order) => serializeOrderForClient(order)),
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la récupération des commandes');
@@ -480,18 +487,7 @@ export async function updateOrder(data: {
       },
     });
 
-    // Convertir les Decimal en number pour la sérialisation
-    const serializedOrder = {
-      ...order,
-      price: (order as any).price ? Number((order as any).price) : null,
-      items: order.items.map((orderItem: any) => ({
-        ...orderItem,
-        item: {
-          ...orderItem.item,
-          price: orderItem.item.price ? Number(orderItem.item.price) : null,
-        },
-      })),
-    };
+    const serializedOrder = serializeOrderForClient(order);
 
     // Si le statut passe à COMPLETED
     if (

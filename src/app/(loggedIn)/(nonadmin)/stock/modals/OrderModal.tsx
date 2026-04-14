@@ -478,8 +478,8 @@ export default function OrderModal({
     }
   };
 
-  const handleDeleteIndividualCustomerSuggestion = async (value: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDeleteIndividualCustomerSuggestion = async (value: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     const trimmed = value.trim();
     if (!trimmed) return;
     const match = individualCustomers.find(
