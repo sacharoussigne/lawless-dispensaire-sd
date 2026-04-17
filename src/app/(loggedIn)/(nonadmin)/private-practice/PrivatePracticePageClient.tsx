@@ -183,8 +183,8 @@ export default function PrivatePracticePageClient({
     }
   };
 
-  const handleDeleteIdentitySuggestion = async (value: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDeleteIdentitySuggestion = async (value: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (!value || value.trim().length === 0) return;
 
     try {

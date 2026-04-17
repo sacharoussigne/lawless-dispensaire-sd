@@ -4,6 +4,7 @@ import { Container } from '@mantine/core';
 import { PermissionsProvider } from '@/app/_contexts/PermissionsContext';
 import { calculatePermissions } from '@/lib/auth/calculatePermissions';
 import { getAppSettings } from '@/lib/appSettings';
+import type { AuthSession } from '@/types/session';
 
 export default async function LanguageLayout({
   children,
@@ -23,7 +24,7 @@ export default async function LanguageLayout({
       initialRole={role}
       initialAppSettings={appSettings}
     >
-      <Header session={session as any} />
+      <Header session={session as AuthSession | null} />
 
       <Container size={"xl"} className={'flex-1 pb-[72px] sm:pb-0'}>
         {children}

@@ -5,10 +5,11 @@ import {
   type AppFeatureKey,
 } from '@/lib/appSettings';
 import { routes } from '@/types/routes';
+import type { AppMiddlewareSession } from '@/types/middlewareSession';
 
 export async function assertAppFeatureEnabledMiddleware(
   request: NextRequest,
-  session: unknown,
+  session: AppMiddlewareSession,
   feature: AppFeatureKey,
 ): Promise<NextResponse> {
   void session;

@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { routes } from "@/types/routes";
 import { hasRole } from "@/lib/auth/permissions";
 import { Role } from "@/types/enum/roles";
+import type { AppMiddlewareSession } from "@/types/middlewareSession";
 
 export async function hasAdminRoleMiddleware(
   request: NextRequest,
-  session: any,
+  session: AppMiddlewareSession,
 ) {
   if (!session) {
     return NextResponse.next();

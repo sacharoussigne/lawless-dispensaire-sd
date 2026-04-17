@@ -6,8 +6,8 @@ import { actionErrorParser } from '@/lib/action';
 import { getAuthSession } from '@/lib/auth';
 import { checkRolePermission } from '@/lib/auth/permissions';
 import { getAppFeatureActionBlock } from '@/lib/appSettings';
-import { addOrderItemsToStock, removeOrderItemsFromStock } from '@/app/_actions/stock';
 import type { OrderStatus } from '@prisma/client';
+import type { OrderWithRelations } from '@/types/orders';
 
 function slugifyOrderNameSegment(name: string): string {
   const slug = name
@@ -17,6 +17,26 @@ function slugifyOrderNameSegment(name: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
   return slug || 'commande';
+}
+
+function serializeOrderForClient(order: {
+  price: unknown;
+  items: Array<{ item: { price?: unknown } & Record<string, unknown> } & Record<string, unknown>>;
+} & Record<string, unknown>): OrderWithRelations {
+  return {
+    ...order,
+    price: order.price != null ? Number(order.price as number) : null,
+    items: order.items.map((orderItem) => ({
+      ...orderItem,
+      item: {
+        ...orderItem.item,
+        price:
+          orderItem.item?.price != null
+            ? Number(orderItem.item.price as number)
+            : null,
+      },
+    })),
+  } as OrderWithRelations;
 }
 
 // Schéma de validation pour créer une commande
@@ -210,7 +230,7 @@ export async function createOrder(data: {
 
     return {
       status: 201,
-      data: order,
+      data: serializeOrderForClient(order),
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la création de la commande');
@@ -231,7 +251,6 @@ const updateOrderSchema = z.object({
       quantity: z.number().int().min(1, 'La quantité doit être au moins 1'),
     })
   ).min(1, 'Au moins un objet est requis').optional(),
-  chestId: z.string().uuid('ID de coffre invalide').optional().nullable(),
 });
 
 // Schéma pour supprimer une commande
@@ -294,22 +313,9 @@ export async function getOrders() {
       },
     });
 
-    // Convertir les Decimal en number pour la sérialisation
-    const serializedOrders = orders.map((order: any) => ({
-      ...order,
-      price: order.price ? Number(order.price) : null,
-      items: order.items.map((orderItem: any) => ({
-        ...orderItem,
-        item: {
-          ...orderItem.item,
-          price: orderItem.item.price ? Number(orderItem.item.price) : null,
-        },
-      })),
-    }));
-
     return {
       status: 200,
-      data: serializedOrders,
+      data: orders.map((order) => serializeOrderForClient(order)),
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la récupération des commandes');
@@ -327,8 +333,6 @@ export async function updateOrder(data: {
   details?: string;
   price?: number;
   items?: { itemId: string; quantity: number }[];
-  addToStock?: boolean;
-  chestId?: string | null;
 }) {
   try {
     const session = await getAuthSession();
@@ -480,49 +484,7 @@ export async function updateOrder(data: {
       },
     });
 
-    // Convertir les Decimal en number pour la sérialisation
-    const serializedOrder = {
-      ...order,
-      price: (order as any).price ? Number((order as any).price) : null,
-      items: order.items.map((orderItem: any) => ({
-        ...orderItem,
-        item: {
-          ...orderItem.item,
-          price: orderItem.item.price ? Number(orderItem.item.price) : null,
-        },
-      })),
-    };
-
-    // Si le statut passe à COMPLETED
-    if (
-      oldOrder.status !== ('COMPLETED' as OrderStatus) &&
-      validatedData.status === 'COMPLETED'
-    ) {
-      // Pour les commandes entrantes (INCOMING), ajouter au stock si demandé
-      if (orderType === 'INCOMING' && data.addToStock === true) {
-        const stockResult = await addOrderItemsToStock(validatedData.id, data.chestId);
-        if (stockResult.status !== 200) {
-          return {
-            status: 200,
-            data: serializedOrder,
-            warning: 'La commande a été mise à jour mais l\'ajout au stock a échoué',
-          };
-        }
-      }
-      
-      // Pour les commandes sortantes (OUTGOING), retirer du stock automatiquement
-      if (orderType === 'OUTGOING') {
-        const stockResult = await removeOrderItemsFromStock(validatedData.id, data.chestId);
-        if (stockResult.status !== 200) {
-          const errorMessage = 'error' in stockResult ? stockResult.error : 'La commande a été mise à jour mais le retrait du stock a échoué';
-          return {
-            status: 200,
-            data: serializedOrder,
-            warning: errorMessage,
-          };
-        }
-      }
-    }
+    const serializedOrder = serializeOrderForClient(order);
 
     return {
       status: 200,

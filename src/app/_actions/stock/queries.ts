@@ -1,0 +1,425 @@
+'use server';
+
+import prisma from '@/lib/prisma';
+import { actionErrorParser } from '@/lib/action';
+import { getAuthSession } from '@/lib/auth';
+import { getAppFeatureActionBlock } from '@/lib/appSettings';
+import {
+  getTodayStart,
+  getYesterdayStart,
+  getTomorrowStart,
+  formatDate,
+  getStartOfDay,
+} from '@/lib/date';
+
+export async function getItemsWithStock(chestId?: string | null) {
+  try {
+    const session = await getAuthSession();
+    if (!session) {
+      return {
+        status: 401,
+        error: 'Non autorisé',
+      };
+    }
+
+    const featureBlock = await getAppFeatureActionBlock('stock');
+    if (featureBlock) return featureBlock;
+
+    const today = getTodayStart();
+    const yesterday = getYesterdayStart();
+    const tomorrow = getTomorrowStart();
+
+    const items = await prisma.item.findMany({
+      where: {
+        isEnabled: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        minimalQuantity: true,
+        isCraftable: true,
+        canBeSold: true,
+        price: true,
+        weight: true,
+        categoryId: true,
+        companyGroupId: true,
+        order: true,
+        createdAt: true,
+        updatedAt: true,
+        category: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+            order: true,
+          },
+        },
+        companyGroup: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        stockHistory: {
+          where: {
+            ...(chestId ? { chestId: chestId } : {}),
+            timestamp: {
+              gte: yesterday,
+              lt: tomorrow,
+            },
+            chest: {
+              isEnabled: true,
+            },
+          },
+          select: {
+            id: true,
+            itemId: true,
+            chestId: true,
+            quantity: true,
+            timestamp: true,
+          },
+          orderBy: {
+            timestamp: 'desc',
+          },
+          take: 100,
+        },
+      },
+    });
+
+    const itemsWithStock = items.map((item) => {
+      if (chestId) {
+        const stockHistoryToday = item.stockHistory.filter((sh) => {
+          const shDateStr = formatDate(new Date(sh.timestamp));
+          const todayStr = formatDate(today);
+          return shDateStr === todayStr;
+        });
+        const stockToday = stockHistoryToday.length > 0 
+          ? stockHistoryToday.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0]
+          : null;
+
+        const stockHistoryYesterday = item.stockHistory.filter((sh) => {
+          const shDateStr = formatDate(new Date(sh.timestamp));
+          const yesterdayStr = formatDate(yesterday);
+          return shDateStr === yesterdayStr;
+        });
+        const stockYesterday = stockHistoryYesterday.length > 0
+          ? stockHistoryYesterday.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0]
+          : null;
+
+        return {
+          ...item,
+          stockToday: stockToday?.quantity ?? null,
+          stockYesterday: stockYesterday?.quantity ?? null,
+          price: item.price ? Number(item.price) : null,
+        };
+      } else {
+        const stockHistoryToday = item.stockHistory.filter((sh) => {
+          const shDateStr = formatDate(new Date(sh.timestamp));
+          const todayStr = formatDate(today);
+          return shDateStr === todayStr;
+        });
+
+        const stocksByChestToday = new Map<string, typeof stockHistoryToday[0]>();
+        stockHistoryToday.forEach((sh) => {
+          const existing = stocksByChestToday.get(sh.chestId);
+          if (!existing || new Date(sh.timestamp).getTime() > new Date(existing.timestamp).getTime()) {
+            stocksByChestToday.set(sh.chestId, sh);
+          }
+        });
+
+        const totalStockToday = Array.from(stocksByChestToday.values()).reduce((sum, sh) => sum + sh.quantity, 0);
+
+        const stockHistoryYesterday = item.stockHistory.filter((sh) => {
+          const shDateStr = formatDate(new Date(sh.timestamp));
+          const yesterdayStr = formatDate(yesterday);
+          return shDateStr === yesterdayStr;
+        });
+
+        const stocksByChestYesterday = new Map<string, typeof stockHistoryYesterday[0]>();
+        stockHistoryYesterday.forEach((sh) => {
+          const existing = stocksByChestYesterday.get(sh.chestId);
+          if (!existing || new Date(sh.timestamp).getTime() > new Date(existing.timestamp).getTime()) {
+            stocksByChestYesterday.set(sh.chestId, sh);
+          }
+        });
+
+        const totalStockYesterday = Array.from(stocksByChestYesterday.values()).reduce((sum, sh) => sum + sh.quantity, 0);
+
+        return {
+          ...item,
+          stockToday: stocksByChestToday.size > 0 ? totalStockToday : null,
+          stockYesterday: stocksByChestYesterday.size > 0 ? totalStockYesterday : null,
+          price: item.price ? Number(item.price) : null,
+        };
+      }
+    });
+
+    return {
+      status: 200,
+      data: itemsWithStock,
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de la récupération des objets avec stock');
+  }
+}
+
+/**
+ * Updates stock for multiple items
+ * If stock already exists today for the specified chest, it is updated
+ * Otherwise, a new stock is created for this chest
+ * @param data - Array of items with their quantities
+ * @param chestId - Chest ID (optional, if null or not provided, uses the "foure tout" chest)
+ */
+
+export async function getItemsWithStockForDate(date: Date, chestId?: string | null) {
+  try {
+    const session = await getAuthSession();
+    if (!session) {
+      return {
+        status: 401,
+        error: 'Non autorisé',
+      };
+    }
+
+    const featureBlock = await getAppFeatureActionBlock('stock');
+    if (featureBlock) return featureBlock;
+
+    const dayStart = getStartOfDay(date);
+    const dayEnd = new Date(dayStart);
+    dayEnd.setDate(dayEnd.getDate() + 1);
+
+    const items = await prisma.item.findMany({
+      where: {
+        isEnabled: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        minimalQuantity: true,
+        isCraftable: true,
+        canBeSold: true,
+        price: true,
+        weight: true,
+        categoryId: true,
+        companyGroupId: true,
+        order: true,
+        createdAt: true,
+        updatedAt: true,
+        category: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+            order: true,
+          },
+        },
+        companyGroup: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        stockHistory: {
+          where: {
+            timestamp: {
+              gte: dayStart,
+              lt: dayEnd,
+            },
+            ...(chestId ? { chestId: chestId } : {}),
+            chest: {
+              isEnabled: true,
+            },
+          },
+          orderBy: {
+            timestamp: 'desc',
+          },
+        },
+      },
+    });
+
+    const itemsWithStock = items.map((item) => {
+      const stockForDate = item.stockHistory.length > 0 
+        ? item.stockHistory[0] // Le plus récent du jour pour ce coffre
+        : null;
+
+      return {
+        ...item,
+        stockForDate: stockForDate?.quantity ?? null,
+        stockHistoryId: stockForDate?.id ?? null,
+        price: item.price ? Number(item.price) : null,
+      };
+    });
+
+    return {
+      status: 200,
+      data: itemsWithStock,
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de la récupération des objets avec stock');
+  }
+}
+
+/**
+ * Overwrites stocks for a given date and specific chest
+ * Deletes all existing stocks for this date and chest, then creates new stocks
+ */
+
+export async function getItemsWithDetailedStock(itemIds?: string[]) {
+  try {
+    const session = await getAuthSession();
+    if (!session) {
+      return {
+        status: 401,
+        error: 'Non autorisé',
+      };
+    }
+
+    const featureBlock = await getAppFeatureActionBlock('search');
+    if (featureBlock) return featureBlock;
+
+    const today = getTodayStart();
+    const yesterday = getYesterdayStart();
+
+    const items = await prisma.item.findMany({
+      where: {
+        isEnabled: true,
+        ...(itemIds && itemIds.length > 0 ? { id: { in: itemIds } } : {}),
+      },
+      orderBy: {
+        name: 'asc',
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        minimalQuantity: true,
+        isCraftable: true,
+        canBeSold: true,
+        price: true,
+        weight: true,
+        categoryId: true,
+        companyGroupId: true,
+        order: true,
+        category: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+          },
+        },
+        companyGroup: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        stockHistory: {
+          where: {
+            timestamp: {
+              gte: yesterday,
+            },
+            chest: {
+              isEnabled: true,
+            },
+          },
+          select: {
+            id: true,
+            chestId: true,
+            quantity: true,
+            timestamp: true,
+            chest: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+          orderBy: {
+            timestamp: 'desc',
+          },
+        },
+      },
+    });
+
+    const allChests = await prisma.chest.findMany({
+      where: {
+        isEnabled: true,
+      },
+      orderBy: {
+        name: 'asc',
+      },
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+
+    const itemsWithDetailedStock = items.map((item) => {
+      // Group stocks by chest for today
+      const stocksByChestToday = new Map<string, { quantity: number; timestamp: Date }>();
+      const stocksByChestYesterday = new Map<string, { quantity: number; timestamp: Date }>();
+
+      item.stockHistory.forEach((sh) => {
+        const shDateStr = formatDate(new Date(sh.timestamp));
+        const todayStr = formatDate(today);
+        const yesterdayStr = formatDate(yesterday);
+
+        if (shDateStr === todayStr) {
+          const existing = stocksByChestToday.get(sh.chestId);
+          if (!existing || new Date(sh.timestamp).getTime() > new Date(existing.timestamp).getTime()) {
+            stocksByChestToday.set(sh.chestId, { quantity: sh.quantity, timestamp: sh.timestamp });
+          }
+        } else if (shDateStr === yesterdayStr) {
+          const existing = stocksByChestYesterday.get(sh.chestId);
+          if (!existing || new Date(sh.timestamp).getTime() > new Date(existing.timestamp).getTime()) {
+            stocksByChestYesterday.set(sh.chestId, { quantity: sh.quantity, timestamp: sh.timestamp });
+          }
+        }
+      });
+
+      // Calculate total stock today and yesterday
+      const totalStockToday = Array.from(stocksByChestToday.values()).reduce((sum, sh) => sum + sh.quantity, 0);
+      const totalStockYesterday = Array.from(stocksByChestYesterday.values()).reduce((sum, sh) => sum + sh.quantity, 0);
+
+      const stockByChest = allChests.map((chest) => {
+        const stockToday = stocksByChestToday.get(chest.id);
+        const stockYesterday = stocksByChestYesterday.get(chest.id);
+
+        return {
+          chestId: chest.id,
+          chestName: chest.name,
+          stockToday: stockToday?.quantity ?? null,
+          stockYesterday: stockYesterday?.quantity ?? null,
+        };
+      });
+
+      return {
+        ...item,
+        price: item.price ? Number(item.price) : null,
+        totalStockToday: stocksByChestToday.size > 0 ? totalStockToday : null,
+        totalStockYesterday: stocksByChestYesterday.size > 0 ? totalStockYesterday : null,
+        stockByChest,
+      };
+    });
+
+    return {
+      status: 200,
+      data: itemsWithDetailedStock,
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de la récupération des items avec stocks détaillés');
+  }
+}
+
+/**
+ * Checks if all order items have today's stock
+ */
+

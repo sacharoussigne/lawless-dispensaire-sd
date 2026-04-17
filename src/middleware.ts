@@ -15,6 +15,7 @@ import { hasPrivatePracticeAccessMiddleware } from './middlewares/hasPrivatePrac
 import { hasMailsAccessMiddleware } from './middlewares/hasMailsAccessMiddleware';
 import { assertAppFeatureEnabledMiddleware } from './middlewares/assertAppFeatureEnabledMiddleware';
 import { chain } from './middlewares/chain';
+import type { AppMiddlewareSession } from '@/types/middlewareSession';
 
 export async function middleware(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
@@ -41,7 +42,7 @@ export async function middleware(req: NextRequest) {
       pathname === routes.admin.payroll || pathname.startsWith(`${routes.admin.payroll}/`);
     if (isPayrollRoute) {
       middlewares.push(hasPayrollReportsAccessMiddleware);
-      middlewares.push((request: NextRequest, session: unknown) =>
+      middlewares.push((request: NextRequest, session: AppMiddlewareSession) =>
         assertAppFeatureEnabledMiddleware(request, session, 'payroll'),
       );
     } else {
@@ -59,7 +60,7 @@ export async function middleware(req: NextRequest) {
     middlewares.push(hasToBeLoggedInMiddleware);
     middlewares.push(hasApplicationAccessMiddleware);
     middlewares.push(hasStockViewAccessMiddleware);
-    middlewares.push((request: NextRequest, session: unknown) =>
+    middlewares.push((request: NextRequest, session: AppMiddlewareSession) =>
       assertAppFeatureEnabledMiddleware(request, session, 'stock'),
     );
   } else if (pathname.startsWith(routes.orders.index)) {
@@ -67,7 +68,7 @@ export async function middleware(req: NextRequest) {
     middlewares.push(hasToBeLoggedInMiddleware);
     middlewares.push(hasApplicationAccessMiddleware);
     middlewares.push(hasOrdersViewAccessMiddleware);
-    middlewares.push((request: NextRequest, session: unknown) =>
+    middlewares.push((request: NextRequest, session: AppMiddlewareSession) =>
       assertAppFeatureEnabledMiddleware(request, session, 'orders'),
     );
   } else if (pathname.startsWith(routes.searchItems.index)) {
@@ -75,7 +76,7 @@ export async function middleware(req: NextRequest) {
     middlewares.push(hasToBeLoggedInMiddleware);
     middlewares.push(hasApplicationAccessMiddleware);
     middlewares.push(hasSearchAccessMiddleware);
-    middlewares.push((request: NextRequest, session: unknown) =>
+    middlewares.push((request: NextRequest, session: AppMiddlewareSession) =>
       assertAppFeatureEnabledMiddleware(request, session, 'search'),
     );
   } else if (pathname.startsWith(routes.bank.index)) {
@@ -83,7 +84,7 @@ export async function middleware(req: NextRequest) {
     middlewares.push(hasToBeLoggedInMiddleware);
     middlewares.push(hasApplicationAccessMiddleware);
     middlewares.push(hasBankAccessMiddleware);
-    middlewares.push((request: NextRequest, session: unknown) =>
+    middlewares.push((request: NextRequest, session: AppMiddlewareSession) =>
       assertAppFeatureEnabledMiddleware(request, session, 'bank'),
     );
   } else if (pathname.startsWith(routes.privatePractice.index)) {
@@ -91,7 +92,7 @@ export async function middleware(req: NextRequest) {
     middlewares.push(hasToBeLoggedInMiddleware);
     middlewares.push(hasApplicationAccessMiddleware);
     middlewares.push(hasPrivatePracticeAccessMiddleware);
-    middlewares.push((request: NextRequest, session: unknown) =>
+    middlewares.push((request: NextRequest, session: AppMiddlewareSession) =>
       assertAppFeatureEnabledMiddleware(request, session, 'privatePractice'),
     );
   } else if (pathname.startsWith(routes.employee.mails)) {
@@ -99,7 +100,7 @@ export async function middleware(req: NextRequest) {
     middlewares.push(hasToBeLoggedInMiddleware);
     middlewares.push(hasApplicationAccessMiddleware);
     middlewares.push(hasMailsAccessMiddleware);
-    middlewares.push((request: NextRequest, session: unknown) =>
+    middlewares.push((request: NextRequest, session: AppMiddlewareSession) =>
       assertAppFeatureEnabledMiddleware(request, session, 'mails'),
     );
   } else {
