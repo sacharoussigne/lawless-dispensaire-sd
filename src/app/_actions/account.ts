@@ -1,6 +1,7 @@
 'use server';
 
-import { auth, getAuthSession } from '@/lib/auth';
+import { auth } from '@/lib/auth';
+import { requireSession } from '@/lib/serverActionAuth';
 import { headers } from 'next/headers';
 import { z } from 'zod/v3';
 import { actionErrorParser } from '@/lib/action';
@@ -35,10 +36,8 @@ const updateMyProfileSchema = z.object({
 
 export async function updateMyProfile(data: z.infer<typeof updateMyProfileSchema>) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return { status: 401, error: 'Non autorisé' };
-    }
+    const ctx = await requireSession();
+    if (!ctx.ok) return ctx.response;
 
     const validated = updateMyProfileSchema.parse(data);
 
@@ -63,10 +62,8 @@ const changeMyPasswordSchema = z.object({
 
 export async function changeMyPassword(data: z.infer<typeof changeMyPasswordSchema>) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return { status: 401, error: 'Non autorisé' };
-    }
+    const ctx = await requireSession();
+    if (!ctx.ok) return ctx.response;
 
     const validated = changeMyPasswordSchema.parse(data);
 

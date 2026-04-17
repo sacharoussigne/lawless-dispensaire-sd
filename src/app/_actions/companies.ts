@@ -3,38 +3,27 @@
 import { z } from 'zod/v3';
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
-import { getAuthSession } from '@/lib/auth';
+import { requireSession } from '@/lib/serverActionAuth';
 
-// Schéma de validation pour créer une entreprise
 const createCompanySchema = z.object({
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
 });
 
-// Schéma de validation pour modifier une entreprise
 const updateCompanySchema = z.object({
   id: z.string().uuid('ID invalide'),
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
 });
 
-// Schéma pour supprimer une entreprise
 const deleteCompanySchema = z.object({
   id: z.string().uuid('ID invalide'),
 });
 
-/**
- * Crée une nouvelle entreprise
- */
 export async function createCompany(data: {
   name: string;
 }) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireSession();
+    if (!ctx.ok) return ctx.response;
 
     const validatedData = createCompanySchema.parse(data);
 
@@ -60,18 +49,10 @@ export async function createCompany(data: {
   }
 }
 
-/**
- * Récupère toutes les entreprises
- */
 export async function getCompanies() {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireSession();
+    if (!ctx.ok) return ctx.response;
 
     const companies = await prisma.company.findMany({
       orderBy: {
@@ -95,21 +76,13 @@ export async function getCompanies() {
   }
 }
 
-/**
- * Modifie une entreprise existante
- */
 export async function updateCompany(data: {
   id: string;
   name: string;
 }) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireSession();
+    if (!ctx.ok) return ctx.response;
 
     const validatedData = updateCompanySchema.parse(data);
 
@@ -138,18 +111,10 @@ export async function updateCompany(data: {
   }
 }
 
-/**
- * Supprime une entreprise
- */
 export async function deleteCompany(data: { id: string }) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireSession();
+    if (!ctx.ok) return ctx.response;
 
     const validatedData = deleteCompanySchema.parse(data);
 
