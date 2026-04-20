@@ -10,6 +10,14 @@ import { findLinkedUserIdByDiscordAccount } from '@/lib/dispensaryWeeklyActivity
 import { activityToSnapshot } from '@/lib/dispensaryWeeklyActivity/snapshot';
 import { getBankWeekBounds } from '@/lib/bankWeek';
 import type { DispensaryWeeklyActivityCreateInput, DispensaryWeeklyActivityUpdateInput } from '@/lib/dispensaryWeeklyActivity/schemas';
+import {
+  emptyWeekdayFlags,
+  parisCalendarDayRangeUtc,
+  parisTodayStartUtc,
+  parisWeekdayKey,
+  parisYesterdayStartUtc,
+  parseWeekdayFlagsJson,
+} from '@/lib/dispensaryWeeklyActivity/weekdayFlags';
 
 function normalizeParisWeekBounds(anchor: Date): { periodStart: Date; periodEnd: Date } {
   const { start, end } = getBankWeekBounds(anchor);
@@ -31,6 +39,21 @@ export async function syncActivityUserIdFromDiscordIfMissing(
   });
 }
 
+export async function findDispensaryActivityOverlappingParisDay(
+  client: WeeklyActivityDb,
+  discordUserId: string,
+  dayAnchor: Date,
+): Promise<DispensaryWeeklyActivity | null> {
+  const { start, end } = parisCalendarDayRangeUtc(dayAnchor);
+  return client.dispensaryWeeklyActivity.findFirst({
+    where: {
+      discordUserId,
+      periodStart: { lte: end },
+      periodEnd: { gte: start },
+    },
+  });
+}
+
 type ActorContext = {
   source: DispensaryWeeklyActivityHistorySource;
   actorUserId: string | null;
@@ -38,7 +61,6 @@ type ActorContext = {
 };
 
 const COUNTER_FIELDS = [
-  'chestCount',
   'sheriffPatientsCount',
   'patientsCount',
   'infusionsCount',
@@ -55,8 +77,6 @@ function counterDeltaToHistoryAction(
   if (before === after) return null;
   const up = after > before;
   switch (field) {
-    case 'chestCount':
-      return up ? 'INCREMENT_CHEST' : 'DECREMENT_CHEST';
     case 'sheriffPatientsCount':
       return up ? 'INCREMENT_SHERIFF' : 'DECREMENT_SHERIFF';
     case 'patientsCount':
@@ -83,6 +103,10 @@ function botMetaChanged(
   );
 }
 
+function snapshotsEqual(a: ReturnType<typeof activityToSnapshot>, b: ReturnType<typeof activityToSnapshot>) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 export async function createDispensaryWeeklyActivityWithHistory(
   input: DispensaryWeeklyActivityCreateInput,
   actor: ActorContext,
@@ -92,6 +116,9 @@ export async function createDispensaryWeeklyActivityWithHistory(
 
   const { periodStart, periodEnd } = normalizeParisWeekBounds(input.periodStart);
 
+  const chestDays = input.chestDays ?? emptyWeekdayFlags();
+  const presenceDays = input.presenceDays ?? emptyWeekdayFlags();
+
   return prisma.$transaction(async (tx) => {
     const created = await tx.dispensaryWeeklyActivity.create({
       data: {
@@ -100,7 +127,8 @@ export async function createDispensaryWeeklyActivityWithHistory(
         displayName: input.displayName,
         discordUserId: input.discordUserId,
         userId: linkedUserId ?? undefined,
-        chestCount: input.chestCount,
+        chestDays: chestDays as Prisma.InputJsonValue,
+        presenceDays: presenceDays as Prisma.InputJsonValue,
         sheriffPatientsCount: input.sheriffPatientsCount,
         patientsCount: input.patientsCount,
         infusionsCount: input.infusionsCount,
@@ -145,7 +173,8 @@ export async function updateDispensaryWeeklyActivityWithHistory(
       data.periodEnd = normalized.periodEnd;
     }
     if (input.displayName !== undefined) data.displayName = input.displayName;
-    if (input.chestCount !== undefined) data.chestCount = input.chestCount;
+    if (input.chestDays !== undefined) data.chestDays = input.chestDays as Prisma.InputJsonValue;
+    if (input.presenceDays !== undefined) data.presenceDays = input.presenceDays as Prisma.InputJsonValue;
     if (input.sheriffPatientsCount !== undefined) data.sheriffPatientsCount = input.sheriffPatientsCount;
     if (input.patientsCount !== undefined) data.patientsCount = input.patientsCount;
     if (input.infusionsCount !== undefined) data.infusionsCount = input.infusionsCount;
@@ -166,17 +195,19 @@ export async function updateDispensaryWeeklyActivityWithHistory(
     const nextSnap = activityToSnapshot(finalRow);
 
     if (actor.source === 'INTRANET') {
-      await tx.dispensaryWeeklyActivityHistory.create({
-        data: {
-          activityId: id,
-          action: 'UPDATE',
-          source: actor.source,
-          actorUserId: actor.actorUserId,
-          actorDiscordUserId: actor.actorDiscordUserId,
-          previousValues: prevSnap as Prisma.InputJsonValue,
-          nextValues: nextSnap as Prisma.InputJsonValue,
-        },
-      });
+      if (!snapshotsEqual(prevSnap, nextSnap)) {
+        await tx.dispensaryWeeklyActivityHistory.create({
+          data: {
+            activityId: id,
+            action: 'UPDATE',
+            source: actor.source,
+            actorUserId: actor.actorUserId,
+            actorDiscordUserId: actor.actorDiscordUserId,
+            previousValues: prevSnap as Prisma.InputJsonValue,
+            nextValues: nextSnap as Prisma.InputJsonValue,
+          },
+        });
+      }
     } else {
       for (const field of COUNTER_FIELDS) {
         const actionKind = counterDeltaToHistoryAction(
@@ -239,5 +270,118 @@ export async function deleteDispensaryWeeklyActivityWithHistory(
     });
 
     await tx.dispensaryWeeklyActivity.delete({ where: { id } });
+  });
+}
+
+export type BotChestMarkResult =
+  | { outcome: 'not_found' }
+  | { outcome: 'already_done'; message: string }
+  | { outcome: 'ok'; activity: DispensaryWeeklyActivity };
+
+export async function botMarkChestForParisToday(discordUserId: string): Promise<BotChestMarkResult> {
+  const anchor = new Date();
+  const existing = await findDispensaryActivityOverlappingParisDay(prisma, discordUserId, anchor);
+  if (!existing) {
+    return { outcome: 'not_found' };
+  }
+
+  const key = parisWeekdayKey(anchor);
+  if (parseWeekdayFlagsJson(existing.chestDays)[key]) {
+    return {
+      outcome: 'already_done',
+      message: 'La caisse de ce jour a déjà été enregistrée.',
+    };
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const row = await tx.dispensaryWeeklyActivity.findUnique({ where: { id: existing.id } });
+    if (!row) {
+      return { outcome: 'not_found' as const };
+    }
+    const current = parseWeekdayFlagsJson(row.chestDays);
+    if (current[key]) {
+      return {
+        outcome: 'already_done' as const,
+        message: 'La caisse de ce jour a déjà été enregistrée.',
+      };
+    }
+    const nextChest = { ...current, [key]: true };
+    const updated = await tx.dispensaryWeeklyActivity.update({
+      where: { id: row.id },
+      data: { chestDays: nextChest as Prisma.InputJsonValue },
+    });
+    const synced = await syncActivityUserIdFromDiscordIfMissing(tx, updated);
+    const prevSnap = activityToSnapshot(row);
+    const nextSnap = activityToSnapshot(synced);
+    await tx.dispensaryWeeklyActivityHistory.create({
+      data: {
+        activityId: synced.id,
+        action: 'UPDATE_CHEST_DAYS',
+        source: 'DISCORD_BOT',
+        actorUserId: null,
+        actorDiscordUserId: discordUserId,
+        previousValues: prevSnap as Prisma.InputJsonValue,
+        nextValues: nextSnap as Prisma.InputJsonValue,
+      },
+    });
+    return { outcome: 'ok' as const, activity: synced };
+  });
+}
+
+export type BotPresenceMarkResult =
+  | { outcome: 'not_found' }
+  | { outcome: 'already_done'; message: string }
+  | { outcome: 'ok'; activity: DispensaryWeeklyActivity };
+
+export async function botMarkPresenceForParisRelativeDay(
+  discordUserId: string,
+  relative: 'today' | 'yesterday',
+): Promise<BotPresenceMarkResult> {
+  const dayAnchor = relative === 'today' ? parisTodayStartUtc() : parisYesterdayStartUtc();
+  const existing = await findDispensaryActivityOverlappingParisDay(prisma, discordUserId, dayAnchor);
+  if (!existing) {
+    return { outcome: 'not_found' };
+  }
+
+  const key = parisWeekdayKey(dayAnchor);
+  if (parseWeekdayFlagsJson(existing.presenceDays)[key]) {
+    return {
+      outcome: 'already_done',
+      message: 'La présence de ce jour a déjà été enregistrée.',
+    };
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const row = await tx.dispensaryWeeklyActivity.findUnique({ where: { id: existing.id } });
+    if (!row) {
+      return { outcome: 'not_found' as const };
+    }
+    const current = parseWeekdayFlagsJson(row.presenceDays);
+    if (current[key]) {
+      return {
+        outcome: 'already_done' as const,
+        message: 'La présence de ce jour a déjà été enregistrée.',
+      };
+    }
+    const nextPresence = { ...current, [key]: true };
+    const updated = await tx.dispensaryWeeklyActivity.update({
+      where: { id: row.id },
+      data: { presenceDays: nextPresence as Prisma.InputJsonValue },
+    });
+    const synced = await syncActivityUserIdFromDiscordIfMissing(tx, updated);
+    const prevSnap = activityToSnapshot(row);
+    const nextSnap = activityToSnapshot(synced);
+    await tx.dispensaryWeeklyActivityHistory.create({
+      data: {
+        activityId: synced.id,
+        action: 'UPDATE_PRESENCE_DAYS',
+        source: 'DISCORD_BOT',
+        actorUserId: null,
+        actorDiscordUserId: discordUserId,
+        previousValues: prevSnap as Prisma.InputJsonValue,
+        nextValues: nextSnap as Prisma.InputJsonValue,
+      },
+    });
+    return { outcome: 'ok' as const, activity: synced };
   });
 }

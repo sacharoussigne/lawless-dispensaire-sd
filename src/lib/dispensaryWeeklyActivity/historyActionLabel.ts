@@ -6,6 +6,8 @@ export function formatDispensaryHistoryAction(action: string): string {
     UPDATE: 'Modification',
     INCREMENT_CHEST: 'Incrément caisses',
     DECREMENT_CHEST: 'Décrément caisses',
+    UPDATE_CHEST_DAYS: 'Mise à jour caisses (jours)',
+    UPDATE_PRESENCE_DAYS: 'Mise à jour présences (jours)',
     INCREMENT_SHERIFF: 'Incrément soins shérifs',
     DECREMENT_SHERIFF: 'Décrément soins shérifs',
     INCREMENT_PATIENTS: 'Incrément patients',

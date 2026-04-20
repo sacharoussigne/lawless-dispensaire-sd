@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActionIcon,
   Button,
+  Checkbox,
   Container,
   Divider,
   Group,
@@ -44,23 +45,53 @@ import {
   formatParisPeriodEndLabel,
   formatParisPeriodStartLabel,
 } from '@/lib/dispensaryWeeklyActivity/parisPeriodLabels';
+import type { SerializedDispensaryWeeklyActivityRow } from '@/lib/dispensaryWeeklyActivity/apiRow';
+import {
+  emptyWeekdayFlags,
+  WEEKDAY_KEYS,
+  type WeekdayFlags,
+  type WeekdayKey,
+} from '@/lib/dispensaryWeeklyActivity/weekdayFlags';
 
-export type WeeklyActivityListItem = {
-  id: string;
-  periodStart: string;
-  periodEnd: string;
-  displayName: string;
-  resolvedDisplayName: string;
-  discordUserId: string;
-  userId: string | null;
-  chestCount: number;
-  sheriffPatientsCount: number;
-  patientsCount: number;
-  infusionsCount: number;
-  poppyMilkCount: number;
-  createdAt: string;
-  updatedAt: string;
+export type WeeklyActivityListItem = SerializedDispensaryWeeklyActivityRow;
+
+const DAY_SHORT: Record<WeekdayKey, string> = {
+  lundi: 'Lun',
+  mardi: 'Mar',
+  mercredi: 'Mer',
+  jeudi: 'Jeu',
+  vendredi: 'Ven',
+  samedi: 'Sam',
+  dimanche: 'Dim',
 };
+
+function DayFlagFields({
+  title,
+  flags,
+  onToggle,
+}: {
+  title: string;
+  flags: WeekdayFlags;
+  onToggle: (key: WeekdayKey, value: boolean) => void;
+}) {
+  return (
+    <div>
+      <Text fw={600} size="sm" mb="xs">
+        {title}
+      </Text>
+      <Group gap="md" wrap="wrap">
+        {WEEKDAY_KEYS.map((k) => (
+          <Checkbox
+            key={k}
+            label={DAY_SHORT[k]}
+            checked={flags[k]}
+            onChange={(e) => onToggle(k, e.currentTarget.checked)}
+          />
+        ))}
+      </Group>
+    </div>
+  );
+}
 
 type HistoryEntry = {
   id: string;
@@ -101,7 +132,8 @@ export default function WeeklyActivityPageClient({
   const [cWeekDateValue, setCWeekDateValue] = useState<Date | null>(defaultWeekMonday);
   const [cTargetUserId, setCTargetUserId] = useState<string | null>(null);
   const [cDisplayName, setCDisplayName] = useState('');
-  const [cChest, setCChest] = useState(0);
+  const [cChestFlags, setCChestFlags] = useState<WeekdayFlags>(() => emptyWeekdayFlags());
+  const [cPresenceFlags, setCPresenceFlags] = useState<WeekdayFlags>(() => emptyWeekdayFlags());
   const [cSheriff, setCSheriff] = useState(0);
   const [cPatients, setCPatients] = useState(0);
   const [cInfusions, setCInfusions] = useState(0);
@@ -109,7 +141,8 @@ export default function WeeklyActivityPageClient({
   const [targetUsers, setTargetUsers] = useState<TargetUser[]>([]);
 
   const [eWeekDateValue, setEWeekDateValue] = useState<Date | null>(null);
-  const [eChest, setEChest] = useState(0);
+  const [eChestFlags, setEChestFlags] = useState<WeekdayFlags>(() => emptyWeekdayFlags());
+  const [ePresenceFlags, setEPresenceFlags] = useState<WeekdayFlags>(() => emptyWeekdayFlags());
   const [eSheriff, setESheriff] = useState(0);
   const [ePatients, setEPatients] = useState(0);
   const [eInfusions, setEInfusions] = useState(0);
@@ -194,7 +227,8 @@ export default function WeeklyActivityPageClient({
       const payload = {
         periodStart: start,
         periodEnd: end,
-        chestCount: cChest,
+        chestDays: cChestFlags,
+        presenceDays: cPresenceFlags,
         sheriffPatientsCount: cSheriff,
         patientsCount: cPatients,
         infusionsCount: cInfusions,
@@ -222,7 +256,8 @@ export default function WeeklyActivityPageClient({
 
   const startEdit = (row: WeeklyActivityListItem) => {
     setEditRow(row);
-    setEChest(row.chestCount);
+    setEChestFlags({ ...row.chestDays });
+    setEPresenceFlags({ ...row.presenceDays });
     setESheriff(row.sheriffPatientsCount);
     setEPatients(row.patientsCount);
     setEInfusions(row.infusionsCount);
@@ -239,7 +274,8 @@ export default function WeeklyActivityPageClient({
         id: editRow.id,
         periodStart: start,
         periodEnd: end,
-        chestCount: eChest,
+        chestDays: eChestFlags,
+        presenceDays: ePresenceFlags,
         sheriffPatientsCount: eSheriff,
         patientsCount: ePatients,
         infusionsCount: eInfusions,
@@ -303,7 +339,8 @@ export default function WeeklyActivityPageClient({
               setCWeekDateValue(defaultWeekMonday);
               setCTargetUserId(null);
               setCDisplayName('');
-              setCChest(0);
+              setCChestFlags(emptyWeekdayFlags());
+              setCPresenceFlags(emptyWeekdayFlags());
               setCSheriff(0);
               setCPatients(0);
               setCInfusions(0);
@@ -336,7 +373,28 @@ export default function WeeklyActivityPageClient({
                 </Text>
               ),
             },
-            { accessor: 'chestCount', title: 'Caisses' },
+            {
+              accessor: 'chestDaysSummary',
+              title: 'Caisses',
+              render: (r) => (
+                <Tooltip label={`${r.chestTotal} jour(s) — L→D : ${r.chestDaysSummary}`}>
+                  <Text size="sm" ff="monospace">
+                    {r.chestDaysSummary}
+                  </Text>
+                </Tooltip>
+              ),
+            },
+            {
+              accessor: 'presenceDaysSummary',
+              title: 'Présences',
+              render: (r) => (
+                <Tooltip label={`${r.presenceTotal} jour(s) — L→D : ${r.presenceDaysSummary}`}>
+                  <Text size="sm" ff="monospace">
+                    {r.presenceDaysSummary}
+                  </Text>
+                </Tooltip>
+              ),
+            },
             { accessor: 'sheriffPatientsCount', title: 'Soins shérifs' },
             { accessor: 'patientsCount', title: 'Patients' },
             { accessor: 'infusionsCount', title: 'Infusions' },
@@ -449,12 +507,24 @@ export default function WeeklyActivityPageClient({
 
           <Divider />
 
+          <DayFlagFields
+            title="Caisses (par jour de semaine)"
+            flags={cChestFlags}
+            onToggle={(key, value) => setCChestFlags((p) => ({ ...p, [key]: value }))}
+          />
+          <DayFlagFields
+            title="Présences (par jour)"
+            flags={cPresenceFlags}
+            onToggle={(key, value) => setCPresenceFlags((p) => ({ ...p, [key]: value }))}
+          />
+
+          <Divider />
+
           <div>
             <Text fw={600} size="sm" mb="xs">
               Compteurs
             </Text>
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-              <NumberInput label="Caisses" value={cChest} onChange={(v) => setCChest(Number(v) || 0)} min={0} />
               <NumberInput
                 label="Soins shérifs"
                 value={cSheriff}
@@ -532,8 +602,20 @@ export default function WeeklyActivityPageClient({
 
             <Divider />
 
+            <DayFlagFields
+              title="Caisses (par jour de semaine)"
+              flags={eChestFlags}
+              onToggle={(key, value) => setEChestFlags((p) => ({ ...p, [key]: value }))}
+            />
+            <DayFlagFields
+              title="Présences (par jour)"
+              flags={ePresenceFlags}
+              onToggle={(key, value) => setEPresenceFlags((p) => ({ ...p, [key]: value }))}
+            />
+
+            <Divider />
+
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-              <NumberInput label="Caisses" value={eChest} onChange={(v) => setEChest(Number(v) || 0)} min={0} />
               <NumberInput
                 label="Soins shérifs"
                 value={eSheriff}

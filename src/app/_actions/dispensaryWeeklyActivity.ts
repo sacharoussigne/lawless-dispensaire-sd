@@ -17,6 +17,7 @@ import {
   getDiscordAccountIdForUser,
   mergeResolvedDisplayNames,
 } from '@/lib/dispensaryWeeklyActivity/resolveDisplayName';
+import { serializeDispensaryWeeklyActivityApiRow } from '@/lib/dispensaryWeeklyActivity/apiRow';
 import {
   dispensaryWeeklyActivityCreateSchema,
   dispensaryWeeklyActivityMetricsSchema,
@@ -108,22 +109,25 @@ export async function listDispensaryWeeklyActivities() {
 
     return {
       status: 200 as const,
-      data: withNames.map((r) => ({
-        id: r.id,
-        periodStart: r.periodStart.toISOString(),
-        periodEnd: r.periodEnd.toISOString(),
-        displayName: r.displayName,
-        resolvedDisplayName: r.resolvedDisplayName,
-        discordUserId: r.discordUserId,
-        userId: r.userId,
-        chestCount: r.chestCount,
-        sheriffPatientsCount: r.sheriffPatientsCount,
-        patientsCount: r.patientsCount,
-        infusionsCount: r.infusionsCount,
-        poppyMilkCount: r.poppyMilkCount,
-        createdAt: r.createdAt.toISOString(),
-        updatedAt: r.updatedAt.toISOString(),
-      })),
+      data: withNames.map((r) =>
+        serializeDispensaryWeeklyActivityApiRow({
+          id: r.id,
+          periodStart: r.periodStart,
+          periodEnd: r.periodEnd,
+          displayName: r.displayName,
+          resolvedDisplayName: r.resolvedDisplayName,
+          discordUserId: r.discordUserId,
+          userId: r.userId,
+          chestDays: r.chestDays,
+          presenceDays: r.presenceDays,
+          sheriffPatientsCount: r.sheriffPatientsCount,
+          patientsCount: r.patientsCount,
+          infusionsCount: r.infusionsCount,
+          poppyMilkCount: r.poppyMilkCount,
+          createdAt: r.createdAt,
+          updatedAt: r.updatedAt,
+        }),
+      ),
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors du chargement des activités');
@@ -283,7 +287,8 @@ export async function createDispensaryWeeklyActivity(input: z.infer<typeof creat
       displayName,
       discordUserId,
       userId: userIdForRow,
-      chestCount: parsed.data.chestCount,
+      chestDays: parsed.data.chestDays,
+      presenceDays: parsed.data.presenceDays,
       sheriffPatientsCount: parsed.data.sheriffPatientsCount,
       patientsCount: parsed.data.patientsCount,
       infusionsCount: parsed.data.infusionsCount,

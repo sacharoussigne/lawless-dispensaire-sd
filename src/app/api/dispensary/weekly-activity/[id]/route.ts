@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { isDispensaryBotApiAuthorized, getDiscordUserIdFromBotRequest } from '@/lib/dispensaryWeeklyActivityApiAuth';
+import { loadSerializedWeeklyActivityById } from '@/lib/dispensaryWeeklyActivity/loadSerializedRow';
 import prisma from '@/lib/prisma';
-import { mergeResolvedDisplayNames } from '@/lib/dispensaryWeeklyActivity/resolveDisplayName';
-import { dispensaryWeeklyActivityUpdateSchema } from '@/lib/dispensaryWeeklyActivity/schemas';
+import { dispensaryWeeklyActivityBotPatchSchema } from '@/lib/dispensaryWeeklyActivity/schemas';
 import {
   deleteDispensaryWeeklyActivityWithHistory,
   syncActivityUserIdFromDiscordIfMissing,
@@ -14,42 +14,6 @@ function jsonError(status: number, error: string) {
 }
 
 type RouteContext = { params: Promise<{ id: string }> };
-
-function serializeRow(
-  r: {
-    id: string;
-    periodStart: Date;
-    periodEnd: Date;
-    displayName: string;
-    resolvedDisplayName: string;
-    discordUserId: string;
-    userId: string | null;
-    chestCount: number;
-    sheriffPatientsCount: number;
-    patientsCount: number;
-    infusionsCount: number;
-    poppyMilkCount: number;
-    createdAt: Date;
-    updatedAt: Date;
-  },
-) {
-  return {
-    id: r.id,
-    periodStart: r.periodStart.toISOString(),
-    periodEnd: r.periodEnd.toISOString(),
-    displayName: r.displayName,
-    resolvedDisplayName: r.resolvedDisplayName,
-    discordUserId: r.discordUserId,
-    userId: r.userId,
-    chestCount: r.chestCount,
-    sheriffPatientsCount: r.sheriffPatientsCount,
-    patientsCount: r.patientsCount,
-    infusionsCount: r.infusionsCount,
-    poppyMilkCount: r.poppyMilkCount,
-    createdAt: r.createdAt.toISOString(),
-    updatedAt: r.updatedAt.toISOString(),
-  };
-}
 
 export async function GET(request: Request, context: RouteContext) {
   if (!isDispensaryBotApiAuthorized(request as Parameters<typeof isDispensaryBotApiAuthorized>[0])) {
@@ -64,7 +28,6 @@ export async function GET(request: Request, context: RouteContext) {
 
   const initial = await prisma.dispensaryWeeklyActivity.findUnique({
     where: { id },
-    include: { user: { select: { name: true } } },
   });
 
   if (!initial) {
@@ -79,17 +42,11 @@ export async function GET(request: Request, context: RouteContext) {
     await syncActivityUserIdFromDiscordIfMissing(prisma, initial);
   }
 
-  const row = await prisma.dispensaryWeeklyActivity.findUnique({
-    where: { id },
-    include: { user: { select: { name: true } } },
-  });
-
-  if (!row) {
+  const data = await loadSerializedWeeklyActivityById(id);
+  if (!data) {
     return jsonError(404, 'Activité introuvable');
   }
-
-  const [withName] = await mergeResolvedDisplayNames(prisma, [row]);
-  return NextResponse.json({ status: 200, data: serializeRow(withName) });
+  return NextResponse.json({ status: 200, data });
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
@@ -118,27 +75,23 @@ export async function PATCH(request: Request, context: RouteContext) {
     return jsonError(400, 'Corps JSON invalide');
   }
 
-  const parsed = dispensaryWeeklyActivityUpdateSchema.safeParse(body);
+  const parsed = dispensaryWeeklyActivityBotPatchSchema.safeParse(body);
   if (!parsed.success) {
     return jsonError(422, parsed.error.issues[0]?.message ?? 'Données invalides');
   }
 
   try {
-    const updated = await updateDispensaryWeeklyActivityWithHistory(id, parsed.data, {
+    await updateDispensaryWeeklyActivityWithHistory(id, parsed.data, {
       source: 'DISCORD_BOT',
       actorUserId: null,
       actorDiscordUserId: discordUserId,
     });
 
-    const full = await prisma.dispensaryWeeklyActivity.findUnique({
-      where: { id: updated.id },
-      include: { user: { select: { name: true } } },
-    });
-    const [withName] = await mergeResolvedDisplayNames(prisma, full ? [full] : []);
-    if (!withName) {
+    const data = await loadSerializedWeeklyActivityById(id);
+    if (!data) {
       return jsonError(500, 'Erreur après mise à jour');
     }
-    return NextResponse.json({ status: 200, data: serializeRow(withName) });
+    return NextResponse.json({ status: 200, data });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Erreur serveur';
     if (msg.includes('Unique constraint')) {

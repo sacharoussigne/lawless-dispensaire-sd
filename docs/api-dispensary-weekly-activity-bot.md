@@ -41,7 +41,21 @@ Les champs `periodStart` et `periodEnd` acceptent des **chaînes ISO 8601** dans
 
 **Semaine canonique (Europe/Paris, lundi → dimanche)** : à chaque création ou mise à jour qui touche la période, le serveur **normalise** les deux dates vers la semaine paie du calendrier **Europe/Paris** contenant l’instant `periodStart` (ou `periodEnd` seul en mise à jour) : `periodStart` = lundi **00:00** (Paris), `periodEnd` = dimanche **fin de journée** (Paris, même règle que la banque). Tu peux envoyer un instant au milieu de la semaine ; la ligne stockée utilisera toujours ces bornes.
 
-Les compteurs sont des **entiers ≥ 0**.
+Les compteurs (patients, infusions, etc.) sont des **entiers ≥ 0**.
+
+### Caisses et présences par jour (Europe/Paris)
+
+Chaque ligne d’activité porte deux objets JSON à clés fixes **`lundi`** … **`dimanche`** (booléens) :
+
+- **`chestDays`** : caisse effectuée ce jour-là ou non.
+- **`presenceDays`** : présence enregistrée pour ce jour-là ou non.
+
+Les réponses exposent aussi :
+
+- **`chestTotal`** / **`presenceTotal`** : nombre de jours à `true`.
+- **`chestDaysSummary`** / **`presenceDaysSummary`** : chaîne de 7 caractères (`✓` = jour coché, `·` = non), ordre **lundi → dimanche** (affichage compact pour le récap bot).
+
+La migration a supprimé l’ancien champ entier **`chestCount`** : l’information par jour ne peut pas être reconstituée à partir des anciennes données ; les lignes migrées ont tous les jours à `false` pour les caisses.
 
 ### Données déjà en base (optionnel)
 
@@ -73,7 +87,12 @@ Liste **toutes** les activités dont `discordUserId` correspond à `X-Discord-Us
 | `resolvedDisplayName` | string | Nom affiché : `User.name` si compte intranet lié à ce Discord, sinon `displayName` |
 | `discordUserId` | string | ID Discord propriétaire de la ligne |
 | `userId` | string \| null | Lien utilisateur intranet si présent |
-| `chestCount` | number | Caisses |
+| `chestDays` | object | Clés `lundi` … `dimanche`, booléens |
+| `presenceDays` | object | Idem |
+| `chestTotal` | number | Nombre de jours avec caisse |
+| `presenceTotal` | number | Nombre de jours avec présence |
+| `chestDaysSummary` | string | Résumé 7 caractères (lundi → dimanche) |
+| `presenceDaysSummary` | string | Idem |
 | `sheriffPatientsCount` | number | Soins shérifs |
 | `patientsCount` | number | Patients |
 | `infusionsCount` | number | Infusions |
@@ -130,7 +149,7 @@ Crée une nouvelle ligne pour le médecin identifié par le **Discord ID** (corp
 
 **En-têtes :** `Authorization`, `X-Discord-User-Id`
 
-**Corps JSON (tous les champs sont requis sauf `userId`) :**
+**Corps JSON (tous les champs sont requis sauf `userId`, `chestDays`, `presenceDays`) :**
 
 | Champ | Type | Description |
 |-------|------|-------------|
@@ -139,11 +158,14 @@ Crée une nouvelle ligne pour le médecin identifié par le **Discord ID** (corp
 | `displayName` | string | Nom affiché côté stockage (souvent le pseudo / nom RP Discord) |
 | `discordUserId` | string | **Doit être identique** à `X-Discord-User-Id` |
 | `userId` | string \| null | Optionnel ; laisser absent en usage bot normal |
-| `chestCount` | number | |
+| `chestDays` | object | Optionnel ; si absent, tous les jours à `false` |
+| `presenceDays` | object | Optionnel ; si absent, tous les jours à `false` |
 | `sheriffPatientsCount` | number | |
 | `patientsCount` | number | |
 | `infusionsCount` | number | |
 | `poppyMilkCount` | number | |
+
+Chaque objet `chestDays` / `presenceDays` doit contenir **exactement** les sept clés `lundi` … `dimanche` avec des booléens si tu l’envoies.
 
 **Réponse 200 — `data` :** un seul objet de la même forme qu’un élément de liste (voir GET).
 
@@ -165,7 +187,6 @@ curl -sS -X POST \
     "periodEnd": "2026-04-19T23:59:59.999+02:00",
     "displayName": "Dr. Dupont",
     "discordUserId": "123456789012345678",
-    "chestCount": 2,
     "sheriffPatientsCount": 1,
     "patientsCount": 5,
     "infusionsCount": 0,
@@ -188,14 +209,53 @@ Récupère **une** ligne par son `id` (UUID).
 
 ---
 
+## `POST /api/dispensary/weekly-activity/bot/caisse`
+
+Enregistre la **caisse pour le jour calendaire actuel en Europe/Paris** pour le médecin identifié par `X-Discord-User-Id`.
+
+**En-têtes :** `Authorization`, `X-Discord-User-Id`
+
+**Corps :** aucun (ou `{}`).
+
+**Réponse 200 — `data` :**
+
+- Si la caisse était déjà enregistrée pour ce jour : `{ "alreadyDone": true, "message": "…" }` (message en français).
+- Sinon : `{ "alreadyDone": false, "activity": { … } }` où `activity` a la même forme qu’un élément de liste (GET).
+
+**404** — aucune ligne d’activité ne couvre ce jour pour ce Discord (créer d’abord une entrée pour la semaine concernée).
+
+---
+
+## `POST /api/dispensary/weekly-activity/bot/presence`
+
+Enregistre la **présence** pour **aujourd’hui** ou **hier** (calendrier **Europe/Paris**). Le serveur choisit la ligne dont la période **chevauche** ce jour (ex. le lundi matin, « hier » = dimanche peut correspondre à la **semaine précédente**).
+
+**En-têtes :** `Authorization`, `X-Discord-User-Id`
+
+**Corps JSON :**
+
+| Champ | Type | Description |
+|-------|------|-------------|
+| `day` | `"today"` \| `"yesterday"` | Jour cible (Paris) |
+
+**Réponse 200 — `data` :** même forme que pour `bot/caisse` (`alreadyDone` + `message` ou `activity`).
+
+**404** — aucune ligne ne couvre le jour demandé.
+
+**422** — `day` invalide ou absent.
+
+---
+
 ## `PATCH /api/dispensary/weekly-activity/{id}`
 
 Met à jour une ligne existante. Tous les champs du corps sont **optionnels** ; seuls ceux fournis sont modifiés.
 
-Champs possibles (même sémantique que pour POST, tous optionnels) :
+Champs possibles (tous optionnels) :
 
 - `periodStart`, `periodEnd`, `displayName`
-- `chestCount`, `sheriffPatientsCount`, `patientsCount`, `infusionsCount`, `poppyMilkCount`
+- `sheriffPatientsCount`, `patientsCount`, `infusionsCount`, `poppyMilkCount`
+
+Les caisses et présences **par jour** ne sont pas modifiables via ce `PATCH` côté bot : utiliser **`POST …/bot/caisse`** et **`POST …/bot/presence`**. (L’intranet utilise les actions serveur dédiées.)
 
 **Comportement côté historique (bot) :** pour chaque compteur dont la valeur change, une entrée d’historique de type **incrément** ou **décrément** est enregistrée ; si la période ou le `displayName` change, une entrée **UPDATE** est aussi enregistrée. Les valeurs envoyées sont des **absolus** (pas des deltas) : l’API calcule la différence pour classer incrément / décrément.
 
@@ -246,6 +306,7 @@ curl -sS -X DELETE \
 
 ## Fichiers de référence (code)
 
-- Routes : `src/app/api/dispensary/weekly-activity/route.ts`, `src/app/api/dispensary/weekly-activity/recap/route.ts`, `src/app/api/dispensary/weekly-activity/[id]/route.ts`
-- Validation : `src/lib/dispensaryWeeklyActivity/schemas.ts`
+- Routes : `src/app/api/dispensary/weekly-activity/route.ts`, `src/app/api/dispensary/weekly-activity/recap/route.ts`, `src/app/api/dispensary/weekly-activity/[id]/route.ts`, `src/app/api/dispensary/weekly-activity/bot/caisse/route.ts`, `src/app/api/dispensary/weekly-activity/bot/presence/route.ts`
+- Validation : `src/lib/dispensaryWeeklyActivity/schemas.ts`, `src/lib/dispensaryWeeklyActivity/weekdayFlags.ts`
+- Sérialisation : `src/lib/dispensaryWeeklyActivity/apiRow.ts`, `src/lib/dispensaryWeeklyActivity/loadSerializedRow.ts`
 - Vérification du secret : `src/lib/dispensaryWeeklyActivityApiAuth.ts`

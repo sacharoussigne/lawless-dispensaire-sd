@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { isDispensaryBotApiAuthorized, getDiscordUserIdFromBotRequest } from '@/lib/dispensaryWeeklyActivityApiAuth';
 import prisma from '@/lib/prisma';
+import { serializeDispensaryWeeklyActivityApiRow } from '@/lib/dispensaryWeeklyActivity/apiRow';
 import { mergeResolvedDisplayNames } from '@/lib/dispensaryWeeklyActivity/resolveDisplayName';
 import { syncActivityUserIdFromDiscordIfMissing } from '@/lib/dispensaryWeeklyActivity/service';
 import { getBankWeekBounds } from '@/lib/bankWeek';
@@ -65,22 +66,25 @@ export async function GET(request: NextRequest) {
     data: {
       periodStart: periodStart.toISOString(),
       periodEnd: periodEnd.toISOString(),
-      rows: sorted.map((r) => ({
-        id: r.id,
-        periodStart: r.periodStart.toISOString(),
-        periodEnd: r.periodEnd.toISOString(),
-        displayName: r.displayName,
-        resolvedDisplayName: r.resolvedDisplayName,
-        discordUserId: r.discordUserId,
-        userId: r.userId,
-        chestCount: r.chestCount,
-        sheriffPatientsCount: r.sheriffPatientsCount,
-        patientsCount: r.patientsCount,
-        infusionsCount: r.infusionsCount,
-        poppyMilkCount: r.poppyMilkCount,
-        createdAt: r.createdAt.toISOString(),
-        updatedAt: r.updatedAt.toISOString(),
-      })),
+      rows: sorted.map((r) =>
+        serializeDispensaryWeeklyActivityApiRow({
+          id: r.id,
+          periodStart: r.periodStart,
+          periodEnd: r.periodEnd,
+          displayName: r.displayName,
+          resolvedDisplayName: r.resolvedDisplayName,
+          discordUserId: r.discordUserId,
+          userId: r.userId,
+          chestDays: r.chestDays,
+          presenceDays: r.presenceDays,
+          sheriffPatientsCount: r.sheriffPatientsCount,
+          patientsCount: r.patientsCount,
+          infusionsCount: r.infusionsCount,
+          poppyMilkCount: r.poppyMilkCount,
+          createdAt: r.createdAt,
+          updatedAt: r.updatedAt,
+        }),
+      ),
     },
   });
 }

@@ -557,6 +557,8 @@ enum DispensaryWeeklyActivityHistoryAction {
   UPDATE
   INCREMENT_CHEST
   DECREMENT_CHEST
+  UPDATE_CHEST_DAYS
+  UPDATE_PRESENCE_DAYS
   INCREMENT_SHERIFF
   DECREMENT_SHERIFF
   INCREMENT_PATIENTS
@@ -580,7 +582,8 @@ model DispensaryWeeklyActivity {
   discordUserId        String
   userId               String?
   user                 User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  chestCount           Int      @default(0)
+  chestDays            Json
+  presenceDays         Json
   sheriffPatientsCount Int      @default(0)
   patientsCount        Int      @default(0)
   infusionsCount       Int      @default(0)

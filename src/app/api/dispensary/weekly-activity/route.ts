@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { isDispensaryBotApiAuthorized, getDiscordUserIdFromBotRequest } from '@/lib/dispensaryWeeklyActivityApiAuth';
 import prisma from '@/lib/prisma';
+import { serializeDispensaryWeeklyActivityApiRow } from '@/lib/dispensaryWeeklyActivity/apiRow';
 import { mergeResolvedDisplayNames } from '@/lib/dispensaryWeeklyActivity/resolveDisplayName';
 import { dispensaryWeeklyActivityCreateSchema } from '@/lib/dispensaryWeeklyActivity/schemas';
+import { loadSerializedWeeklyActivityById } from '@/lib/dispensaryWeeklyActivity/loadSerializedRow';
 import {
   createDispensaryWeeklyActivityWithHistory,
   syncActivityUserIdFromDiscordIfMissing,
@@ -43,22 +45,25 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     status: 200,
-    data: withNames.map((r) => ({
-      id: r.id,
-      periodStart: r.periodStart.toISOString(),
-      periodEnd: r.periodEnd.toISOString(),
-      displayName: r.displayName,
-      resolvedDisplayName: r.resolvedDisplayName,
-      discordUserId: r.discordUserId,
-      userId: r.userId,
-      chestCount: r.chestCount,
-      sheriffPatientsCount: r.sheriffPatientsCount,
-      patientsCount: r.patientsCount,
-      infusionsCount: r.infusionsCount,
-      poppyMilkCount: r.poppyMilkCount,
-      createdAt: r.createdAt.toISOString(),
-      updatedAt: r.updatedAt.toISOString(),
-    })),
+    data: withNames.map((r) =>
+      serializeDispensaryWeeklyActivityApiRow({
+        id: r.id,
+        periodStart: r.periodStart,
+        periodEnd: r.periodEnd,
+        displayName: r.displayName,
+        resolvedDisplayName: r.resolvedDisplayName,
+        discordUserId: r.discordUserId,
+        userId: r.userId,
+        chestDays: r.chestDays,
+        presenceDays: r.presenceDays,
+        sheriffPatientsCount: r.sheriffPatientsCount,
+        patientsCount: r.patientsCount,
+        infusionsCount: r.infusionsCount,
+        poppyMilkCount: r.poppyMilkCount,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+      }),
+    ),
   });
 }
 
@@ -94,33 +99,14 @@ export async function POST(request: Request) {
       actorDiscordUserId: discordUserId,
     });
 
-    const full = await prisma.dispensaryWeeklyActivity.findUnique({
-      where: { id: created.id },
-      include: { user: { select: { name: true } } },
-    });
-    const [withName] = await mergeResolvedDisplayNames(prisma, full ? [full] : []);
-    if (!withName) {
+    const data = await loadSerializedWeeklyActivityById(created.id);
+    if (!data) {
       return jsonError(500, 'Erreur après création');
     }
 
     return NextResponse.json({
       status: 200,
-      data: {
-        id: withName.id,
-        periodStart: withName.periodStart.toISOString(),
-        periodEnd: withName.periodEnd.toISOString(),
-        displayName: withName.displayName,
-        resolvedDisplayName: withName.resolvedDisplayName,
-        discordUserId: withName.discordUserId,
-        userId: withName.userId,
-        chestCount: withName.chestCount,
-        sheriffPatientsCount: withName.sheriffPatientsCount,
-        patientsCount: withName.patientsCount,
-        infusionsCount: withName.infusionsCount,
-        poppyMilkCount: withName.poppyMilkCount,
-        createdAt: withName.createdAt.toISOString(),
-        updatedAt: withName.updatedAt.toISOString(),
-      },
+      data,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Erreur serveur';

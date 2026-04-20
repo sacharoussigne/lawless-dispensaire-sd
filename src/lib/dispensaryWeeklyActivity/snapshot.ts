@@ -1,4 +1,5 @@
 import type { DispensaryWeeklyActivity } from '@prisma/client';
+import { parseWeekdayFlagsJson, type WeekdayFlags } from '@/lib/dispensaryWeeklyActivity/weekdayFlags';
 
 export type ActivitySnapshotJson = {
   periodStart: string;
@@ -6,7 +7,8 @@ export type ActivitySnapshotJson = {
   displayName: string;
   discordUserId: string;
   userId: string | null;
-  chestCount: number;
+  chestDays: WeekdayFlags;
+  presenceDays: WeekdayFlags;
   sheriffPatientsCount: number;
   patientsCount: number;
   infusionsCount: number;
@@ -20,7 +22,8 @@ export function activityToSnapshot(activity: DispensaryWeeklyActivity): Activity
     displayName: activity.displayName,
     discordUserId: activity.discordUserId,
     userId: activity.userId,
-    chestCount: activity.chestCount,
+    chestDays: parseWeekdayFlagsJson(activity.chestDays),
+    presenceDays: parseWeekdayFlagsJson(activity.presenceDays),
     sheriffPatientsCount: activity.sheriffPatientsCount,
     patientsCount: activity.patientsCount,
     infusionsCount: activity.infusionsCount,
