@@ -13,11 +13,11 @@ Tous les chemins ci-dessous sont relatifs à cette base.
 | En-tête | Obligatoire | Description |
 |--------|-------------|-------------|
 | `Authorization` | Oui | `Bearer <secret>` où `<secret>` est la valeur de la variable d’environnement **`DISPENSARY_BOT_API_SECRET`** côté serveur. |
-| `X-Discord-User-Id` | Oui pour toutes les routes documentées | ID Discord (snowflake) de l’utilisateur dont le bot agit **au nom**. Les écritures ne sont autorisées que pour les lignes dont le champ `discordUserId` est égal à cet ID. |
+| `X-Discord-User-Id` | Oui sauf `GET …/recap` (là il est optionnel) | ID Discord (snowflake) de l’utilisateur dont le bot agit **au nom**. Les écritures ne sont autorisées que pour les lignes dont le champ `discordUserId` est égal à cet ID. |
 
 En cas d’échec d’authentification par clé : réponse **401** avec un corps JSON `{ "status": 401, "error": "Non autorisé" }`.
 
-Si `X-Discord-User-Id` est absent alors qu’il est requis : **400**.
+Si `X-Discord-User-Id` est absent alors qu’il est requis par la route : **400** (sauf `GET …/recap` où l’en-tête est optionnel).
 
 ## Format des réponses
 
@@ -87,6 +87,37 @@ curl -sS \
   -H "Authorization: Bearer VOTRE_SECRET" \
   -H "X-Discord-User-Id: 123456789012345678" \
   "https://votre-domaine/api/dispensary/weekly-activity"
+```
+
+---
+
+## `GET /api/dispensary/weekly-activity/recap?date=YYYY-MM-DD`
+
+Récapitulatif pour la **semaine UTC ISO** (lundi → dimanche, voir section *Dates et JSON*) qui contient le jour `date` (interprété comme jour calendaire **UTC**).
+
+**En-têtes :** `Authorization` obligatoire ; **`X-Discord-User-Id` optionnel** — s’il est présent, seule la ligne de ce médecin pour cette semaine est renvoyée (0 ou 1 entrée dans `rows`) ; s’il est absent, **toutes** les lignes de la semaine sont renvoyées (récap équipe).
+
+**Query :**
+
+| Paramètre | Obligatoire | Description |
+|-----------|-------------|-------------|
+| `date` | Oui | `YYYY-MM-DD` (UTC). Ex. `2026-04-15` désigne la semaine du 13 au 19 avril 2026 UTC. |
+
+**Réponse 200 — `data` :**
+
+| Champ | Type | Description |
+|-------|------|-------------|
+| `periodStart`, `periodEnd` | string ISO | Bornes canoniques de la semaine |
+| `rows` | array | Même forme d’objets que le `GET` liste (tri par `resolvedDisplayName`, locale `fr`) |
+
+**Erreurs :** **400** — `date` manquant ou format invalide ; **401** — secret invalide.
+
+**Exemple (récap toute l’équipe) :**
+
+```bash
+curl -sS \
+  -H "Authorization: Bearer VOTRE_SECRET" \
+  "https://votre-domaine/api/dispensary/weekly-activity/recap?date=2026-04-15"
 ```
 
 ---
@@ -205,7 +236,7 @@ curl -sS -X DELETE \
 ## Checklist bot Discord
 
 1. Stocker **`DISPENSARY_BOT_API_SECRET`** dans l’environnement du serveur qui héberge Next.js (et une copie chiffrée côté bot si besoin).
-2. À chaque requête : envoyer **`Authorization: Bearer …`** et **`X-Discord-User-Id`** = l’ID Discord de l’utilisateur qui déclenche l’action dans Discord.
+2. À chaque requête : envoyer **`Authorization: Bearer …`**. Ajouter **`X-Discord-User-Id`** (sauf pour **`GET …/recap`** sans filtre médecin) = l’ID Discord de l’utilisateur qui déclenche l’action dans Discord.
 3. Pour **POST**, aligner **`discordUserId`** du JSON sur cet en-tête.
 4. Utiliser l’**URL HTTPS** de prod dans le bot ; ne pas exposer le secret dans le dépôt ou le client web.
 
@@ -213,6 +244,6 @@ curl -sS -X DELETE \
 
 ## Fichiers de référence (code)
 
-- Routes : `src/app/api/dispensary/weekly-activity/route.ts`, `src/app/api/dispensary/weekly-activity/[id]/route.ts`
+- Routes : `src/app/api/dispensary/weekly-activity/route.ts`, `src/app/api/dispensary/weekly-activity/recap/route.ts`, `src/app/api/dispensary/weekly-activity/[id]/route.ts`
 - Validation : `src/lib/dispensaryWeeklyActivity/schemas.ts`
 - Vérification du secret : `src/lib/dispensaryWeeklyActivityApiAuth.ts`
