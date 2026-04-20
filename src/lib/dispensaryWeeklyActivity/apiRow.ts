@@ -15,7 +15,7 @@ type RowLike = {
   userId: string | null;
   chestDays: unknown;
   presenceDays: unknown;
-  sheriffPatientsCount: number;
+  sherifCount: number;
   patientsCount: number;
   infusionsCount: number;
   poppyMilkCount: number;
@@ -37,7 +37,7 @@ export type SerializedDispensaryWeeklyActivityRow = {
   presenceTotal: number;
   chestDaysSummary: string;
   presenceDaysSummary: string;
-  sheriffPatientsCount: number;
+  sherifCount: number;
   patientsCount: number;
   infusionsCount: number;
   poppyMilkCount: number;
@@ -62,7 +62,7 @@ export function serializeDispensaryWeeklyActivityApiRow(r: RowLike): SerializedD
     presenceTotal: countWeekdayTrues(presenceDays),
     chestDaysSummary: formatWeekdayFlagsSummary(chestDays),
     presenceDaysSummary: formatWeekdayFlagsSummary(presenceDays),
-    sheriffPatientsCount: r.sheriffPatientsCount,
+    sherifCount: r.sherifCount,
     patientsCount: r.patientsCount,
     infusionsCount: r.infusionsCount,
     poppyMilkCount: r.poppyMilkCount,

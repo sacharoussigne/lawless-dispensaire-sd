@@ -93,7 +93,7 @@ Liste **toutes** les activités dont `discordUserId` correspond à `X-Discord-Us
 | `presenceTotal` | number | Nombre de jours avec présence |
 | `chestDaysSummary` | string | Résumé 7 caractères (lundi → dimanche) |
 | `presenceDaysSummary` | string | Idem |
-| `sheriffPatientsCount` | number | Soins shérifs |
+| `sherifCount` | number | Soins shérifs |
 | `patientsCount` | number | Patients |
 | `infusionsCount` | number | Infusions |
 | `poppyMilkCount` | number | Lait de pavot |
@@ -160,7 +160,7 @@ Crée une nouvelle ligne pour le médecin identifié par le **Discord ID** (corp
 | `userId` | string \| null | Optionnel ; laisser absent en usage bot normal |
 | `chestDays` | object | Optionnel ; si absent, tous les jours à `false` |
 | `presenceDays` | object | Optionnel ; si absent, tous les jours à `false` |
-| `sheriffPatientsCount` | number | |
+| `sherifCount` | number | |
 | `patientsCount` | number | |
 | `infusionsCount` | number | |
 | `poppyMilkCount` | number | |
@@ -187,7 +187,7 @@ curl -sS -X POST \
     "periodEnd": "2026-04-19T23:59:59.999+02:00",
     "displayName": "Dr. Dupont",
     "discordUserId": "123456789012345678",
-    "sheriffPatientsCount": 1,
+    "sherifCount": 1,
     "patientsCount": 5,
     "infusionsCount": 0,
     "poppyMilkCount": 0
@@ -253,7 +253,7 @@ Met à jour une ligne existante. Tous les champs du corps sont **optionnels** ; 
 Champs possibles (tous optionnels) :
 
 - `periodStart`, `periodEnd`, `displayName`
-- `sheriffPatientsCount`, `patientsCount`, `infusionsCount`, `poppyMilkCount`
+- `sherifCount`, `patientsCount`, `infusionsCount`, `poppyMilkCount`
 
 Les caisses et présences **par jour** ne sont pas modifiables via ce `PATCH` côté bot : utiliser **`POST …/bot/caisse`** et **`POST …/bot/presence`**. (L’intranet utilise les actions serveur dédiées.)
 
@@ -270,7 +270,7 @@ curl -sS -X PATCH \
   -H "Authorization: Bearer VOTRE_SECRET" \
   -H "X-Discord-User-Id: 123456789012345678" \
   -H "Content-Type: application/json" \
-  -d '{"sheriffPatientsCount": 3, "patientsCount": 8}' \
+  -d '{"sherifCount": 3, "patientsCount": 8}' \
   "https://votre-domaine/api/dispensary/weekly-activity/<UUID>"
 ```
 

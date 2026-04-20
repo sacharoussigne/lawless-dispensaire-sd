@@ -1,2 +1,0 @@
--- RenameIndex
-ALTER INDEX "dispensary_weekly_activity_discordUserId_periodStart_periodEnd_" RENAME TO "dispensary_weekly_activity_discordUserId_periodStart_period_key";

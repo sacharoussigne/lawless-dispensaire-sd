@@ -61,7 +61,7 @@ type ActorContext = {
 };
 
 const COUNTER_FIELDS = [
-  'sheriffPatientsCount',
+  'sherifCount',
   'patientsCount',
   'infusionsCount',
   'poppyMilkCount',
@@ -77,7 +77,7 @@ function counterDeltaToHistoryAction(
   if (before === after) return null;
   const up = after > before;
   switch (field) {
-    case 'sheriffPatientsCount':
+    case 'sherifCount':
       return up ? 'INCREMENT_SHERIFF' : 'DECREMENT_SHERIFF';
     case 'patientsCount':
       return up ? 'INCREMENT_PATIENTS' : 'DECREMENT_PATIENTS';
@@ -129,7 +129,7 @@ export async function createDispensaryWeeklyActivityWithHistory(
         userId: linkedUserId ?? undefined,
         chestDays: chestDays as Prisma.InputJsonValue,
         presenceDays: presenceDays as Prisma.InputJsonValue,
-        sheriffPatientsCount: input.sheriffPatientsCount,
+        sherifCount: input.sherifCount,
         patientsCount: input.patientsCount,
         infusionsCount: input.infusionsCount,
         poppyMilkCount: input.poppyMilkCount,
@@ -175,7 +175,7 @@ export async function updateDispensaryWeeklyActivityWithHistory(
     if (input.displayName !== undefined) data.displayName = input.displayName;
     if (input.chestDays !== undefined) data.chestDays = input.chestDays as Prisma.InputJsonValue;
     if (input.presenceDays !== undefined) data.presenceDays = input.presenceDays as Prisma.InputJsonValue;
-    if (input.sheriffPatientsCount !== undefined) data.sheriffPatientsCount = input.sheriffPatientsCount;
+    if (input.sherifCount !== undefined) data.sherifCount = input.sherifCount;
     if (input.patientsCount !== undefined) data.patientsCount = input.patientsCount;
     if (input.infusionsCount !== undefined) data.infusionsCount = input.infusionsCount;
     if (input.poppyMilkCount !== undefined) data.poppyMilkCount = input.poppyMilkCount;

@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
           userId: r.userId,
           chestDays: r.chestDays,
           presenceDays: r.presenceDays,
-          sheriffPatientsCount: r.sheriffPatientsCount,
+          sherifCount: r.sherifCount,
           patientsCount: r.patientsCount,
           infusionsCount: r.infusionsCount,
           poppyMilkCount: r.poppyMilkCount,

@@ -1,11 +1,11 @@
 -- CreateEnum
-CREATE TYPE "DispensaryWeeklyActivityHistoryAction" AS ENUM ('CREATE', 'UPDATE', 'DELETE');
+CREATE TYPE "DispensaryWeeklyActivityHistoryAction" AS ENUM ('CREATE', 'DELETE', 'UPDATE', 'INCREMENT_CHEST', 'DECREMENT_CHEST', 'UPDATE_CHEST_DAYS', 'UPDATE_PRESENCE_DAYS', 'INCREMENT_SHERIFF', 'DECREMENT_SHERIFF', 'INCREMENT_PATIENTS', 'DECREMENT_PATIENTS', 'INCREMENT_INFUSIONS', 'DECREMENT_INFUSIONS', 'INCREMENT_POPPY_MILK', 'DECREMENT_POPPY_MILK');
 
 -- CreateEnum
 CREATE TYPE "DispensaryWeeklyActivityHistorySource" AS ENUM ('INTRANET', 'DISCORD_BOT');
 
 -- AlterTable
-ALTER TABLE "app_settings" ADD COLUMN "featureWeeklyDispensaryActivityEnabled" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "app_settings" ADD COLUMN     "featureWeeklyDispensaryActivityEnabled" BOOLEAN NOT NULL DEFAULT true;
 
 -- CreateTable
 CREATE TABLE "dispensary_weekly_activity" (
@@ -15,8 +15,9 @@ CREATE TABLE "dispensary_weekly_activity" (
     "displayName" TEXT NOT NULL,
     "discordUserId" TEXT NOT NULL,
     "userId" TEXT,
-    "chestCount" INTEGER NOT NULL DEFAULT 0,
-    "sheriffPatientsCount" INTEGER NOT NULL DEFAULT 0,
+    "chestDays" JSONB NOT NULL,
+    "presenceDays" JSONB NOT NULL,
+    "sherifCount" INTEGER NOT NULL DEFAULT 0,
     "patientsCount" INTEGER NOT NULL DEFAULT 0,
     "infusionsCount" INTEGER NOT NULL DEFAULT 0,
     "poppyMilkCount" INTEGER NOT NULL DEFAULT 0,
@@ -42,13 +43,13 @@ CREATE TABLE "dispensary_weekly_activity_history" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "dispensary_weekly_activity_discordUserId_periodStart_periodEnd_key" ON "dispensary_weekly_activity"("discordUserId", "periodStart", "periodEnd");
-
--- CreateIndex
 CREATE INDEX "dispensary_weekly_activity_discordUserId_idx" ON "dispensary_weekly_activity"("discordUserId");
 
 -- CreateIndex
 CREATE INDEX "dispensary_weekly_activity_userId_idx" ON "dispensary_weekly_activity"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "dispensary_weekly_activity_discordUserId_periodStart_period_key" ON "dispensary_weekly_activity"("discordUserId", "periodStart", "periodEnd");
 
 -- CreateIndex
 CREATE INDEX "dispensary_weekly_activity_history_activityId_idx" ON "dispensary_weekly_activity_history"("activityId");

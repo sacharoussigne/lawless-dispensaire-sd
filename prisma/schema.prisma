@@ -584,7 +584,7 @@ model DispensaryWeeklyActivity {
   user                 User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   chestDays            Json
   presenceDays         Json
-  sheriffPatientsCount Int      @default(0)
+  sherifCount          Int      @default(0)
   patientsCount        Int      @default(0)
   infusionsCount       Int      @default(0)
   poppyMilkCount       Int      @default(0)
