@@ -39,6 +39,9 @@ export const routes = {
   privatePractice: {
     index: '/private-practice',
   },
+  weeklyActivity: {
+    index: '/weekly-activity',
+  },
   employee: {
     index: '/employee',
     mails: '/employee/mails',

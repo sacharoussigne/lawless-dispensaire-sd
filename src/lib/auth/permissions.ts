@@ -11,6 +11,7 @@ const defaultApplicationPermissions = {
     application: ["access", "management"],
     mails: ["access"],
     payroll_reports: ["view", "create"],
+    weekly_dispensary_activity: ["view", "edit_own", "edit_all"],
 };
 export const statement = {
     ...defaultStatements, // Les permissions par défaut (user, session)
@@ -33,6 +34,7 @@ const user = ac.newRole({
     application: [],
     mails: [],
     payroll_reports: [],
+    weekly_dispensary_activity: [],
 });
 
 const admin = ac.newRole({
@@ -48,6 +50,7 @@ const employee = ac.newRole({
     application: ["access"],
     mails: ["access"],
     payroll_reports: [],
+    weekly_dispensary_activity: [],
 });
 
 const inventory_manager = ac.newRole({
@@ -60,6 +63,7 @@ const inventory_manager = ac.newRole({
     application: ["access", "management"],
     mails: ["access"],
     payroll_reports: [],
+    weekly_dispensary_activity: [],
 });
 
 const inventory_viewer = ac.newRole({
@@ -72,6 +76,7 @@ const inventory_viewer = ac.newRole({
     application: ["access"],
     mails: [],
     payroll_reports: [],
+    weekly_dispensary_activity: [],
 });
 
 const private_practitioner = ac.newRole({
@@ -82,6 +87,7 @@ const private_practitioner = ac.newRole({
     application: ["access"],
     mails: [],
     payroll_reports: [],
+    weekly_dispensary_activity: ["view", "edit_own"],
 });
 
 const direction = ac.newRole({
@@ -94,6 +100,7 @@ const direction = ac.newRole({
     application: ["access"],
     mails: [],
     payroll_reports: ["view", "create"],
+    weekly_dispensary_activity: ["view", "edit_all"],
 });
 
 // Map des rôles pour faciliter l'accès

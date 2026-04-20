@@ -8,6 +8,7 @@ import {
   IconUserHeart,
   IconMail,
   IconReportMoney,
+  IconHeartbeat,
 } from '@tabler/icons-react';
 import { getAuthSession } from '@/lib/auth';
 import { calculatePermissions } from '@/lib/auth/calculatePermissions';
@@ -51,6 +52,17 @@ export default async function EmployeePage() {
         appSettings.featureBankEnabled &&
         checkRolePermission(role, 'bank', 'access'),
       color: 'violet',
+    },
+    {
+      title: 'Activité hebdomadaire',
+      description:
+        'Saisissez les compteurs par période (caisses, soins, infusions, lait de pavot) pour le dispensaire.',
+      icon: IconHeartbeat,
+      href: routes.weeklyActivity.index,
+      hasAccess:
+        appSettings.featureWeeklyDispensaryActivityEnabled &&
+        (permissions?.weeklyDispensaryActivity.view ?? false),
+      color: 'red',
     },
     {
       title: 'Cabinet privé',
