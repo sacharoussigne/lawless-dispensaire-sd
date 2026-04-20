@@ -39,7 +39,19 @@ Le code HTTP reprend le même ordre de grandeur que `status` dans le JSON.
 
 Les champs `periodStart` et `periodEnd` acceptent des **chaînes ISO 8601** dans le corps JSON (ex. `"2026-04-14T00:00:00.000Z"` ou `"2026-04-14"` selon ce que le parseur interprète). Les réponses renvoient des dates en **ISO string** (`toISOString()`).
 
+**Semaine canonique (UTC, lundi → dimanche)** : à chaque création ou mise à jour qui touche la période, le serveur **normalise** les deux dates vers la semaine ISO du calendrier **UTC** contenant `periodStart` (ou `periodEnd` seul en mise à jour) : `periodStart` = lundi `00:00:00.000Z`, `periodEnd` = dimanche `23:59:59.999Z`. Tu peux donc envoyer un instant au milieu de la semaine ; la ligne stockée utilisera toujours ces bornes. Évite d’envoyer un `periodEnd` au lundi `00:00:00.000Z` suivant (borne « exclusive ») : il sera recalculé vers le dimanche précédent.
+
 Les compteurs sont des **entiers ≥ 0**.
+
+### Données déjà en base (optionnel)
+
+Si d’anciennes lignes ont un `periodEnd` égal au **lundi suivant minuit** (borne « exclusive » : exactement 7 jours après le lundi `periodStart`), recalcule la fin canonique ainsi :
+
+```sql
+UPDATE dispensary_weekly_activity
+SET "periodEnd" = "periodStart" + interval '7 days' - interval '1 millisecond'
+WHERE "periodEnd" = "periodStart" + interval '7 days';
+```
 
 ---
 

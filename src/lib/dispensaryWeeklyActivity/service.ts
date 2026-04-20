@@ -9,6 +9,7 @@ import prisma from '@/lib/prisma';
 import { findLinkedUserIdByDiscordAccount } from '@/lib/dispensaryWeeklyActivity/resolveDisplayName';
 import { activityToSnapshot } from '@/lib/dispensaryWeeklyActivity/snapshot';
 import type { DispensaryWeeklyActivityCreateInput, DispensaryWeeklyActivityUpdateInput } from '@/lib/dispensaryWeeklyActivity/schemas';
+import { getUtcIsoWeekRange } from '@/lib/dispensaryWeeklyActivity/utcIsoWeek';
 
 type WeeklyActivityDb = Pick<PrismaClient, 'dispensaryWeeklyActivity' | 'account'>;
 
@@ -84,11 +85,13 @@ export async function createDispensaryWeeklyActivityWithHistory(
   const linkedUserId =
     input.userId ?? (await findLinkedUserIdByDiscordAccount(prisma, input.discordUserId));
 
+  const { periodStart, periodEnd } = getUtcIsoWeekRange(input.periodStart);
+
   return prisma.$transaction(async (tx) => {
     const created = await tx.dispensaryWeeklyActivity.create({
       data: {
-        periodStart: input.periodStart,
-        periodEnd: input.periodEnd,
+        periodStart,
+        periodEnd,
         displayName: input.displayName,
         discordUserId: input.discordUserId,
         userId: linkedUserId ?? undefined,
@@ -130,8 +133,12 @@ export async function updateDispensaryWeeklyActivityWithHistory(
     }
 
     const data: Prisma.DispensaryWeeklyActivityUpdateInput = {};
-    if (input.periodStart !== undefined) data.periodStart = input.periodStart;
-    if (input.periodEnd !== undefined) data.periodEnd = input.periodEnd;
+    if (input.periodStart !== undefined || input.periodEnd !== undefined) {
+      const anchor = (input.periodStart ?? input.periodEnd)!;
+      const normalized = getUtcIsoWeekRange(anchor);
+      data.periodStart = normalized.periodStart;
+      data.periodEnd = normalized.periodEnd;
+    }
     if (input.displayName !== undefined) data.displayName = input.displayName;
     if (input.chestCount !== undefined) data.chestCount = input.chestCount;
     if (input.sheriffPatientsCount !== undefined) data.sheriffPatientsCount = input.sheriffPatientsCount;

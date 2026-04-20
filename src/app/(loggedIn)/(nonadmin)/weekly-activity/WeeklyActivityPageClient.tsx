@@ -26,7 +26,6 @@ import {
 } from '@tabler/icons-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { endOfWeek, startOfWeek } from 'date-fns';
 import {
   createDispensaryWeeklyActivity,
   deleteDispensaryWeeklyActivity,
@@ -35,6 +34,13 @@ import {
 } from '@/app/_actions/dispensaryWeeklyActivity';
 import { handleAction } from '@/lib/action';
 import { formatDispensaryHistoryAction } from '@/lib/dispensaryWeeklyActivity/historyActionLabel';
+import {
+  formatUtcPeriodEndLabel,
+  formatUtcPeriodStartLabel,
+  getUtcIsoWeekRange,
+  toUtcYmd,
+  utcMidnightFromYmd,
+} from '@/lib/dispensaryWeeklyActivity/utcIsoWeek';
 export type WeeklyActivityListItem = {
   id: string;
   periodStart: string;
@@ -85,14 +91,10 @@ export default function WeeklyActivityPageClient({
   const [historyTitle, setHistoryTitle] = useState('');
 
   const defaultPeriod = useMemo(() => {
-    const now = new Date();
-    const start = startOfWeek(now, { weekStartsOn: 1 });
-    const end = endOfWeek(now, { weekStartsOn: 1 });
+    const { periodStart, periodEnd } = getUtcIsoWeekRange(new Date());
     return {
-      start,
-      end,
-      startStr: format(start, 'yyyy-MM-dd'),
-      endStr: format(end, 'yyyy-MM-dd'),
+      startStr: toUtcYmd(periodStart),
+      endStr: toUtcYmd(periodEnd),
     };
   }, []);
 
@@ -148,8 +150,8 @@ export default function WeeklyActivityPageClient({
     }
     try {
       const payload = {
-        periodStart: new Date(cPeriodStart),
-        periodEnd: new Date(cPeriodEnd),
+        periodStart: utcMidnightFromYmd(cPeriodStart),
+        periodEnd: utcMidnightFromYmd(cPeriodEnd),
         chestCount: cChest,
         sheriffPatientsCount: cSheriff,
         patientsCount: cPatients,
@@ -180,8 +182,8 @@ export default function WeeklyActivityPageClient({
     setEPatients(row.patientsCount);
     setEInfusions(row.infusionsCount);
     setEPoppy(row.poppyMilkCount);
-    setEPeriodStart(format(new Date(row.periodStart), 'yyyy-MM-dd'));
-    setEPeriodEnd(format(new Date(row.periodEnd), 'yyyy-MM-dd'));
+    setEPeriodStart(toUtcYmd(new Date(row.periodStart)));
+    setEPeriodEnd(toUtcYmd(new Date(row.periodEnd)));
     setEDisplayName(row.displayName);
   };
 
@@ -190,8 +192,8 @@ export default function WeeklyActivityPageClient({
     try {
       const base = {
         id: editRow.id,
-        periodStart: new Date(ePeriodStart),
-        periodEnd: new Date(ePeriodEnd),
+        periodStart: utcMidnightFromYmd(ePeriodStart),
+        periodEnd: utcMidnightFromYmd(ePeriodEnd),
         chestCount: eChest,
         sheriffPatientsCount: eSheriff,
         patientsCount: ePatients,
@@ -283,8 +285,8 @@ export default function WeeklyActivityPageClient({
                 title: 'Période',
                 render: (r) => (
                   <Text size="sm">
-                    {format(new Date(r.periodStart), 'd MMM', { locale: fr })} —{' '}
-                    {format(new Date(r.periodEnd), 'd MMM yyyy', { locale: fr })}
+                    {formatUtcPeriodStartLabel(new Date(r.periodStart))} —{' '}
+                    {formatUtcPeriodEndLabel(new Date(r.periodEnd))}
                   </Text>
                 ),
               },
