@@ -43,6 +43,8 @@ export default function AppSettingsPageClient({
   const [featurePayrollEnabled, setFeaturePayrollEnabled] = useState(
     initial.featurePayrollEnabled,
   );
+  const [featureWeeklyDispensaryActivityEnabled, setFeatureWeeklyDispensaryActivityEnabled] =
+    useState(initial.featureWeeklyDispensaryActivityEnabled);
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async () => {
@@ -56,6 +58,7 @@ export default function AppSettingsPageClient({
       featureSearchEnabled,
       featureMailsEnabled,
       featurePayrollEnabled,
+      featureWeeklyDispensaryActivityEnabled,
     });
     setSubmitting(false);
 
@@ -154,6 +157,15 @@ export default function AppSettingsPageClient({
                 checked={featurePayrollEnabled}
                 onChange={(e) =>
                   setFeaturePayrollEnabled(e.currentTarget.checked)
+                }
+              />
+            </Paper>
+            <Paper withBorder p="md" radius="md" bg="var(--mantine-color-body)">
+              <Switch
+                label="Activité hebdomadaire (dispensaire)"
+                checked={featureWeeklyDispensaryActivityEnabled}
+                onChange={(e) =>
+                  setFeatureWeeklyDispensaryActivityEnabled(e.currentTarget.checked)
                 }
               />
             </Paper>

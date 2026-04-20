@@ -167,6 +167,15 @@ export default function Header({
                           Cabinet privé
                         </Link>
                       )}
+                    {appSettings.featureWeeklyDispensaryActivityEnabled &&
+                      permissions?.weeklyDispensaryActivity.view && (
+                        <Link
+                          href={routes.weeklyActivity.index}
+                          className={`${classes.link} ${isRouteActive(routes.weeklyActivity.index) ? classes.linkActive : ''}`}
+                        >
+                          Activité hebdo
+                        </Link>
+                      )}
                     {appSettings.featureOrdersEnabled &&
                       checkRolePermission(userRole, 'orders', 'view') && (
                         <Link

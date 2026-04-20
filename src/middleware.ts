@@ -12,6 +12,7 @@ import { hasOrdersViewAccessMiddleware } from './middlewares/hasOrdersViewAccess
 import { hasSearchAccessMiddleware } from './middlewares/hasSearchAccessMiddleware';
 import { hasBankAccessMiddleware } from './middlewares/hasBankAccessMiddleware';
 import { hasPrivatePracticeAccessMiddleware } from './middlewares/hasPrivatePracticeAccessMiddleware';
+import { hasWeeklyDispensaryActivityMiddleware } from './middlewares/hasWeeklyDispensaryActivityMiddleware';
 import { hasMailsAccessMiddleware } from './middlewares/hasMailsAccessMiddleware';
 import { assertAppFeatureEnabledMiddleware } from './middlewares/assertAppFeatureEnabledMiddleware';
 import { chain } from './middlewares/chain';
@@ -95,6 +96,13 @@ export async function middleware(req: NextRequest) {
     middlewares.push((request: NextRequest, session: AppMiddlewareSession) =>
       assertAppFeatureEnabledMiddleware(request, session, 'privatePractice'),
     );
+  } else if (pathname.startsWith(routes.weeklyActivity.index)) {
+    middlewares.push(hasToBeLoggedInMiddleware);
+    middlewares.push(hasApplicationAccessMiddleware);
+    middlewares.push(hasWeeklyDispensaryActivityMiddleware);
+    middlewares.push((request: NextRequest, session: AppMiddlewareSession) =>
+      assertAppFeatureEnabledMiddleware(request, session, 'weeklyDispensaryActivity'),
+    );
   } else if (pathname.startsWith(routes.employee.mails)) {
     // For employee mails routes, check login, application access, then mails access
     middlewares.push(hasToBeLoggedInMiddleware);
@@ -126,6 +134,7 @@ export const config = {
     '/search-items/:path*',
     '/bank/:path*',
     '/private-practice/:path*',
+    '/weekly-activity/:path*',
     '/employee/:path*',
     '/management/:path*',
   ],
