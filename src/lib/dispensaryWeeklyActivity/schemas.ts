@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { weekdayFlagsSchema } from '@/lib/dispensaryWeeklyActivity/weekdayFlags';
 
 export const dispensaryWeeklyActivityMetricsSchema = z.object({
-  sheriffPatientsCount: z.number().int().min(0),
+  sherifCount: z.number().int().min(0),
   patientsCount: z.number().int().min(0),
   infusionsCount: z.number().int().min(0),
   poppyMilkCount: z.number().int().min(0),
@@ -44,7 +44,7 @@ export const dispensaryWeeklyActivityUpdateSchema = dispensaryWeeklyActivityMetr
 /** Bot `PATCH …/[id]` : counters and meta only (caisse / présence via routes dédiées). */
 export const dispensaryWeeklyActivityBotPatchSchema = z
   .object({
-    sheriffPatientsCount: z.number().int().min(0).optional(),
+    sherifCount: z.number().int().min(0).optional(),
     patientsCount: z.number().int().min(0).optional(),
     infusionsCount: z.number().int().min(0).optional(),
     poppyMilkCount: z.number().int().min(0).optional(),

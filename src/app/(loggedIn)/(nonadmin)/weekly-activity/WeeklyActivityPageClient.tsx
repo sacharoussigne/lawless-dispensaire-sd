@@ -229,7 +229,7 @@ export default function WeeklyActivityPageClient({
         periodEnd: end,
         chestDays: cChestFlags,
         presenceDays: cPresenceFlags,
-        sheriffPatientsCount: cSheriff,
+        sherifCount: cSheriff,
         patientsCount: cPatients,
         infusionsCount: cInfusions,
         poppyMilkCount: cPoppy,
@@ -258,7 +258,7 @@ export default function WeeklyActivityPageClient({
     setEditRow(row);
     setEChestFlags({ ...row.chestDays });
     setEPresenceFlags({ ...row.presenceDays });
-    setESheriff(row.sheriffPatientsCount);
+    setESheriff(row.sherifCount);
     setEPatients(row.patientsCount);
     setEInfusions(row.infusionsCount);
     setEPoppy(row.poppyMilkCount);
@@ -276,7 +276,7 @@ export default function WeeklyActivityPageClient({
         periodEnd: end,
         chestDays: eChestFlags,
         presenceDays: ePresenceFlags,
-        sheriffPatientsCount: eSheriff,
+        sherifCount: eSheriff,
         patientsCount: ePatients,
         infusionsCount: eInfusions,
         poppyMilkCount: ePoppy,
@@ -395,7 +395,7 @@ export default function WeeklyActivityPageClient({
                 </Tooltip>
               ),
             },
-            { accessor: 'sheriffPatientsCount', title: 'Soins shérifs' },
+            { accessor: 'sherifCount', title: 'Soins shérifs' },
             { accessor: 'patientsCount', title: 'Patients' },
             { accessor: 'infusionsCount', title: 'Infusions' },
             { accessor: 'poppyMilkCount', title: 'Lait de pavot' },
