@@ -186,7 +186,7 @@ const createIntranetSchema = dispensaryWeeklyActivityMetricsSchema
     z.object({
       periodStart: z.coerce.date(),
       periodEnd: z.coerce.date(),
-      targetUserId: z.string().uuid('Utilisateur invalide').optional(),
+      targetUserId: z.string().trim().min(1).max(191).optional(),
       displayName: z.string().trim().min(1).max(200).optional(),
     }),
   )
