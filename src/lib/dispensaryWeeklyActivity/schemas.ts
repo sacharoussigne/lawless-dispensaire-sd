@@ -62,6 +62,15 @@ export const dispensaryWeeklyActivityBotPatchSchema = z
     { message: 'La fin de période doit être après le début', path: ['periodEnd'] },
   );
 
+export const dispensaryWeeklyActivityBotCaisseBodySchema = z.object({
+  displayName: z.string().trim().min(1).max(200).optional(),
+});
+
+export const dispensaryWeeklyActivityBotPresenceBodySchema = z.object({
+  day: z.enum(['today', 'yesterday']),
+  displayName: z.string().trim().min(1).max(200).optional(),
+});
+
 export type DispensaryWeeklyActivityCreateInput = z.infer<typeof dispensaryWeeklyActivityCreateSchema>;
 export type DispensaryWeeklyActivityUpdateInput = z.infer<typeof dispensaryWeeklyActivityUpdateSchema>;
 export type DispensaryWeeklyActivityBotPatchInput = z.infer<typeof dispensaryWeeklyActivityBotPatchSchema>;

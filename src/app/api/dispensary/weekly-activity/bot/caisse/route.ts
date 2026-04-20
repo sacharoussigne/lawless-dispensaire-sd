@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { isDispensaryBotApiAuthorized, getDiscordUserIdFromBotRequest } from '@/lib/dispensaryWeeklyActivityApiAuth';
 import { loadSerializedWeeklyActivityById } from '@/lib/dispensaryWeeklyActivity/loadSerializedRow';
+import { dispensaryWeeklyActivityBotCaisseBodySchema } from '@/lib/dispensaryWeeklyActivity/schemas';
 import { botMarkChestForParisToday } from '@/lib/dispensaryWeeklyActivity/service';
 
 function jsonError(status: number, error: string) {
@@ -16,8 +17,25 @@ export async function POST(request: Request) {
     return jsonError(400, 'En-tête X-Discord-User-Id requis');
   }
 
+  const text = await request.text();
+  let body: unknown = {};
+  if (text.trim() !== '') {
+    try {
+      body = JSON.parse(text) as unknown;
+    } catch {
+      return jsonError(400, 'Corps JSON invalide');
+    }
+  }
+
+  const parsed = dispensaryWeeklyActivityBotCaisseBodySchema.safeParse(body);
+  if (!parsed.success) {
+    return jsonError(422, parsed.error.issues[0]?.message ?? 'Données invalides');
+  }
+
   try {
-    const result = await botMarkChestForParisToday(discordUserId);
+    const result = await botMarkChestForParisToday(discordUserId, {
+      displayName: parsed.data.displayName,
+    });
     if (result.outcome === 'already_done') {
       return NextResponse.json({
         status: 200,

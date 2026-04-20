@@ -215,14 +215,29 @@ Enregistre la **caisse pour le jour calendaire actuel en Europe/Paris** pour le 
 
 **En-têtes :** `Authorization`, `X-Discord-User-Id`
 
-**Corps :** aucun (ou `{}`).
+**Corps :** JSON optionnel (corps vide autorisé, ou `{}`).
+
+| Champ | Obligatoire | Description |
+|-------|-------------|-------------|
+| `displayName` | Non | Pseudo / nom RP du médecin (ex. depuis Discord). Si présent, **non vide** après trim, et **différent** du `displayName` stocké sur la ligne, le serveur met à jour le champ `displayName` (même règle que le reste de l’API : 1–200 caractères) avant d’enregistrer la caisse. Si identique au stocké, aucune mise à jour du nom. |
 
 **Réponse 200 — `data` :**
 
 - Si la caisse était déjà enregistrée pour ce jour : `{ "alreadyDone": true, "message": "…" }` (message en français).
 - Sinon : `{ "alreadyDone": false, "activity": { … } }` où `activity` a la même forme qu’un élément de liste (GET).
 
-Si aucune ligne ne couvre encore ce jour, le serveur **crée d’abord** une entrée d’activité pour la **semaine Europe/Paris** concernée (compteurs à 0, caisses/présences vides), avec un `displayName` = nom du compte intranet lié à ce Discord si disponible, sinon `Médecin <discordUserId>`, puis enregistre la caisse du jour.
+Si aucune ligne ne couvre encore ce jour, le serveur **crée d’abord** une entrée d’activité pour la **semaine Europe/Paris** concernée (compteurs à 0, caisses/présences vides). Le `displayName` initial est : valeur de **`displayName`** dans le corps si fournie, sinon nom du compte intranet lié à ce Discord si disponible, sinon `Médecin <discordUserId>`, puis enregistrement de la caisse du jour.
+
+**Exemple (corps avec nom RP) :**
+
+```bash
+curl -sS -X POST \
+  -H "Authorization: Bearer VOTRE_SECRET" \
+  -H "X-Discord-User-Id: 123456789012345678" \
+  -H "Content-Type: application/json" \
+  -d '{"displayName": "Dr. H. Morgan"}' \
+  "https://votre-domaine/api/dispensary/weekly-activity/bot/caisse"
+```
 
 ---
 
@@ -237,6 +252,7 @@ Enregistre la **présence** pour **aujourd’hui** ou **hier** (calendrier **Eur
 | Champ | Type | Description |
 |-------|------|-------------|
 | `day` | `"today"` \| `"yesterday"` | Jour cible (Paris) |
+| `displayName` | string | Optionnel ; même sémantique que pour **`POST …/bot/caisse`** (mise à jour du `displayName` stocké uniquement si fourni, non vide, et différent de la valeur actuelle). |
 
 **Réponse 200 — `data` :** même forme que pour `bot/caisse` (`alreadyDone` + `message` ou `activity`).
 
@@ -307,6 +323,6 @@ curl -sS -X DELETE \
 ## Fichiers de référence (code)
 
 - Routes : `src/app/api/dispensary/weekly-activity/route.ts`, `src/app/api/dispensary/weekly-activity/recap/route.ts`, `src/app/api/dispensary/weekly-activity/[id]/route.ts`, `src/app/api/dispensary/weekly-activity/bot/caisse/route.ts`, `src/app/api/dispensary/weekly-activity/bot/presence/route.ts`
-- Validation : `src/lib/dispensaryWeeklyActivity/schemas.ts`, `src/lib/dispensaryWeeklyActivity/weekdayFlags.ts`
+- Validation : `src/lib/dispensaryWeeklyActivity/schemas.ts` (dont schémas corps `bot/caisse` et `bot/presence`), `src/lib/dispensaryWeeklyActivity/weekdayFlags.ts`
 - Sérialisation : `src/lib/dispensaryWeeklyActivity/apiRow.ts`, `src/lib/dispensaryWeeklyActivity/loadSerializedRow.ts`
 - Vérification du secret : `src/lib/dispensaryWeeklyActivityApiAuth.ts`

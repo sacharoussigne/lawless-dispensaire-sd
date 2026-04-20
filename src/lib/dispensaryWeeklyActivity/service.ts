@@ -280,19 +280,30 @@ export async function findOrCreateDispensaryActivityForParisDay(
   client: WeeklyActivityDb,
   discordUserId: string,
   dayAnchor: Date,
+  preferredDisplayName?: string,
 ): Promise<DispensaryWeeklyActivity> {
-  const found = await findDispensaryActivityOverlappingParisDay(client, discordUserId, dayAnchor);
-  if (found) return found;
-
-  const { start, end } = getBankWeekBounds(dayAnchor);
-  const displayName = await resolveBotWeeklyActivityDisplayName(client, discordUserId);
-  const linkedUserId = await findLinkedUserIdByDiscordAccount(client, discordUserId);
+  const preferred =
+    preferredDisplayName !== undefined && preferredDisplayName.trim().length > 0
+      ? preferredDisplayName.trim().slice(0, 200)
+      : undefined;
 
   const actor: ActorContext = {
     source: 'DISCORD_BOT',
     actorUserId: null,
     actorDiscordUserId: discordUserId,
   };
+
+  const found = await findDispensaryActivityOverlappingParisDay(client, discordUserId, dayAnchor);
+  if (found) {
+    if (preferred && preferred !== found.displayName) {
+      return updateDispensaryWeeklyActivityWithHistory(found.id, { displayName: preferred }, actor);
+    }
+    return found;
+  }
+
+  const { start, end } = getBankWeekBounds(dayAnchor);
+  const displayName = preferred ?? (await resolveBotWeeklyActivityDisplayName(client, discordUserId));
+  const linkedUserId = await findLinkedUserIdByDiscordAccount(client, discordUserId);
 
   try {
     return await createDispensaryWeeklyActivityWithHistory(
@@ -312,7 +323,16 @@ export async function findOrCreateDispensaryActivityForParisDay(
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
       const raced = await findDispensaryActivityOverlappingParisDay(client, discordUserId, dayAnchor);
-      if (raced) return raced;
+      if (raced) {
+        if (preferred && preferred !== raced.displayName) {
+          return updateDispensaryWeeklyActivityWithHistory(
+            raced.id,
+            { displayName: preferred },
+            actor,
+          );
+        }
+        return raced;
+      }
     }
     throw e;
   }
@@ -322,9 +342,22 @@ export type BotChestMarkResult =
   | { outcome: 'already_done'; message: string }
   | { outcome: 'ok'; activity: DispensaryWeeklyActivity };
 
-export async function botMarkChestForParisToday(discordUserId: string): Promise<BotChestMarkResult> {
+export type BotWeeklyActivityRequestOptions = {
+  /** RP / Discord display name; updates stored `displayName` when different (trim, 1–200 chars). */
+  displayName?: string;
+};
+
+export async function botMarkChestForParisToday(
+  discordUserId: string,
+  options?: BotWeeklyActivityRequestOptions,
+): Promise<BotChestMarkResult> {
   const anchor = new Date();
-  const existing = await findOrCreateDispensaryActivityForParisDay(prisma, discordUserId, anchor);
+  const existing = await findOrCreateDispensaryActivityForParisDay(
+    prisma,
+    discordUserId,
+    anchor,
+    options?.displayName,
+  );
 
   const key = parisWeekdayKey(anchor);
   if (parseWeekdayFlagsJson(existing.chestDays)[key]) {
@@ -376,9 +409,15 @@ export type BotPresenceMarkResult =
 export async function botMarkPresenceForParisRelativeDay(
   discordUserId: string,
   relative: 'today' | 'yesterday',
+  options?: BotWeeklyActivityRequestOptions,
 ): Promise<BotPresenceMarkResult> {
   const dayAnchor = relative === 'today' ? parisTodayStartUtc() : parisYesterdayStartUtc();
-  const existing = await findOrCreateDispensaryActivityForParisDay(prisma, discordUserId, dayAnchor);
+  const existing = await findOrCreateDispensaryActivityForParisDay(
+    prisma,
+    discordUserId,
+    dayAnchor,
+    options?.displayName,
+  );
 
   const key = parisWeekdayKey(dayAnchor);
   if (parseWeekdayFlagsJson(existing.presenceDays)[key]) {
