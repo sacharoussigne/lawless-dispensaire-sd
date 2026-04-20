@@ -61,13 +61,15 @@ export async function GET(request: NextRequest) {
     a.resolvedDisplayName.localeCompare(b.resolvedDisplayName, 'fr', { sensitivity: 'base' }),
   );
 
+  
+
   return NextResponse.json({
     status: 200,
     data: {
       periodStart: periodStart.toISOString(),
       periodEnd: periodEnd.toISOString(),
-      rows: sorted.map((r) =>
-        serializeDispensaryWeeklyActivityApiRow({
+      rows: sorted.map((r) => {
+        return serializeDispensaryWeeklyActivityApiRow({
           id: r.id,
           periodStart: r.periodStart,
           periodEnd: r.periodEnd,
@@ -83,7 +85,8 @@ export async function GET(request: NextRequest) {
           poppyMilkCount: r.poppyMilkCount,
           createdAt: r.createdAt,
           updatedAt: r.updatedAt,
-        }),
+        })
+      },
       ),
     },
   });

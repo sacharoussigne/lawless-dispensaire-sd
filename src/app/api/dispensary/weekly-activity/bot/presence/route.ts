@@ -1,16 +1,12 @@
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
 import { isDispensaryBotApiAuthorized, getDiscordUserIdFromBotRequest } from '@/lib/dispensaryWeeklyActivityApiAuth';
 import { loadSerializedWeeklyActivityById } from '@/lib/dispensaryWeeklyActivity/loadSerializedRow';
+import { dispensaryWeeklyActivityBotPresenceBodySchema } from '@/lib/dispensaryWeeklyActivity/schemas';
 import { botMarkPresenceForParisRelativeDay } from '@/lib/dispensaryWeeklyActivity/service';
 
 function jsonError(status: number, error: string) {
   return NextResponse.json({ status, error }, { status });
 }
-
-const bodySchema = z.object({
-  day: z.enum(['today', 'yesterday']),
-});
 
 export async function POST(request: Request) {
   if (!isDispensaryBotApiAuthorized(request as Parameters<typeof isDispensaryBotApiAuthorized>[0])) {
@@ -28,13 +24,15 @@ export async function POST(request: Request) {
     return jsonError(400, 'Corps JSON invalide');
   }
 
-  const parsed = bodySchema.safeParse(body);
+  const parsed = dispensaryWeeklyActivityBotPresenceBodySchema.safeParse(body);
   if (!parsed.success) {
     return jsonError(422, parsed.error.issues[0]?.message ?? 'Données invalides');
   }
 
   try {
-    const result = await botMarkPresenceForParisRelativeDay(discordUserId, parsed.data.day);
+    const result = await botMarkPresenceForParisRelativeDay(discordUserId, parsed.data.day, {
+      displayName: parsed.data.displayName,
+    });
     if (result.outcome === 'already_done') {
       return NextResponse.json({
         status: 200,
