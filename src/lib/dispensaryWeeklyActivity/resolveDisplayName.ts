@@ -3,6 +3,26 @@ import { DISCORD_ACCOUNT_PROVIDER_ID } from '@/lib/dispensaryWeeklyActivity/cons
 
 type AccountDelegate = Pick<PrismaClient, 'account'>;
 
+/** Default `displayName` when the Discord bot auto-creates a weekly activity row. */
+export async function resolveBotWeeklyActivityDisplayName(
+  prisma: AccountDelegate,
+  discordUserId: string,
+): Promise<string> {
+  const acc = await prisma.account.findFirst({
+    where: {
+      providerId: DISCORD_ACCOUNT_PROVIDER_ID,
+      accountId: discordUserId,
+    },
+    include: { user: { select: { name: true } } },
+  });
+  const name = acc?.user?.name?.trim();
+  if (name && name.length > 0) {
+    return name.length > 200 ? name.slice(0, 200) : name;
+  }
+  const fallback = `Médecin ${discordUserId}`;
+  return fallback.length > 200 ? fallback.slice(0, 200) : fallback;
+}
+
 export async function findLinkedUserIdByDiscordAccount(
   prisma: AccountDelegate,
   discordUserId: string,
