@@ -222,7 +222,7 @@ Enregistre la **caisse pour le jour calendaire actuel en Europe/Paris** pour le 
 - Si la caisse était déjà enregistrée pour ce jour : `{ "alreadyDone": true, "message": "…" }` (message en français).
 - Sinon : `{ "alreadyDone": false, "activity": { … } }` où `activity` a la même forme qu’un élément de liste (GET).
 
-**404** — aucune ligne d’activité ne couvre ce jour pour ce Discord (créer d’abord une entrée pour la semaine concernée).
+Si aucune ligne ne couvre encore ce jour, le serveur **crée d’abord** une entrée d’activité pour la **semaine Europe/Paris** concernée (compteurs à 0, caisses/présences vides), avec un `displayName` = nom du compte intranet lié à ce Discord si disponible, sinon `Médecin <discordUserId>`, puis enregistre la caisse du jour.
 
 ---
 
@@ -240,7 +240,7 @@ Enregistre la **présence** pour **aujourd’hui** ou **hier** (calendrier **Eur
 
 **Réponse 200 — `data` :** même forme que pour `bot/caisse` (`alreadyDone` + `message` ou `activity`).
 
-**404** — aucune ligne ne couvre le jour demandé.
+Même logique de **création automatique** de la ligne de semaine si elle n’existait pas (voir `bot/caisse`).
 
 **422** — `day` invalide ou absent.
 

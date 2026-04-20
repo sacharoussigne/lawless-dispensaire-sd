@@ -6,7 +6,10 @@ import type {
   PrismaClient,
 } from '@prisma/client';
 import prisma from '@/lib/prisma';
-import { findLinkedUserIdByDiscordAccount } from '@/lib/dispensaryWeeklyActivity/resolveDisplayName';
+import {
+  findLinkedUserIdByDiscordAccount,
+  resolveBotWeeklyActivityDisplayName,
+} from '@/lib/dispensaryWeeklyActivity/resolveDisplayName';
 import { activityToSnapshot } from '@/lib/dispensaryWeeklyActivity/snapshot';
 import { getBankWeekBounds } from '@/lib/bankWeek';
 import type { DispensaryWeeklyActivityCreateInput, DispensaryWeeklyActivityUpdateInput } from '@/lib/dispensaryWeeklyActivity/schemas';
@@ -273,17 +276,55 @@ export async function deleteDispensaryWeeklyActivityWithHistory(
   });
 }
 
+export async function findOrCreateDispensaryActivityForParisDay(
+  client: WeeklyActivityDb,
+  discordUserId: string,
+  dayAnchor: Date,
+): Promise<DispensaryWeeklyActivity> {
+  const found = await findDispensaryActivityOverlappingParisDay(client, discordUserId, dayAnchor);
+  if (found) return found;
+
+  const { start, end } = getBankWeekBounds(dayAnchor);
+  const displayName = await resolveBotWeeklyActivityDisplayName(client, discordUserId);
+  const linkedUserId = await findLinkedUserIdByDiscordAccount(client, discordUserId);
+
+  const actor: ActorContext = {
+    source: 'DISCORD_BOT',
+    actorUserId: null,
+    actorDiscordUserId: discordUserId,
+  };
+
+  try {
+    return await createDispensaryWeeklyActivityWithHistory(
+      {
+        periodStart: start,
+        periodEnd: end,
+        displayName,
+        discordUserId,
+        userId: linkedUserId,
+        sherifCount: 0,
+        patientsCount: 0,
+        infusionsCount: 0,
+        poppyMilkCount: 0,
+      },
+      actor,
+    );
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+      const raced = await findDispensaryActivityOverlappingParisDay(client, discordUserId, dayAnchor);
+      if (raced) return raced;
+    }
+    throw e;
+  }
+}
+
 export type BotChestMarkResult =
-  | { outcome: 'not_found' }
   | { outcome: 'already_done'; message: string }
   | { outcome: 'ok'; activity: DispensaryWeeklyActivity };
 
 export async function botMarkChestForParisToday(discordUserId: string): Promise<BotChestMarkResult> {
   const anchor = new Date();
-  const existing = await findDispensaryActivityOverlappingParisDay(prisma, discordUserId, anchor);
-  if (!existing) {
-    return { outcome: 'not_found' };
-  }
+  const existing = await findOrCreateDispensaryActivityForParisDay(prisma, discordUserId, anchor);
 
   const key = parisWeekdayKey(anchor);
   if (parseWeekdayFlagsJson(existing.chestDays)[key]) {
@@ -296,7 +337,7 @@ export async function botMarkChestForParisToday(discordUserId: string): Promise<
   return prisma.$transaction(async (tx) => {
     const row = await tx.dispensaryWeeklyActivity.findUnique({ where: { id: existing.id } });
     if (!row) {
-      return { outcome: 'not_found' as const };
+      throw new Error('Activité introuvable');
     }
     const current = parseWeekdayFlagsJson(row.chestDays);
     if (current[key]) {
@@ -329,7 +370,6 @@ export async function botMarkChestForParisToday(discordUserId: string): Promise<
 }
 
 export type BotPresenceMarkResult =
-  | { outcome: 'not_found' }
   | { outcome: 'already_done'; message: string }
   | { outcome: 'ok'; activity: DispensaryWeeklyActivity };
 
@@ -338,10 +378,7 @@ export async function botMarkPresenceForParisRelativeDay(
   relative: 'today' | 'yesterday',
 ): Promise<BotPresenceMarkResult> {
   const dayAnchor = relative === 'today' ? parisTodayStartUtc() : parisYesterdayStartUtc();
-  const existing = await findDispensaryActivityOverlappingParisDay(prisma, discordUserId, dayAnchor);
-  if (!existing) {
-    return { outcome: 'not_found' };
-  }
+  const existing = await findOrCreateDispensaryActivityForParisDay(prisma, discordUserId, dayAnchor);
 
   const key = parisWeekdayKey(dayAnchor);
   if (parseWeekdayFlagsJson(existing.presenceDays)[key]) {
@@ -354,7 +391,7 @@ export async function botMarkPresenceForParisRelativeDay(
   return prisma.$transaction(async (tx) => {
     const row = await tx.dispensaryWeeklyActivity.findUnique({ where: { id: existing.id } });
     if (!row) {
-      return { outcome: 'not_found' as const };
+      throw new Error('Activité introuvable');
     }
     const current = parseWeekdayFlagsJson(row.presenceDays);
     if (current[key]) {
