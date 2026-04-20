@@ -39,7 +39,7 @@ Le code HTTP reprend le même ordre de grandeur que `status` dans le JSON.
 
 Les champs `periodStart` et `periodEnd` acceptent des **chaînes ISO 8601** dans le corps JSON (ex. `"2026-04-14T00:00:00.000Z"` ou `"2026-04-14"` selon ce que le parseur interprète). Les réponses renvoient des dates en **ISO string** (`toISOString()`).
 
-**Semaine canonique (UTC, lundi → dimanche)** : à chaque création ou mise à jour qui touche la période, le serveur **normalise** les deux dates vers la semaine ISO du calendrier **UTC** contenant `periodStart` (ou `periodEnd` seul en mise à jour) : `periodStart` = lundi `00:00:00.000Z`, `periodEnd` = dimanche `23:59:59.999Z`. Tu peux donc envoyer un instant au milieu de la semaine ; la ligne stockée utilisera toujours ces bornes. Évite d’envoyer un `periodEnd` au lundi `00:00:00.000Z` suivant (borne « exclusive ») : il sera recalculé vers le dimanche précédent.
+**Semaine canonique (Europe/Paris, lundi → dimanche)** : à chaque création ou mise à jour qui touche la période, le serveur **normalise** les deux dates vers la semaine paie du calendrier **Europe/Paris** contenant l’instant `periodStart` (ou `periodEnd` seul en mise à jour) : `periodStart` = lundi **00:00** (Paris), `periodEnd` = dimanche **fin de journée** (Paris, même règle que la banque). Tu peux envoyer un instant au milieu de la semaine ; la ligne stockée utilisera toujours ces bornes.
 
 Les compteurs sont des **entiers ≥ 0**.
 
@@ -93,21 +93,23 @@ curl -sS \
 
 ## `GET /api/dispensary/weekly-activity/recap?date=YYYY-MM-DD`
 
-Récapitulatif pour la **semaine UTC ISO** (lundi → dimanche, voir section *Dates et JSON*) qui contient le jour `date` (interprété comme jour calendaire **UTC**).
+Récapitulatif pour la **semaine Europe/Paris** (lundi → dimanche, voir section *Dates et JSON*) qui contient le jour `date` (interprété comme jour calendaire **Europe/Paris**).
 
-**En-têtes :** `Authorization` obligatoire ; **`X-Discord-User-Id` optionnel** — s’il est présent, seule la ligne de ce médecin pour cette semaine est renvoyée (0 ou 1 entrée dans `rows`) ; s’il est absent, **toutes** les lignes de la semaine sont renvoyées (récap équipe).
+Les lignes renvoyées sont celles dont la période **chevauche** cette semaine (inclut d’éventuelles anciennes lignes aux bornes UTC si elles intersectent encore la fenêtre Paris demandée).
+
+**En-têtes :** `Authorization` obligatoire ; **`X-Discord-User-Id` optionnel** — s’il est présent, seules les lignes de ce médecin qui chevauchent la semaine sont renvoyées ; s’il est absent, **toutes** les lignes concernées sont renvoyées (récap équipe).
 
 **Query :**
 
 | Paramètre | Obligatoire | Description |
 |-----------|-------------|-------------|
-| `date` | Oui | `YYYY-MM-DD` (UTC). Ex. `2026-04-15` désigne la semaine du 13 au 19 avril 2026 UTC. |
+| `date` | Oui | `YYYY-MM-DD` interprété en **Europe/Paris** (minuit local ce jour-là). |
 
 **Réponse 200 — `data` :**
 
 | Champ | Type | Description |
 |-------|------|-------------|
-| `periodStart`, `periodEnd` | string ISO | Bornes canoniques de la semaine |
+| `periodStart`, `periodEnd` | string ISO | Bornes canoniques de la semaine (Paris) pour la requête |
 | `rows` | array | Même forme d’objets que le `GET` liste (tri par `resolvedDisplayName`, locale `fr`) |
 
 **Erreurs :** **400** — `date` manquant ou format invalide ; **401** — secret invalide.
@@ -117,7 +119,7 @@ Récapitulatif pour la **semaine UTC ISO** (lundi → dimanche, voir section *Da
 ```bash
 curl -sS \
   -H "Authorization: Bearer VOTRE_SECRET" \
-  "https://votre-domaine/api/dispensary/weekly-activity/recap?date=2026-04-15"
+  "/api/dispensary/weekly-activity/recap?date=2026-04-15"
 ```
 
 ---
@@ -159,8 +161,8 @@ curl -sS -X POST \
   -H "X-Discord-User-Id: 123456789012345678" \
   -H "Content-Type: application/json" \
   -d '{
-    "periodStart": "2026-04-13T00:00:00.000Z",
-    "periodEnd": "2026-04-19T23:59:59.999Z",
+    "periodStart": "2026-04-13T00:00:00.000+02:00",
+    "periodEnd": "2026-04-19T23:59:59.999+02:00",
     "displayName": "Dr. Dupont",
     "discordUserId": "123456789012345678",
     "chestCount": 2,

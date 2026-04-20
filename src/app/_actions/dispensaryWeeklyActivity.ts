@@ -11,6 +11,7 @@ import {
   canViewWeeklyDispensaryActivity,
   isWeeklyActivityOwner,
 } from '@/lib/dispensaryWeeklyActivity/access';
+import { DISCORD_ACCOUNT_PROVIDER_ID } from '@/lib/dispensaryWeeklyActivity/constants';
 import {
   findLinkedUserIdByDiscordAccount,
   getDiscordAccountIdForUser,
@@ -185,7 +186,7 @@ const createIntranetSchema = dispensaryWeeklyActivityMetricsSchema
     z.object({
       periodStart: z.coerce.date(),
       periodEnd: z.coerce.date(),
-      discordUserId: z.string().trim().min(1).max(40).optional(),
+      targetUserId: z.string().uuid('Utilisateur invalide').optional(),
       displayName: z.string().trim().min(1).max(200).optional(),
     }),
   )
@@ -193,6 +194,32 @@ const createIntranetSchema = dispensaryWeeklyActivityMetricsSchema
     message: 'La fin de période doit être après le début',
     path: ['periodEnd'],
   });
+
+export async function listDispensaryWeeklyActivityTargets() {
+  try {
+    const gate = await requireWeeklyActivityEdit();
+    if (!gate.ok) {
+      return gate.response;
+    }
+    if (!canEditAllWeeklyDispensaryActivity(gate.session.user.role)) {
+      return { status: 403 as const, error: 'Permission refusée' };
+    }
+
+    const users = await prisma.user.findMany({
+      where: {
+        accounts: {
+          some: { providerId: DISCORD_ACCOUNT_PROVIDER_ID },
+        },
+      },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    });
+
+    return { status: 200 as const, data: { users } };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors du chargement des utilisateurs');
+  }
+}
 
 export async function createDispensaryWeeklyActivity(input: z.infer<typeof createIntranetSchema>) {
   try {
@@ -211,6 +238,7 @@ export async function createDispensaryWeeklyActivity(input: z.infer<typeof creat
 
     let discordUserId: string;
     let displayName: string;
+    let resolvedUserId: string | null;
 
     if (!editAll) {
       const ownDiscord = await getDiscordAccountIdForUser(prisma, session.user.id);
@@ -222,22 +250,39 @@ export async function createDispensaryWeeklyActivity(input: z.infer<typeof creat
       }
       discordUserId = ownDiscord;
       displayName = session.user.name;
+      resolvedUserId = session.user.id;
     } else {
-      if (!parsed.data.discordUserId || !parsed.data.displayName) {
-        return { status: 400 as const, error: 'Nom affiché et Discord ID requis' };
+      if (!parsed.data.targetUserId) {
+        return { status: 400 as const, error: 'Sélectionnez un médecin' };
       }
-      discordUserId = parsed.data.discordUserId;
-      displayName = parsed.data.displayName;
+      const target = await prisma.user.findUnique({
+        where: { id: parsed.data.targetUserId },
+        select: { id: true, name: true },
+      });
+      if (!target) {
+        return { status: 400 as const, error: 'Utilisateur introuvable' };
+      }
+      const targetDiscord = await getDiscordAccountIdForUser(prisma, target.id);
+      if (!targetDiscord) {
+        return {
+          status: 400 as const,
+          error: 'Ce compte intranet n’a pas de Discord lié.',
+        };
+      }
+      discordUserId = targetDiscord;
+      displayName = (parsed.data.displayName?.trim() || target.name).trim();
+      resolvedUserId = target.id;
     }
 
     const linked = await findLinkedUserIdByDiscordAccount(prisma, discordUserId);
+    const userIdForRow = resolvedUserId ?? linked ?? null;
 
     const validated = dispensaryWeeklyActivityCreateSchema.safeParse({
       periodStart: parsed.data.periodStart,
       periodEnd: parsed.data.periodEnd,
       displayName,
       discordUserId,
-      userId: linked ?? null,
+      userId: userIdForRow,
       chestCount: parsed.data.chestCount,
       sheriffPatientsCount: parsed.data.sheriffPatientsCount,
       patientsCount: parsed.data.patientsCount,

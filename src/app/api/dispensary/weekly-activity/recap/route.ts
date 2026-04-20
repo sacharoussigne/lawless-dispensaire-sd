@@ -4,7 +4,8 @@ import { isDispensaryBotApiAuthorized, getDiscordUserIdFromBotRequest } from '@/
 import prisma from '@/lib/prisma';
 import { mergeResolvedDisplayNames } from '@/lib/dispensaryWeeklyActivity/resolveDisplayName';
 import { syncActivityUserIdFromDiscordIfMissing } from '@/lib/dispensaryWeeklyActivity/service';
-import { getUtcIsoWeekRange, utcMidnightFromYmd } from '@/lib/dispensaryWeeklyActivity/utcIsoWeek';
+import { getBankWeekBounds } from '@/lib/bankWeek';
+import dayjs from '@/lib/dayjs';
 
 function jsonError(status: number, error: string) {
   return NextResponse.json({ status, error }, { status });
@@ -19,27 +20,25 @@ export async function GET(request: NextRequest) {
 
   const dateParam = request.nextUrl.searchParams.get('date')?.trim() ?? '';
   if (!YMD.test(dateParam)) {
-    return jsonError(400, 'Paramètre date requis (YYYY-MM-DD, calendrier UTC)');
+    return jsonError(400, 'Paramètre date requis (YYYY-MM-DD, calendrier Europe/Paris)');
   }
 
-  let anchor: Date;
-  try {
-    anchor = utcMidnightFromYmd(dateParam);
-    if (Number.isNaN(anchor.getTime())) {
-      return jsonError(400, 'Date invalide');
-    }
-  } catch {
+  const anchorParis = dayjs.tz(dateParam, 'YYYY-MM-DD', 'Europe/Paris').startOf('day');
+  if (!anchorParis.isValid()) {
     return jsonError(400, 'Date invalide');
   }
 
-  const { periodStart, periodEnd } = getUtcIsoWeekRange(anchor);
+  const { start: periodStart, end: periodEnd } = getBankWeekBounds(anchorParis.toDate());
   const optionalDiscord = getDiscordUserIdFromBotRequest(request);
 
+  const overlapWhere = {
+    periodStart: { lte: periodEnd },
+    periodEnd: { gte: periodStart },
+    ...(optionalDiscord ? { discordUserId: optionalDiscord } : {}),
+  };
+
   const initial = await prisma.dispensaryWeeklyActivity.findMany({
-    where: {
-      periodStart,
-      ...(optionalDiscord ? { discordUserId: optionalDiscord } : {}),
-    },
+    where: overlapWhere,
     include: { user: { select: { name: true } } },
     orderBy: [{ displayName: 'asc' }, { discordUserId: 'asc' }],
   });
@@ -51,10 +50,7 @@ export async function GET(request: NextRequest) {
   }
 
   const refreshed = await prisma.dispensaryWeeklyActivity.findMany({
-    where: {
-      periodStart,
-      ...(optionalDiscord ? { discordUserId: optionalDiscord } : {}),
-    },
+    where: overlapWhere,
     include: { user: { select: { name: true } } },
     orderBy: [{ displayName: 'asc' }, { discordUserId: 'asc' }],
   });

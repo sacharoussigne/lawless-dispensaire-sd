@@ -8,8 +8,13 @@ import type {
 import prisma from '@/lib/prisma';
 import { findLinkedUserIdByDiscordAccount } from '@/lib/dispensaryWeeklyActivity/resolveDisplayName';
 import { activityToSnapshot } from '@/lib/dispensaryWeeklyActivity/snapshot';
+import { getBankWeekBounds } from '@/lib/bankWeek';
 import type { DispensaryWeeklyActivityCreateInput, DispensaryWeeklyActivityUpdateInput } from '@/lib/dispensaryWeeklyActivity/schemas';
-import { getUtcIsoWeekRange } from '@/lib/dispensaryWeeklyActivity/utcIsoWeek';
+
+function normalizeParisWeekBounds(anchor: Date): { periodStart: Date; periodEnd: Date } {
+  const { start, end } = getBankWeekBounds(anchor);
+  return { periodStart: start, periodEnd: end };
+}
 
 type WeeklyActivityDb = Pick<PrismaClient, 'dispensaryWeeklyActivity' | 'account'>;
 
@@ -85,7 +90,7 @@ export async function createDispensaryWeeklyActivityWithHistory(
   const linkedUserId =
     input.userId ?? (await findLinkedUserIdByDiscordAccount(prisma, input.discordUserId));
 
-  const { periodStart, periodEnd } = getUtcIsoWeekRange(input.periodStart);
+  const { periodStart, periodEnd } = normalizeParisWeekBounds(input.periodStart);
 
   return prisma.$transaction(async (tx) => {
     const created = await tx.dispensaryWeeklyActivity.create({
@@ -135,7 +140,7 @@ export async function updateDispensaryWeeklyActivityWithHistory(
     const data: Prisma.DispensaryWeeklyActivityUpdateInput = {};
     if (input.periodStart !== undefined || input.periodEnd !== undefined) {
       const anchor = (input.periodStart ?? input.periodEnd)!;
-      const normalized = getUtcIsoWeekRange(anchor);
+      const normalized = normalizeParisWeekBounds(anchor);
       data.periodStart = normalized.periodStart;
       data.periodEnd = normalized.periodEnd;
     }
