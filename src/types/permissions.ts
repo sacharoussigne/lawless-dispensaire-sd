@@ -26,6 +26,11 @@ export interface Permissions {
     view: boolean;
     create: boolean;
   };
+  weeklyDispensaryActivity: {
+    view: boolean;
+    editOwn: boolean;
+    editAll: boolean;
+  };
 }
 
 export interface PermissionsContextType {

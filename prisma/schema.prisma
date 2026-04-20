@@ -27,6 +27,8 @@ model User {
   mails        Mail[]
   uiPreferences UserUiPreferences?
   payrollWeeklyReports PayrollWeeklyReport[]
+  dispensaryWeeklyActivities DispensaryWeeklyActivity[]
+  dispensaryWeeklyActivityHistoryAsActor DispensaryWeeklyActivityHistory[] @relation("DispensaryWeeklyActivityHistoryActor")
 
   @@unique([email])
   @@map("user")
@@ -129,6 +131,7 @@ model AppSettings {
   featureSearchEnabled         Boolean  @default(true)
   featureMailsEnabled          Boolean  @default(true)
   featurePayrollEnabled        Boolean  @default(true)
+  featureWeeklyDispensaryActivityEnabled Boolean @default(true)
   createdAt                    DateTime @default(now())
   updatedAt                    DateTime @updatedAt
 
@@ -546,4 +549,66 @@ model PrivatePracticePatient {
   @@index([weekId])
   @@index([date])
   @@map("private_practice_patient")
+}
+
+enum DispensaryWeeklyActivityHistoryAction {
+  CREATE
+  DELETE
+  UPDATE
+  INCREMENT_CHEST
+  DECREMENT_CHEST
+  INCREMENT_SHERIFF
+  DECREMENT_SHERIFF
+  INCREMENT_PATIENTS
+  DECREMENT_PATIENTS
+  INCREMENT_INFUSIONS
+  DECREMENT_INFUSIONS
+  INCREMENT_POPPY_MILK
+  DECREMENT_POPPY_MILK
+}
+
+enum DispensaryWeeklyActivityHistorySource {
+  INTRANET
+  DISCORD_BOT
+}
+
+model DispensaryWeeklyActivity {
+  id                   String   @id @default(uuid())
+  periodStart          DateTime
+  periodEnd            DateTime
+  displayName          String
+  discordUserId        String
+  userId               String?
+  user                 User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  chestCount           Int      @default(0)
+  sheriffPatientsCount Int      @default(0)
+  patientsCount        Int      @default(0)
+  infusionsCount       Int      @default(0)
+  poppyMilkCount       Int      @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  history              DispensaryWeeklyActivityHistory[]
+
+  @@unique([discordUserId, periodStart, periodEnd])
+  @@index([discordUserId])
+  @@index([userId])
+  @@map("dispensary_weekly_activity")
+}
+
+model DispensaryWeeklyActivityHistory {
+  id                 String                            @id @default(uuid())
+  activityId         String?
+  activity           DispensaryWeeklyActivity?         @relation(fields: [activityId], references: [id], onDelete: SetNull)
+  action             DispensaryWeeklyActivityHistoryAction
+  source             DispensaryWeeklyActivityHistorySource
+  actorUserId        String?
+  actorUser          User?                             @relation("DispensaryWeeklyActivityHistoryActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  actorDiscordUserId String?
+  previousValues     Json?
+  nextValues         Json?
+  createdAt          DateTime                          @default(now())
+
+  @@index([activityId])
+  @@index([actorUserId])
+  @@map("dispensary_weekly_activity_history")
 }

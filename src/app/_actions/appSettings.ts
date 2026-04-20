@@ -26,6 +26,7 @@ const updateSchema = z.object({
   featureSearchEnabled: z.boolean(),
   featureMailsEnabled: z.boolean(),
   featurePayrollEnabled: z.boolean(),
+  featureWeeklyDispensaryActivityEnabled: z.boolean(),
 });
 
 export async function getAppSettingsForAdmin(): Promise<
@@ -92,6 +93,8 @@ export async function updateAppSettings(
         featureSearchEnabled: parsed.data.featureSearchEnabled,
         featureMailsEnabled: parsed.data.featureMailsEnabled,
         featurePayrollEnabled: parsed.data.featurePayrollEnabled,
+        featureWeeklyDispensaryActivityEnabled:
+          parsed.data.featureWeeklyDispensaryActivityEnabled,
       },
       update: {
         dispensaryName: parsed.data.dispensaryName,
@@ -102,6 +105,8 @@ export async function updateAppSettings(
         featureSearchEnabled: parsed.data.featureSearchEnabled,
         featureMailsEnabled: parsed.data.featureMailsEnabled,
         featurePayrollEnabled: parsed.data.featurePayrollEnabled,
+        featureWeeklyDispensaryActivityEnabled:
+          parsed.data.featureWeeklyDispensaryActivityEnabled,
       },
     });
 
@@ -116,6 +121,7 @@ export async function updateAppSettings(
       featureSearchEnabled: row.featureSearchEnabled,
       featureMailsEnabled: row.featureMailsEnabled,
       featurePayrollEnabled: row.featurePayrollEnabled,
+      featureWeeklyDispensaryActivityEnabled: row.featureWeeklyDispensaryActivityEnabled,
     };
 
     return { status: 200, data };

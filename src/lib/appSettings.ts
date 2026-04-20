@@ -27,6 +27,7 @@ function mapFromDb(row: {
   featureSearchEnabled: boolean;
   featureMailsEnabled: boolean;
   featurePayrollEnabled: boolean;
+  featureWeeklyDispensaryActivityEnabled: boolean;
 }): AppSettingsDTO {
   return {
     dispensaryName: row.dispensaryName?.trim() || APP_SETTINGS_DEFAULTS.dispensaryName,
@@ -37,6 +38,7 @@ function mapFromDb(row: {
     featureSearchEnabled: row.featureSearchEnabled,
     featureMailsEnabled: row.featureMailsEnabled,
     featurePayrollEnabled: row.featurePayrollEnabled,
+    featureWeeklyDispensaryActivityEnabled: row.featureWeeklyDispensaryActivityEnabled,
   };
 }
 
