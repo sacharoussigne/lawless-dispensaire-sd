@@ -12,7 +12,7 @@ import {
   PAYROLL_OFFERED_ITEM_USD,
   PAYROLL_PATIENT_CARE_USD,
 } from '@/lib/payroll/constants';
-import { mergeHtmlAndWeeklyActivity } from '@/lib/payroll/mergeWeeklyActivity';
+import { mergeHtmlAndWeeklyActivity, type WaRow } from '@/lib/payroll/mergeWeeklyActivity';
 import { type ParsedPayrollTable, parsePayrollHtmlTable } from '@/lib/payroll/parsePayrollHtmlTable';
 import { payrollReportResultSchema } from '@/lib/payroll/schema';
 import { weekRangeFromIsoDate } from '@/lib/payroll/week';
@@ -98,9 +98,15 @@ export async function createPayrollReportFromForm(formData: FormData) {
     offeredItemPriceUsd = n;
   }
 
+  const importWaRaw = formData.get('importWeeklyActivity');
+  const importWeeklyActivity =
+    importWaRaw === '1' || importWaRaw === 'on' || importWaRaw === 'true';
+
   const waWeekRef = formData.get('weeklyActivityWeekStart');
   const waWeekStartStr =
-    typeof waWeekRef === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(waWeekRef.trim())
+    importWeeklyActivity &&
+    typeof waWeekRef === 'string' &&
+    /^\d{4}-\d{2}-\d{2}$/.test(waWeekRef.trim())
       ? waWeekRef.trim()
       : null;
 
@@ -124,22 +130,32 @@ export async function createPayrollReportFromForm(formData: FormData) {
     return { status: 400, error: msg };
   }
 
-  const { weekStart: waImportStart, weekEnd: waImportEnd } = weekRangeFromIsoDate(
-    waWeekStartStr ?? weekStartStr,
-  );
+  let activitiesWithNames: WaRow[] = [];
+  let waImportStart: Date | undefined;
+  let waImportEnd: Date | undefined;
 
-  const rawActivities = await prisma.dispensaryWeeklyActivity.findMany({
-    where: { periodStart: waImportStart, periodEnd: waImportEnd },
-    include: { user: { select: { name: true } } },
-  });
-  const activitiesWithNames = await mergeResolvedDisplayNames(prisma, rawActivities);
+  if (importWeeklyActivity) {
+    const range = weekRangeFromIsoDate(waWeekStartStr ?? weekStartStr);
+    waImportStart = range.weekStart;
+    waImportEnd = range.weekEnd;
+    const rawActivities = await prisma.dispensaryWeeklyActivity.findMany({
+      where: { periodStart: waImportStart, periodEnd: waImportEnd },
+      include: { user: { select: { name: true } } },
+    });
+    activitiesWithNames = (await mergeResolvedDisplayNames(
+      prisma,
+      rawActivities,
+    )) as WaRow[];
+  }
+
   const employeesMerged = mergeHtmlAndWeeklyActivity(parsed, activitiesWithNames);
 
   if (employeesMerged.length === 0) {
     return {
       status: 400,
-      error:
-        'Aucune donnée : collez le tableau HTML et/ou assurez-vous qu’il existe des entrées d’activité hebdomadaire pour la semaine d’import choisie.',
+      error: importWeeklyActivity
+        ? 'Aucune donnée : collez le tableau HTML et/ou assurez-vous qu’il existe des entrées d’activité hebdomadaire pour la semaine d’import choisie.'
+        : 'Collez le tableau HTML (au moins une ligne employé) ou activez l’import d’activité hebdomadaire.',
     };
   }
 
@@ -170,10 +186,14 @@ export async function createPayrollReportFromForm(formData: FormData) {
         caisse_sale_price_usd: caisseSalePriceUsd,
         patient_care_price_usd: patientCarePriceUsd,
         offered_item_price_usd: offeredItemPriceUsd,
-        weekly_activity_import: {
-          weekStart: waImportStart.toISOString(),
-          weekEnd: waImportEnd.toISOString(),
-        },
+        ...(importWeeklyActivity && waImportStart && waImportEnd
+          ? {
+              weekly_activity_import: {
+                weekStart: waImportStart.toISOString(),
+                weekEnd: waImportEnd.toISOString(),
+              },
+            }
+          : {}),
       }),
     );
 

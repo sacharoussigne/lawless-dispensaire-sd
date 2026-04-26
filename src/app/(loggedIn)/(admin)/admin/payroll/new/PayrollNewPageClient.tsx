@@ -4,6 +4,7 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   Container,
   Group,
   NumberInput,
@@ -53,6 +54,7 @@ function SectionHeader({ icon: Icon, children }: { icon: typeof IconCalendarWeek
 export default function PayrollNewPageClient() {
   const router = useRouter();
   const [weekDate, setWeekDate] = useState<string | null>(format(new Date(), 'yyyy-MM-dd'));
+  const [importWeeklyActivity, setImportWeeklyActivity] = useState(false);
   const [waWeekDate, setWaWeekDate] = useState<string | null>(format(new Date(), 'yyyy-MM-dd'));
   const [caisseSalePriceUsd, setCaisseSalePriceUsd] = useState<number>(PAYROLL_CAISSE_SALE_USD);
   const [caissePriceUsd, setCaissePriceUsd] = useState<number>(PAYROLL_CAISSE_USD);
@@ -94,7 +96,14 @@ export default function PayrollNewPageClient() {
       notifications.show({ title: 'Date requise', message: 'Choisissez une date dans la semaine.', color: 'red' });
       return;
     }
-    const waWeek = waWeekDate ?? weekStart;
+    if (!importWeeklyActivity && !tableHtml.trim()) {
+      notifications.show({
+        title: 'Données manquantes',
+        message: 'Sans import weekly activity, collez le HTML du tableau des salaires.',
+        color: 'red',
+      });
+      return;
+    }
     if (
       !Number.isFinite(caissePriceUsd) ||
       caissePriceUsd <= 0 ||
@@ -153,7 +162,12 @@ export default function PayrollNewPageClient() {
       fd.set('caisseSalePriceUsd', String(caisseSalePriceUsd));
       fd.set('patientCarePriceUsd', String(patientCarePriceUsd));
       fd.set('offeredItemPriceUsd', String(offeredItemPriceUsd));
-      fd.set('weeklyActivityWeekStart', waWeek);
+      if (importWeeklyActivity) {
+        fd.set('importWeeklyActivity', '1');
+        fd.set('weeklyActivityWeekStart', waWeekDate ?? weekStart);
+      } else {
+        fd.set('importWeeklyActivity', '0');
+      }
 
       const result = await createPayrollReportFromForm(fd);
       const data = handleAction(result);
@@ -199,8 +213,8 @@ export default function PayrollNewPageClient() {
           Nouveau rapport
         </Title>
         <Text size="sm" c="dimmed" maw={520} mb="xl">
-          Semaine de référence du rapport, semaine d’import de l’activité Discord (ou identique), tarifs, puis optionnel
-          le HTML du tableau : fusion avec max / union selon le plan d’import.
+          Semaine du rapport, tarifs, optionnellement fusion avec l’activité hebdomadaire Discord, et tableau HTML
+          (obligatoire si vous n’activez pas l’import weekly activity).
         </Text>
 
         <Stack gap="lg">
@@ -225,23 +239,34 @@ export default function PayrollNewPageClient() {
 
           <Paper withBorder p={{ base: 'md', sm: 'lg' }} radius="md" shadow="xs">
             <SectionHeader icon={IconCalendarWeek}>Import weekly activity</SectionHeader>
-            <DateInput
-              label="Date dans la semaine à importer (Discord)"
-              description="Sert à charger et fusionner `dispensary_weekly_activity` pour cette semaine. Par défaut, aligné sur la semaine du rapport."
-              placeholder="JJ/MM/AAAA"
-              value={waWeekDate}
-              onChange={setWaWeekDate}
-              maxDate={format(new Date(), 'yyyy-MM-dd')}
-              valueFormat="DD/MM/YYYY"
-              size="md"
-              clearable={false}
-              popoverProps={{ withinPortal: true }}
+            <Checkbox
+              label="Importer et fusionner l’activité hebdomadaire (Discord / intranet)"
+              description="Désactivé : uniquement le tableau HTML, sans requête sur les données d’activité."
+              checked={importWeeklyActivity}
+              onChange={(e) => setImportWeeklyActivity(e.currentTarget.checked)}
+              mb="md"
             />
-            {knownWaWeeks.length > 0 && (
-              <Text size="xs" c="dimmed" mt="xs">
-                Semaines connues en base (aperçu)&nbsp;: {knownWaWeeks.slice(0, 4).map((k) => k.value).join(', ')}
-                {knownWaWeeks.length > 4 ? '…' : ''}
-              </Text>
+            {importWeeklyActivity && (
+              <>
+                <DateInput
+                  label="Date dans la semaine à importer"
+                  description="Semaine de référence pour charger les entrées d’activité (lundi–dimanche, Paris). Par défaut : même que le rapport."
+                  placeholder="JJ/MM/AAAA"
+                  value={waWeekDate}
+                  onChange={setWaWeekDate}
+                  maxDate={format(new Date(), 'yyyy-MM-dd')}
+                  valueFormat="DD/MM/YYYY"
+                  size="md"
+                  clearable={false}
+                  popoverProps={{ withinPortal: true }}
+                />
+                {knownWaWeeks.length > 0 && (
+                  <Text size="xs" c="dimmed" mt="xs">
+                    Semaines connues en base (aperçu)&nbsp;: {knownWaWeeks.slice(0, 4).map((k) => k.value).join(', ')}
+                    {knownWaWeeks.length > 4 ? '…' : ''}
+                  </Text>
+                )}
+              </>
             )}
           </Paper>
 
@@ -326,11 +351,20 @@ export default function PayrollNewPageClient() {
           <Paper withBorder p={{ base: 'md', sm: 'lg' }} radius="md" shadow="xs">
             <SectionHeader icon={IconTable}>Tableau HTML</SectionHeader>
             <Alert variant="light" color="gray" icon={<IconInfoCircle size={18} />} mb="md" radius="sm">
-              Colle la balise <Text span ff="monospace" size="xs">{`<table>…</table>`}</Text> telle qu’exportée, ou
-              laisse vide si toutes les données viennent de l’activité hebdo pour la semaine d’import.
+              {importWeeklyActivity ? (
+                <>
+                  Colle la balise <Text span ff="monospace" size="xs">{`<table>…</table>`}</Text> si tu en as une, ou
+                  laisse vide si toute l’équipe est couverte par l’activité hebdomadaire importée.
+                </>
+              ) : (
+                <>
+                  Colle la balise <Text span ff="monospace" size="xs">{`<table>…</table>`}</Text> telle qu’exportée.
+                  L’import weekly activity est désactivé : le HTML est requis.
+                </>
+              )}
             </Alert>
             <Textarea
-              label="Source HTML (optionnel si import WA suffit)"
+              label={importWeeklyActivity ? 'Source HTML (optionnel)' : 'Source HTML (requis)'}
               description={`${htmlCharCount.toLocaleString('fr-FR')} caractère${htmlCharCount === 1 ? '' : 's'}`}
               placeholder="<table>...</table>"
               value={tableHtml}
