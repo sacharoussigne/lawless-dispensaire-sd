@@ -73,10 +73,10 @@ function payrollRpDisplayDate(d: Date): Date {
   return subYears(d, PAYROLL_RP_DISPLAY_YEAR_OFFSET);
 }
 
-function wireTransferDescription(weekStart: Date, weekEnd: Date): string {
+function wireTransferDescription(weekStart: Date, weekEnd: Date, reportType: string): string {
   const displayStart = payrollRpDisplayDate(weekStart);
   const displayEnd = payrollRpDisplayDate(weekEnd);
-  return `Salaire Semaine ${format(displayStart, 'dd MMMM yyyy', { locale: fr })} au ${format(displayEnd, 'dd MMMM yyyy', { locale: fr })} - N°${getISOWeek(weekStart)}`;
+  return `Salaire — ${reportType} — Semaine ${format(displayStart, 'dd MMMM yyyy', { locale: fr })} au ${format(displayEnd, 'dd MMMM yyyy', { locale: fr })} - N°${getISOWeek(weekStart)}`;
 }
 
 function CopyableCell({
@@ -125,6 +125,7 @@ export default function PayrollReportDetail({
     id: string;
     weekStart: string;
     weekEnd: string;
+    reportType: string;
     resultJson: Prisma.JsonValue;
     errorMessage: string | null;
     createdAt: string;
@@ -290,7 +291,7 @@ export default function PayrollReportDetail({
 
   const weekStartDate = new Date(report.weekStart);
   const weekEndDate = new Date(report.weekEnd);
-  const wireDescription = wireTransferDescription(weekStartDate, weekEndDate);
+  const wireDescription = wireTransferDescription(weekStartDate, weekEndDate, report.reportType);
 
   return (
     <Container size="xl" py="xl">
@@ -311,7 +312,10 @@ export default function PayrollReportDetail({
             Semaine du {format(payrollRpDisplayDate(weekStartDate), 'dd MMMM yyyy', { locale: fr })} au{' '}
             {format(payrollRpDisplayDate(weekEndDate), 'dd MMMM yyyy', { locale: fr })}
           </Title>
-          <Text size="sm" c="dimmed" mt={4}>
+          <Text size="sm" fw={500} mt="xs">
+            {report.reportType}
+          </Text>
+          <Text size="sm" c="dimmed" mt="xs">
             Par {report.createdBy.name} — {format(new Date(report.createdAt), 'Pp', { locale: fr })}
           </Text>
           {draft?.weekly_activity_import && (

@@ -9,6 +9,7 @@ import {
   Group,
   NumberInput,
   Paper,
+  Select,
   SimpleGrid,
   Stack,
   Text,
@@ -35,10 +36,14 @@ import {
   PAYROLL_CAISSE_USD,
   PAYROLL_OFFERED_ITEM_USD,
   PAYROLL_PATIENT_CARE_USD,
+  PAYROLL_REPORT_TYPE_EMPLOYES,
+  PAYROLL_REPORT_TYPES,
 } from '@/lib/payroll/constants';
 import { routes } from '@/types/routes';
 
 const MAX_CAISSE_PRICE_USD = 1_000_000;
+
+const REPORT_TYPE_SELECT_DATA = PAYROLL_REPORT_TYPES.map((t) => ({ value: t, label: t }));
 
 function SectionHeader({ icon: Icon, children }: { icon: typeof IconCalendarWeek; children: ReactNode }) {
   return (
@@ -61,6 +66,7 @@ export default function PayrollNewPageClient() {
   const [patientCarePriceUsd, setPatientCarePriceUsd] = useState<number>(PAYROLL_PATIENT_CARE_USD);
   const [offeredItemPriceUsd, setOfferedItemPriceUsd] = useState<number>(PAYROLL_OFFERED_ITEM_USD);
   const [tableHtml, setTableHtml] = useState('');
+  const [reportType, setReportType] = useState<string>(PAYROLL_REPORT_TYPE_EMPLOYES);
   const [submitting, setSubmitting] = useState(false);
   const [knownWaWeeks, setKnownWaWeeks] = useState<{ value: string; label: string }[]>([]);
 
@@ -162,6 +168,7 @@ export default function PayrollNewPageClient() {
       fd.set('caisseSalePriceUsd', String(caisseSalePriceUsd));
       fd.set('patientCarePriceUsd', String(patientCarePriceUsd));
       fd.set('offeredItemPriceUsd', String(offeredItemPriceUsd));
+      fd.set('reportType', reportType);
       if (importWeeklyActivity) {
         fd.set('importWeeklyActivity', '1');
         fd.set('weeklyActivityWeekStart', waWeekDate ?? weekStart);
@@ -235,6 +242,16 @@ export default function PayrollNewPageClient() {
             <Text size="xs" c="dimmed" mt="sm">
               La plage « semaine du … au … » du rapport est dérivée automatiquement (lundi–dimanche, heure de Paris).
             </Text>
+            <Select
+              label="Type de rapport"
+              description="Vous pouvez créer un second rapport sur la même semaine avec un type différent."
+              data={REPORT_TYPE_SELECT_DATA}
+              value={reportType}
+              onChange={(v) => setReportType(v ?? PAYROLL_REPORT_TYPE_EMPLOYES)}
+              size="md"
+              mt="md"
+              allowDeselect={false}
+            />
           </Paper>
 
           <Paper withBorder p={{ base: 'md', sm: 'lg' }} radius="md" shadow="xs">

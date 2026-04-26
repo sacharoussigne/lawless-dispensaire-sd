@@ -16,6 +16,7 @@ export interface PayrollReportListItem {
   id: string;
   weekStart: string;
   weekEnd: string;
+  reportType: string;
   createdAt: string;
   createdBy: { name: string; id: string };
 }
@@ -68,6 +69,11 @@ export default function PayrollReportsList({
                 {format(new Date(r.weekEnd), 'd MMM yyyy', { locale: fr })}
               </Text>
             ),
+          },
+          {
+            accessor: 'reportType',
+            title: 'Type',
+            render: (r) => r.reportType,
           },
           {
             accessor: 'createdBy',

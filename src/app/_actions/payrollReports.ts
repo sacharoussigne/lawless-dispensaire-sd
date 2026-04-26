@@ -11,6 +11,8 @@ import {
   PAYROLL_CAISSE_USD,
   PAYROLL_OFFERED_ITEM_USD,
   PAYROLL_PATIENT_CARE_USD,
+  PAYROLL_REPORT_TYPE_EMPLOYES,
+  isPayrollReportType,
 } from '@/lib/payroll/constants';
 import { mergeHtmlAndWeeklyActivity, type WaRow } from '@/lib/payroll/mergeWeeklyActivity';
 import { type ParsedPayrollTable, parsePayrollHtmlTable } from '@/lib/payroll/parsePayrollHtmlTable';
@@ -113,6 +115,17 @@ export async function createPayrollReportFromForm(formData: FormData) {
   if (!weekStartStr || !/^\d{4}-\d{2}-\d{2}$/.test(weekStartStr)) {
     return { status: 400, error: 'weekStart must be YYYY-MM-DD' };
   }
+
+  const reportTypeRaw = formData.get('reportType');
+  const reportTypeStr =
+    typeof reportTypeRaw === 'string' && reportTypeRaw.trim() !== ''
+      ? reportTypeRaw.trim()
+      : PAYROLL_REPORT_TYPE_EMPLOYES;
+  if (!isPayrollReportType(reportTypeStr)) {
+    return { status: 400, error: 'Type de rapport invalide.' };
+  }
+  const reportType = reportTypeStr;
+
   if (tableHtml.length > MAX_HTML_CHARS) {
     return { status: 400, error: `Le HTML est trop long (max ${MAX_HTML_CHARS} caractères)` };
   }
@@ -161,9 +174,11 @@ export async function createPayrollReportFromForm(formData: FormData) {
 
   const { weekStart, weekEnd } = weekRangeFromIsoDate(weekStartStr);
 
-  const existing = await prisma.payrollWeeklyReport.findUnique({ where: { weekStart } });
+  const existing = await prisma.payrollWeeklyReport.findUnique({
+    where: { weekStart_reportType: { weekStart, reportType } },
+  });
   if (existing) {
-    return { status: 409, error: 'Un rapport existe déjà pour cette semaine.' };
+    return { status: 409, error: 'Un rapport de ce type existe déjà pour cette semaine.' };
   }
 
   const reportId = randomUUID();
@@ -173,6 +188,7 @@ export async function createPayrollReportFromForm(formData: FormData) {
       id: reportId,
       weekStart,
       weekEnd,
+      reportType,
       createdById: session.user.id,
     },
   });
