@@ -608,7 +608,7 @@ export default function PayrollReportDetail({
                     <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="sm" mt="md">
                       <div>
                         <Text size="xs" c="dimmed" mb={4}>
-                          Shérifs soignés
+                          Shérifs
                         </Text>
                         {canEdit && isEditing ? (
                           <NumberInput
@@ -628,7 +628,7 @@ export default function PayrollReportDetail({
                       </div>
                       <div>
                         <Text size="xs" c="dimmed" mb={4}>
-                          Palefreniers soignés
+                          Palefreniers
                         </Text>
                         {canEdit && isEditing ? (
                           <NumberInput

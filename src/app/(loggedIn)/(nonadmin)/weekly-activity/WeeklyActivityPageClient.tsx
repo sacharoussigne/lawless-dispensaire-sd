@@ -135,6 +135,7 @@ export default function WeeklyActivityPageClient({
   const [cChestFlags, setCChestFlags] = useState<WeekdayFlags>(() => emptyWeekdayFlags());
   const [cPresenceFlags, setCPresenceFlags] = useState<WeekdayFlags>(() => emptyWeekdayFlags());
   const [cSheriff, setCSheriff] = useState(0);
+  const [cPalefrenier, setCPalefrenier] = useState(0);
   const [cPatients, setCPatients] = useState(0);
   const [cInfusions, setCInfusions] = useState(0);
   const [cPoppy, setCPoppy] = useState(0);
@@ -144,6 +145,7 @@ export default function WeeklyActivityPageClient({
   const [eChestFlags, setEChestFlags] = useState<WeekdayFlags>(() => emptyWeekdayFlags());
   const [ePresenceFlags, setEPresenceFlags] = useState<WeekdayFlags>(() => emptyWeekdayFlags());
   const [eSheriff, setESheriff] = useState(0);
+  const [ePalefrenier, setEPalefrenier] = useState(0);
   const [ePatients, setEPatients] = useState(0);
   const [eInfusions, setEInfusions] = useState(0);
   const [ePoppy, setEPoppy] = useState(0);
@@ -230,6 +232,7 @@ export default function WeeklyActivityPageClient({
         chestDays: cChestFlags,
         presenceDays: cPresenceFlags,
         sherifCount: cSheriff,
+        palefrenierCount: cPalefrenier,
         patientsCount: cPatients,
         infusionsCount: cInfusions,
         poppyMilkCount: cPoppy,
@@ -259,6 +262,7 @@ export default function WeeklyActivityPageClient({
     setEChestFlags({ ...row.chestDays });
     setEPresenceFlags({ ...row.presenceDays });
     setESheriff(row.sherifCount);
+    setEPalefrenier(row.palefrenierCount);
     setEPatients(row.patientsCount);
     setEInfusions(row.infusionsCount);
     setEPoppy(row.poppyMilkCount);
@@ -277,6 +281,7 @@ export default function WeeklyActivityPageClient({
         chestDays: eChestFlags,
         presenceDays: ePresenceFlags,
         sherifCount: eSheriff,
+        palefrenierCount: ePalefrenier,
         patientsCount: ePatients,
         infusionsCount: eInfusions,
         poppyMilkCount: ePoppy,
@@ -342,6 +347,7 @@ export default function WeeklyActivityPageClient({
               setCChestFlags(emptyWeekdayFlags());
               setCPresenceFlags(emptyWeekdayFlags());
               setCSheriff(0);
+              setCPalefrenier(0);
               setCPatients(0);
               setCInfusions(0);
               setCPoppy(0);
@@ -395,7 +401,8 @@ export default function WeeklyActivityPageClient({
                 </Tooltip>
               ),
             },
-            { accessor: 'sherifCount', title: 'Soins shérifs' },
+            { accessor: 'sherifCount', title: 'Shérifs' },
+            { accessor: 'palefrenierCount', title: 'Palefreniers' },
             { accessor: 'patientsCount', title: 'Patients' },
             { accessor: 'infusionsCount', title: 'Infusions' },
             { accessor: 'poppyMilkCount', title: 'Lait de pavot' },
@@ -526,13 +533,19 @@ export default function WeeklyActivityPageClient({
             </Text>
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
               <NumberInput
-                label="Soins shérifs"
+                label="Shérifs"
                 value={cSheriff}
                 onChange={(v) => setCSheriff(Number(v) || 0)}
                 min={0}
               />
               <NumberInput
-                label="Patients soignés"
+                label="Palefreniers"
+                value={cPalefrenier}
+                onChange={(v) => setCPalefrenier(Number(v) || 0)}
+                min={0}
+              />
+              <NumberInput
+                label="Patients"
                 value={cPatients}
                 onChange={(v) => setCPatients(Number(v) || 0)}
                 min={0}
@@ -617,13 +630,19 @@ export default function WeeklyActivityPageClient({
 
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
               <NumberInput
-                label="Soins shérifs"
+                label="Shérifs"
                 value={eSheriff}
                 onChange={(v) => setESheriff(Number(v) || 0)}
                 min={0}
               />
               <NumberInput
-                label="Patients soignés"
+                label="Palefreniers"
+                value={ePalefrenier}
+                onChange={(v) => setEPalefrenier(Number(v) || 0)}
+                min={0}
+              />
+              <NumberInput
+                label="Patients"
                 value={ePatients}
                 onChange={(v) => setEPatients(Number(v) || 0)}
                 min={0}

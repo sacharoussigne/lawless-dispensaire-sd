@@ -80,6 +80,7 @@ export async function GET(request: NextRequest) {
           chestDays: r.chestDays,
           presenceDays: r.presenceDays,
           sherifCount: r.sherifCount,
+          palefrenierCount: r.palefrenierCount,
           patientsCount: r.patientsCount,
           infusionsCount: r.infusionsCount,
           poppyMilkCount: r.poppyMilkCount,
