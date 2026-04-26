@@ -28,6 +28,7 @@ export async function loadSerializedWeeklyActivityById(
     chestDays: withName.chestDays,
     presenceDays: withName.presenceDays,
     sherifCount: withName.sherifCount,
+    palefrenierCount: withName.palefrenierCount,
     patientsCount: withName.patientsCount,
     infusionsCount: withName.infusionsCount,
     poppyMilkCount: withName.poppyMilkCount,

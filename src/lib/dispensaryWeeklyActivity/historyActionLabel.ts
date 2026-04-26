@@ -10,6 +10,8 @@ export function formatDispensaryHistoryAction(action: string): string {
     UPDATE_PRESENCE_DAYS: 'Mise à jour présences (jours)',
     INCREMENT_SHERIFF: 'Incrément soins shérifs',
     DECREMENT_SHERIFF: 'Décrément soins shérifs',
+    INCREMENT_PALEFRENIER: 'Incrément palefreniers',
+    DECREMENT_PALEFRENIER: 'Décrément palefreniers',
     INCREMENT_PATIENTS: 'Incrément patients',
     DECREMENT_PATIENTS: 'Décrément patients',
     INCREMENT_INFUSIONS: 'Incrément infusions',
