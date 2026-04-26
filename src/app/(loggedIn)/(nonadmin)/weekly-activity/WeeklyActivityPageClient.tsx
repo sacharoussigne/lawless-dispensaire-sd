@@ -141,7 +141,6 @@ export default function WeeklyActivityPageClient({
   const [cPoppy, setCPoppy] = useState(0);
   const [targetUsers, setTargetUsers] = useState<TargetUser[]>([]);
 
-  const [eWeekDateValue, setEWeekDateValue] = useState<Date | null>(null);
   const [eChestFlags, setEChestFlags] = useState<WeekdayFlags>(() => emptyWeekdayFlags());
   const [ePresenceFlags, setEPresenceFlags] = useState<WeekdayFlags>(() => emptyWeekdayFlags());
   const [eSheriff, setESheriff] = useState(0);
@@ -154,11 +153,6 @@ export default function WeeklyActivityPageClient({
   const createWeekBounds = useMemo(
     () => getBankWeekBounds(cWeekDateValue ?? defaultWeekMonday),
     [cWeekDateValue, defaultWeekMonday],
-  );
-
-  const editWeekBounds = useMemo(
-    () => (eWeekDateValue ? getBankWeekBounds(eWeekDateValue) : null),
-    [eWeekDateValue],
   );
 
   useEffect(() => {
@@ -266,18 +260,14 @@ export default function WeeklyActivityPageClient({
     setEPatients(row.patientsCount);
     setEInfusions(row.infusionsCount);
     setEPoppy(row.poppyMilkCount);
-    setEWeekDateValue(new Date(row.periodStart));
     setEDisplayName(row.displayName);
   };
 
   const submitEdit = async () => {
-    if (!editRow || !eWeekDateValue) return;
-    const { start, end } = getBankWeekBounds(eWeekDateValue);
+    if (!editRow) return;
     try {
       const base = {
         id: editRow.id,
-        periodStart: start,
-        periodEnd: end,
         chestDays: eChestFlags,
         presenceDays: ePresenceFlags,
         sherifCount: eSheriff,
@@ -581,7 +571,7 @@ export default function WeeklyActivityPageClient({
         size="lg"
         radius="md"
       >
-        {editRow && eWeekDateValue && editWeekBounds && (
+        {editRow && (
           <Stack gap="lg">
             <Text size="sm" fw={500}>
               {editRow.resolvedDisplayName}
@@ -593,27 +583,6 @@ export default function WeeklyActivityPageClient({
                 onChange={(e) => setEDisplayName(e.currentTarget.value)}
               />
             )}
-
-            <div>
-              <Text fw={600} size="sm" mb="xs">
-                Période
-              </Text>
-              <Text size="xs" c="dimmed" mb="sm">
-                Semaine Europe/Paris (même règle qu’à la création).
-              </Text>
-              <WeekNavigation
-                weekStart={editWeekBounds.start}
-                weekEnd={editWeekBounds.end}
-                weekDateValue={eWeekDateValue}
-                onWeekChange={(d) => {
-                  if (d) setEWeekDateValue(d);
-                }}
-                onPreviousWeek={() => setEWeekDateValue((prev) => (prev ? addParisWeeks(prev, -1) : prev))}
-                onNextWeek={() => setEWeekDateValue((prev) => (prev ? addParisWeeks(prev, 1) : prev))}
-              />
-            </div>
-
-            <Divider />
 
             <DayFlagFields
               title="Caisses (par jour de semaine)"
