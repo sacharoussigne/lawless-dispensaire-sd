@@ -80,10 +80,10 @@ function payrollRpDisplayDate(d: Date): Date {
   return subYears(d, PAYROLL_RP_DISPLAY_YEAR_OFFSET);
 }
 
-function wireTransferDescription(weekStart: Date, weekEnd: Date, reportType: string): string {
+function wireTransferDescription(weekStart: Date, weekEnd: Date): string {
   const displayStart = payrollRpDisplayDate(weekStart);
   const displayEnd = payrollRpDisplayDate(weekEnd);
-  return `Salaire — ${reportType} — Semaine ${format(displayStart, 'dd MMMM yyyy', { locale: fr })} au ${format(displayEnd, 'dd MMMM yyyy', { locale: fr })} - N°${getISOWeek(weekStart)}`;
+  return `Salaire Semaine ${format(displayStart, 'dd MMMM yyyy', { locale: fr })} au ${format(displayEnd, 'dd MMMM yyyy', { locale: fr })} - N°${getISOWeek(weekStart)}`;
 }
 
 function CopyableCell({
@@ -305,7 +305,7 @@ export default function PayrollReportDetail({
 
   const weekStartDate = new Date(report.weekStart);
   const weekEndDate = new Date(report.weekEnd);
-  const wireDescription = wireTransferDescription(weekStartDate, weekEndDate, report.reportType);
+  const wireDescription = wireTransferDescription(weekStartDate, weekEndDate);
 
   return (
     <Container size="xl" py="xl">
@@ -692,7 +692,7 @@ export default function PayrollReportDetail({
                 </CopyButton>
               </Group>
             </Box>
-            <Table striped highlightOnHover withTableBorder layout="fixed">
+            <Table striped highlightOnHover withTableBorder layout="fixed" style={{borderRadius: 'var(--mantine-radius-md)'}}>
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th style={{ width: '18%' }}>Nom</Table.Th>
@@ -756,11 +756,9 @@ export default function PayrollReportDetail({
           </Paper>
 
           <Accordion
-            variant="separated"
+            variant="contained"
             radius="md"
-            multiple
             mb="xl"
-            defaultValue={draft.employees.length > 0 ? ['emp-0'] : undefined}
           >
             {draft.employees.map((emp, i) => {
               const caisses = emp.stats.nombre_caisses ?? 0;
