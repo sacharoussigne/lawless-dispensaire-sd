@@ -309,18 +309,15 @@ export default function PayrollReportDetail({
             Rapports salaires
           </Button>
           <Title order={1}>
-            Semaine du {format(payrollRpDisplayDate(weekStartDate), 'dd MMMM yyyy', { locale: fr })} au{' '}
+          {report.reportType} - Semaine du {format(payrollRpDisplayDate(weekStartDate), 'dd MMMM yyyy', { locale: fr })} au{' '}
             {format(payrollRpDisplayDate(weekEndDate), 'dd MMMM yyyy', { locale: fr })}
           </Title>
-          <Text size="sm" fw={500} mt="xs">
-            {report.reportType}
-          </Text>
           <Text size="sm" c="dimmed" mt="xs">
             Par {report.createdBy.name} — {format(new Date(report.createdAt), 'Pp', { locale: fr })}
           </Text>
           {draft?.weekly_activity_import && (
             <Text size="xs" c="dimmed" mt={6}>
-              Import weekly activity :{' '}
+              Import de l'activité hebdomadaire :{' '}
               {format(
                 subYears(new Date(draft.weekly_activity_import.weekStart), PAYROLL_RP_DISPLAY_YEAR_OFFSET),
                 'dd/MM/yyyy',
@@ -474,13 +471,13 @@ export default function PayrollReportDetail({
               </div>
               <div>
                 <Text size="sm" c="dimmed">
-                  Total virements (caisses + patients) ($)
+                  Total virements (caisses + soins patients)
                 </Text>
                 <Text fw={600}>{draft.global_stats.total_employee_payout_usd.toFixed(2)} $</Text>
               </div>
               <div>
                 <Text size="sm" c="dimmed">
-                  Bénéfice ($)
+                  Bénéfice
                 </Text>
                 <Text fw={600}>{draft.global_stats.total_benefit_usd.toFixed(2)} $</Text>
               </div>
@@ -498,15 +495,15 @@ export default function PayrollReportDetail({
               </div>
               <div>
                 <Text size="sm" c="dimmed">
-                  Valeur offres ($)
+                  Total items données
                 </Text>
                 <Text fw={600}>{draft.global_stats.total_offered_retail_value_usd.toFixed(2)} $</Text>
               </div>
               <div>
                 <Text size="sm" c="dimmed">
-                  Total argent (virements + offres) ($)
+                  Total soins
                 </Text>
-                <Text fw={600}>{draft.global_stats.total_monetary_including_offers_usd.toFixed(2)} $</Text>
+                <Text fw={600}>{(draft.global_stats.total_patients_soignes * draft.patient_care_price_usd).toFixed(2)} $</Text>
               </div>
               <div>
                 <Text size="sm" c="dimmed">

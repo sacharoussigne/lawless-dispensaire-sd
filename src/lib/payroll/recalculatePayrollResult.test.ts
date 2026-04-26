@@ -68,7 +68,6 @@ function baseReport(
       total_offered_item_count: 0,
       total_employee_payout_usd: 0,
       total_offered_retail_value_usd: 0,
-      total_monetary_including_offers_usd: 0,
     },
     ...overrides,
   };

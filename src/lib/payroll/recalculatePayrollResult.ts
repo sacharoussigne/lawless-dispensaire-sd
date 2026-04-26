@@ -46,7 +46,6 @@ export function recalculatePayrollResult(data: PayrollReportResult): PayrollRepo
     0,
   );
   const total_offered_retail_value_usd = total_offered_item_count * data.offered_item_price_usd;
-  const total_monetary_including_offers_usd = total_employee_payout_usd + total_offered_retail_value_usd;
   const total_patients_soignes = employees.reduce((s, e) => s + (e.stats.patients_soignes ?? 0), 0);
 
   const global_stats = {
@@ -62,7 +61,6 @@ export function recalculatePayrollResult(data: PayrollReportResult): PayrollRepo
     total_offered_item_count,
     total_employee_payout_usd,
     total_offered_retail_value_usd,
-    total_monetary_including_offers_usd,
   };
 
   return { ...data, employees, global_stats };

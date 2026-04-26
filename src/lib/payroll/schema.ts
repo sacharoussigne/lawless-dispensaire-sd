@@ -61,7 +61,6 @@ const payrollReportResultInnerSchema = z.object({
     total_offered_item_count: z.number().default(0),
     total_employee_payout_usd: z.number().default(0),
     total_offered_retail_value_usd: z.number().default(0),
-    total_monetary_including_offers_usd: z.number().default(0),
   }),
 });
 
