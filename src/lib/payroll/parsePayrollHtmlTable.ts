@@ -22,7 +22,9 @@ export function cleanText(text: string): string {
 
 function parseEmployeeCell(text: string): { name: string | null; role: string | null; id: number | null } {
   const normalized = cleanText(text.replace(/\r?\n/g, ' '));
-  const nameMatch = normalized.match(/^(.+?)\s*(Médecin|Apprenti|Infirmière)/i);
+  const nameMatch = normalized.match(
+    /^(.+?)\s*(Médecin|Apprenti|Infirmière|Infirmier|Directeur|Co-Directeur|Co-Directrice)/i,
+  );
   const idMatch = normalized.match(/\((\d+)\)/);
 
   return {
@@ -60,9 +62,14 @@ function parseSchedule(rawCells: string[]): {
   return { schedule, caisseCount, presenceCount };
 }
 
-function parseStatsRow(cells: string[]): { sherifs: number | null; palefreniers: number | null } {
+function parseStatsRow(cells: string[]): {
+  sherifs: number | null;
+  palefreniers: number | null;
+  patients_soignes: number | null;
+} {
   let sherifs: number | null = null;
   let palefreniers: number | null = null;
+  let patients_soignes: number | null = null;
 
   const texts = cells.map((c) => cleanText(c));
 
@@ -83,6 +90,15 @@ function parseStatsRow(cells: string[]): { sherifs: number | null; palefreniers:
         if (!Number.isNaN(val)) palefreniers = val;
       }
     }
+
+    const patientsLabel = t.includes('patient') && (t.includes('soign') || t.includes('soigné') || t.includes('soigne'));
+    if (patientsLabel) {
+      const next = texts[i + 1];
+      if (next) {
+        const val = parseInt(next.replace(/[^\d]/g, ''), 10);
+        if (!Number.isNaN(val)) patients_soignes = val;
+      }
+    }
   }
 
   for (let i = 0; i < texts.length; i++) {
@@ -96,10 +112,15 @@ function parseStatsRow(cells: string[]): { sherifs: number | null; palefreniers:
       if ((prev.includes('shérif') || prev.includes('sherif')) && sherifs === null && !Number.isNaN(val)) {
         sherifs = val;
       }
+      if (prev.includes('patient') && (prev.includes('soign') || prev.includes('soigné') || prev.includes('soigne'))) {
+        if (patients_soignes === null && !Number.isNaN(val)) {
+          patients_soignes = val;
+        }
+      }
     }
   }
 
-  return { sherifs, palefreniers };
+  return { sherifs, palefreniers, patients_soignes };
 }
 
 export type ParsedPayrollTable = {
@@ -111,6 +132,7 @@ export type ParsedPayrollTable = {
     stats: {
       sherifs: number | null;
       palefreniers: number | null;
+      patients_soignes: number | null;
       nombre_caisses: number;
       nombre_presences: number;
     };
@@ -159,6 +181,7 @@ export function parsePayrollHtmlTable(html: string): ParsedPayrollTable {
         stats: {
           sherifs: statsParsed.sherifs,
           palefreniers: statsParsed.palefreniers,
+          patients_soignes: statsParsed.patients_soignes,
           nombre_caisses: caisseCount,
           nombre_presences: presenceCount,
         },
@@ -184,7 +207,15 @@ export function parsedToPayrollReportResult(parsed: ParsedPayrollTable): Payroll
     role: cleanText(e.role ?? ''),
     id: e.id,
     schedule: e.schedule,
-    stats: e.stats,
+    stats: {
+      sherifs: e.stats.sherifs,
+      palefreniers: e.stats.palefreniers,
+      nombre_caisses: e.stats.nombre_caisses,
+      nombre_presences: e.stats.nombre_presences,
+      patients_soignes: e.stats.patients_soignes ?? 0,
+      poppy_milk_offertes: 0,
+      infusions_ginseng_offertes: 0,
+    },
   }));
 
   return payrollReportResultSchema.parse({

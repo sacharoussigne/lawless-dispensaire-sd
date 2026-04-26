@@ -214,6 +214,20 @@ export default function PayrollReportDetail({
     setDraft((prev) => (prev ? recalculatePayrollResult({ ...prev, caisse_sale_price_usd: n }) : prev));
   }, []);
 
+  const patchReportPatientCarePrice = useCallback((value: number | string) => {
+    if (value === '' || value === undefined) return;
+    const n = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(n) || n <= 0) return;
+    setDraft((prev) => (prev ? recalculatePayrollResult({ ...prev, patient_care_price_usd: n }) : prev));
+  }, []);
+
+  const patchReportOfferedItemPrice = useCallback((value: number | string) => {
+    if (value === '' || value === undefined) return;
+    const n = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(n) || n <= 0) return;
+    setDraft((prev) => (prev ? recalculatePayrollResult({ ...prev, offered_item_price_usd: n }) : prev));
+  }, []);
+
   const handleCancelEdit = () => {
     const raw = baselineJson.current;
     if (raw) {
@@ -300,6 +314,22 @@ export default function PayrollReportDetail({
           <Text size="sm" c="dimmed" mt={4}>
             Par {report.createdBy.name} — {format(new Date(report.createdAt), 'Pp', { locale: fr })}
           </Text>
+          {draft?.weekly_activity_import && (
+            <Text size="xs" c="dimmed" mt={6}>
+              Import weekly activity :{' '}
+              {format(
+                subYears(new Date(draft.weekly_activity_import.weekStart), PAYROLL_RP_DISPLAY_YEAR_OFFSET),
+                'dd/MM/yyyy',
+                { locale: fr },
+              )}{' '}
+              –{' '}
+              {format(
+                subYears(new Date(draft.weekly_activity_import.weekEnd), PAYROLL_RP_DISPLAY_YEAR_OFFSET),
+                'dd/MM/yyyy',
+                { locale: fr },
+              )}
+            </Text>
+          )}
         </div>
         <Group gap="sm" justify="flex-end" wrap="wrap">
           {canEdit && !isEditing && !isDirty && (
@@ -401,18 +431,78 @@ export default function PayrollReportDetail({
                 )}
               </div>
               <div>
+                <Text size="sm" c="dimmed" mb={4}>
+                  Bonus patient ($)
+                </Text>
+                {canEdit && isEditing ? (
+                  <NumberInput
+                    size="xs"
+                    min={0.01}
+                    max={1_000_000}
+                    step={0.05}
+                    decimalScale={2}
+                    value={draft.patient_care_price_usd}
+                    onChange={(v) => patchReportPatientCarePrice(v)}
+                    w={110}
+                  />
+                ) : (
+                  <Text fw={600}>{draft.patient_care_price_usd.toFixed(2)}</Text>
+                )}
+              </div>
+              <div>
+                <Text size="sm" c="dimmed" mb={4}>
+                  Prix unitaire offre ($)
+                </Text>
+                {canEdit && isEditing ? (
+                  <NumberInput
+                    size="xs"
+                    min={0.01}
+                    max={1_000_000}
+                    step={0.05}
+                    decimalScale={2}
+                    value={draft.offered_item_price_usd}
+                    onChange={(v) => patchReportOfferedItemPrice(v)}
+                    w={110}
+                  />
+                ) : (
+                  <Text fw={600}>{draft.offered_item_price_usd.toFixed(2)}</Text>
+                )}
+              </div>
+              <div>
                 <Text size="sm" c="dimmed">
-                  Total salaires ($)
+                  Total virements (caisses + patients) ($)
                 </Text>
-                <Text fw={600}>
-                  {(draft.global_stats.total_caisses * draft.caisse_price_usd).toFixed(2)} $
-                </Text>
+                <Text fw={600}>{draft.global_stats.total_employee_payout_usd.toFixed(2)} $</Text>
               </div>
               <div>
                 <Text size="sm" c="dimmed">
                   Bénéfice ($)
                 </Text>
                 <Text fw={600}>{draft.global_stats.total_benefit_usd.toFixed(2)} $</Text>
+              </div>
+              <div>
+                <Text size="sm" c="dimmed">
+                  Patients soignés (total)
+                </Text>
+                <Text fw={600}>{draft.global_stats.total_patients_soignes}</Text>
+              </div>
+              <div>
+                <Text size="sm" c="dimmed">
+                  Objets offerts (total)
+                </Text>
+                <Text fw={600}>{draft.global_stats.total_offered_item_count}</Text>
+              </div>
+              <div>
+                <Text size="sm" c="dimmed">
+                  Valeur offres ($)
+                </Text>
+                <Text fw={600}>{draft.global_stats.total_offered_retail_value_usd.toFixed(2)} $</Text>
+              </div>
+              <div>
+                <Text size="sm" c="dimmed">
+                  Total argent (virements + offres) ($)
+                </Text>
+                <Text fw={600}>{draft.global_stats.total_monetary_including_offers_usd.toFixed(2)} $</Text>
               </div>
               <div>
                 <Text size="sm" c="dimmed">
@@ -479,8 +569,9 @@ export default function PayrollReportDetail({
               <Table.Tbody onMouseLeave={() => setHoveredVirementRow(null)}>
                 {draft.employees.map((emp, rowIdx) => {
                   const caisses = emp.stats.nombre_caisses ?? 0;
-                  const unit = draft.caisse_price_usd;
-                  const pay = caisses * unit;
+                  const patients = emp.stats.patients_soignes ?? 0;
+                  const pay =
+                    caisses * draft.caisse_price_usd + patients * draft.patient_care_price_usd;
                   const payStr = `${pay.toFixed(2)} $`;
                   const payCopyValue = pay.toFixed(2);
                   const idDisplay = emp.id != null ? String(emp.id) : '—';
@@ -537,8 +628,9 @@ export default function PayrollReportDetail({
           >
             {draft.employees.map((emp, i) => {
               const caisses = emp.stats.nombre_caisses ?? 0;
-              const unit = draft.caisse_price_usd;
-              const pay = caisses * unit;
+              const patients = emp.stats.patients_soignes ?? 0;
+              const pay =
+                caisses * draft.caisse_price_usd + patients * draft.patient_care_price_usd;
               return (
                 <Accordion.Item key={`${emp.name}-${emp.id ?? i}`} value={`emp-${i}`}>
                   <Accordion.Control>
@@ -552,7 +644,8 @@ export default function PayrollReportDetail({
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <Text size="xs" c="dimmed">
-                          Caisses × {unit.toFixed(2)} $
+                          Caisses × {draft.caisse_price_usd.toFixed(2)} $ + patients ×{' '}
+                          {draft.patient_care_price_usd.toFixed(2)} $
                         </Text>
                         <Text fw={700}>{pay.toFixed(2)} $</Text>
                       </div>
@@ -657,6 +750,66 @@ export default function PayrollReportDetail({
                           Présences
                         </Text>
                         <Text>{emp.stats.nombre_presences ?? '—'}</Text>
+                      </div>
+                      <div>
+                        <Text size="xs" c="dimmed" mb={4}>
+                          Patients soignés
+                        </Text>
+                        {canEdit && isEditing ? (
+                          <NumberInput
+                            size="xs"
+                            min={0}
+                            allowDecimal={false}
+                            value={emp.stats.patients_soignes}
+                            onChange={(v) =>
+                              patchEmployeeStats(i, {
+                                patients_soignes: v === '' || v === undefined ? 0 : Number(v),
+                              })
+                            }
+                          />
+                        ) : (
+                          <Text>{emp.stats.patients_soignes}</Text>
+                        )}
+                      </div>
+                      <div>
+                        <Text size="xs" c="dimmed" mb={4}>
+                          Lait de pavot offert
+                        </Text>
+                        {canEdit && isEditing ? (
+                          <NumberInput
+                            size="xs"
+                            min={0}
+                            allowDecimal={false}
+                            value={emp.stats.poppy_milk_offertes}
+                            onChange={(v) =>
+                              patchEmployeeStats(i, {
+                                poppy_milk_offertes: v === '' || v === undefined ? 0 : Number(v),
+                              })
+                            }
+                          />
+                        ) : (
+                          <Text>{emp.stats.poppy_milk_offertes}</Text>
+                        )}
+                      </div>
+                      <div>
+                        <Text size="xs" c="dimmed" mb={4}>
+                          Infusions ginseng offertes
+                        </Text>
+                        {canEdit && isEditing ? (
+                          <NumberInput
+                            size="xs"
+                            min={0}
+                            allowDecimal={false}
+                            value={emp.stats.infusions_ginseng_offertes}
+                            onChange={(v) =>
+                              patchEmployeeStats(i, {
+                                infusions_ginseng_offertes: v === '' || v === undefined ? 0 : Number(v),
+                              })
+                            }
+                          />
+                        ) : (
+                          <Text>{emp.stats.infusions_ginseng_offertes}</Text>
+                        )}
                       </div>
                     </SimpleGrid>
                   </Accordion.Panel>

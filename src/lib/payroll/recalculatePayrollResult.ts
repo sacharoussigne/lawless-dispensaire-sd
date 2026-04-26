@@ -21,6 +21,7 @@ function countSchedule(schedule: PayrollReportResult['employees'][number]['sched
 }
 
 export function recalculatePayrollResult(data: PayrollReportResult): PayrollReportResult {
+  const unitBenefitUsd = data.caisse_sale_price_usd - data.caisse_price_usd;
   const employees = data.employees.map((emp) => {
     const { nombre_caisses, nombre_presences } = countSchedule(emp.schedule);
     return {
@@ -33,16 +34,35 @@ export function recalculatePayrollResult(data: PayrollReportResult): PayrollRepo
     };
   });
 
-  const unitBenefitUsd = data.caisse_sale_price_usd - data.caisse_price_usd;
+  const total_employee_payout_usd = employees.reduce((sum, e) => {
+    const ca = e.stats.nombre_caisses ?? 0;
+    const p = e.stats.patients_soignes ?? 0;
+    return sum + ca * data.caisse_price_usd + p * data.patient_care_price_usd;
+  }, 0);
+
+  const total_offered_item_count = employees.reduce(
+    (sum, e) =>
+      sum + (e.stats.poppy_milk_offertes ?? 0) + (e.stats.infusions_ginseng_offertes ?? 0),
+    0,
+  );
+  const total_offered_retail_value_usd = total_offered_item_count * data.offered_item_price_usd;
+  const total_monetary_including_offers_usd = total_employee_payout_usd + total_offered_retail_value_usd;
+  const total_patients_soignes = employees.reduce((s, e) => s + (e.stats.patients_soignes ?? 0), 0);
+
   const global_stats = {
     total_employees: employees.length,
-    total_caisses: employees.reduce((sum, e) => sum + e.stats.nombre_caisses, 0),
+    total_caisses: employees.reduce((sum, e) => sum + (e.stats.nombre_caisses ?? 0), 0),
     total_sherifs: employees.reduce((sum, e) => sum + (e.stats.sherifs ?? 0), 0),
     total_palefreniers: employees.reduce((sum, e) => sum + (e.stats.palefreniers ?? 0), 0),
     total_benefit_usd: employees.reduce(
-      (sum, e) => sum + e.stats.nombre_caisses * unitBenefitUsd,
+      (sum, e) => sum + (e.stats.nombre_caisses ?? 0) * unitBenefitUsd,
       0,
     ),
+    total_patients_soignes,
+    total_offered_item_count,
+    total_employee_payout_usd,
+    total_offered_retail_value_usd,
+    total_monetary_including_offers_usd,
   };
 
   return { ...data, employees, global_stats };

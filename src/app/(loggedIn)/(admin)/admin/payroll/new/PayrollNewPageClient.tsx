@@ -18,12 +18,23 @@ import { DateInput, DatesProvider } from '@mantine/dates';
 import { notifications } from '@mantine/notifications';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { format } from 'date-fns';
-import { IconArrowLeft, IconCalendarWeek, IconCoin, IconInfoCircle, IconTable } from '@tabler/icons-react';
-import { createPayrollReportFromForm } from '@/app/_actions/payrollReports';
+import {
+  IconArrowLeft,
+  IconCalendarWeek,
+  IconCoin,
+  IconInfoCircle,
+  IconTable,
+} from '@tabler/icons-react';
+import { createPayrollReportFromForm, listPayrollImportableActivityWeeks } from '@/app/_actions/payrollReports';
 import { handleAction } from '@/lib/action';
-import { PAYROLL_CAISSE_SALE_USD, PAYROLL_CAISSE_USD } from '@/lib/payroll/constants';
+import {
+  PAYROLL_CAISSE_SALE_USD,
+  PAYROLL_CAISSE_USD,
+  PAYROLL_OFFERED_ITEM_USD,
+  PAYROLL_PATIENT_CARE_USD,
+} from '@/lib/payroll/constants';
 import { routes } from '@/types/routes';
 
 const MAX_CAISSE_PRICE_USD = 1_000_000;
@@ -42,10 +53,33 @@ function SectionHeader({ icon: Icon, children }: { icon: typeof IconCalendarWeek
 export default function PayrollNewPageClient() {
   const router = useRouter();
   const [weekDate, setWeekDate] = useState<string | null>(format(new Date(), 'yyyy-MM-dd'));
+  const [waWeekDate, setWaWeekDate] = useState<string | null>(format(new Date(), 'yyyy-MM-dd'));
   const [caisseSalePriceUsd, setCaisseSalePriceUsd] = useState<number>(PAYROLL_CAISSE_SALE_USD);
   const [caissePriceUsd, setCaissePriceUsd] = useState<number>(PAYROLL_CAISSE_USD);
+  const [patientCarePriceUsd, setPatientCarePriceUsd] = useState<number>(PAYROLL_PATIENT_CARE_USD);
+  const [offeredItemPriceUsd, setOfferedItemPriceUsd] = useState<number>(PAYROLL_OFFERED_ITEM_USD);
   const [tableHtml, setTableHtml] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [knownWaWeeks, setKnownWaWeeks] = useState<{ value: string; label: string }[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const res = await listPayrollImportableActivityWeeks();
+      if (cancelled || res.status !== 200 || !('data' in res)) return;
+      const w = (res as { data: { weeks: { weekStart: string; periodStart: string; periodEnd: string }[] } })
+        .data.weeks;
+      setKnownWaWeeks(
+        w.map((row) => ({
+          value: row.weekStart,
+          label: `Semaine ${row.weekStart} → ${row.periodEnd.slice(0, 10)}`,
+        })),
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const unitMarginUsd = useMemo(
     () => (Number.isFinite(caisseSalePriceUsd) && Number.isFinite(caissePriceUsd) ? caisseSalePriceUsd - caissePriceUsd : 0),
@@ -60,14 +94,7 @@ export default function PayrollNewPageClient() {
       notifications.show({ title: 'Date requise', message: 'Choisissez une date dans la semaine.', color: 'red' });
       return;
     }
-    if (!tableHtml.trim()) {
-      notifications.show({
-        title: 'Contenu requis',
-        message: 'Collez le HTML du tableau (copié depuis le jeu ou l’éditeur).',
-        color: 'red',
-      });
-      return;
-    }
+    const waWeek = waWeekDate ?? weekStart;
     if (
       !Number.isFinite(caissePriceUsd) ||
       caissePriceUsd <= 0 ||
@@ -92,6 +119,30 @@ export default function PayrollNewPageClient() {
       });
       return;
     }
+    if (
+      !Number.isFinite(patientCarePriceUsd) ||
+      patientCarePriceUsd <= 0 ||
+      patientCarePriceUsd > MAX_CAISSE_PRICE_USD
+    ) {
+      notifications.show({
+        title: 'Prix par patient invalide',
+        message: `Indiquez un montant entre 0,01 et ${MAX_CAISSE_PRICE_USD.toLocaleString('fr-FR')} $.`,
+        color: 'red',
+      });
+      return;
+    }
+    if (
+      !Number.isFinite(offeredItemPriceUsd) ||
+      offeredItemPriceUsd <= 0 ||
+      offeredItemPriceUsd > MAX_CAISSE_PRICE_USD
+    ) {
+      notifications.show({
+        title: "Prix d'offre invalide",
+        message: `Indiquez un montant entre 0,01 et ${MAX_CAISSE_PRICE_USD.toLocaleString('fr-FR')} $.`,
+        color: 'red',
+      });
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -100,6 +151,9 @@ export default function PayrollNewPageClient() {
       fd.set('tableHtml', tableHtml);
       fd.set('caissePriceUsd', String(caissePriceUsd));
       fd.set('caisseSalePriceUsd', String(caisseSalePriceUsd));
+      fd.set('patientCarePriceUsd', String(patientCarePriceUsd));
+      fd.set('offeredItemPriceUsd', String(offeredItemPriceUsd));
+      fd.set('weeklyActivityWeekStart', waWeek);
 
       const result = await createPayrollReportFromForm(fd);
       const data = handleAction(result);
@@ -145,8 +199,8 @@ export default function PayrollNewPageClient() {
           Nouveau rapport
         </Title>
         <Text size="sm" c="dimmed" maw={520} mb="xl">
-          Indique la semaine de référence, les tarifs caisses puis colle le tableau HTML : le rapport calcule présences,
-          caisses et montants de virement.
+          Semaine de référence du rapport, semaine d’import de l’activité Discord (ou identique), tarifs, puis optionnel
+          le HTML du tableau : fusion avec max / union selon le plan d’import.
         </Text>
 
         <Stack gap="lg">
@@ -170,7 +224,29 @@ export default function PayrollNewPageClient() {
           </Paper>
 
           <Paper withBorder p={{ base: 'md', sm: 'lg' }} radius="md" shadow="xs">
-            <SectionHeader icon={IconCoin}>Tarifs caisses (USD)</SectionHeader>
+            <SectionHeader icon={IconCalendarWeek}>Import weekly activity</SectionHeader>
+            <DateInput
+              label="Date dans la semaine à importer (Discord)"
+              description="Sert à charger et fusionner `dispensary_weekly_activity` pour cette semaine. Par défaut, aligné sur la semaine du rapport."
+              placeholder="JJ/MM/AAAA"
+              value={waWeekDate}
+              onChange={setWaWeekDate}
+              maxDate={format(new Date(), 'yyyy-MM-dd')}
+              valueFormat="DD/MM/YYYY"
+              size="md"
+              clearable={false}
+              popoverProps={{ withinPortal: true }}
+            />
+            {knownWaWeeks.length > 0 && (
+              <Text size="xs" c="dimmed" mt="xs">
+                Semaines connues en base (aperçu)&nbsp;: {knownWaWeeks.slice(0, 4).map((k) => k.value).join(', ')}
+                {knownWaWeeks.length > 4 ? '…' : ''}
+              </Text>
+            )}
+          </Paper>
+
+          <Paper withBorder p={{ base: 'md', sm: 'lg' }} radius="md" shadow="xs">
+            <SectionHeader icon={IconCoin}>Tarifs (USD)</SectionHeader>
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={{ base: 'md', sm: 'lg' }}>
               <NumberInput
                 label="Prix de vente dispensaire"
@@ -204,6 +280,38 @@ export default function PayrollNewPageClient() {
                   if (Number.isFinite(n) && n > 0) setCaissePriceUsd(n);
                 }}
               />
+              <NumberInput
+                label="Bonus par patient soigné (virement)"
+                description="Ajouté au virement, par patient, hors objets offerts."
+                min={0.01}
+                max={MAX_CAISSE_PRICE_USD}
+                step={0.05}
+                decimalScale={2}
+                suffix=" $"
+                size="md"
+                value={patientCarePriceUsd}
+                onChange={(v) => {
+                  if (v === '' || v === undefined) return;
+                  const n = typeof v === 'number' ? v : Number(String(v).replace(',', '.'));
+                  if (Number.isFinite(n) && n > 0) setPatientCarePriceUsd(n);
+                }}
+              />
+              <NumberInput
+                label="Prix unitaire chose offerte (hors virement)"
+                description="Lait de pavot / infusion ginseng, pour le total argent (pas le salaire)."
+                min={0.01}
+                max={MAX_CAISSE_PRICE_USD}
+                step={0.05}
+                decimalScale={2}
+                suffix=" $"
+                size="md"
+                value={offeredItemPriceUsd}
+                onChange={(v) => {
+                  if (v === '' || v === undefined) return;
+                  const n = typeof v === 'number' ? v : Number(String(v).replace(',', '.'));
+                  if (Number.isFinite(n) && n > 0) setOfferedItemPriceUsd(n);
+                }}
+              />
             </SimpleGrid>
             <Text size="sm" mt="md">
               <Text span c="dimmed">
@@ -218,11 +326,11 @@ export default function PayrollNewPageClient() {
           <Paper withBorder p={{ base: 'md', sm: 'lg' }} radius="md" shadow="xs">
             <SectionHeader icon={IconTable}>Tableau HTML</SectionHeader>
             <Alert variant="light" color="gray" icon={<IconInfoCircle size={18} />} mb="md" radius="sm">
-              Colle la balise <Text span ff="monospace" size="xs">{`<table>…</table>`}</Text> telle qu’exportée. Le parse
-              attend les colonnes habituelles (rôle, jours, etc.) du tableau salaires.
+              Colle la balise <Text span ff="monospace" size="xs">{`<table>…</table>`}</Text> telle qu’exportée, ou
+              laisse vide si toutes les données viennent de l’activité hebdo pour la semaine d’import.
             </Alert>
             <Textarea
-              label="Source HTML"
+              label="Source HTML (optionnel si import WA suffit)"
               description={`${htmlCharCount.toLocaleString('fr-FR')} caractère${htmlCharCount === 1 ? '' : 's'}`}
               placeholder="<table>...</table>"
               value={tableHtml}
