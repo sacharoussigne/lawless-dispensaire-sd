@@ -8,17 +8,21 @@ import {
   Box,
   Button,
   Code,
+  Collapse,
   Container,
   CopyButton,
+  Divider,
   Group,
   NumberInput,
   Paper,
   Select,
   SimpleGrid,
+  Stack,
   Table,
   Text,
   Title,
   Tooltip,
+  UnstyledButton,
 } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
@@ -29,7 +33,10 @@ import { fr } from 'date-fns/locale';
 import type { Prisma } from '@prisma/client';
 import {
   IconArrowLeft,
+  IconCalculator,
   IconCheck,
+  IconChevronDown,
+  IconCoin,
   IconCopy,
   IconEdit,
   IconTrash,
@@ -125,6 +132,7 @@ export default function PayrollReportDetail({
     id: string;
     weekStart: string;
     weekEnd: string;
+    reportType: string;
     resultJson: Prisma.JsonValue;
     errorMessage: string | null;
     createdAt: string;
@@ -137,6 +145,7 @@ export default function PayrollReportDetail({
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [hoveredVirementRow, setHoveredVirementRow] = useState<number | null>(null);
+  const [pricingSectionOpen, setPricingSectionOpen] = useState(false);
   const baselineJson = useRef('');
 
   const resultFingerprint = JSON.stringify(report.resultJson ?? null);
@@ -156,6 +165,12 @@ export default function PayrollReportDetail({
       setDraft(null);
     }
   }, [report.errorMessage, report.id, resultFingerprint]);
+
+  useEffect(() => {
+    if (isEditing && canEdit) {
+      setPricingSectionOpen(true);
+    }
+  }, [isEditing, canEdit]);
 
   const isDirty = draft != null && JSON.stringify(draft) !== baselineJson.current;
 
@@ -212,6 +227,20 @@ export default function PayrollReportDetail({
     const n = typeof value === 'number' ? value : Number(value);
     if (!Number.isFinite(n) || n <= 0) return;
     setDraft((prev) => (prev ? recalculatePayrollResult({ ...prev, caisse_sale_price_usd: n }) : prev));
+  }, []);
+
+  const patchReportPatientCarePrice = useCallback((value: number | string) => {
+    if (value === '' || value === undefined) return;
+    const n = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(n) || n <= 0) return;
+    setDraft((prev) => (prev ? recalculatePayrollResult({ ...prev, patient_care_price_usd: n }) : prev));
+  }, []);
+
+  const patchReportOfferedItemPrice = useCallback((value: number | string) => {
+    if (value === '' || value === undefined) return;
+    const n = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(n) || n <= 0) return;
+    setDraft((prev) => (prev ? recalculatePayrollResult({ ...prev, offered_item_price_usd: n }) : prev));
   }, []);
 
   const handleCancelEdit = () => {
@@ -294,12 +323,28 @@ export default function PayrollReportDetail({
             Rapports salaires
           </Button>
           <Title order={1}>
-            Semaine du {format(payrollRpDisplayDate(weekStartDate), 'dd MMMM yyyy', { locale: fr })} au{' '}
+          {report.reportType} - Semaine du {format(payrollRpDisplayDate(weekStartDate), 'dd MMMM yyyy', { locale: fr })} au{' '}
             {format(payrollRpDisplayDate(weekEndDate), 'dd MMMM yyyy', { locale: fr })}
           </Title>
-          <Text size="sm" c="dimmed" mt={4}>
+          <Text size="sm" c="dimmed" mt="xs">
             Par {report.createdBy.name} — {format(new Date(report.createdAt), 'Pp', { locale: fr })}
           </Text>
+          {draft?.weekly_activity_import && (
+            <Text size="xs" c="dimmed" mt={6}>
+              Import de l'activité hebdomadaire :{' '}
+              {format(
+                subYears(new Date(draft.weekly_activity_import.weekStart), PAYROLL_RP_DISPLAY_YEAR_OFFSET),
+                'dd/MM/yyyy',
+                { locale: fr },
+              )}{' '}
+              –{' '}
+              {format(
+                subYears(new Date(draft.weekly_activity_import.weekEnd), PAYROLL_RP_DISPLAY_YEAR_OFFSET),
+                'dd/MM/yyyy',
+                { locale: fr },
+              )}
+            </Text>
+          )}
         </div>
         <Group gap="sm" justify="flex-end" wrap="wrap">
           {canEdit && !isEditing && !isDirty && (
@@ -346,87 +391,268 @@ export default function PayrollReportDetail({
       {!report.errorMessage && parsed.success && draft && (
         <>
           <Paper shadow="sm" p="md" withBorder mb="lg">
-            <Title order={4} mb="sm">
+            <Title order={4} mb="xs">
               Totaux
             </Title>
-            <SimpleGrid cols={{ base: 1, sm: 2, md: 2, lg: 4 }} spacing="md">
+            <Stack gap="xl">
+              <Paper
+                p="md"
+                radius="md"
+                withBorder
+                style={{ background: 'var(--mantine-color-default-hover)' }}
+              >
+                <UnstyledButton
+                  type="button"
+                  onClick={() => setPricingSectionOpen((o) => !o)}
+                  w="100%"
+                  p={0}
+                  style={{ textAlign: 'left' as const, borderRadius: 'var(--mantine-radius-sm)' }}
+                >
+                  <Group align="flex-start" gap="md" wrap="nowrap" justify="space-between">
+                    <Group align="flex-start" gap="md" wrap="nowrap" style={{ minWidth: 0 }}>
+                      <IconCoin
+                        size={22}
+                        stroke={1.5}
+                        style={{ flexShrink: 0, color: 'var(--mantine-color-dimmed)', marginTop: 2 }}
+                      />
+                      <div>
+                        <Text fw={600} size="sm">
+                          Grille tarifaire
+                        </Text>
+                        <Text size="xs" c="dimmed" maw={520}>
+                          Prix unitaire par caisse, soin patient et offre. En pratique, ne les ajustez que si la
+                          grille tarifaire a changé. Cliquer pour afficher ou masquer.
+                        </Text>
+                      </div>
+                    </Group>
+                    <IconChevronDown
+                      size={20}
+                      stroke={1.5}
+                      style={{
+                        flexShrink: 0,
+                        color: 'var(--mantine-color-dimmed)',
+                        transform: pricingSectionOpen ? 'rotate(180deg)' : 'none',
+                        transition: 'transform 200ms ease',
+                        marginTop: 2,
+                      }}
+                    />
+                  </Group>
+                </UnstyledButton>
+                <Collapse in={pricingSectionOpen}>
+                  <Box pt="md">
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+                  <div>
+                    <Text size="sm" c="dimmed" mb={6}>
+                      Prix de vente dispensaire
+                    </Text>
+                    {canEdit && isEditing ? (
+                      <NumberInput
+                        size="sm"
+                        min={0.01}
+                        max={1_000_000}
+                        step={0.5}
+                        decimalScale={2}
+                        value={draft.caisse_sale_price_usd}
+                        onChange={(v) => patchReportCaisseSalePrice(v)}
+                        w="100%"
+                        maw={200}
+                        suffix=" $"
+                      />
+                    ) : (
+                      <Text fw={600} size="md" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {draft.caisse_sale_price_usd.toFixed(2)} $
+                      </Text>
+                    )}
+                  </div>
+                  <div>
+                    <Text size="sm" c="dimmed" mb={6}>
+                      Reversé employé / caisse
+                    </Text>
+                    {canEdit && isEditing ? (
+                      <NumberInput
+                        size="sm"
+                        min={0.01}
+                        max={1_000_000}
+                        step={0.5}
+                        decimalScale={2}
+                        value={draft.caisse_price_usd}
+                        onChange={(v) => patchReportCaissePrice(v)}
+                        w="100%"
+                        maw={200}
+                        suffix=" $"
+                      />
+                    ) : (
+                      <Text fw={600} size="md" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {draft.caisse_price_usd.toFixed(2)} $
+                      </Text>
+                    )}
+                  </div>
+                  <div>
+                    <Text size="sm" c="dimmed" mb={6}>
+                      Bonus par patient soigné
+                    </Text>
+                    {canEdit && isEditing ? (
+                      <NumberInput
+                        size="sm"
+                        min={0.01}
+                        max={1_000_000}
+                        step={0.05}
+                        decimalScale={2}
+                        value={draft.patient_care_price_usd}
+                        onChange={(v) => patchReportPatientCarePrice(v)}
+                        w="100%"
+                        maw={200}
+                        suffix=" $"
+                      />
+                    ) : (
+                      <Text fw={600} size="md" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {draft.patient_care_price_usd.toFixed(2)} $
+                      </Text>
+                    )}
+                  </div>
+                  <div>
+                    <Text size="sm" c="dimmed" mb={6}>
+                      Prix unitaire des items offerts
+                    </Text>
+                    {canEdit && isEditing ? (
+                      <NumberInput
+                        size="sm"
+                        min={0.01}
+                        max={1_000_000}
+                        step={0.05}
+                        decimalScale={2}
+                        value={draft.offered_item_price_usd}
+                        onChange={(v) => patchReportOfferedItemPrice(v)}
+                        w="100%"
+                        maw={200}
+                        suffix=" $"
+                      />
+                    ) : (
+                      <Text fw={600} size="md" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {draft.offered_item_price_usd.toFixed(2)} $
+                      </Text>
+                    )}
+                  </div>
+                </SimpleGrid>
+                  </Box>
+                </Collapse>
+              </Paper>
+
               <div>
-                <Text size="sm" c="dimmed">
-                  Employés
-                </Text>
-                <Text fw={600}>{draft.global_stats.total_employees}</Text>
-              </div>
-              <div>
-                <Text size="sm" c="dimmed">
-                  Caisses (total)
-                </Text>
-                <Text fw={600}>{draft.global_stats.total_caisses}</Text>
-              </div>
-              <div>
-                <Text size="sm" c="dimmed" mb={4}>
-                  Prix vente dispensaire ($)
-                </Text>
-                {canEdit && isEditing ? (
-                  <NumberInput
-                    size="xs"
-                    min={0.01}
-                    max={1_000_000}
-                    step={0.5}
-                    decimalScale={2}
-                    value={draft.caisse_sale_price_usd}
-                    onChange={(v) => patchReportCaisseSalePrice(v)}
-                    w={110}
+                <Group align="flex-start" gap="md" wrap="nowrap" mb="md">
+                  <IconCalculator
+                    size={22}
+                    stroke={1.5}
+                    style={{ flexShrink: 0, color: 'var(--mantine-color-dimmed)', marginTop: 2 }}
                   />
-                ) : (
-                  <Text fw={600}>{draft.caisse_sale_price_usd.toFixed(2)}</Text>
-                )}
-              </div>
-              <div>
-                <Text size="sm" c="dimmed" mb={4}>
-                  Reversé employé ($)
+                  <div>
+                    <Text fw={600} size="sm">
+                      Synthèse calculée
+                    </Text>
+                    <Text size="xs" c="dimmed" maw={560}>
+                      Quantités et montants dérivés du planning et de la grille tarifaire (non éditables ici).
+                    </Text>
+                  </div>
+                </Group>
+
+                <Text size="xs" tt="uppercase" fw={600} c="dimmed" mb="sm" style={{ letterSpacing: '0.04em' }}>
+                  Effectif et volumes
                 </Text>
-                {canEdit && isEditing ? (
-                  <NumberInput
-                    size="xs"
-                    min={0.01}
-                    max={1_000_000}
-                    step={0.5}
-                    decimalScale={2}
-                    value={draft.caisse_price_usd}
-                    onChange={(v) => patchReportCaissePrice(v)}
-                    w={110}
-                  />
-                ) : (
-                  <Text fw={600}>{draft.caisse_price_usd.toFixed(2)}</Text>
-                )}
+                <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md" mb="lg">
+                  <div>
+                    <Text size="sm" c="dimmed" mb={4}>
+                      Employés
+                    </Text>
+                    <Text fw={600} style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      {draft.global_stats.total_employees}
+                    </Text>
+                  </div>
+                  <div>
+                    <Text size="sm" c="dimmed" mb={4}>
+                      Caisses
+                    </Text>
+                    <Text fw={600} style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      {draft.global_stats.total_caisses}
+                    </Text>
+                  </div>
+                  <div>
+                    <Text size="sm" c="dimmed" mb={4}>
+                      Items offerts
+                    </Text>
+                    <Text fw={600} style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      {draft.global_stats.total_offered_item_count}
+                    </Text>
+                  </div>
+                  <div>
+                    <Text size="sm" c="dimmed" mb={4}>
+                      Patients soignés
+                    </Text>
+                    <Text fw={600} style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      {draft.global_stats.total_patients_soignes}
+                    </Text>
+                  </div>
+                  <div>
+                    <Text size="sm" c="dimmed" mb={4}>
+                      Shérifs soignés
+                    </Text>
+                    <Text fw={600} style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      {draft.global_stats.total_sherifs}
+                    </Text>
+                  </div>
+                  <div>
+                    <Text size="sm" c="dimmed" mb={4}>
+                      Palefreniers soignés
+                    </Text>
+                    <Text fw={600} style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      {draft.global_stats.total_palefreniers}
+                    </Text>
+                  </div>
+                  
+                </SimpleGrid>
+
+                <Divider
+                  my="md"
+                  label="Montants"
+                  labelPosition="left"
+                  color="var(--mantine-color-default-border)"
+                />
+
+                <SimpleGrid cols={{ base: 1, sm: 2, lg: 2 }} spacing="md">
+                  <div>
+                    <Text size="sm" c="dimmed" mb={4}>
+                      Total virements (caisses + soins patients)
+                    </Text>
+                    <Text fw={600} size="md" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      {draft.global_stats.total_employee_payout_usd.toFixed(2)} $
+                    </Text>
+                  </div>
+                  <div>
+                    <Text size="sm" c="dimmed" mb={4}>
+                      Marge (bénéfice) sur caisses
+                    </Text>
+                    <Text fw={600} size="md" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      {draft.global_stats.total_benefit_usd.toFixed(2)} $
+                    </Text>
+                  </div>
+                  <div>
+                    <Text size="sm" c="dimmed" mb={4}>
+                      Montant soins patients
+                    </Text>
+                    <Text fw={600} size="md" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      {(draft.global_stats.total_patients_soignes * draft.patient_care_price_usd).toFixed(2)} $
+                    </Text>
+                  </div>
+                  <div>
+                    <Text size="sm" c="dimmed" mb={4}>
+                      Valeur totale des items offerts
+                    </Text>
+                    <Text fw={600} size="md" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      {draft.global_stats.total_offered_retail_value_usd.toFixed(2)} $
+                    </Text>
+                  </div>
+                </SimpleGrid>
               </div>
-              <div>
-                <Text size="sm" c="dimmed">
-                  Total salaires ($)
-                </Text>
-                <Text fw={600}>
-                  {(draft.global_stats.total_caisses * draft.caisse_price_usd).toFixed(2)} $
-                </Text>
-              </div>
-              <div>
-                <Text size="sm" c="dimmed">
-                  Bénéfice ($)
-                </Text>
-                <Text fw={600}>{draft.global_stats.total_benefit_usd.toFixed(2)} $</Text>
-              </div>
-              <div>
-                <Text size="sm" c="dimmed">
-                  Shérifs soignés (total)
-                </Text>
-                <Text fw={600}>{draft.global_stats.total_sherifs}</Text>
-              </div>
-              <div>
-                <Text size="sm" c="dimmed">
-                  Palefreniers (total)
-                </Text>
-                <Text fw={600}>{draft.global_stats.total_palefreniers}</Text>
-              </div>
-            </SimpleGrid>
+            </Stack>
           </Paper>
 
           <Paper shadow="sm" p="md" withBorder mb="lg">
@@ -466,7 +692,7 @@ export default function PayrollReportDetail({
                 </CopyButton>
               </Group>
             </Box>
-            <Table striped highlightOnHover withTableBorder layout="fixed">
+            <Table striped highlightOnHover withTableBorder layout="fixed" style={{borderRadius: 'var(--mantine-radius-md)'}}>
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th style={{ width: '18%' }}>Nom</Table.Th>
@@ -479,8 +705,9 @@ export default function PayrollReportDetail({
               <Table.Tbody onMouseLeave={() => setHoveredVirementRow(null)}>
                 {draft.employees.map((emp, rowIdx) => {
                   const caisses = emp.stats.nombre_caisses ?? 0;
-                  const unit = draft.caisse_price_usd;
-                  const pay = caisses * unit;
+                  const patients = emp.stats.patients_soignes ?? 0;
+                  const pay =
+                    caisses * draft.caisse_price_usd + patients * draft.patient_care_price_usd;
                   const payStr = `${pay.toFixed(2)} $`;
                   const payCopyValue = pay.toFixed(2);
                   const idDisplay = emp.id != null ? String(emp.id) : '—';
@@ -529,16 +756,15 @@ export default function PayrollReportDetail({
           </Paper>
 
           <Accordion
-            variant="separated"
+            variant="contained"
             radius="md"
-            multiple
             mb="xl"
-            defaultValue={draft.employees.length > 0 ? ['emp-0'] : undefined}
           >
             {draft.employees.map((emp, i) => {
               const caisses = emp.stats.nombre_caisses ?? 0;
-              const unit = draft.caisse_price_usd;
-              const pay = caisses * unit;
+              const patients = emp.stats.patients_soignes ?? 0;
+              const pay =
+                caisses * draft.caisse_price_usd + patients * draft.patient_care_price_usd;
               return (
                 <Accordion.Item key={`${emp.name}-${emp.id ?? i}`} value={`emp-${i}`}>
                   <Accordion.Control>
@@ -552,7 +778,8 @@ export default function PayrollReportDetail({
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <Text size="xs" c="dimmed">
-                          Caisses × {unit.toFixed(2)} $
+                          Caisses × {draft.caisse_price_usd.toFixed(2)} $ + patients ×{' '}
+                          {draft.patient_care_price_usd.toFixed(2)} $
                         </Text>
                         <Text fw={700}>{pay.toFixed(2)} $</Text>
                       </div>
@@ -657,6 +884,66 @@ export default function PayrollReportDetail({
                           Présences
                         </Text>
                         <Text>{emp.stats.nombre_presences ?? '—'}</Text>
+                      </div>
+                      <div>
+                        <Text size="xs" c="dimmed" mb={4}>
+                          Patients soignés
+                        </Text>
+                        {canEdit && isEditing ? (
+                          <NumberInput
+                            size="xs"
+                            min={0}
+                            allowDecimal={false}
+                            value={emp.stats.patients_soignes}
+                            onChange={(v) =>
+                              patchEmployeeStats(i, {
+                                patients_soignes: v === '' || v === undefined ? 0 : Number(v),
+                              })
+                            }
+                          />
+                        ) : (
+                          <Text>{emp.stats.patients_soignes}</Text>
+                        )}
+                      </div>
+                      <div>
+                        <Text size="xs" c="dimmed" mb={4}>
+                          Lait de pavot offert
+                        </Text>
+                        {canEdit && isEditing ? (
+                          <NumberInput
+                            size="xs"
+                            min={0}
+                            allowDecimal={false}
+                            value={emp.stats.poppy_milk_offertes}
+                            onChange={(v) =>
+                              patchEmployeeStats(i, {
+                                poppy_milk_offertes: v === '' || v === undefined ? 0 : Number(v),
+                              })
+                            }
+                          />
+                        ) : (
+                          <Text>{emp.stats.poppy_milk_offertes}</Text>
+                        )}
+                      </div>
+                      <div>
+                        <Text size="xs" c="dimmed" mb={4}>
+                          Infusions ginseng offertes
+                        </Text>
+                        {canEdit && isEditing ? (
+                          <NumberInput
+                            size="xs"
+                            min={0}
+                            allowDecimal={false}
+                            value={emp.stats.infusions_ginseng_offertes}
+                            onChange={(v) =>
+                              patchEmployeeStats(i, {
+                                infusions_ginseng_offertes: v === '' || v === undefined ? 0 : Number(v),
+                              })
+                            }
+                          />
+                        ) : (
+                          <Text>{emp.stats.infusions_ginseng_offertes}</Text>
+                        )}
                       </div>
                     </SimpleGrid>
                   </Accordion.Panel>

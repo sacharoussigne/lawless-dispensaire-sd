@@ -19,12 +19,13 @@ export default async function PayrollReportsPage() {
   const canCreate = checkRolePermission(session.user.role, 'payroll_reports', 'create');
 
   const rows = await prisma.payrollWeeklyReport.findMany({
-    orderBy: { weekStart: 'desc' },
+    orderBy: [{ weekStart: 'desc' }, { reportType: 'asc' }],
     take: 100,
     select: {
       id: true,
       weekStart: true,
       weekEnd: true,
+      reportType: true,
       createdAt: true,
       createdBy: { select: { name: true, id: true } },
     },
@@ -34,6 +35,7 @@ export default async function PayrollReportsPage() {
     id: r.id,
     weekStart: r.weekStart.toISOString(),
     weekEnd: r.weekEnd.toISOString(),
+    reportType: r.reportType,
     createdAt: r.createdAt.toISOString(),
     createdBy: r.createdBy,
   }));
