@@ -62,6 +62,43 @@ function parseSchedule(rawCells: string[]): {
   return { schedule, caisseCount, presenceCount };
 }
 
+/** One cell per day (X = caisse), e.g. coffre / préparateurs de caisse tables. */
+function parseScheduleCaisseOnly(rawCells: string[]): {
+  schedule: Record<PayrollDay, { caisse: string | null; presence: string | null }>;
+  caisseCount: number;
+  presenceCount: number;
+} {
+  const schedule = {} as Record<PayrollDay, { caisse: string | null; presence: string | null }>;
+  let caisseCount = 0;
+  for (let i = 0; i < 7; i++) {
+    const t = cleanText(rawCells[i] ?? '').toUpperCase();
+    const caisseVal = t.includes('X') ? 'X' : null;
+    if (caisseVal) caisseCount++;
+    schedule[PAYROLL_DAYS[i]] = {
+      caisse: caisseVal,
+      presence: null,
+    };
+  }
+  return { schedule, caisseCount, presenceCount: 0 };
+}
+
+/** For tables without Médecin / rôle: name + optional (id) only. */
+function parseEmployeeCellLoose(text: string): { name: string | null; role: string; id: number | null } {
+  const normalized = cleanText(text.replace(/\r?\n/g, ' '));
+  const idMatch = normalized.match(/\((\d+)\)/);
+  const namePart = cleanText(
+    normalized
+      .replace(/\([^)]*\)/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim(),
+  );
+  return {
+    name: namePart || null,
+    role: '',
+    id: idMatch ? Number(idMatch[1]) : null,
+  };
+}
+
 function parseStatsRow(cells: string[]): {
   sherifs: number | null;
   palefreniers: number | null;
@@ -145,10 +182,71 @@ export type ParsedPayrollTable = {
   };
 };
 
-export function parsePayrollHtmlTable(html: string): ParsedPayrollTable {
-  const $ = load(html);
-  const rows = $('table tr');
+function isCaisseOnlyStyleHeader($: ReturnType<typeof load>, row: unknown): boolean {
+  const $row = $(row as Parameters<typeof $>[0]);
+  const headers = $row.find('td, th');
+  if (headers.length < 7) return false;
+  // Coffre / préparateurs: first cell is empty (no "Nom" / "Employé" like legacy headers).
+  const firstCell = cleanText(headers.first().text());
+  if (firstCell.length > 0) return false;
+  const rowText = cleanText($row.text());
+  if (!/CAISSE/i.test(rowText)) return false;
+  if (!/(LUN|MAR|MER|JEU|VEN|SAM|DIM)\.?\b/i.test(rowText)) return false;
+  return true;
+}
 
+function buildGlobalStats(employees: ParsedPayrollTable['employees']): ParsedPayrollTable['global_stats'] {
+  return {
+    total_employees: employees.length,
+    total_caisses: employees.reduce((sum, e) => sum + e.stats.nombre_caisses, 0),
+    total_sherifs: employees.reduce((sum, e) => sum + (e.stats.sherifs ?? 0), 0),
+    total_palefreniers: employees.reduce((sum, e) => sum + (e.stats.palefreniers ?? 0), 0),
+  };
+}
+
+function tryParseCaisseOnlyTable($: ReturnType<typeof load>): ParsedPayrollTable | null {
+  for (const table of $('table').toArray()) {
+    const trs = $(table).find('tr');
+    if (trs.length < 2) continue;
+    if (!isCaisseOnlyStyleHeader($, trs[0])) continue;
+
+    const employees: ParsedPayrollTable['employees'] = [];
+
+    for (let i = 1; i < trs.length; i++) {
+      const cells = $(trs[i]).find('td');
+      if (cells.length < 8) continue;
+      const firstCellText = cleanText($(cells[0]).text());
+      if (!firstCellText) continue;
+      const employeeInfo = parseEmployeeCellLoose(firstCellText);
+      if (!employeeInfo.name) continue;
+      const rawCells: string[] = [];
+      for (let j = 1; j <= 7; j++) {
+        rawCells.push($(cells[j]).text());
+      }
+      const { schedule, caisseCount, presenceCount } = parseScheduleCaisseOnly(rawCells);
+      employees.push({
+        name: employeeInfo.name,
+        role: employeeInfo.role,
+        id: employeeInfo.id,
+        schedule,
+        stats: {
+          sherifs: null,
+          palefreniers: null,
+          patients_soignes: null,
+          nombre_caisses: caisseCount,
+          nombre_presences: presenceCount,
+        },
+      });
+    }
+
+    if (employees.length === 0) continue;
+    return { employees, global_stats: buildGlobalStats(employees) };
+  }
+  return null;
+}
+
+function parseLegacyPayrollFromDoc($: ReturnType<typeof load>): ParsedPayrollTable {
+  const rows = $('table tr');
   const employees: ParsedPayrollTable['employees'] = [];
 
   for (let i = 1; i < rows.length; i++) {
@@ -191,14 +289,20 @@ export function parsePayrollHtmlTable(html: string): ParsedPayrollTable {
     }
   }
 
-  const global_stats = {
-    total_employees: employees.length,
-    total_caisses: employees.reduce((sum, e) => sum + e.stats.nombre_caisses, 0),
-    total_sherifs: employees.reduce((sum, e) => sum + (e.stats.sherifs ?? 0), 0),
-    total_palefreniers: employees.reduce((sum, e) => sum + (e.stats.palefreniers ?? 0), 0),
-  };
+  return { employees, global_stats: buildGlobalStats(employees) };
+}
 
-  return { employees, global_stats };
+export function parsePayrollHtmlTable(html: string): ParsedPayrollTable {
+  const $ = load(html);
+  const legacy = parseLegacyPayrollFromDoc($);
+  if (legacy.employees.length > 0) {
+    return legacy;
+  }
+  const caisseParsed = tryParseCaisseOnlyTable($);
+  if (caisseParsed) {
+    return caisseParsed;
+  }
+  return legacy;
 }
 
 export function parsedToPayrollReportResult(parsed: ParsedPayrollTable): PayrollReportResult {
