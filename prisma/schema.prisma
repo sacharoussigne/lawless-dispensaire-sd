@@ -38,6 +38,7 @@ model PayrollWeeklyReport {
   id              String   @id @default(uuid())
   weekStart       DateTime
   weekEnd         DateTime
+  reportType      String   @default("Employés")
   resultJson      Json?
   errorMessage    String?
   createdById     String
@@ -45,7 +46,7 @@ model PayrollWeeklyReport {
   createdAt       DateTime                  @default(now())
   updatedAt       DateTime                  @updatedAt
 
-  @@unique([weekStart])
+  @@unique([weekStart, reportType])
   @@index([createdById])
   @@index([weekStart])
   @@map("payroll_weekly_report")

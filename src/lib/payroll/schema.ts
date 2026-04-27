@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { PAYROLL_CAISSE_SALE_USD, PAYROLL_CAISSE_USD } from './constants';
+import {
+  PAYROLL_CAISSE_SALE_USD,
+  PAYROLL_CAISSE_USD,
+  PAYROLL_OFFERED_ITEM_USD,
+  PAYROLL_PATIENT_CARE_USD,
+} from './constants';
 
 const dayScheduleSchema = z.object({
   caisse: z.string().nullable(),
@@ -21,6 +26,9 @@ const employeeStatsSchema = z.object({
   palefreniers: z.number().nullable(),
   nombre_caisses: z.number().nullable(),
   nombre_presences: z.number().nullable(),
+  patients_soignes: z.number().int().min(0).default(0),
+  poppy_milk_offertes: z.number().int().min(0).default(0),
+  infusions_ginseng_offertes: z.number().int().min(0).default(0),
 });
 
 const employeeSchema = z.object({
@@ -31,9 +39,17 @@ const employeeSchema = z.object({
   stats: employeeStatsSchema,
 });
 
+const weeklyActivityImportSchema = z.object({
+  weekStart: z.string(),
+  weekEnd: z.string(),
+});
+
 const payrollReportResultInnerSchema = z.object({
   caisse_price_usd: z.number().positive().max(1_000_000).default(PAYROLL_CAISSE_USD),
   caisse_sale_price_usd: z.number().positive().max(1_000_000).default(PAYROLL_CAISSE_SALE_USD),
+  patient_care_price_usd: z.number().positive().max(1_000_000).default(PAYROLL_PATIENT_CARE_USD),
+  offered_item_price_usd: z.number().positive().max(1_000_000).default(PAYROLL_OFFERED_ITEM_USD),
+  weekly_activity_import: weeklyActivityImportSchema.nullable().optional(),
   employees: z.array(employeeSchema),
   global_stats: z.object({
     total_employees: z.number(),
@@ -41,6 +57,10 @@ const payrollReportResultInnerSchema = z.object({
     total_sherifs: z.number(),
     total_palefreniers: z.number().default(0),
     total_benefit_usd: z.number().default(0),
+    total_patients_soignes: z.number().default(0),
+    total_offered_item_count: z.number().default(0),
+    total_employee_payout_usd: z.number().default(0),
+    total_offered_retail_value_usd: z.number().default(0),
   }),
 });
 
@@ -92,10 +112,32 @@ export function normalizePayrollReportResultRaw(raw: unknown): unknown {
     caisse_sale_price_usd = PAYROLL_CAISSE_SALE_USD;
   }
 
+  let patient_care_price_usd = o.patient_care_price_usd;
+  if (
+    patient_care_price_usd === undefined ||
+    patient_care_price_usd === null ||
+    (typeof patient_care_price_usd === 'number' &&
+      (!Number.isFinite(patient_care_price_usd) || patient_care_price_usd <= 0))
+  ) {
+    patient_care_price_usd = PAYROLL_PATIENT_CARE_USD;
+  }
+
+  let offered_item_price_usd = o.offered_item_price_usd;
+  if (
+    offered_item_price_usd === undefined ||
+    offered_item_price_usd === null ||
+    (typeof offered_item_price_usd === 'number' &&
+      (!Number.isFinite(offered_item_price_usd) || offered_item_price_usd <= 0))
+  ) {
+    offered_item_price_usd = PAYROLL_OFFERED_ITEM_USD;
+  }
+
   return {
     ...o,
     caisse_price_usd: resolvedCaissePrice,
     caisse_sale_price_usd,
+    patient_care_price_usd,
+    offered_item_price_usd,
     employees,
   };
 }

@@ -36,6 +36,7 @@ export default async function PayrollReportByIdPage({ params }: PageProps) {
         id: report.id,
         weekStart: report.weekStart.toISOString(),
         weekEnd: report.weekEnd.toISOString(),
+        reportType: report.reportType,
         resultJson: report.resultJson,
         errorMessage: report.errorMessage,
         createdAt: report.createdAt.toISOString(),

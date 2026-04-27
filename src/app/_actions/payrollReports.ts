@@ -5,14 +5,35 @@ import { getAuthSession } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { checkRolePermission } from '@/lib/auth/permissions';
 import { getAppFeatureActionBlock } from '@/lib/appSettings';
-import { PAYROLL_CAISSE_SALE_USD, PAYROLL_CAISSE_USD } from '@/lib/payroll/constants';
-import { parsePayrollHtmlTable, parsedToPayrollReportResult } from '@/lib/payroll/parsePayrollHtmlTable';
+import { mergeResolvedDisplayNames } from '@/lib/dispensaryWeeklyActivity/resolveDisplayName';
+import {
+  PAYROLL_CAISSE_SALE_USD,
+  PAYROLL_CAISSE_USD,
+  PAYROLL_OFFERED_ITEM_USD,
+  PAYROLL_PATIENT_CARE_USD,
+  PAYROLL_REPORT_TYPE_EMPLOYES,
+  isPayrollReportType,
+} from '@/lib/payroll/constants';
+import { mergeHtmlAndWeeklyActivity, type WaRow } from '@/lib/payroll/mergeWeeklyActivity';
+import { type ParsedPayrollTable, parsePayrollHtmlTable } from '@/lib/payroll/parsePayrollHtmlTable';
 import { payrollReportResultSchema } from '@/lib/payroll/schema';
 import { weekRangeFromIsoDate } from '@/lib/payroll/week';
 import { recalculatePayrollResult } from '@/lib/payroll/recalculatePayrollResult';
 
 const MAX_CAISSE_PRICE_USD = 1_000_000;
 const MAX_HTML_CHARS = 600_000;
+
+const emptyGlobalStats = () => ({
+  total_employees: 0,
+  total_caisses: 0,
+  total_sherifs: 0,
+  total_palefreniers: 0,
+  total_benefit_usd: 0,
+  total_patients_soignes: 0,
+  total_offered_item_count: 0,
+  total_employee_payout_usd: 0,
+  total_offered_retail_value_usd: 0,
+});
 
 export async function createPayrollReportFromForm(formData: FormData) {
   const session = await getAuthSession();
@@ -58,37 +79,105 @@ export async function createPayrollReportFromForm(formData: FormData) {
     caisseSalePriceUsd = n;
   }
 
+  const patientCareRaw = formData.get('patientCarePriceUsd');
+  let patientCarePriceUsd = PAYROLL_PATIENT_CARE_USD;
+  if (patientCareRaw != null && String(patientCareRaw).trim() !== '') {
+    const n = Number(String(patientCareRaw).trim().replace(',', '.'));
+    if (!Number.isFinite(n) || n <= 0 || n > MAX_CAISSE_PRICE_USD) {
+      return { status: 400, error: 'Prix par patient soigné invalide (entre 0,01 et 1 000 000 $).' };
+    }
+    patientCarePriceUsd = n;
+  }
+
+  const offeredRaw = formData.get('offeredItemPriceUsd');
+  let offeredItemPriceUsd = PAYROLL_OFFERED_ITEM_USD;
+  if (offeredRaw != null && String(offeredRaw).trim() !== '') {
+    const n = Number(String(offeredRaw).trim().replace(',', '.'));
+    if (!Number.isFinite(n) || n <= 0 || n > MAX_CAISSE_PRICE_USD) {
+      return { status: 400, error: "Prix unitaire d'offre invalide (entre 0,01 et 1 000 000 $)." };
+    }
+    offeredItemPriceUsd = n;
+  }
+
+  const importWaRaw = formData.get('importWeeklyActivity');
+  const importWeeklyActivity =
+    importWaRaw === '1' || importWaRaw === 'on' || importWaRaw === 'true';
+
+  const waWeekRef = formData.get('weeklyActivityWeekStart');
+  const waWeekStartStr =
+    importWeeklyActivity &&
+    typeof waWeekRef === 'string' &&
+    /^\d{4}-\d{2}-\d{2}$/.test(waWeekRef.trim())
+      ? waWeekRef.trim()
+      : null;
+
   if (!weekStartStr || !/^\d{4}-\d{2}-\d{2}$/.test(weekStartStr)) {
     return { status: 400, error: 'weekStart must be YYYY-MM-DD' };
   }
-  if (!tableHtml.trim()) {
-    return { status: 400, error: 'Le contenu HTML du tableau est requis' };
+
+  const reportTypeRaw = formData.get('reportType');
+  const reportTypeStr =
+    typeof reportTypeRaw === 'string' && reportTypeRaw.trim() !== ''
+      ? reportTypeRaw.trim()
+      : PAYROLL_REPORT_TYPE_EMPLOYES;
+  if (!isPayrollReportType(reportTypeStr)) {
+    return { status: 400, error: 'Type de rapport invalide.' };
   }
+  const reportType = reportTypeStr;
+
   if (tableHtml.length > MAX_HTML_CHARS) {
     return { status: 400, error: `Le HTML est trop long (max ${MAX_HTML_CHARS} caractères)` };
   }
 
-  let parsed;
+  const emptyParsed: ParsedPayrollTable = {
+    employees: [],
+    global_stats: { total_employees: 0, total_caisses: 0, total_sherifs: 0, total_palefreniers: 0 },
+  };
+
+  let parsed: ParsedPayrollTable;
   try {
-    parsed = parsePayrollHtmlTable(tableHtml);
+    parsed = tableHtml.trim() ? parsePayrollHtmlTable(tableHtml) : emptyParsed;
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Échec du parse HTML';
     return { status: 400, error: msg };
   }
 
-  if (parsed.employees.length === 0) {
+  let activitiesWithNames: WaRow[] = [];
+  let waImportStart: Date | undefined;
+  let waImportEnd: Date | undefined;
+
+  if (importWeeklyActivity) {
+    const range = weekRangeFromIsoDate(waWeekStartStr ?? weekStartStr);
+    waImportStart = range.weekStart;
+    waImportEnd = range.weekEnd;
+    const rawActivities = await prisma.dispensaryWeeklyActivity.findMany({
+      where: { periodStart: waImportStart, periodEnd: waImportEnd },
+      include: { user: { select: { name: true } } },
+    });
+    activitiesWithNames = (await mergeResolvedDisplayNames(
+      prisma,
+      rawActivities,
+    )) as WaRow[];
+  }
+
+  const employeesMerged = mergeHtmlAndWeeklyActivity(parsed, activitiesWithNames);
+
+  if (employeesMerged.length === 0) {
     return {
       status: 400,
-      error:
-        'Aucune ligne employé détectée (attendu : cellule avec Médecin, Apprenti ou Infirmière). Vérifiez que le HTML contient bien le tableau.',
+      error: importWeeklyActivity
+        ? 'Aucune donnée : collez le tableau HTML et/ou assurez-vous qu’il existe des entrées d’activité hebdomadaire pour la semaine d’import choisie.'
+        : 'Collez le tableau HTML (au moins une ligne employé) ou activez l’import d’activité hebdomadaire.',
     };
   }
 
   const { weekStart, weekEnd } = weekRangeFromIsoDate(weekStartStr);
 
-  const existing = await prisma.payrollWeeklyReport.findUnique({ where: { weekStart } });
+  const existing = await prisma.payrollWeeklyReport.findUnique({
+    where: { weekStart_reportType: { weekStart, reportType } },
+  });
   if (existing) {
-    return { status: 409, error: 'Un rapport existe déjà pour cette semaine.' };
+    return { status: 409, error: 'Un rapport de ce type existe déjà pour cette semaine.' };
   }
 
   const reportId = randomUUID();
@@ -98,17 +187,28 @@ export async function createPayrollReportFromForm(formData: FormData) {
       id: reportId,
       weekStart,
       weekEnd,
+      reportType,
       createdById: session.user.id,
     },
   });
 
   try {
-    const parsedResult = parsedToPayrollReportResult(parsed);
     const result = recalculatePayrollResult(
       payrollReportResultSchema.parse({
-        ...parsedResult,
+        employees: employeesMerged,
+        global_stats: emptyGlobalStats(),
         caisse_price_usd: caissePriceUsd,
         caisse_sale_price_usd: caisseSalePriceUsd,
+        patient_care_price_usd: patientCarePriceUsd,
+        offered_item_price_usd: offeredItemPriceUsd,
+        ...(importWeeklyActivity && waImportStart && waImportEnd
+          ? {
+              weekly_activity_import: {
+                weekStart: waImportStart.toISOString(),
+                weekEnd: waImportEnd.toISOString(),
+              },
+            }
+          : {}),
       }),
     );
 
@@ -206,4 +306,32 @@ export async function deletePayrollReport(id: string) {
   await prisma.payrollWeeklyReport.delete({ where: { id: report.id } });
 
   return { status: 200 };
+}
+
+export async function listPayrollImportableActivityWeeks() {
+  const session = await getAuthSession();
+  if (!session?.user) {
+    return { status: 401, error: 'Non autorisé' };
+  }
+  if (!checkRolePermission(session.user.role, 'payroll_reports', 'create')) {
+    return { status: 403, error: 'Accès refusé' };
+  }
+
+  const groups = await prisma.dispensaryWeeklyActivity.groupBy({
+    by: ['periodStart', 'periodEnd'],
+    _count: { _all: true },
+    orderBy: { periodStart: 'desc' },
+    take: 52,
+  });
+
+  return {
+    status: 200,
+    data: {
+      weeks: groups.map((g) => ({
+        weekStart: g.periodStart.toISOString().slice(0, 10),
+        periodStart: g.periodStart.toISOString(),
+        periodEnd: g.periodEnd.toISOString(),
+      })),
+    },
+  };
 }
