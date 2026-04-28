@@ -99,6 +99,7 @@ type HistoryEntry = {
   action: string;
   source: string;
   actorUserName: string | null;
+  actorResolvedName: string | null;
   actorDiscordUserId: string | null;
   previousValues: unknown;
   nextValues: unknown;
@@ -334,10 +335,6 @@ export default function WeeklyActivityPageClient({
       <Group justify="space-between" mb="xl" align="flex-start">
         <div>
           <Title order={1}>Activité hebdomadaire</Title>
-          <Text c="dimmed" mt="xs">
-            Compteurs par semaine Europe/Paris (lundi → dimanche). Les entrées créées via le bot ou
-            sans compte intranet restent rattachées à un ID Discord.
-          </Text>
         </div>
         {canEdit && (
           <Button
@@ -403,9 +400,9 @@ export default function WeeklyActivityPageClient({
                 </Tooltip>
               ),
             },
+            { accessor: 'patientsCount', title: 'Patients' },
             { accessor: 'sherifCount', title: 'Shérifs' },
             { accessor: 'palefrenierCount', title: 'Palefreniers' },
-            { accessor: 'patientsCount', title: 'Patients' },
             { accessor: 'infusionsCount', title: 'Infusions' },
             { accessor: 'poppyMilkCount', title: 'Lait de pavot' },
             {
@@ -673,7 +670,9 @@ export default function WeeklyActivityPageClient({
                   {h.source === 'INTRANET' ? 'Intranet' : 'Bot Discord'}
                 </Text>
                 <Text size="sm">
-                  {h.actorUserName ?? h.actorDiscordUserId ?? '—'}
+                  {h.actorResolvedName
+                    ? `${h.actorResolvedName}${h.actorDiscordUserId ? ` (${h.actorDiscordUserId})` : ''}`
+                    : (h.actorDiscordUserId ?? '—')}
                 </Text>
               </Paper>
             ))
