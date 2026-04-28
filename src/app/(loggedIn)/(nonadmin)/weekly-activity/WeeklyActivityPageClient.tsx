@@ -34,6 +34,7 @@ import {
   createDispensaryWeeklyActivity,
   deleteDispensaryWeeklyActivity,
   getDispensaryWeeklyActivityHistory,
+  listDispensaryWeeklyActivities,
   listDispensaryWeeklyActivityTargets,
   updateDispensaryWeeklyActivity,
 } from '@/app/_actions/dispensaryWeeklyActivity';
@@ -121,6 +122,7 @@ export default function WeeklyActivityPageClient({
   viewerDiscordId: string | null;
   defaultDisplayName: string;
 }) {
+  const [rows, setRows] = useState<WeeklyActivityListItem[]>(initialRows);
   const [createOpen, setCreateOpen] = useState(false);
   const [editRow, setEditRow] = useState<WeeklyActivityListItem | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -183,6 +185,16 @@ export default function WeeklyActivityPageClient({
     };
   }, [createOpen, canEditAll]);
 
+  const refreshRows = async () => {
+    const res = await listDispensaryWeeklyActivities();
+    const data = handleAction<WeeklyActivityListItem[]>(res);
+    if (Array.isArray(data)) {
+      setRows(data);
+    } else {
+      setRows([]);
+    }
+  };
+
   const canEditRow = (row: WeeklyActivityListItem) => {
     if (!canEdit) return false;
     if (canEditAll) return true;
@@ -241,7 +253,7 @@ export default function WeeklyActivityPageClient({
       handleAction(res);
       notifications.show({ title: 'Créé', message: '', color: 'green' });
       setCreateOpen(false);
-      window.location.reload();
+      await refreshRows();
     } catch (e) {
       notifications.show({
         title: 'Erreur',
@@ -284,7 +296,7 @@ export default function WeeklyActivityPageClient({
       handleAction(res);
       notifications.show({ title: 'Enregistré', message: '', color: 'green' });
       setEditRow(null);
-      window.location.reload();
+      await refreshRows();
     } catch (e) {
       notifications.show({
         title: 'Erreur',
@@ -305,7 +317,7 @@ export default function WeeklyActivityPageClient({
           const res = await deleteDispensaryWeeklyActivity({ id: row.id });
           handleAction(res);
           notifications.show({ title: 'Supprimé', message: '', color: 'green' });
-          window.location.reload();
+          await refreshRows();
         } catch (e) {
           notifications.show({
             title: 'Erreur',
@@ -351,7 +363,7 @@ export default function WeeklyActivityPageClient({
 
       <Paper shadow="sm" p="md" withBorder radius="md">
         <DataTable
-          records={initialRows}
+          records={rows}
           minHeight={200}
           columns={[
             {
