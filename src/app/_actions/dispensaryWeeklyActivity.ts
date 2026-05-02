@@ -168,6 +168,50 @@ export async function getDispensaryWeeklyActivityHistory(input: z.infer<typeof i
       include: { actorUser: { select: { name: true } } },
     });
 
+    const missingDiscordIds = [
+      ...new Set(
+        history
+          .filter((h) => !h.actorUser?.name && h.actorDiscordUserId)
+          .map((h) => h.actorDiscordUserId as string),
+      ),
+    ];
+
+    const discordIdToName = new Map<string, string>();
+    if (missingDiscordIds.length > 0) {
+      const accounts = await prisma.account.findMany({
+        where: {
+          providerId: DISCORD_ACCOUNT_PROVIDER_ID,
+          accountId: { in: missingDiscordIds },
+        },
+        include: { user: { select: { name: true } } },
+      });
+      for (const a of accounts) {
+        if (a.user?.name) {
+          discordIdToName.set(a.accountId, a.user.name);
+        }
+      }
+
+      const stillMissing = missingDiscordIds.filter((id) => !discordIdToName.has(id));
+      if (stillMissing.length > 0) {
+        const latestByDiscord = await Promise.all(
+          stillMissing.map(async (discordUserId) => {
+            const row = await prisma.dispensaryWeeklyActivity.findFirst({
+              where: { discordUserId },
+              orderBy: { periodStart: 'desc' },
+              include: { user: { select: { name: true } } },
+            });
+            const name = row?.user?.name ?? row?.displayName ?? null;
+            return { discordUserId, name };
+          }),
+        );
+        for (const item of latestByDiscord) {
+          if (item.name) {
+            discordIdToName.set(item.discordUserId, item.name);
+          }
+        }
+      }
+    }
+
     return {
       status: 200 as const,
       data: history.map((h) => ({
@@ -176,6 +220,9 @@ export async function getDispensaryWeeklyActivityHistory(input: z.infer<typeof i
         source: h.source,
         actorUserName: h.actorUser?.name ?? null,
         actorDiscordUserId: h.actorDiscordUserId,
+        actorResolvedName:
+          h.actorUser?.name ??
+          (h.actorDiscordUserId ? discordIdToName.get(h.actorDiscordUserId) ?? null : null),
         previousValues: h.previousValues,
         nextValues: h.nextValues,
         createdAt: h.createdAt.toISOString(),
