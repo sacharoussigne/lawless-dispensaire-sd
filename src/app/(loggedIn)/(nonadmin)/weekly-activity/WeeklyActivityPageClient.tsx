@@ -34,6 +34,7 @@ import {
   createDispensaryWeeklyActivity,
   deleteDispensaryWeeklyActivity,
   getDispensaryWeeklyActivityHistory,
+  listDispensaryWeeklyActivities,
   listDispensaryWeeklyActivityTargets,
   updateDispensaryWeeklyActivity,
 } from '@/app/_actions/dispensaryWeeklyActivity';
@@ -98,6 +99,7 @@ type HistoryEntry = {
   action: string;
   source: string;
   actorUserName: string | null;
+  actorResolvedName: string | null;
   actorDiscordUserId: string | null;
   previousValues: unknown;
   nextValues: unknown;
@@ -121,6 +123,7 @@ export default function WeeklyActivityPageClient({
   viewerDiscordId: string | null;
   defaultDisplayName: string;
 }) {
+  const [rows, setRows] = useState<WeeklyActivityListItem[]>(initialRows);
   const [createOpen, setCreateOpen] = useState(false);
   const [editRow, setEditRow] = useState<WeeklyActivityListItem | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -183,6 +186,16 @@ export default function WeeklyActivityPageClient({
     };
   }, [createOpen, canEditAll]);
 
+  const refreshRows = async () => {
+    const res = await listDispensaryWeeklyActivities();
+    const data = handleAction<WeeklyActivityListItem[]>(res);
+    if (Array.isArray(data)) {
+      setRows(data);
+    } else {
+      setRows([]);
+    }
+  };
+
   const canEditRow = (row: WeeklyActivityListItem) => {
     if (!canEdit) return false;
     if (canEditAll) return true;
@@ -241,7 +254,7 @@ export default function WeeklyActivityPageClient({
       handleAction(res);
       notifications.show({ title: 'Créé', message: '', color: 'green' });
       setCreateOpen(false);
-      window.location.reload();
+      await refreshRows();
     } catch (e) {
       notifications.show({
         title: 'Erreur',
@@ -284,7 +297,7 @@ export default function WeeklyActivityPageClient({
       handleAction(res);
       notifications.show({ title: 'Enregistré', message: '', color: 'green' });
       setEditRow(null);
-      window.location.reload();
+      await refreshRows();
     } catch (e) {
       notifications.show({
         title: 'Erreur',
@@ -305,7 +318,7 @@ export default function WeeklyActivityPageClient({
           const res = await deleteDispensaryWeeklyActivity({ id: row.id });
           handleAction(res);
           notifications.show({ title: 'Supprimé', message: '', color: 'green' });
-          window.location.reload();
+          await refreshRows();
         } catch (e) {
           notifications.show({
             title: 'Erreur',
@@ -322,10 +335,6 @@ export default function WeeklyActivityPageClient({
       <Group justify="space-between" mb="xl" align="flex-start">
         <div>
           <Title order={1}>Activité hebdomadaire</Title>
-          <Text c="dimmed" mt="xs">
-            Compteurs par semaine Europe/Paris (lundi → dimanche). Les entrées créées via le bot ou
-            sans compte intranet restent rattachées à un ID Discord.
-          </Text>
         </div>
         {canEdit && (
           <Button
@@ -351,7 +360,7 @@ export default function WeeklyActivityPageClient({
 
       <Paper shadow="sm" p="md" withBorder radius="md">
         <DataTable
-          records={initialRows}
+          records={rows}
           minHeight={200}
           columns={[
             {
@@ -391,9 +400,9 @@ export default function WeeklyActivityPageClient({
                 </Tooltip>
               ),
             },
+            { accessor: 'patientsCount', title: 'Patients' },
             { accessor: 'sherifCount', title: 'Shérifs' },
             { accessor: 'palefrenierCount', title: 'Palefreniers' },
-            { accessor: 'patientsCount', title: 'Patients' },
             { accessor: 'infusionsCount', title: 'Infusions' },
             { accessor: 'poppyMilkCount', title: 'Lait de pavot' },
             {
@@ -541,7 +550,7 @@ export default function WeeklyActivityPageClient({
                 min={0}
               />
               <NumberInput
-                label="Infusions vendues"
+                label="Infusions"
                 value={cInfusions}
                 onChange={(v) => setCInfusions(Number(v) || 0)}
                 min={0}
@@ -617,7 +626,7 @@ export default function WeeklyActivityPageClient({
                 min={0}
               />
               <NumberInput
-                label="Infusions vendues"
+                label="Infusions"
                 value={eInfusions}
                 onChange={(v) => setEInfusions(Number(v) || 0)}
                 min={0}
@@ -661,7 +670,9 @@ export default function WeeklyActivityPageClient({
                   {h.source === 'INTRANET' ? 'Intranet' : 'Bot Discord'}
                 </Text>
                 <Text size="sm">
-                  {h.actorUserName ?? h.actorDiscordUserId ?? '—'}
+                  {h.actorResolvedName
+                    ? `${h.actorResolvedName}${h.actorDiscordUserId ? ` (${h.actorDiscordUserId})` : ''}`
+                    : (h.actorDiscordUserId ?? '—')}
                 </Text>
               </Paper>
             ))

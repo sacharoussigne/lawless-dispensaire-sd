@@ -34,6 +34,7 @@ export function MailTemplateModal({
     initialValues: {
       name: '',
       description: '',
+      defaultMailName: '',
       content: '',
     },
     validate: {
@@ -47,6 +48,7 @@ export function MailTemplateModal({
       form.setValues({
         name: editingMailTemplate.name,
         description: editingMailTemplate.description || '',
+        defaultMailName: editingMailTemplate.defaultMailName || '',
         content: editingMailTemplate.content,
       });
     } else {
@@ -63,12 +65,14 @@ export function MailTemplateModal({
           name: values.name,
           description: values.description || undefined,
           content: values.content,
+          defaultMailName: values.defaultMailName || undefined,
         });
       } else {
         result = await createMailTemplate({
           name: values.name,
           description: values.description || undefined,
           content: values.content,
+          defaultMailName: values.defaultMailName || undefined,
         });
       }
 
@@ -113,6 +117,11 @@ export function MailTemplateModal({
             placeholder="Nom du template"
             required
             {...form.getInputProps('name')}
+          />
+          <TextInput
+            label="Nom du courrier par défaut"
+            placeholder="Préremplit le champ « Nom » à la création d’un courrier (optionnel)"
+            {...form.getInputProps('defaultMailName')}
           />
           <Textarea
             label="Description"

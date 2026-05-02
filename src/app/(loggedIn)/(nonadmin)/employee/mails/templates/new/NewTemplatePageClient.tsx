@@ -22,6 +22,7 @@ export default function NewTemplatePageClient() {
     initialValues: {
       name: '',
       description: '',
+      defaultMailName: '',
       content: '',
     },
     validate: {
@@ -58,6 +59,7 @@ export default function NewTemplatePageClient() {
         name: values.name,
         description: values.description || undefined,
         content: values.content,
+        defaultMailName: values.defaultMailName || undefined,
       });
 
       handleAction(result);
@@ -112,6 +114,13 @@ export default function NewTemplatePageClient() {
                   label="Description"
                   placeholder="Description du modèle (optionnel)"
                   {...form.getInputProps('description')}
+                />
+              </Grid.Col>
+              <Grid.Col span={12}>
+                <TextInput
+                  label="Nom du courrier par défaut"
+                  placeholder="Préremplit le champ « Nom » à la création d’un courrier (optionnel)"
+                  {...form.getInputProps('defaultMailName')}
                 />
               </Grid.Col>
             </Grid>

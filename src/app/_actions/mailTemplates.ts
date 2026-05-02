@@ -7,10 +7,20 @@ import { getAuthSession } from '@/lib/auth';
 import { checkRolePermission } from '@/lib/auth/permissions';
 import { getAppFeatureActionBlock } from '@/lib/appSettings';
 
+const optionalDefaultMailName = z
+  .string()
+  .max(255, 'Le nom du courrier par défaut est trop long')
+  .optional()
+  .transform((v) => {
+    const t = v?.trim();
+    return t ? t : undefined;
+  });
+
 const createMailTemplateSchema = z.object({
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
   description: z.string().optional(),
   content: z.string().min(1, 'Le contenu est requis'),
+  defaultMailName: optionalDefaultMailName,
 });
 
 const updateMailTemplateSchema = z.object({
@@ -18,6 +28,7 @@ const updateMailTemplateSchema = z.object({
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
   description: z.string().optional(),
   content: z.string().min(1, 'Le contenu est requis'),
+  defaultMailName: optionalDefaultMailName,
 });
 
 const deleteMailTemplateSchema = z.object({
@@ -28,6 +39,7 @@ export async function createMailTemplate(data: {
   name: string;
   description?: string;
   content: string;
+  defaultMailName?: string;
 }) {
   try {
     const session = await getAuthSession();
@@ -48,6 +60,7 @@ export async function createMailTemplate(data: {
         name: validatedData.name,
         description: validatedData.description,
         content: validatedData.content,
+        defaultMailName: validatedData.defaultMailName ?? null,
         userId: null,
       },
     });
@@ -97,6 +110,7 @@ export async function updateMailTemplate(data: {
   name: string;
   description?: string;
   content: string;
+  defaultMailName?: string;
 }) {
   try {
     const session = await getAuthSession();
@@ -140,6 +154,7 @@ export async function updateMailTemplate(data: {
         name: validatedData.name,
         description: validatedData.description,
         content: validatedData.content,
+        defaultMailName: validatedData.defaultMailName ?? null,
       },
     });
 
@@ -370,6 +385,7 @@ export async function createUserMailTemplate(data: {
   name: string;
   description?: string;
   content: string;
+  defaultMailName?: string;
 }) {
   try {
     const session = await getAuthSession();
@@ -390,6 +406,7 @@ export async function createUserMailTemplate(data: {
         name: validatedData.name,
         description: validatedData.description,
         content: validatedData.content,
+        defaultMailName: validatedData.defaultMailName ?? null,
         userId: session.user.id,
       },
     });
@@ -408,6 +425,7 @@ export async function updateUserMailTemplate(data: {
   name: string;
   description?: string;
   content: string;
+  defaultMailName?: string;
 }) {
   try {
     const session = await getAuthSession();
@@ -461,6 +479,7 @@ export async function updateUserMailTemplate(data: {
         name: validatedData.name,
         description: validatedData.description,
         content: validatedData.content,
+        defaultMailName: validatedData.defaultMailName ?? null,
       },
     });
 
