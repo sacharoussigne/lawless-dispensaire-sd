@@ -550,7 +550,7 @@ export default function WeeklyActivityPageClient({
                 min={0}
               />
               <NumberInput
-                label="Infusions vendues"
+                label="Infusions"
                 value={cInfusions}
                 onChange={(v) => setCInfusions(Number(v) || 0)}
                 min={0}
@@ -626,7 +626,7 @@ export default function WeeklyActivityPageClient({
                 min={0}
               />
               <NumberInput
-                label="Infusions vendues"
+                label="Infusions"
                 value={eInfusions}
                 onChange={(v) => setEInfusions(Number(v) || 0)}
                 min={0}
