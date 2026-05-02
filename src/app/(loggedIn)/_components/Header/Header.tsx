@@ -13,11 +13,12 @@ import classes from './Header.module.scss';
 import { authClient } from '@/lib/client';
 import { useRouter, usePathname } from 'next/navigation';
 import { useState } from 'react';
+import { notifications } from '@mantine/notifications';
 import { AuthSession } from '@/types/session';
 import { routes } from '@/types/routes';
 import Link from 'next/link';
 import Image from 'next/image';
-import { IconLogout, IconSearch, IconSettings } from '@tabler/icons-react';
+import { IconArrowBackUp, IconLogout, IconSearch, IconSettings } from '@tabler/icons-react';
 import { usePermissions } from '@/app/_contexts/PermissionsContext';
 import { dispensarySiteTitle } from '@/lib/appSettingsShared';
 import { hasRole, checkRolePermission } from '@/lib/auth/permissions';
@@ -25,13 +26,18 @@ import { Role } from '@/types/enum/roles';
 
 export default function Header({
   session,
+  impersonatorDisplayName,
 }: Readonly<{
   session: AuthSession | null;
+  impersonatorDisplayName?: string | null;
 }>) {
   const router = useRouter();
   const pathname = usePathname();
   const [userMenuOpened, setUserMenuOpened] = useState(false);
+  const [stoppingImpersonation, setStoppingImpersonation] = useState(false);
   const { permissions, userRole, appSettings } = usePermissions();
+
+  const isImpersonating = Boolean(session?.session.impersonatedBy);
 
   const isAdminSpace = pathname?.startsWith(routes.admin.index) || false;
   const isManagementSpace = pathname?.startsWith(routes.management.index) || false;
@@ -53,6 +59,36 @@ export default function Header({
         },
       },
     });
+  };
+
+  const handleStopImpersonating = async () => {
+    setStoppingImpersonation(true);
+    try {
+      const result = await authClient.admin.stopImpersonating();
+      if (result.error) {
+        notifications.show({
+          title: 'Erreur',
+          message: result.error.message || 'Impossible de quitter la session impersonnée.',
+          color: 'red',
+        });
+        return;
+      }
+      notifications.show({
+        title: 'Session restaurée',
+        message: 'Vous êtes de nouveau connecté avec votre compte.',
+        color: 'green',
+      });
+      router.refresh();
+      router.push(routes.admin.users);
+    } catch {
+      notifications.show({
+        title: 'Erreur',
+        message: 'Impossible de quitter la session impersonnée.',
+        color: 'red',
+      });
+    } finally {
+      setStoppingImpersonation(false);
+    }
   };
 
   // Determine if user can see SegmentedControl
@@ -92,6 +128,7 @@ export default function Header({
           <Group>
             {session ? (
               <>
+                
                 {isAdminOrManagementSpace && permissions?.application.management ? (
                   <Menu
                     width={260}
@@ -277,6 +314,22 @@ export default function Header({
                     </Menu.Item>
                   </Menu.Dropdown>
                 </Menu>
+                {isImpersonating && (
+                  <Button
+                    color="orange"
+                    variant="light"
+                    leftSection={<IconArrowBackUp size={18} />}
+                    loading={stoppingImpersonation}
+                    onClick={handleStopImpersonating}
+                    aria-label={
+                      impersonatorDisplayName?.trim()
+                        ? `Revenir au compte ${impersonatorDisplayName.trim()}`
+                        : 'Revenir à votre compte'
+                    }
+                  >
+                    {impersonatorDisplayName?.trim() || 'Compte'}
+                  </Button>
+                )}
               </>
             ) : (
               <>
