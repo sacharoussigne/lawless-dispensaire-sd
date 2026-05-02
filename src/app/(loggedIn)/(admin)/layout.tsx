@@ -5,6 +5,7 @@ import Header from '../_components/Header/Header';
 import { PermissionsProvider } from '@/app/_contexts/PermissionsContext';
 import { calculatePermissions } from '@/lib/auth/calculatePermissions';
 import { getAppSettings } from '@/lib/appSettings';
+import { getImpersonatorDisplayName } from '@/lib/auth/impersonationDisplay';
 
 export default async function LanguageLayout({
   children,
@@ -14,6 +15,7 @@ export default async function LanguageLayout({
   params: Promise<{ userLanguageAlias?: string }>;
 }) {
   const session = await getAuthSession();
+  const impersonatorDisplayName = await getImpersonatorDisplayName(session?.session?.impersonatedBy);
   const role = session?.user?.role || null;
   const permissions = calculatePermissions(role);
   const appSettings = await getAppSettings();
@@ -24,7 +26,10 @@ export default async function LanguageLayout({
       initialRole={role}
       initialAppSettings={appSettings}
     >
-      <Header session={session as AuthSession | null} />
+      <Header
+        session={session as AuthSession | null}
+        impersonatorDisplayName={impersonatorDisplayName}
+      />
 
       <Container size={'xl'} className={'flex-1 pb-[72px] sm:pb-0'}>
         {children}
