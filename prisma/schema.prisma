@@ -366,10 +366,11 @@ model OrderItem {
 }
 
 model MailTemplate {
-  id          String                          @id @default(uuid())
-  name        String
-  description String?
-  content     String
+  id               String                          @id @default(uuid())
+  name             String
+  description      String?
+  content          String
+  defaultMailName  String?
   userId      String?
   user        User?                           @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt   DateTime                        @default(now())

@@ -29,6 +29,7 @@ export default function EditTemplatePageClient({
     initialValues: {
       name: template.name,
       description: template.description || '',
+      defaultMailName: template.defaultMailName || '',
       content: template.content,
     },
     validate: {
@@ -66,6 +67,7 @@ export default function EditTemplatePageClient({
         name: values.name,
         description: values.description || undefined,
         content: values.content,
+        defaultMailName: values.defaultMailName || undefined,
       });
 
       handleAction(result);
@@ -120,6 +122,13 @@ export default function EditTemplatePageClient({
                   label="Description"
                   placeholder="Description du modèle (optionnel)"
                   {...form.getInputProps('description')}
+                />
+              </Grid.Col>
+              <Grid.Col span={12}>
+                <TextInput
+                  label="Nom du courrier par défaut"
+                  placeholder="Préremplit le champ « Nom » à la création d’un courrier (optionnel)"
+                  {...form.getInputProps('defaultMailName')}
                 />
               </Grid.Col>
             </Grid>

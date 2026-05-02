@@ -82,7 +82,10 @@ export default function NewMailPageClient({
 
   const handleTemplateChange = (templateId: string | null) => {
     setSelectedTemplateId(templateId);
-    if (!templateId) {
+    if (templateId) {
+      const t = mailTemplates.find((tpl) => tpl.id === templateId);
+      form.setFieldValue('name', t?.defaultMailName ?? '');
+    } else {
       form.setFieldValue('content', '');
       setRenderedContent('');
     }
