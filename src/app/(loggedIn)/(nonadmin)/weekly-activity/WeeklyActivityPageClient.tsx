@@ -21,7 +21,7 @@ import {
 } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
-import { DataTable } from 'mantine-datatable';
+import { DataTable, type DataTableSortStatus } from 'mantine-datatable';
 import {
   IconHistory,
   IconPencil,
@@ -38,8 +38,10 @@ import {
   listDispensaryWeeklyActivityTargets,
   updateDispensaryWeeklyActivity,
 } from '@/app/_actions/dispensaryWeeklyActivity';
+import { ActiveFilters } from '@/app/_components/ActiveFilters/ActiveFilters';
 import { WeekNavigation } from '@/app/_components/WeekNavigation/WeekNavigation';
 import { handleAction } from '@/lib/action';
+import dayjs from '@/lib/dayjs';
 import { addParisWeeks, getBankWeekBounds } from '@/lib/bankWeek';
 import { formatDispensaryHistoryAction } from '@/lib/dispensaryWeeklyActivity/historyActionLabel';
 import {
@@ -108,6 +110,48 @@ type HistoryEntry = {
 
 type TargetUser = { id: string; name: string };
 
+type DoctorFilterOption = { value: string; label: string };
+
+function doctorKey(row: WeeklyActivityListItem): string {
+  if (row.userId) return `user:${row.userId}`;
+  if (row.discordUserId) return `discord:${row.discordUserId}`;
+  return `name:${row.resolvedDisplayName}`;
+}
+
+function compareWeeklyActivityRows(
+  a: WeeklyActivityListItem,
+  b: WeeklyActivityListItem,
+  columnAccessor: string,
+  direction: 'asc' | 'desc',
+): number {
+  const m = direction === 'asc' ? 1 : -1;
+  let cmp = 0;
+
+  if (columnAccessor === 'resolvedDisplayName') {
+    cmp = a.resolvedDisplayName.localeCompare(b.resolvedDisplayName, 'fr', { sensitivity: 'base' });
+  } else if (columnAccessor === 'periodStart') {
+    cmp = new Date(a.periodStart).getTime() - new Date(b.periodStart).getTime();
+  } else if (columnAccessor === 'patientsCount') {
+    cmp = a.patientsCount - b.patientsCount;
+  } else if (columnAccessor === 'sherifCount') {
+    cmp = a.sherifCount - b.sherifCount;
+  } else if (columnAccessor === 'palefrenierCount') {
+    cmp = a.palefrenierCount - b.palefrenierCount;
+  } else if (columnAccessor === 'infusionsCount') {
+    cmp = a.infusionsCount - b.infusionsCount;
+  } else if (columnAccessor === 'poppyMilkCount') {
+    cmp = a.poppyMilkCount - b.poppyMilkCount;
+  } else if (columnAccessor === 'chestTotal') {
+    cmp = a.chestTotal - b.chestTotal;
+  } else if (columnAccessor === 'presenceTotal') {
+    cmp = a.presenceTotal - b.presenceTotal;
+  } else {
+    return 0;
+  }
+
+  return cmp * m;
+}
+
 export default function WeeklyActivityPageClient({
   initialRows,
   canEditAll,
@@ -152,6 +196,56 @@ export default function WeeklyActivityPageClient({
   const [eInfusions, setEInfusions] = useState(0);
   const [ePoppy, setEPoppy] = useState(0);
   const [eDisplayName, setEDisplayName] = useState('');
+
+  const [selectedDoctorKey, setSelectedDoctorKey] = useState<string | null>(null);
+  const [periodWeekDateValue, setPeriodWeekDateValue] = useState<Date | null>(() =>
+    getBankWeekBounds(dayjs().tz('Europe/Paris').startOf('day').toDate()).start,
+  );
+  const [sortStatus, setSortStatus] = useState<DataTableSortStatus<WeeklyActivityListItem>>({
+    columnAccessor: 'periodStart',
+    direction: 'desc',
+  });
+
+  const doctorOptions = useMemo<DoctorFilterOption[]>(() => {
+    const byKey = new Map<string, string>();
+    for (const r of rows) {
+      const k = doctorKey(r);
+      if (!byKey.has(k)) {
+        byKey.set(k, r.resolvedDisplayName);
+      }
+    }
+    return [...byKey.entries()]
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'fr', { sensitivity: 'base' }));
+  }, [rows]);
+
+  const currentWeekBounds = useMemo(() => {
+    if (!periodWeekDateValue) return null;
+    return getBankWeekBounds(periodWeekDateValue);
+  }, [periodWeekDateValue]);
+
+  const filteredRows = useMemo(() => {
+    let out = rows;
+    if (selectedDoctorKey) {
+      out = out.filter((r) => doctorKey(r) === selectedDoctorKey);
+    }
+    if (currentWeekBounds) {
+      const weekStart = currentWeekBounds.start.getTime();
+      const weekEnd = currentWeekBounds.end.getTime();
+      out = out.filter((r) => {
+        const rs = new Date(r.periodStart).getTime();
+        const re = new Date(r.periodEnd).getTime();
+        return rs <= weekEnd && re >= weekStart;
+      });
+    }
+    return out;
+  }, [rows, selectedDoctorKey, currentWeekBounds]);
+
+  const sortedRows = useMemo(() => {
+    return [...filteredRows].sort((a, b) =>
+      compareWeeklyActivityRows(a, b, String(sortStatus.columnAccessor), sortStatus.direction),
+    );
+  }, [filteredRows, sortStatus]);
 
   const createWeekBounds = useMemo(
     () => getBankWeekBounds(cWeekDateValue ?? defaultWeekMonday),
@@ -359,18 +453,81 @@ export default function WeeklyActivityPageClient({
       </Group>
 
       <Paper shadow="sm" p="md" withBorder radius="md">
+        <ActiveFilters
+          filters={[
+            {
+              label: 'Médecin',
+              value: selectedDoctorKey,
+              displayValue:
+                (selectedDoctorKey
+                  ? doctorOptions.find((o) => o.value === selectedDoctorKey)?.label ?? selectedDoctorKey
+                  : null) ?? undefined,
+              onRemove: () => setSelectedDoctorKey(null),
+            },
+            {
+              label: 'Période',
+              value: periodWeekDateValue ? periodWeekDateValue.toISOString().slice(0, 10) : null,
+              displayValue:
+                currentWeekBounds
+                  ? `Semaine du ${format(currentWeekBounds.start, 'd MMM', { locale: fr })} au ${format(currentWeekBounds.end, 'd MMM yyyy', { locale: fr })}`
+                  : undefined,
+              onRemove: () => setPeriodWeekDateValue(null),
+            },
+          ]}
+        />
+
+        <Group gap="md" mb="md" wrap="wrap" align="flex-end">
+          <Select
+            label="Médecin"
+            placeholder="Tous"
+            data={doctorOptions}
+            value={selectedDoctorKey}
+            onChange={(v) => setSelectedDoctorKey(v || null)}
+            searchable
+            clearable
+            nothingFoundMessage="Aucun résultat"
+            style={{ minWidth: 260 }}
+          />
+          {currentWeekBounds && (
+            <WeekNavigation
+              weekStart={currentWeekBounds.start}
+              weekEnd={currentWeekBounds.end}
+              weekDateValue={periodWeekDateValue}
+              onWeekChange={(d) => setPeriodWeekDateValue(d)}
+              onPreviousWeek={() =>
+                setPeriodWeekDateValue((prev) => (prev ? addParisWeeks(prev, -1) : prev))
+              }
+              onNextWeek={() => setPeriodWeekDateValue((prev) => (prev ? addParisWeeks(prev, 1) : prev))}
+            />
+          )}
+          {!currentWeekBounds && (
+            <Button
+              variant="light"
+              onClick={() => setPeriodWeekDateValue(getBankWeekBounds(dayjs().tz('Europe/Paris').startOf('day').toDate()).start)}
+            >
+              Filtrer sur la semaine courante
+            </Button>
+          )}
+        </Group>
+
         <DataTable
-          records={rows}
+          records={sortedRows}
           minHeight={200}
+          sortStatus={sortStatus}
+          onSortStatusChange={setSortStatus}
+          striped
+          highlightOnHover
           columns={[
             {
               accessor: 'resolvedDisplayName',
               title: 'Médecin',
+              sortable: true,
               render: (r) => r.resolvedDisplayName,
             },
             {
-              accessor: 'period',
+              accessor: 'periodStart',
               title: 'Période',
+              sortable: true,
               render: (r) => (
                 <Text size="sm">
                   {formatParisPeriodStartLabel(new Date(r.periodStart))} —{' '}
@@ -400,11 +557,11 @@ export default function WeeklyActivityPageClient({
                 </Tooltip>
               ),
             },
-            { accessor: 'patientsCount', title: 'Patients' },
-            { accessor: 'sherifCount', title: 'Shérifs' },
-            { accessor: 'palefrenierCount', title: 'Palefreniers' },
-            { accessor: 'infusionsCount', title: 'Infusions' },
-            { accessor: 'poppyMilkCount', title: 'Lait de pavot' },
+            { accessor: 'patientsCount', title: 'Patients', sortable: true },
+            { accessor: 'sherifCount', title: 'Shérifs', sortable: true },
+            { accessor: 'palefrenierCount', title: 'Palefreniers', sortable: true },
+            { accessor: 'infusionsCount', title: 'Infusions', sortable: true },
+            { accessor: 'poppyMilkCount', title: 'Lait de pavot', sortable: true },
             {
               accessor: 'actions',
               title: '',
