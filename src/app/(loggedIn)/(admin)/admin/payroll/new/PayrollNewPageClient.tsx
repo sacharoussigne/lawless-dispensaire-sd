@@ -220,8 +220,8 @@ export default function PayrollNewPageClient() {
           Nouveau rapport
         </Title>
         <Text size="sm" c="dimmed" maw={520} mb="xl">
-          Semaine du rapport, tarifs, optionnellement fusion avec l’activité hebdomadaire Discord, et tableau HTML
-          (obligatoire si vous n’activez pas l’import weekly activity).
+          Semaine, tarifs, fusion activité Discord (optionnel), tableau HTML obligatoire si pas d’import.
+     
         </Text>
 
         <Stack gap="lg">
@@ -255,7 +255,7 @@ export default function PayrollNewPageClient() {
           </Paper>
 
           <Paper withBorder p={{ base: 'md', sm: 'lg' }} radius="md" shadow="xs">
-            <SectionHeader icon={IconCalendarWeek}>Import weekly activity</SectionHeader>
+            <SectionHeader icon={IconCalendarWeek}>Import de l'activité hebdomadaire</SectionHeader>
             <Checkbox
               label="Importer et fusionner l’activité hebdomadaire (Discord / intranet)"
               description="Désactivé : uniquement le tableau HTML, sans requête sur les données d’activité."
@@ -288,7 +288,7 @@ export default function PayrollNewPageClient() {
           </Paper>
 
           <Paper withBorder p={{ base: 'md', sm: 'lg' }} radius="md" shadow="xs">
-            <SectionHeader icon={IconCoin}>Tarifs (USD)</SectionHeader>
+            <SectionHeader icon={IconCoin}>Tarifs</SectionHeader>
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={{ base: 'md', sm: 'lg' }}>
               <NumberInput
                 label="Prix de vente dispensaire"
