@@ -144,7 +144,7 @@ export default function Header({
                     <Menu.Dropdown>
                       <Menu.Label>Gestion</Menu.Label>
                       {appSettings.featurePayrollEnabled && permissions?.payrollReports.view && (
-                        <Link href={routes.admin.payroll}>
+                        <Link href={routes.employee.payroll}>
                           <Menu.Item>
                             Rapports salaires
                           </Menu.Item>
@@ -231,6 +231,14 @@ export default function Header({
                           Stocks
                         </Link>
                       )}
+                    {appSettings.featurePayrollEnabled && permissions?.payrollReports.view && (
+                      <Link
+                        href={routes.employee.payroll}
+                        className={`${classes.link} ${isRouteActive(routes.employee.payroll) ? classes.linkActive : ''}`}
+                      >
+                        Salaires
+                      </Link>
+                    )}
                   </>
                 )}
                 {/* Search icon: employee space or payroll-only (Direction) */}

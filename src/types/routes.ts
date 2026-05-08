@@ -44,6 +44,9 @@ export const routes = {
   },
   employee: {
     index: '/employee',
+    payroll: '/employee/payroll',
+    payrollNew: '/employee/payroll/new',
+    payrollDetail: (id: string) => `/employee/payroll/${id}`,
     mails: '/employee/mails',
     newMail: '/employee/mails/new',
     editMail: (id: string) => `/employee/mails/${id}/edit`,

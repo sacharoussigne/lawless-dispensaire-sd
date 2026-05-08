@@ -103,6 +103,16 @@ export async function middleware(req: NextRequest) {
     middlewares.push((request: NextRequest, session: AppMiddlewareSession) =>
       assertAppFeatureEnabledMiddleware(request, session, 'weeklyDispensaryActivity'),
     );
+  } else if (
+    pathname === routes.employee.payroll ||
+    pathname.startsWith(`${routes.employee.payroll}/`)
+  ) {
+    middlewares.push(hasToBeLoggedInMiddleware);
+    middlewares.push(hasApplicationAccessMiddleware);
+    middlewares.push(hasPayrollReportsAccessMiddleware);
+    middlewares.push((request: NextRequest, session: AppMiddlewareSession) =>
+      assertAppFeatureEnabledMiddleware(request, session, 'payroll'),
+    );
   } else if (pathname.startsWith(routes.employee.mails)) {
     // For employee mails routes, check login, application access, then mails access
     middlewares.push(hasToBeLoggedInMiddleware);

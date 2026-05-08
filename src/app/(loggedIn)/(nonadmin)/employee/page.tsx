@@ -91,7 +91,7 @@ export default async function EmployeePage() {
       description:
         'Consultez et gérez les rapports de salaires hebdomadaires et les virements associés.',
       icon: IconReportMoney,
-      href: routes.admin.payroll,
+      href: routes.employee.payroll,
       hasAccess:
         appSettings.featurePayrollEnabled && (permissions?.payrollReports.view ?? false),
       color: 'teal',
