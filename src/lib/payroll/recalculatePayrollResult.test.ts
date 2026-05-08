@@ -6,7 +6,7 @@ import {
   PAYROLL_PATIENT_CARE_USD,
 } from './constants';
 import type { PayrollReportResult } from './schema';
-import { recalculatePayrollResult } from './recalculatePayrollResult';
+import { effectiveCaisseUnitUsd, recalculatePayrollResult } from './recalculatePayrollResult';
 
 const emptyDay = { caisse: null as string | null, presence: null as string | null };
 
@@ -35,6 +35,7 @@ function baseEmployee(
       poppy_milk_offertes: 0,
       infusions_ginseng_offertes: 0,
     },
+    salary_supplement_usd: 0,
     ...overrides,
   };
 }
@@ -226,5 +227,63 @@ describe('recalculatePayrollResult', () => {
     const out = recalculatePayrollResult(data);
     expect(out.global_stats.total_employee_payout_usd).toBeCloseTo(2 * 6 + 10 * 0.3, 5);
     expect(out.global_stats.total_patients_soignes).toBe(10);
+  });
+
+  it('uses per-employee caisse override for payout and benefit', () => {
+    const data = baseReport(
+      [
+        baseEmployee({
+          caisse_unit_override_usd: 10,
+          stats: {
+            sherifs: null,
+            palefreniers: null,
+            nombre_caisses: 2,
+            nombre_presences: 0,
+            patients_soignes: 0,
+            poppy_milk_offertes: 0,
+            infusions_ginseng_offertes: 0,
+          },
+          schedule: {
+            lundi: { caisse: 'X', presence: null },
+            mardi: { caisse: 'X', presence: null },
+            mercredi: { ...emptyDay },
+            jeudi: { ...emptyDay },
+            vendredi: { ...emptyDay },
+            samedi: { ...emptyDay },
+            dimanche: { ...emptyDay },
+          },
+        }),
+      ],
+      { caisse_sale_price_usd: 12, caisse_price_usd: 6 },
+    );
+
+    const out = recalculatePayrollResult(data);
+    expect(effectiveCaisseUnitUsd(out.employees[0], 6)).toBe(10);
+    expect(out.global_stats.total_employee_payout_usd).toBeCloseTo(20, 5);
+    expect(out.global_stats.total_benefit_usd).toBeCloseTo(2 * (12 - 10), 5);
+  });
+
+  it('adds signed salary supplement to payout only', () => {
+    const data = baseReport(
+      [
+        baseEmployee({
+          salary_supplement_usd: -5,
+          stats: {
+            sherifs: null,
+            palefreniers: null,
+            nombre_caisses: 0,
+            nombre_presences: 0,
+            patients_soignes: 0,
+            poppy_milk_offertes: 0,
+            infusions_ginseng_offertes: 0,
+          },
+        }),
+      ],
+      { caisse_sale_price_usd: 7.5, caisse_price_usd: 6.5 },
+    );
+
+    const out = recalculatePayrollResult(data);
+    expect(out.global_stats.total_employee_payout_usd).toBeCloseTo(-5, 5);
+    expect(out.global_stats.total_benefit_usd).toBeCloseTo(0, 5);
   });
 });

@@ -39,6 +39,7 @@ import {
   IconCoin,
   IconCopy,
   IconEdit,
+  IconRefresh,
   IconTrash,
   IconX,
 } from '@tabler/icons-react';
@@ -48,7 +49,11 @@ import {
 } from '@/app/_actions/payrollReports';
 import { handleAction } from '@/lib/action';
 import { payrollReportResultSchema, type PayrollReportResult } from '@/lib/payroll/schema';
-import { recalculatePayrollResult } from '@/lib/payroll/recalculatePayrollResult';
+import {
+  effectiveCaisseUnitUsd,
+  recalculatePayrollResult,
+} from '@/lib/payroll/recalculatePayrollResult';
+import { PAYROLL_MAX_USD } from '@/lib/payroll/constants';
 import { routes } from '@/types/routes';
 
 const DAYS = [
@@ -209,6 +214,38 @@ export default function PayrollReportDetail({
         const employees = prev.employees.map((e, i) =>
           i === empIndex ? { ...e, stats: { ...e.stats, ...patch } } : e,
         );
+        return recalculatePayrollResult({ ...prev, employees });
+      });
+    },
+    [],
+  );
+
+  const patchEmployeePayrollSettings = useCallback(
+    (
+      empIndex: number,
+      patch: {
+        caisse_unit_override_usd?: number | undefined;
+        salary_supplement_usd?: number;
+      },
+    ) => {
+      setDraft((prev) => {
+        if (!prev) return prev;
+        const employees = prev.employees.map((e, i) => {
+          if (i !== empIndex) return e;
+          const next: PayrollReportResult['employees'][number] = { ...e };
+          if ('caisse_unit_override_usd' in patch) {
+            const v = patch.caisse_unit_override_usd;
+            if (v === undefined) {
+              delete next.caisse_unit_override_usd;
+            } else {
+              next.caisse_unit_override_usd = v;
+            }
+          }
+          if (patch.salary_supplement_usd !== undefined) {
+            next.salary_supplement_usd = patch.salary_supplement_usd;
+          }
+          return next;
+        });
         return recalculatePayrollResult({ ...prev, employees });
       });
     },
@@ -706,8 +743,12 @@ export default function PayrollReportDetail({
                 {draft.employees.map((emp, rowIdx) => {
                   const caisses = emp.stats.nombre_caisses ?? 0;
                   const patients = emp.stats.patients_soignes ?? 0;
+                  const unitUsd = effectiveCaisseUnitUsd(emp, draft.caisse_price_usd);
+                  const supplement = emp.salary_supplement_usd ?? 0;
                   const pay =
-                    caisses * draft.caisse_price_usd + patients * draft.patient_care_price_usd;
+                    caisses * unitUsd +
+                    patients * draft.patient_care_price_usd +
+                    supplement;
                   const payStr = `${pay.toFixed(2)} $`;
                   const payCopyValue = pay.toFixed(2);
                   const idDisplay = emp.id != null ? String(emp.id) : '—';
@@ -763,8 +804,10 @@ export default function PayrollReportDetail({
             {draft.employees.map((emp, i) => {
               const caisses = emp.stats.nombre_caisses ?? 0;
               const patients = emp.stats.patients_soignes ?? 0;
+              const unitUsd = effectiveCaisseUnitUsd(emp, draft.caisse_price_usd);
+              const supplement = emp.salary_supplement_usd ?? 0;
               const pay =
-                caisses * draft.caisse_price_usd + patients * draft.patient_care_price_usd;
+                caisses * unitUsd + patients * draft.patient_care_price_usd + supplement;
               return (
                 <Accordion.Item key={`${emp.name}-${emp.id ?? i}`} value={`emp-${i}`}>
                   <Accordion.Control>
@@ -778,8 +821,11 @@ export default function PayrollReportDetail({
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <Text size="xs" c="dimmed">
-                          Caisses × {draft.caisse_price_usd.toFixed(2)} $ + patients ×{' '}
+                          Caisses × {unitUsd.toFixed(2)} $ + patients ×{' '}
                           {draft.patient_care_price_usd.toFixed(2)} $
+                          {supplement !== 0
+                            ? ` ${supplement >= 0 ? '+' : ''}${supplement.toFixed(2)} $`
+                            : ''}
                         </Text>
                         <Text fw={700}>{pay.toFixed(2)} $</Text>
                       </div>
@@ -831,6 +877,104 @@ export default function PayrollReportDetail({
                         ))}
                       </Table.Tbody>
                     </Table>
+
+                    <Divider label="Rémunération" labelPosition="left" my="md" />
+                    {canEdit && isEditing ? (
+                      <Group align="flex-start" gap="lg" wrap="wrap" mb="md">
+                        <div>
+                          <Text size="xs" c="dimmed" mb={4}>
+                            Reversé par caisse
+                          </Text>
+                          <NumberInput
+                            size="xs"
+                            min={0.01}
+                            max={PAYROLL_MAX_USD}
+                            step={0.05}
+                            decimalScale={2}
+                            placeholder={`Par défaut : ${draft.caisse_price_usd.toFixed(2)} $`}
+                            value={emp.caisse_unit_override_usd ?? ''}
+                            onChange={(v) => {
+                              if (v === '' || v === undefined) {
+                                patchEmployeePayrollSettings(i, {
+                                  caisse_unit_override_usd: undefined,
+                                });
+                                return;
+                              }
+                              const n = typeof v === 'number' ? v : Number(v);
+                              if (!Number.isFinite(n) || n <= 0) return;
+                              patchEmployeePayrollSettings(i, { caisse_unit_override_usd: n });
+                            }}
+                            suffix=" $"
+                            w="100%"
+                            maw={220}
+                            rightSectionWidth={42}
+                            rightSection={
+                              emp.caisse_unit_override_usd != null ? (
+                                <Tooltip label="Revenir au défaut du rapport" withArrow>
+                                  <ActionIcon
+                                    variant="subtle"
+                                    color="gray"
+                                    size="sm"
+                                    aria-label="Réinitialiser au défaut"
+                                    onClick={() =>
+                                      patchEmployeePayrollSettings(i, {
+                                        caisse_unit_override_usd: undefined,
+                                      })
+                                    }
+                                  >
+                                    <IconRefresh size={16} stroke={1.5} />
+                                  </ActionIcon>
+                                </Tooltip>
+                              ) : null
+                            }
+                          />
+                        </div>
+                        <div>
+                          <Text size="xs" c="dimmed" mb={4}>
+                            Complément de salaire
+                          </Text>
+                          <NumberInput
+                            size="xs"
+                            min={-PAYROLL_MAX_USD}
+                            max={PAYROLL_MAX_USD}
+                            step={0.5}
+                            decimalScale={2}
+                            value={emp.salary_supplement_usd ?? 0}
+                            onChange={(v) =>
+                              patchEmployeePayrollSettings(i, {
+                                salary_supplement_usd:
+                                  v === '' || v === undefined ? 0 : Number(v),
+                              })
+                            }
+                            suffix=" $"
+                            w="100%"
+                            maw={220}
+                          />
+                        </div>
+                      </Group>
+                    ) : (
+                      <Stack gap={6} mb="md">
+                        <Text size="sm">
+                          Reversé par caisse :{' '}
+                          <Text span fw={600} style={{ fontVariantNumeric: 'tabular-nums' }}>
+                            {unitUsd.toFixed(2)} $
+                          </Text>
+                          {emp.caisse_unit_override_usd != null ? (
+                            <Text span size="xs" c="dimmed" ml={6}>
+                              (par defaut: {draft.caisse_price_usd.toFixed(2)} $)
+                            </Text>
+                          ) : null}
+                        </Text>
+                        {(emp.salary_supplement_usd ?? 0) !== 0 && (
+                          <Text size="sm">
+                            Complément :{' '}
+                            <Text span fw={600} style={{ fontVariantNumeric: 'tabular-nums' }}>
+                              {(emp.salary_supplement_usd ?? 0).toFixed(2)} $
+                            </Text>
+                          </Text>
+                        )}
+                      </Stack>
+                    )}
 
                     <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="sm" mt="md">
                       <div>

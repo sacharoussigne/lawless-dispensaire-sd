@@ -140,6 +140,7 @@ export function mergeHtmlAndWeeklyActivity(parsed: ParsedPayrollTable, activitie
       name: cleanText(row.name ?? ''),
       role: cleanText(row.role ?? ''),
       id: row.id,
+      salary_supplement_usd: 0,
       schedule,
       stats: {
         nombre_caisses: row.stats.nombre_caisses,
@@ -163,6 +164,7 @@ export function mergeHtmlAndWeeklyActivity(parsed: ParsedPayrollTable, activitie
       name: label,
       role: '',
       id: null,
+      salary_supplement_usd: 0,
       schedule,
       stats: {
         sherifs: wa.sherifCount > 0 ? wa.sherifCount : null,

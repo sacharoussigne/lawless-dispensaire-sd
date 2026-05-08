@@ -10,6 +10,9 @@ export const PAYROLL_PATIENT_CARE_USD = 0.3;
 /** Default retail USD per offered item (infusion / poppy milk) in totals, not in virement. */
 export const PAYROLL_OFFERED_ITEM_USD = 0.4;
 
+/** Upper bound for payroll amounts (grid, per-employee overrides, supplements). */
+export const PAYROLL_MAX_USD = 1_000_000;
+
 export const PAYROLL_REPORT_TYPE_EMPLOYES = 'Employés';
 export const PAYROLL_REPORT_TYPE_PREPARATEURS_CAISSE = 'Préparateurs de caisse';
 
