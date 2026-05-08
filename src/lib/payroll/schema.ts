@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   PAYROLL_CAISSE_SALE_USD,
   PAYROLL_CAISSE_USD,
+  PAYROLL_MAX_USD,
   PAYROLL_OFFERED_ITEM_USD,
   PAYROLL_PATIENT_CARE_USD,
 } from './constants';
@@ -37,6 +38,8 @@ const employeeSchema = z.object({
   id: z.number().nullable(),
   schedule: scheduleSchema,
   stats: employeeStatsSchema,
+  caisse_unit_override_usd: z.number().positive().max(PAYROLL_MAX_USD).optional(),
+  salary_supplement_usd: z.number().min(-PAYROLL_MAX_USD).max(PAYROLL_MAX_USD).default(0),
 });
 
 const weeklyActivityImportSchema = z.object({

@@ -1,5 +1,12 @@
 import type { PayrollReportResult } from './schema';
 
+export function effectiveCaisseUnitUsd(
+  emp: PayrollReportResult['employees'][number],
+  reportCaisseUsd: number,
+): number {
+  return emp.caisse_unit_override_usd ?? reportCaisseUsd;
+}
+
 const SCHEDULE_DAYS = [
   'lundi',
   'mardi',
@@ -21,7 +28,6 @@ function countSchedule(schedule: PayrollReportResult['employees'][number]['sched
 }
 
 export function recalculatePayrollResult(data: PayrollReportResult): PayrollReportResult {
-  const unitBenefitUsd = data.caisse_sale_price_usd - data.caisse_price_usd;
   const employees = data.employees.map((emp) => {
     const { nombre_caisses, nombre_presences } = countSchedule(emp.schedule);
     return {
@@ -37,7 +43,9 @@ export function recalculatePayrollResult(data: PayrollReportResult): PayrollRepo
   const total_employee_payout_usd = employees.reduce((sum, e) => {
     const ca = e.stats.nombre_caisses ?? 0;
     const p = e.stats.patients_soignes ?? 0;
-    return sum + ca * data.caisse_price_usd + p * data.patient_care_price_usd;
+    const unit = effectiveCaisseUnitUsd(e, data.caisse_price_usd);
+    const supplement = e.salary_supplement_usd ?? 0;
+    return sum + ca * unit + p * data.patient_care_price_usd + supplement;
   }, 0);
 
   const total_offered_item_count = employees.reduce(
@@ -53,10 +61,11 @@ export function recalculatePayrollResult(data: PayrollReportResult): PayrollRepo
     total_caisses: employees.reduce((sum, e) => sum + (e.stats.nombre_caisses ?? 0), 0),
     total_sherifs: employees.reduce((sum, e) => sum + (e.stats.sherifs ?? 0), 0),
     total_palefreniers: employees.reduce((sum, e) => sum + (e.stats.palefreniers ?? 0), 0),
-    total_benefit_usd: employees.reduce(
-      (sum, e) => sum + (e.stats.nombre_caisses ?? 0) * unitBenefitUsd,
-      0,
-    ),
+    total_benefit_usd: employees.reduce((sum, e) => {
+      const ca = e.stats.nombre_caisses ?? 0;
+      const unit = effectiveCaisseUnitUsd(e, data.caisse_price_usd);
+      return sum + ca * (data.caisse_sale_price_usd - unit);
+    }, 0),
     total_patients_soignes,
     total_offered_item_count,
     total_employee_payout_usd,
