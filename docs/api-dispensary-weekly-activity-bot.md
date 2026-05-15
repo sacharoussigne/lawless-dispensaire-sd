@@ -214,24 +214,41 @@ Récupère **une** ligne par son `id` (UUID).
 
 ## `POST /api/dispensary/weekly-activity/bot/caisse`
 
-Enregistre la **caisse pour le jour calendaire actuel en Europe/Paris** pour le médecin identifié par `X-Discord-User-Id`.
+Met à jour la **caisse** (`chestDays`) du médecin identifié par `X-Discord-User-Id`. Deux modes selon le corps JSON.
 
 **En-têtes :** `Authorization`, `X-Discord-User-Id`
 
-**Corps :** JSON optionnel (corps vide autorisé, ou `{}`).
+### Mode legacy (raccourci)
+
+Corps vide, `{}`, ou `{ "displayName": "…" }` uniquement : enregistre la caisse **aujourd’hui** (Paris) à `true` (comportement historique).
+
+### Mode édition (semaine courante)
+
+Corps avec **`value`** (booléen) et **exactement un** de **`weekday`** ou **`date`** :
 
 | Champ | Obligatoire | Description |
 |-------|-------------|-------------|
-| `displayName` | Non | Pseudo / nom RP du médecin (ex. depuis Discord). Si présent, **non vide** après trim, et **différent** du `displayName` stocké sur la ligne, le serveur met à jour le champ `displayName` (même règle que le reste de l’API : 1–200 caractères) avant d’enregistrer la caisse. Si identique au stocké, aucune mise à jour du nom. |
+| `value` | Oui (mode édition) | `true` pour cocher la caisse ce jour-là, `false` pour décocher |
+| `weekday` | Un de `weekday` / `date` | `lundi` … `dimanche` — jour de la **semaine courante** (Paris) |
+| `date` | Un de `weekday` / `date` | `YYYY-MM-DD` interprété en minuit **Europe/Paris** |
+| `displayName` | Non | Même sémantique qu’avant (mise à jour du nom stocké si différent) |
+
+**Règles :**
+
+- Uniquement la **semaine courante** (lundi → dimanche, Paris).
+- Jours **éditables** : aujourd’hui et les jours déjà passés de cette semaine (pas les jours futurs).
+- Uniquement les données du `X-Discord-User-Id` (pas d’édition pour un autre médecin).
 
 **Réponse 200 — `data` :**
 
-- Si la caisse était déjà enregistrée pour ce jour : `{ "alreadyDone": true, "message": "…" }` (message en français).
-- Sinon : `{ "alreadyDone": false, "activity": { … } }` où `activity` a la même forme qu’un élément de liste (GET).
+- Valeur déjà identique : `{ "alreadyDone": true, "message": "…", "activity": { … } }` (aucune entrée d’historique ; le bot peut s’appuyer sur `alreadyDone` pour afficher un retour utilisateur).
+- Changement effectué : `{ "alreadyDone": false, "activity": { … } }`.
 
-Si aucune ligne ne couvre encore ce jour, le serveur **crée d’abord** une entrée d’activité pour la **semaine Europe/Paris** concernée (compteurs à 0, caisses/présences vides). Le `displayName` initial est : valeur de **`displayName`** dans le corps si fournie, sinon nom du compte intranet lié à ce Discord si disponible, sinon `Médecin <discordUserId>`, puis enregistrement de la caisse du jour.
+**Historique :** action `UPDATE_CHEST_DAYS`, source `DISCORD_BOT`, avec `previousValues` / `nextValues` du type `{ "day": "mercredi", "date": "2026-05-14", "chest": false }` → `{ …, "chest": true }`.
 
-**Exemple (corps avec nom RP) :**
+**Erreurs :** **400** — jour futur ou hors semaine courante ; **422** — combinaison de champs invalide.
+
+**Exemple legacy :**
 
 ```bash
 curl -sS -X POST \
@@ -242,26 +259,73 @@ curl -sS -X POST \
   "https://votre-domaine/api/dispensary/weekly-activity/bot/caisse"
 ```
 
+**Exemple édition (décocher le jeudi de la semaine courante) :**
+
+```bash
+curl -sS -X POST \
+  -H "Authorization: Bearer VOTRE_SECRET" \
+  -H "X-Discord-User-Id: 123456789012345678" \
+  -H "Content-Type: application/json" \
+  -d '{"weekday": "jeudi", "value": false}' \
+  "https://votre-domaine/api/dispensary/weekly-activity/bot/caisse"
+```
+
+**Exemple édition par date :**
+
+```bash
+curl -sS -X POST \
+  -H "Authorization: Bearer VOTRE_SECRET" \
+  -H "X-Discord-User-Id: 123456789012345678" \
+  -H "Content-Type: application/json" \
+  -d '{"date": "2026-05-14", "value": true}' \
+  "https://votre-domaine/api/dispensary/weekly-activity/bot/caisse"
+```
+
 ---
 
 ## `POST /api/dispensary/weekly-activity/bot/presence`
 
-Enregistre la **présence** pour **aujourd’hui** ou **hier** (calendrier **Europe/Paris**). Le serveur choisit la ligne dont la période **chevauche** ce jour (ex. le lundi matin, « hier » = dimanche peut correspondre à la **semaine précédente**).
+Met à jour la **présence** (`presenceDays`). Deux modes selon le corps JSON.
 
 **En-têtes :** `Authorization`, `X-Discord-User-Id`
 
-**Corps JSON :**
+### Mode legacy (raccourci)
 
-| Champ | Type | Description |
-|-------|------|-------------|
-| `day` | `"today"` \| `"yesterday"` | Jour cible (Paris) |
-| `displayName` | string | Optionnel ; même sémantique que pour **`POST …/bot/caisse`** (mise à jour du `displayName` stocké uniquement si fourni, non vide, et différent de la valeur actuelle). |
+`{ "day": "today" }` ou `{ "day": "yesterday" }` **sans** `value`, `weekday` ni `date` : enregistre la présence à `true` pour ce jour relatif (Paris). « Hier » peut encore tomber sur la **semaine précédente** (ex. dimanche si on est lundi).
 
-**Réponse 200 — `data` :** même forme que pour `bot/caisse` (`alreadyDone` + `message` ou `activity`).
+Corps vide ou sans `day` : équivalent à `{ "day": "today" }`.
 
-Même logique de **création automatique** de la ligne de semaine si elle n’existait pas (voir `bot/caisse`).
+### Mode édition (semaine courante)
 
-**422** — `day` invalide ou absent.
+Mêmes champs que **`bot/caisse`** (`value`, `weekday` ou `date`, `displayName` optionnel), mais pour `presenceDays`. **Ne pas mélanger** `day` (today/yesterday) avec `value` / `weekday` / `date` dans la même requête.
+
+**Règles mode édition :** identiques à la caisse (semaine courante, jours ≤ aujourd’hui, propre utilisateur Discord).
+
+**Historique :** action `UPDATE_PRESENCE_DAYS`, payloads `{ "day", "date", "presence": … }`.
+
+**Erreurs :** **400**, **422** — voir `bot/caisse`.
+
+**Exemple legacy :**
+
+```bash
+curl -sS -X POST \
+  -H "Authorization: Bearer VOTRE_SECRET" \
+  -H "X-Discord-User-Id: 123456789012345678" \
+  -H "Content-Type: application/json" \
+  -d '{"day": "yesterday"}' \
+  "https://votre-domaine/api/dispensary/weekly-activity/bot/presence"
+```
+
+**Exemple édition :**
+
+```bash
+curl -sS -X POST \
+  -H "Authorization: Bearer VOTRE_SECRET" \
+  -H "X-Discord-User-Id: 123456789012345678" \
+  -H "Content-Type: application/json" \
+  -d '{"weekday": "mardi", "value": true}' \
+  "https://votre-domaine/api/dispensary/weekly-activity/bot/presence"
+```
 
 ---
 
@@ -326,6 +390,6 @@ curl -sS -X DELETE \
 ## Fichiers de référence (code)
 
 - Routes : `src/app/api/dispensary/weekly-activity/route.ts`, `src/app/api/dispensary/weekly-activity/recap/route.ts`, `src/app/api/dispensary/weekly-activity/[id]/route.ts`, `src/app/api/dispensary/weekly-activity/bot/caisse/route.ts`, `src/app/api/dispensary/weekly-activity/bot/presence/route.ts`
-- Validation : `src/lib/dispensaryWeeklyActivity/schemas.ts` (dont schémas corps `bot/caisse` et `bot/presence`), `src/lib/dispensaryWeeklyActivity/weekdayFlags.ts`
+- Validation : `src/lib/dispensaryWeeklyActivity/schemas.ts` (dont schémas corps `bot/caisse` et `bot/presence`), `src/lib/dispensaryWeeklyActivity/weekdayFlags.ts`, `src/lib/dispensaryWeeklyActivity/botDayEdit.ts`
 - Sérialisation : `src/lib/dispensaryWeeklyActivity/apiRow.ts`, `src/lib/dispensaryWeeklyActivity/loadSerializedRow.ts`
 - Vérification du secret : `src/lib/dispensaryWeeklyActivityApiAuth.ts`

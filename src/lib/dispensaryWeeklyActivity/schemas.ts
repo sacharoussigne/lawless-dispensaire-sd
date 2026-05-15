@@ -1,5 +1,71 @@
 import { z } from 'zod';
-import { weekdayFlagsSchema } from '@/lib/dispensaryWeeklyActivity/weekdayFlags';
+import { WEEKDAY_KEYS, weekdayFlagsSchema } from '@/lib/dispensaryWeeklyActivity/weekdayFlags';
+
+const parisDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, {
+  message: 'Format de date attendu : YYYY-MM-DD',
+});
+
+const botDayEditFieldsSchema = z.object({
+  weekday: z.enum(WEEKDAY_KEYS).optional(),
+  date: parisDateSchema.optional(),
+  value: z.boolean().optional(),
+  displayName: z.string().trim().min(1).max(200).optional(),
+});
+
+function refineBotDayEditExclusive(d: { weekday?: string; date?: string; value?: boolean }) {
+  const hasWeekday = d.weekday !== undefined;
+  const hasDate = d.date !== undefined;
+  const hasValue = d.value !== undefined;
+  const isEdit = hasWeekday || hasDate || hasValue;
+
+  if (!isEdit) return true;
+
+  if (hasWeekday && hasDate) {
+    return false;
+  }
+  if (!hasWeekday && !hasDate) {
+    return false;
+  }
+  return hasValue;
+}
+
+export const dispensaryWeeklyActivityBotCaisseBodySchema = botDayEditFieldsSchema.refine(
+  refineBotDayEditExclusive,
+  {
+    message:
+      'Pour éditer une caisse : indiquez value et exactement un de weekday ou date (pas les deux).',
+  },
+);
+
+export const dispensaryWeeklyActivityBotPresenceBodySchema = z
+  .object({
+    day: z.enum(['today', 'yesterday']).optional(),
+    weekday: z.enum(WEEKDAY_KEYS).optional(),
+    date: parisDateSchema.optional(),
+    value: z.boolean().optional(),
+    displayName: z.string().trim().min(1).max(200).optional(),
+  })
+  .refine(
+    (d) => {
+      const legacyDay = d.day !== undefined;
+      const hasWeekday = d.weekday !== undefined;
+      const hasDate = d.date !== undefined;
+      const hasValue = d.value !== undefined;
+      const isEdit = hasWeekday || hasDate || hasValue;
+
+      if (legacyDay && isEdit) {
+        return false;
+      }
+      if (legacyDay) {
+        return true;
+      }
+      return refineBotDayEditExclusive(d);
+    },
+    {
+      message:
+        'Utilisez day (today/yesterday) seul, ou value avec exactement un de weekday ou date (sans mélanger).',
+    },
+  );
 
 export const dispensaryWeeklyActivityMetricsSchema = z.object({
   sherifCount: z.number().int().min(0),
@@ -64,14 +130,12 @@ export const dispensaryWeeklyActivityBotPatchSchema = z
     { message: 'La fin de période doit être après le début', path: ['periodEnd'] },
   );
 
-export const dispensaryWeeklyActivityBotCaisseBodySchema = z.object({
-  displayName: z.string().trim().min(1).max(200).optional(),
-});
-
-export const dispensaryWeeklyActivityBotPresenceBodySchema = z.object({
-  day: z.enum(['today', 'yesterday']),
-  displayName: z.string().trim().min(1).max(200).optional(),
-});
+export type DispensaryWeeklyActivityBotCaisseBody = z.infer<
+  typeof dispensaryWeeklyActivityBotCaisseBodySchema
+>;
+export type DispensaryWeeklyActivityBotPresenceBody = z.infer<
+  typeof dispensaryWeeklyActivityBotPresenceBodySchema
+>;
 
 export type DispensaryWeeklyActivityCreateInput = z.infer<typeof dispensaryWeeklyActivityCreateSchema>;
 export type DispensaryWeeklyActivityUpdateInput = z.infer<typeof dispensaryWeeklyActivityUpdateSchema>;
