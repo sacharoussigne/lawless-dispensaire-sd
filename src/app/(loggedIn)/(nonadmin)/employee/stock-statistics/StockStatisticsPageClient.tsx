@@ -258,21 +258,13 @@ export default function StockStatisticsPageClient() {
           </Stack>
         </Paper>
 
-        <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
           <Paper withBorder p="md" radius="md">
             <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
               Total — {modeLabel}
             </Text>
             <Text size="xl" fw={700} c={valueColor(displayMode, modeTotal)}>
               {modeTotal.toLocaleString('fr-FR')}
-            </Text>
-          </Paper>
-          <Paper withBorder p="md" radius="md">
-            <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
-              Objets avec mouvement
-            </Text>
-            <Text size="xl" fw={700}>
-              {filteredRows.length.toLocaleString('fr-FR')}
             </Text>
           </Paper>
           <Paper withBorder p="md" radius="md">
