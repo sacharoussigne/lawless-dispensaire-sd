@@ -150,6 +150,13 @@ export default function Header({
                           </Menu.Item>
                         </Link>
                       )}
+                      {appSettings.featureStockEnabled && permissions?.stockStatistics.view && (
+                        <Link href={routes.employee.stockStatistics}>
+                          <Menu.Item>
+                            Statistiques de stock
+                          </Menu.Item>
+                        </Link>
+                      )}
                       <Link href={routes.management.categoryItems}>
                         <Menu.Item>
                           Catégories d'objets
@@ -237,6 +244,14 @@ export default function Header({
                         className={`${classes.link} ${isRouteActive(routes.employee.payroll) ? classes.linkActive : ''}`}
                       >
                         Salaires
+                      </Link>
+                    )}
+                    {appSettings.featureStockEnabled && permissions?.stockStatistics.view && (
+                      <Link
+                        href={routes.employee.stockStatistics}
+                        className={`${classes.link} ${isRouteActive(routes.employee.stockStatistics) ? classes.linkActive : ''}`}
+                      >
+                        Stats stock
                       </Link>
                     )}
                   </>

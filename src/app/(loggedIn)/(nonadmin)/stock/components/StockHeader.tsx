@@ -1,6 +1,6 @@
 'use client';
 
-import { Group, Title, Badge, Button } from '@mantine/core';
+import { Group, Title, Badge, Button, Checkbox, Tooltip } from '@mantine/core';
 import { IconEdit, IconCheck, IconX, IconTools, IconArrowsExchange } from '@tabler/icons-react';
 
 interface StockHeaderProps {
@@ -9,6 +9,7 @@ interface StockHeaderProps {
   selectedChestId: string | null;
   isEditing: boolean;
   saving: boolean;
+  skipHistory: boolean;
   canCraftReadOrWrite: boolean;
   canStockUpdate: boolean;
   onOpenCraft: () => void;
@@ -16,6 +17,7 @@ interface StockHeaderProps {
   onStartEdit: () => void;
   onCancelEdit: () => void;
   onSave: () => void;
+  onSkipHistoryChange: (value: boolean) => void;
 }
 
 export function StockHeader({
@@ -24,6 +26,7 @@ export function StockHeader({
   selectedChestId,
   isEditing,
   saving,
+  skipHistory,
   canCraftReadOrWrite,
   canStockUpdate,
   onOpenCraft,
@@ -31,6 +34,7 @@ export function StockHeader({
   onStartEdit,
   onCancelEdit,
   onSave,
+  onSkipHistoryChange,
 }: StockHeaderProps) {
   return (
     <Group justify="space-between" mb="xl">
@@ -76,6 +80,17 @@ export function StockHeader({
                 )
               ) : (
                 <>
+                  <Tooltip
+                    label="Aucun mouvement ne sera enregistré (ex. transfert manuel entre coffres sans utiliser Transférer)."
+                    multiline
+                    w={280}
+                  >
+                    <Checkbox
+                      label="Écraser (sans historique)"
+                      checked={skipHistory}
+                      onChange={(e) => onSkipHistoryChange(e.currentTarget.checked)}
+                    />
+                  </Tooltip>
                   <Button
                     leftSection={<IconX size={16} />}
                     onClick={onCancelEdit}

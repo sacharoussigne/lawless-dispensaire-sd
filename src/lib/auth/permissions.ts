@@ -18,6 +18,7 @@ export const statement = {
 
     // Vos ressources personnalisées
     ...defaultApplicationPermissions,
+    stock_statistics: ["view"],
 } as const;
 
 
@@ -35,6 +36,7 @@ const user = ac.newRole({
     mails: [],
     payroll_reports: [],
     weekly_dispensary_activity: [],
+    stock_statistics: [],
 });
 
 const admin = ac.newRole({
@@ -51,6 +53,7 @@ const employee = ac.newRole({
     mails: ["access"],
     payroll_reports: [],
     weekly_dispensary_activity: [],
+    stock_statistics: [],
 });
 
 const inventory_manager = ac.newRole({
@@ -64,6 +67,7 @@ const inventory_manager = ac.newRole({
     mails: ["access"],
     payroll_reports: [],
     weekly_dispensary_activity: [],
+    stock_statistics: [],
 });
 
 const inventory_viewer = ac.newRole({
@@ -77,6 +81,7 @@ const inventory_viewer = ac.newRole({
     mails: [],
     payroll_reports: [],
     weekly_dispensary_activity: [],
+    stock_statistics: [],
 });
 
 const private_practitioner = ac.newRole({
@@ -88,6 +93,7 @@ const private_practitioner = ac.newRole({
     mails: [],
     payroll_reports: [],
     weekly_dispensary_activity: ["view", "edit_own"],
+    stock_statistics: [],
 });
 
 const direction = ac.newRole({
@@ -101,6 +107,7 @@ const direction = ac.newRole({
     mails: [],
     payroll_reports: ["view", "create"],
     weekly_dispensary_activity: ["view", "edit_all"],
+    stock_statistics: ["view"],
 });
 
 // Map des rôles pour faciliter l'accès

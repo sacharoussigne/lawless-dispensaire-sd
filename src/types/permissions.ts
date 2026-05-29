@@ -31,6 +31,9 @@ export interface Permissions {
     editOwn: boolean;
     editAll: boolean;
   };
+  stockStatistics: {
+    view: boolean;
+  };
 }
 
 export interface PermissionsContextType {

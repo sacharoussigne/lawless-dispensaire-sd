@@ -9,6 +9,7 @@ import {
   IconMail,
   IconReportMoney,
   IconHeartbeat,
+  IconChartBar,
 } from '@tabler/icons-react';
 import { getAuthSession } from '@/lib/auth';
 import { calculatePermissions } from '@/lib/auth/calculatePermissions';
@@ -95,6 +96,16 @@ export default async function EmployeePage() {
       hasAccess:
         appSettings.featurePayrollEnabled && (permissions?.payrollReports.view ?? false),
       color: 'teal',
+    },
+    {
+      title: 'Statistiques de stock',
+      description:
+        'Analysez les consommations, ajouts et la balance nette des objets sur une période.',
+      icon: IconChartBar,
+      href: routes.employee.stockStatistics,
+      hasAccess:
+        appSettings.featureStockEnabled && (permissions?.stockStatistics.view ?? false),
+      color: 'orange',
     },
   ] as const;
 

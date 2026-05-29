@@ -1,14 +1,20 @@
 'use server';
 
+import { StockMovementKind } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
 import { getAuthSession } from '@/lib/auth';
 import { checkRolePermission } from '@/lib/auth/permissions';
 import { getAppFeatureActionBlock } from '@/lib/appSettings';
-import { getTodayStart, getTomorrowStart, getStartOfDay } from '@/lib/date';
+import { getTodayStart, getTomorrowStart, getYesterdayStart, getStartOfDay } from '@/lib/date';
 import { getDefaultChestId } from '@/app/_actions/stock/internals';
+import { buildManualMovements } from '@/lib/stock/movements';
 
-export async function updateStock(data: { itemId: string; quantity: number }[], chestId?: string | null) {
+export async function updateStock(
+  data: { itemId: string; quantity: number }[],
+  chestId?: string | null,
+  options?: { skipHistory?: boolean },
+) {
   try {
     const session = await getAuthSession();
     if (!session) {
@@ -31,6 +37,9 @@ export async function updateStock(data: { itemId: string; quantity: number }[], 
 
     const today = getTodayStart();
     const tomorrow = getTomorrowStart();
+    const yesterday = getYesterdayStart();
+    const skipHistory = options?.skipHistory ?? false;
+    const userId = session.user.id;
 
     let targetChestId = chestId;
     if (!targetChestId) {
@@ -49,42 +58,82 @@ export async function updateStock(data: { itemId: string; quantity: number }[], 
       targetChestId = defaultChest.id;
     }
 
-    const results = await Promise.all(
-      data.map(async ({ itemId, quantity }) => {
-        const existingStock = await prisma.stockHistory.findFirst({
-          where: {
-            itemId,
-            chestId: targetChestId,
-            timestamp: {
-              gte: today,
-              lt: tomorrow,
-            },
-          },
-          orderBy: {
-            timestamp: 'desc',
-          },
-        });
+    const results = await prisma.$transaction(async (tx) => {
+      const movementInputs: {
+        itemId: string;
+        newQty: number;
+        stockToday: number | null;
+        stockYesterday: number | null;
+      }[] = [];
 
-        if (existingStock) {
-          return prisma.stockHistory.update({
+      const stockResults = await Promise.all(
+        data.map(async ({ itemId, quantity }) => {
+          const existingStock = await tx.stockHistory.findFirst({
             where: {
-              id: existingStock.id,
+              itemId,
+              chestId: targetChestId!,
+              timestamp: {
+                gte: today,
+                lt: tomorrow,
+              },
             },
-            data: {
-              quantity,
+            orderBy: {
+              timestamp: 'desc',
             },
           });
-        } else {
-          return prisma.stockHistory.create({
+
+          const yesterdayStock = await tx.stockHistory.findFirst({
+            where: {
+              itemId,
+              chestId: targetChestId!,
+              timestamp: {
+                gte: yesterday,
+                lt: today,
+              },
+            },
+            orderBy: {
+              timestamp: 'desc',
+            },
+          });
+
+          movementInputs.push({
+            itemId,
+            newQty: quantity,
+            stockToday: existingStock?.quantity ?? null,
+            stockYesterday: yesterdayStock?.quantity ?? null,
+          });
+
+          if (existingStock) {
+            return tx.stockHistory.update({
+              where: { id: existingStock.id },
+              data: { quantity },
+            });
+          }
+
+          return tx.stockHistory.create({
             data: {
               itemId,
-              chestId: targetChestId,
+              chestId: targetChestId!,
               quantity,
             },
           });
-        }
-      })
-    );
+        }),
+      );
+
+      const movements = buildManualMovements(movementInputs, skipHistory);
+      if (movements.length > 0) {
+        await tx.stockItemMovement.createMany({
+          data: movements.map((m) => ({
+            itemId: m.itemId,
+            quantity: m.quantity,
+            kind: m.kind,
+            userId,
+          })),
+        });
+      }
+
+      return stockResults;
+    });
 
     return {
       status: 200,
@@ -216,6 +265,8 @@ export async function craftItem(data: {
       };
     }
 
+    const userId = session.user.id;
+
     await prisma.$transaction(async (tx) => {
       const existingCraftedStock = await tx.stockHistory.findFirst({
         where: {
@@ -288,6 +339,27 @@ export async function craftItem(data: {
             },
           });
         }
+      }
+
+      await tx.stockItemMovement.create({
+        data: {
+          itemId: data.craftedItemId,
+          quantity: totalQuantityProduced,
+          kind: StockMovementKind.CRAFT_PRODUCE,
+          userId,
+        },
+      });
+
+      for (const ingredient of recipe.ingredients) {
+        const requiredQuantity = ingredient.quantity * data.times;
+        await tx.stockItemMovement.create({
+          data: {
+            itemId: ingredient.usedItemId,
+            quantity: -requiredQuantity,
+            kind: StockMovementKind.CRAFT_CONSUME,
+            userId,
+          },
+        });
       }
     });
 

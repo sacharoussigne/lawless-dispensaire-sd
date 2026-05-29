@@ -7,6 +7,7 @@ import { hasApplicationAccessMiddleware } from './middlewares/hasApplicationAcce
 import { hasManagementAccessMiddleware } from './middlewares/hasManagementAccessMiddleware';
 import { hasAdminRoleMiddleware } from './middlewares/hasAdminRoleMiddleware';
 import { hasPayrollReportsAccessMiddleware } from './middlewares/hasPayrollReportsAccessMiddleware';
+import { hasStockStatisticsAccessMiddleware } from './middlewares/hasStockStatisticsAccessMiddleware';
 import { hasStockViewAccessMiddleware } from './middlewares/hasStockViewAccessMiddleware';
 import { hasOrdersViewAccessMiddleware } from './middlewares/hasOrdersViewAccessMiddleware';
 import { hasSearchAccessMiddleware } from './middlewares/hasSearchAccessMiddleware';
@@ -112,6 +113,16 @@ export async function middleware(req: NextRequest) {
     middlewares.push(hasPayrollReportsAccessMiddleware);
     middlewares.push((request: NextRequest, session: AppMiddlewareSession) =>
       assertAppFeatureEnabledMiddleware(request, session, 'payroll'),
+    );
+  } else if (
+    pathname === routes.employee.stockStatistics ||
+    pathname.startsWith(`${routes.employee.stockStatistics}/`)
+  ) {
+    middlewares.push(hasToBeLoggedInMiddleware);
+    middlewares.push(hasApplicationAccessMiddleware);
+    middlewares.push(hasStockStatisticsAccessMiddleware);
+    middlewares.push((request: NextRequest, session: AppMiddlewareSession) =>
+      assertAppFeatureEnabledMiddleware(request, session, 'stock'),
     );
   } else if (pathname.startsWith(routes.employee.mails)) {
     // For employee mails routes, check login, application access, then mails access
