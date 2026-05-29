@@ -36,6 +36,7 @@ export default function StockPageClient({ initialItems, initialChests, stockUiPr
   const [craftModalOpened, setCraftModalOpened] = useState(false);
   const [transferModalOpened, setTransferModalOpened] = useState(false);
   const [editedQuantitiesByItemId, setEditedQuantitiesByItemId] = useState<Record<string, number | null>>({});
+  const [skipHistory, setSkipHistory] = useState(false);
   const [stockChecksSummary, setStockChecksSummary] = useState<StockChecksSummary | null>(null);
 
   const loadStockChecksSummary = async () => {
@@ -114,7 +115,7 @@ export default function StockPageClient({ initialItems, initialChests, stockUiPr
         return;
       }
 
-      const result = await updateStock(stockData, targetChestId);
+      const result = await updateStock(stockData, targetChestId, { skipHistory });
       handleAction(result);
 
       const chestName = targetChestId
@@ -129,6 +130,7 @@ export default function StockPageClient({ initialItems, initialChests, stockUiPr
 
       setIsEditing(false);
       setEditedQuantitiesByItemId({});
+      setSkipHistory(false);
       await loadItems();
     } catch (error: any) {
       notifications.show({
@@ -144,6 +146,7 @@ export default function StockPageClient({ initialItems, initialChests, stockUiPr
   const handleCancelEdit = () => {
     setIsEditing(false);
     setEditedQuantitiesByItemId({});
+    setSkipHistory(false);
   };
 
   // Expression helpers moved to src/lib/stock/expression.ts
@@ -271,6 +274,7 @@ export default function StockPageClient({ initialItems, initialChests, stockUiPr
         selectedChestId={selectedChestId}
         isEditing={isEditing}
         saving={saving}
+        skipHistory={skipHistory}
         canCraftReadOrWrite={Boolean(permissions?.stock.craftRead || permissions?.stock.craftWrite)}
         canStockUpdate={Boolean(permissions?.stock.update)}
         onOpenCraft={() => setCraftModalOpened(true)}
@@ -278,6 +282,7 @@ export default function StockPageClient({ initialItems, initialChests, stockUiPr
         onStartEdit={() => setIsEditing(true)}
         onCancelEdit={handleCancelEdit}
         onSave={handleSaveStock}
+        onSkipHistoryChange={setSkipHistory}
       />
 
       <ChestSelectorBar

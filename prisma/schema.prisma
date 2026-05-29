@@ -29,6 +29,7 @@ model User {
   payrollWeeklyReports PayrollWeeklyReport[]
   dispensaryWeeklyActivities DispensaryWeeklyActivity[]
   dispensaryWeeklyActivityHistoryAsActor DispensaryWeeklyActivityHistory[] @relation("DispensaryWeeklyActivityHistoryActor")
+  stockItemMovements StockItemMovement[]
 
   @@unique([email])
   @@map("user")
@@ -170,6 +171,7 @@ model Item {
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
   stockHistory   StockHistory[]
+  stockItemMovements StockItemMovement[]
   craftRecipes   CraftRecipe[]     @relation("CraftedItem")
   usedInRecipes  CraftRecipeItem[] @relation("UsedItem")
   orderItems     OrderItem[]
@@ -230,6 +232,29 @@ model StockHistory {
   @@index([chestId])
   @@index([timestamp])
   @@map("stock_history")
+}
+
+enum StockMovementKind {
+  MANUAL_FIRST_COUNT
+  MANUAL_ADJUST
+  CRAFT_CONSUME
+  CRAFT_PRODUCE
+}
+
+model StockItemMovement {
+  id        String            @id @default(uuid())
+  itemId    String
+  quantity  Int
+  kind      StockMovementKind
+  userId    String?
+  createdAt DateTime          @default(now())
+
+  item Item  @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([itemId, createdAt])
+  @@index([createdAt])
+  @@map("stock_item_movement")
 }
 
 model Company {
