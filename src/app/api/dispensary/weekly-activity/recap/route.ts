@@ -52,7 +52,6 @@ export async function GET(request: NextRequest) {
 
   const initial = await prisma.dispensaryWeeklyActivity.findMany({
     where: overlapWhere,
-    include: { user: { select: { name: true } } },
     orderBy: [{ displayName: 'asc' }, { discordUserId: 'asc' }],
   });
 
@@ -64,7 +63,6 @@ export async function GET(request: NextRequest) {
 
   const refreshed = await prisma.dispensaryWeeklyActivity.findMany({
     where: overlapWhere,
-    include: { user: { select: { name: true } } },
     orderBy: [{ displayName: 'asc' }, { discordUserId: 'asc' }],
   });
 

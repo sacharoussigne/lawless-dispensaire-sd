@@ -14,8 +14,11 @@ import {
 import { DISCORD_ACCOUNT_PROVIDER_ID } from '@/lib/dispensaryWeeklyActivity/constants';
 import {
   findLinkedUserIdByDiscordAccount,
+  genericDoctorFallbackName,
   getDiscordAccountIdForUser,
+  getLatestDiscordDisplayNames,
   mergeResolvedDisplayNames,
+  resolveDiscordDisplayName,
 } from '@/lib/dispensaryWeeklyActivity/resolveDisplayName';
 import { serializeDispensaryWeeklyActivityApiRow } from '@/lib/dispensaryWeeklyActivity/apiRow';
 import {
@@ -101,7 +104,6 @@ export async function listDispensaryWeeklyActivities(dispensarySlug: string) {
 
     const rows = await prisma.dispensaryWeeklyActivity.findMany({
       where,
-      include: { user: { select: { name: true } } },
       orderBy: { periodStart: 'desc' },
     });
 
@@ -113,7 +115,6 @@ export async function listDispensaryWeeklyActivities(dispensarySlug: string) {
 
     const refreshed = await prisma.dispensaryWeeklyActivity.findMany({
       where,
-      include: { user: { select: { name: true } } },
       orderBy: { periodStart: 'desc' },
     });
 
@@ -189,65 +190,66 @@ export async function getDispensaryWeeklyActivityHistory(
       include: { actorUser: { select: { name: true } } },
     });
 
-    const missingDiscordIds = [
+    const actorUserIdsWithoutDiscord = [
       ...new Set(
         history
-          .filter((h) => !h.actorUser?.name && h.actorDiscordUserId)
-          .map((h) => h.actorDiscordUserId as string),
+          .filter((h) => h.actorUserId && !h.actorDiscordUserId)
+          .map((h) => h.actorUserId as string),
       ),
     ];
 
-    const discordIdToName = new Map<string, string>();
-    if (missingDiscordIds.length > 0) {
+    const userIdToDiscordId = new Map<string, string>();
+    if (actorUserIdsWithoutDiscord.length > 0) {
       const accounts = await prisma.account.findMany({
         where: {
+          userId: { in: actorUserIdsWithoutDiscord },
           providerId: DISCORD_ACCOUNT_PROVIDER_ID,
-          accountId: { in: missingDiscordIds },
         },
-        include: { user: { select: { name: true } } },
+        select: { userId: true, accountId: true },
       });
-      for (const a of accounts) {
-        if (a.user?.name) {
-          discordIdToName.set(a.accountId, a.user.name);
-        }
+      for (const account of accounts) {
+        userIdToDiscordId.set(account.userId, account.accountId);
       }
+    }
 
-      const stillMissing = missingDiscordIds.filter((id) => !discordIdToName.has(id));
-      if (stillMissing.length > 0) {
-        const latestByDiscord = await Promise.all(
-          stillMissing.map(async (discordUserId) => {
-            const row = await prisma.dispensaryWeeklyActivity.findFirst({
-              where: { discordUserId, ...tenantWhere(dispensaryId) },
-              orderBy: { periodStart: 'desc' },
-              include: { user: { select: { name: true } } },
-            });
-            const name = row?.user?.name ?? row?.displayName ?? null;
-            return { discordUserId, name };
-          }),
-        );
-        for (const item of latestByDiscord) {
-          if (item.name) {
-            discordIdToName.set(item.discordUserId, item.name);
-          }
+    const actorDiscordIds = new Set<string>();
+    for (const h of history) {
+      if (h.actorDiscordUserId) {
+        actorDiscordIds.add(h.actorDiscordUserId);
+        continue;
+      }
+      if (h.actorUserId) {
+        const discordId = userIdToDiscordId.get(h.actorUserId);
+        if (discordId) {
+          actorDiscordIds.add(discordId);
         }
       }
     }
 
+    const discordIdToName = await getLatestDiscordDisplayNames(prisma, [...actorDiscordIds]);
+
     return {
       status: 200 as const,
-      data: history.map((h) => ({
-        id: h.id,
-        action: h.action,
-        source: h.source,
-        actorUserName: h.actorUser?.name ?? null,
-        actorDiscordUserId: h.actorDiscordUserId,
-        actorResolvedName:
-          h.actorUser?.name ??
-          (h.actorDiscordUserId ? discordIdToName.get(h.actorDiscordUserId) ?? null : null),
-        previousValues: h.previousValues,
-        nextValues: h.nextValues,
-        createdAt: h.createdAt.toISOString(),
-      })),
+      data: history.map((h) => {
+        const actorDiscordUserId =
+          h.actorDiscordUserId ??
+          (h.actorUserId ? userIdToDiscordId.get(h.actorUserId) ?? null : null);
+        const actorResolvedName = actorDiscordUserId
+          ? discordIdToName.get(actorDiscordUserId) ?? genericDoctorFallbackName(actorDiscordUserId)
+          : null;
+
+        return {
+          id: h.id,
+          action: h.action,
+          source: h.source,
+          actorUserName: h.actorUser?.name ?? null,
+          actorDiscordUserId,
+          actorResolvedName,
+          previousValues: h.previousValues,
+          nextValues: h.nextValues,
+          createdAt: h.createdAt.toISOString(),
+        };
+      }),
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors du chargement de l’historique');
@@ -284,11 +286,39 @@ export async function listDispensaryWeeklyActivityTargets(dispensarySlug: string
           some: { providerId: DISCORD_ACCOUNT_PROVIDER_ID },
         },
       },
-      select: { id: true, name: true },
-      orderBy: { name: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        accounts: {
+          where: { providerId: DISCORD_ACCOUNT_PROVIDER_ID },
+          select: { accountId: true },
+          take: 1,
+        },
+      },
     });
 
-    return { status: 200 as const, data: { users } };
+    const discordUserIds = users
+      .map((user) => user.accounts[0]?.accountId)
+      .filter((id): id is string => Boolean(id));
+    const discordDisplayNames = await getLatestDiscordDisplayNames(prisma, discordUserIds);
+
+    const enriched = users
+      .map((user) => {
+        const discordUserId = user.accounts[0]?.accountId;
+        const discordDisplayName = discordUserId
+          ? discordDisplayNames.get(discordUserId) ?? genericDoctorFallbackName(discordUserId)
+          : genericDoctorFallbackName('unknown');
+        return {
+          id: user.id,
+          name: user.name,
+          discordDisplayName,
+        };
+      })
+      .sort((a, b) =>
+        a.discordDisplayName.localeCompare(b.discordDisplayName, 'fr', { sensitivity: 'base' }),
+      );
+
+    return { status: 200 as const, data: { users: enriched } };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors du chargement des utilisateurs');
   }
@@ -326,7 +356,9 @@ export async function createDispensaryWeeklyActivity(
         };
       }
       discordUserId = ownDiscord;
-      displayName = session.user.name;
+      displayName =
+        parsed.data.displayName?.trim() ||
+        (await resolveDiscordDisplayName(prisma, ownDiscord));
       resolvedUserId = session.user.id;
     } else {
       if (!parsed.data.targetUserId) {
@@ -347,7 +379,9 @@ export async function createDispensaryWeeklyActivity(
         };
       }
       discordUserId = targetDiscord;
-      displayName = (parsed.data.displayName?.trim() || target.name).trim();
+      displayName =
+        parsed.data.displayName?.trim() ||
+        (await resolveDiscordDisplayName(prisma, targetDiscord));
       resolvedUserId = target.id;
     }
 

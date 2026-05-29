@@ -155,7 +155,6 @@ export async function createPayrollReportFromForm(dispensarySlug: string, formDa
         periodEnd: waImportEnd,
         ...tenantWhere(dispensaryId),
       },
-      include: { user: { select: { name: true } } },
     });
     activitiesWithNames = (await mergeResolvedDisplayNames(
       prisma,

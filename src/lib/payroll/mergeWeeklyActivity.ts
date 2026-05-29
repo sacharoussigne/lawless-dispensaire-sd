@@ -71,9 +71,6 @@ function waNameKeys(a: WaRow): string[] {
   if (r) keys.add(payrollNameKey(r));
   const d = cleanText(a.displayName);
   if (d) keys.add(payrollNameKey(d));
-  if (a.user?.name) {
-    keys.add(payrollNameKey(a.user.name));
-  }
   return [...keys];
 }
 

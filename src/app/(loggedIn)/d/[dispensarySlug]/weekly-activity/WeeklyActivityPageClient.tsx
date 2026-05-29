@@ -110,7 +110,7 @@ type HistoryEntry = {
   createdAt: string;
 };
 
-type TargetUser = { id: string; name: string };
+type TargetUser = { id: string; name: string; discordDisplayName: string };
 
 type DoctorFilterOption = { value: string; label: string };
 
@@ -639,20 +639,20 @@ export default function WeeklyActivityPageClient({
                   label="Utilisateur intranet"
                   description="Comptes avec Discord lié uniquement."
                   placeholder="Choisir un utilisateur"
-                  data={targetUsers.map((u) => ({ value: u.id, label: u.name }))}
+                  data={targetUsers.map((u) => ({ value: u.id, label: u.discordDisplayName }))}
                   value={cTargetUserId}
                   onChange={(id) => {
                     setCTargetUserId(id);
                     const u = targetUsers.find((t) => t.id === id);
-                    if (u) setCDisplayName(u.name);
+                    if (u) setCDisplayName(u.discordDisplayName);
                   }}
                   searchable
                   nothingFoundMessage="Aucun résultat"
                   required
                 />
                 <TextInput
-                  label="Nom affiché"
-                  description="Par défaut le nom du compte ; vous pouvez le personnaliser (RP, etc.)."
+                  label="Pseudo Discord"
+                  description="Par défaut le dernier pseudo Discord connu ; vous pouvez le personnaliser (RP, etc.)."
                   value={cDisplayName}
                   onChange={(e) => setCDisplayName(e.currentTarget.value)}
                   mt="sm"

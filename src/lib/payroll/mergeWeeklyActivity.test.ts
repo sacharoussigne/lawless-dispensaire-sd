@@ -14,6 +14,7 @@ function row(
 ): Parameters<typeof mergeHtmlAndWeeklyActivity>[1][number] {
   return {
     id: 'wa-1',
+    dispensaryId: 'dispensary-1',
     periodStart: new Date(),
     periodEnd: new Date(),
     displayName: 'Test',
@@ -85,6 +86,42 @@ describe('mergeHtmlAndWeeklyActivity', () => {
     expect(out[0].stats.patients_soignes).toBe(3);
     expect(out[0].stats.poppy_milk_offertes).toBe(1);
     expect(out[0].stats.infusions_ginseng_offertes).toBe(2);
+  });
+
+  it('does not match weekly activity via intranet user name', () => {
+    const schedule = Object.fromEntries(PAYROLL_DAYS.map((d) => [d, { ...emptyDay }])) as ParsedPayrollTable['employees'][0]['schedule'];
+    const parsed: ParsedPayrollTable = {
+      employees: [
+        {
+          name: 'IntranetOnly',
+          role: 'Médecin',
+          id: 1,
+          schedule,
+          stats: {
+            sherifs: null,
+            palefreniers: null,
+            patients_soignes: 0,
+            nombre_caisses: 0,
+            nombre_presences: 0,
+          },
+        },
+      ],
+      global_stats: { total_employees: 1, total_caisses: 0, total_sherifs: 0, total_palefreniers: 0 },
+    };
+    const wa = [
+      row({
+        resolvedDisplayName: 'DiscordPseudo',
+        displayName: 'DiscordPseudo',
+        user: { name: 'IntranetOnly' },
+        patientsCount: 4,
+      }),
+    ];
+    const out = mergeHtmlAndWeeklyActivity(parsed, wa);
+    expect(out).toHaveLength(2);
+    expect(out[0].name).toBe('IntranetOnly');
+    expect(out[0].stats.patients_soignes).toBe(0);
+    expect(out[1].name).toBe('DiscordPseudo');
+    expect(out[1].stats.patients_soignes).toBe(4);
   });
 });
 

@@ -3,7 +3,7 @@ import { SuspenseLoader } from '@/app/_components/SuspenseLoader/SuspenseLoader'
 import WeeklyActivityPageClient from './WeeklyActivityPageClient';
 import { getAuthSession } from '@/lib/auth';
 import { checkRolePermission } from '@/lib/auth/permissions';
-import { getDiscordAccountIdForUser } from '@/lib/dispensaryWeeklyActivity/resolveDisplayName';
+import { getDiscordAccountIdForUser, resolveDiscordDisplayName } from '@/lib/dispensaryWeeklyActivity/resolveDisplayName';
 import prisma from '@/lib/prisma';
 import { getDataOrThrow } from '@/lib/response';
 
@@ -22,6 +22,9 @@ async function WeeklyActivityContent({ dispensarySlug }: { dispensarySlug: strin
     checkRolePermission(session.user.role, 'weekly_dispensary_activity', 'edit_own');
 
   const viewerDiscordId = await getDiscordAccountIdForUser(prisma, session.user.id);
+  const defaultDisplayName = viewerDiscordId
+    ? await resolveDiscordDisplayName(prisma, viewerDiscordId)
+    : session.user.name;
 
   return (
     <WeeklyActivityPageClient
@@ -30,7 +33,7 @@ async function WeeklyActivityContent({ dispensarySlug }: { dispensarySlug: strin
       canEdit={canEdit}
       sessionUserId={session.user.id}
       viewerDiscordId={viewerDiscordId}
-      defaultDisplayName={session.user.name}
+      defaultDisplayName={defaultDisplayName}
     />
   );
 }

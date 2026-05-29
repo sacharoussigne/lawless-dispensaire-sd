@@ -37,7 +37,6 @@ export async function GET(request: Request) {
 
   const initial = await prisma.dispensaryWeeklyActivity.findMany({
     where: { dispensaryId: dispensaryCtx.dispensaryId, discordUserId },
-    include: { user: { select: { name: true } } },
     orderBy: { periodStart: 'desc' },
   });
 
@@ -49,7 +48,6 @@ export async function GET(request: Request) {
 
   const refreshed = await prisma.dispensaryWeeklyActivity.findMany({
     where: { dispensaryId: dispensaryCtx.dispensaryId, discordUserId },
-    include: { user: { select: { name: true } } },
     orderBy: { periodStart: 'desc' },
   });
 

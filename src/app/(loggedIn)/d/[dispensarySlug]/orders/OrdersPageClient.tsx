@@ -6,8 +6,11 @@ import {
   Title,
   Group,
   Button,
+  Paper,
+  Stack,
+  Text,
 } from '@mantine/core';
-import { IconPlus } from '@tabler/icons-react';
+import { IconPlus, IconPackage } from '@tabler/icons-react';
 import { getOrders } from '@/app/_actions/orders';
 import { handleAction } from '@/lib/action';
 import { notifications } from '@mantine/notifications';
@@ -171,42 +174,55 @@ export default function OrdersPageClient({
         )}
       </Group>
 
-      <ActiveFilters
-        filters={[
-          {
-            label: 'Nom',
-            value: nameFilter,
-            onRemove: () => setNameFilter(''),
-          },
-          {
-            label: 'Statut',
-            value: statusFilter,
-            onRemove: () => setStatusFilter(null),
-          },
-        ]}
-      />
+      {orders.length === 0 && !loading ? (
+        <Paper shadow="sm" withBorder>
+          <Stack align="center" gap="xs" py="xl">
+            <IconPackage size={48} stroke={1.5} style={{ color: 'var(--mantine-color-dimmed)' }} />
+            <Text size="sm" c="dimmed" fw={500}>
+              Aucune commande trouvée
+            </Text>
+          </Stack>
+        </Paper>
+      ) : (
+        <>
+          <ActiveFilters
+            filters={[
+              {
+                label: 'Nom',
+                value: nameFilter,
+                onRemove: () => setNameFilter(''),
+              },
+              {
+                label: 'Statut',
+                value: statusFilter,
+                onRemove: () => setStatusFilter(null),
+              },
+            ]}
+          />
 
-      <OrdersTable
-        orders={paginatedOrders}
-        loading={loading}
-        statusFilter={statusFilter}
-        nameFilter={nameFilter}
-        page={page}
-        pageSize={pageSize}
-        totalRecords={totalRecords}
-        permissions={permissions}
-        onStatusFilterChange={(value) => setStatusFilter(value)}
-        onNameFilterChange={(value) => setNameFilter(value)}
-        onPageChange={(p) => setPage(p)}
-        onView={handleViewDetails}
-        onEdit={handleEdit}
-        onDelete={(order) => {
-          setOrderToDelete(order);
-          setDeleteModalOpened(true);
-        }}
-        onPreviewLetter={handlePreviewLetter}
-        hasLetterTemplateForOrder={hasLetterTemplateForOrder}
-      />
+          <OrdersTable
+            orders={paginatedOrders}
+            loading={loading}
+            statusFilter={statusFilter}
+            nameFilter={nameFilter}
+            page={page}
+            pageSize={pageSize}
+            totalRecords={totalRecords}
+            permissions={permissions}
+            onStatusFilterChange={(value) => setStatusFilter(value)}
+            onNameFilterChange={(value) => setNameFilter(value)}
+            onPageChange={(p) => setPage(p)}
+            onView={handleViewDetails}
+            onEdit={handleEdit}
+            onDelete={(order) => {
+              setOrderToDelete(order);
+              setDeleteModalOpened(true);
+            }}
+            onPreviewLetter={handlePreviewLetter}
+            hasLetterTemplateForOrder={hasLetterTemplateForOrder}
+          />
+        </>
+      )}
 
       <EditOrderModal
         opened={modalOpened}
