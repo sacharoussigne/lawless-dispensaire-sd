@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { BotDayEditError, resolveParisDayAnchor } from '@/lib/dispensaryWeeklyActivity/botDayEdit';
-import { loadSerializedWeeklyActivityById } from '@/lib/dispensaryWeeklyActivity/loadSerializedRow';
+import { loadSerializedWeeklyActivityByIdForDispensary } from '@/lib/dispensaryWeeklyActivity/loadSerializedRow';
 import type { BotWeekdayFlagMarkResult } from '@/lib/dispensaryWeeklyActivity/service';
 import { botSetWeekdayFlag } from '@/lib/dispensaryWeeklyActivity/service';
 
@@ -8,8 +8,14 @@ export function jsonBotError(status: number, error: string) {
   return NextResponse.json({ status, error }, { status });
 }
 
-export async function respondToBotWeekdayFlagResult(result: BotWeekdayFlagMarkResult) {
-  const serialized = await loadSerializedWeeklyActivityById(result.activity.id);
+export async function respondToBotWeekdayFlagResult(
+  dispensaryId: string,
+  result: BotWeekdayFlagMarkResult,
+) {
+  const serialized = await loadSerializedWeeklyActivityByIdForDispensary(
+    result.activity.id,
+    dispensaryId,
+  );
   if (!serialized) {
     return jsonBotError(500, 'Erreur après mise à jour');
   }

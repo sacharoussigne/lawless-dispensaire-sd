@@ -2,7 +2,12 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { isDispensaryBotApiAuthorized, getDiscordUserIdFromBotRequest } from '@/lib/dispensaryWeeklyActivityApiAuth';
 import prisma from '@/lib/prisma';
+import { getAppSettings } from '@/lib/appSettings';
 import { serializeDispensaryWeeklyActivityApiRow } from '@/lib/dispensaryWeeklyActivity/apiRow';
+import {
+  redactSerializedWeeklyActivityRow,
+  weeklyActivityFieldVisibilityFromSettings,
+} from '@/lib/dispensaryWeeklyActivity/fieldVisibility';
 import { mergeResolvedDisplayNames } from '@/lib/dispensaryWeeklyActivity/resolveDisplayName';
 import { syncActivityUserIdFromDiscordIfMissing } from '@/lib/dispensaryWeeklyActivity/service';
 import { getBankWeekBounds } from '@/lib/bankWeek';
@@ -67,6 +72,8 @@ export async function GET(request: NextRequest) {
   const sorted = [...withNames].sort((a, b) =>
     a.resolvedDisplayName.localeCompare(b.resolvedDisplayName, 'fr', { sensitivity: 'base' }),
   );
+  const settings = await getAppSettings(dispensaryCtx.dispensaryId);
+  const visibility = weeklyActivityFieldVisibilityFromSettings(settings);
 
   return NextResponse.json({
     status: 200,
@@ -74,7 +81,8 @@ export async function GET(request: NextRequest) {
       periodStart: periodStart.toISOString(),
       periodEnd: periodEnd.toISOString(),
       rows: sorted.map((r) => {
-        return serializeDispensaryWeeklyActivityApiRow({
+        return redactSerializedWeeklyActivityRow(
+          serializeDispensaryWeeklyActivityApiRow({
           id: r.id,
           periodStart: r.periodStart,
           periodEnd: r.periodEnd,
@@ -85,13 +93,14 @@ export async function GET(request: NextRequest) {
           chestDays: r.chestDays,
           presenceDays: r.presenceDays,
           sherifCount: r.sherifCount,
-          palefrenierCount: r.palefrenierCount,
           patientsCount: r.patientsCount,
           infusionsCount: r.infusionsCount,
           poppyMilkCount: r.poppyMilkCount,
           createdAt: r.createdAt,
           updatedAt: r.updatedAt,
-        });
+        }),
+          visibility,
+        );
       }),
     },
   });

@@ -114,7 +114,6 @@ Ne retourne que les activités du dispensaire indiqué par `X-Dispensary-Id`.
 | `chestDaysSummary` | string | Résumé 7 caractères (lundi → dimanche) |
 | `presenceDaysSummary` | string | Idem |
 | `sherifCount` | number | Soins shérifs |
-| `palefrenierCount` | number | Palefreniers |
 | `patientsCount` | number | Patients |
 | `infusionsCount` | number | Infusions |
 | `poppyMilkCount` | number | Lait de pavot |
@@ -186,7 +185,6 @@ La ligne créée est rattachée au dispensaire `X-Dispensary-Id`.
 | `chestDays` | object | Optionnel ; si absent, tous les jours à `false` |
 | `presenceDays` | object | Optionnel ; si absent, tous les jours à `false` |
 | `sherifCount` | number | |
-| `palefrenierCount` | number | |
 | `patientsCount` | number | |
 | `infusionsCount` | number | |
 | `poppyMilkCount` | number | |
@@ -215,7 +213,6 @@ curl -sS -X POST \
     "displayName": "Dr. Dupont",
     "discordUserId": "123456789012345678",
     "sherifCount": 1,
-    "palefrenierCount": 0,
     "patientsCount": 5,
     "infusionsCount": 0,
     "poppyMilkCount": 0
@@ -368,11 +365,11 @@ Met à jour une ligne existante. Tous les champs du corps sont **optionnels** ; 
 Champs possibles (tous optionnels) :
 
 - `periodStart`, `periodEnd`, `displayName`
-- `sherifCount`, `palefrenierCount`, `patientsCount`, `infusionsCount`, `poppyMilkCount`
+- `sherifCount`, `patientsCount`, `infusionsCount`, `poppyMilkCount`
 
 Les caisses et présences **par jour** ne sont pas modifiables via ce `PATCH` côté bot : utiliser **`POST …/bot/caisse`** et **`POST …/bot/presence`**. (L’intranet utilise les actions serveur dédiées.)
 
-**Comportement côté historique (bot) :** pour chaque compteur dont la valeur change, une entrée d’historique de type **incrément** ou **décrément** est enregistrée (shérifs, palefreniers, patients, infusions, lait de pavot) ; si la période ou le `displayName` change, une entrée **UPDATE** est aussi enregistrée. Les valeurs envoyées sont des **absolus** (pas des deltas) : l’API calcule la différence pour classer incrément / décrément.
+**Comportement côté historique (bot) :** pour chaque compteur dont la valeur change, une entrée d’historique de type **incrément** ou **décrément** est enregistrée (shérifs, patients, infusions, lait de pavot) ; si la période ou le `displayName` change, une entrée **UPDATE** est aussi enregistrée. Les valeurs envoyées sont des **absolus** (pas des deltas) : l’API calcule la différence pour classer incrément / décrément.
 
 **En-têtes :** `Authorization`, `X-Dispensary-Id`, `X-Discord-User-Id`
 
@@ -388,7 +385,7 @@ curl -sS -X PATCH \
   -H "X-Dispensary-Id: 00000000-0000-4000-8000-000000000001" \
   -H "X-Discord-User-Id: 123456789012345678" \
   -H "Content-Type: application/json" \
-  -d '{"sherifCount": 3, "palefrenierCount": 1, "patientsCount": 8}' \
+  -d '{"sherifCount": 3, "patientsCount": 8}' \
   "https://votre-domaine/api/dispensary/weekly-activity/<UUID>"
 ```
 

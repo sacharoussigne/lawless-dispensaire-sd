@@ -2,7 +2,13 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import type { DispensaryWeeklyActivity } from '@prisma/client';
 import { isDispensaryBotApiAuthorized, getDiscordUserIdFromBotRequest } from '@/lib/dispensaryWeeklyActivityApiAuth';
-import { loadSerializedWeeklyActivityById } from '@/lib/dispensaryWeeklyActivity/loadSerializedRow';
+import { getAppSettings } from '@/lib/appSettings';
+import {
+  applyVisibilityToUpdateInput,
+  botPatchFieldVisibilityError,
+  weeklyActivityFieldVisibilityFromSettings,
+} from '@/lib/dispensaryWeeklyActivity/fieldVisibility';
+import { loadSerializedWeeklyActivityByIdForDispensary } from '@/lib/dispensaryWeeklyActivity/loadSerializedRow';
 import prisma from '@/lib/prisma';
 import { dispensaryWeeklyActivityBotPatchSchema } from '@/lib/dispensaryWeeklyActivity/schemas';
 import {
@@ -71,7 +77,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
     return loaded.error;
   }
 
-  const data = await loadSerializedWeeklyActivityById(id);
+  const data = await loadSerializedWeeklyActivityByIdForDispensary(
+    id,
+    dispensaryCtx.dispensaryId,
+  );
   if (!data) {
     return jsonError(404, 'Activité introuvable');
   }
@@ -114,15 +123,26 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     return jsonError(422, parsed.error.issues[0]?.message ?? 'Données invalides');
   }
 
+  const settings = await getAppSettings(dispensaryCtx.dispensaryId);
+  const visibility = weeklyActivityFieldVisibilityFromSettings(settings);
+  const fieldError = botPatchFieldVisibilityError(parsed.data, visibility);
+  if (fieldError) {
+    return jsonError(403, fieldError);
+  }
+  const updateInput = applyVisibilityToUpdateInput(parsed.data, visibility);
+
   try {
-    await updateDispensaryWeeklyActivityWithHistory(id, parsed.data, {
+    await updateDispensaryWeeklyActivityWithHistory(id, updateInput, {
       source: 'DISCORD_BOT',
       actorUserId: null,
       actorDiscordUserId: discordUserId,
       dispensaryId: dispensaryCtx.dispensaryId,
     });
 
-    const data = await loadSerializedWeeklyActivityById(id);
+    const data = await loadSerializedWeeklyActivityByIdForDispensary(
+      id,
+      dispensaryCtx.dispensaryId,
+    );
     if (!data) {
       return jsonError(500, 'Erreur après mise à jour');
     }

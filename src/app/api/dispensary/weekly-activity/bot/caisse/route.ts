@@ -1,4 +1,9 @@
+import { getAppSettings } from '@/lib/appSettings';
 import { isDispensaryBotApiAuthorized, getDiscordUserIdFromBotRequest } from '@/lib/dispensaryWeeklyActivityApiAuth';
+import {
+  botWeekdayFieldVisibilityError,
+  weeklyActivityFieldVisibilityFromSettings,
+} from '@/lib/dispensaryWeeklyActivity/fieldVisibility';
 import {
   botEditWeekdayFlag,
   isCaisseEditBody,
@@ -40,6 +45,13 @@ export async function POST(request: Request) {
     return jsonBotError(422, parsed.error.issues[0]?.message ?? 'Données invalides');
   }
 
+  const settings = await getAppSettings(dispensaryCtx.dispensaryId);
+  const visibility = weeklyActivityFieldVisibilityFromSettings(settings);
+  const hiddenErr = botWeekdayFieldVisibilityError('chest', visibility);
+  if (hiddenErr) {
+    return jsonBotError(403, hiddenErr);
+  }
+
   try {
     if (isCaisseEditBody(parsed.data)) {
       const result = await botEditWeekdayFlag(
@@ -48,13 +60,13 @@ export async function POST(request: Request) {
         'chest',
         parsed.data,
       );
-      return respondToBotWeekdayFlagResult(result);
+      return respondToBotWeekdayFlagResult(dispensaryCtx.dispensaryId, result);
     }
 
     const result = await botMarkChestForParisToday(dispensaryCtx.dispensaryId, discordUserId, {
       displayName: parsed.data.displayName,
     });
-    return respondToBotWeekdayFlagResult(result);
+    return respondToBotWeekdayFlagResult(dispensaryCtx.dispensaryId, result);
   } catch (e) {
     const mapped = mapBotRouteError(e);
     if (mapped) return mapped;

@@ -22,7 +22,7 @@ import {
 } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
-import { DataTable, type DataTableSortStatus } from 'mantine-datatable';
+import { DataTable, type DataTableColumn, type DataTableSortStatus } from 'mantine-datatable';
 import {
   IconHistory,
   IconPencil,
@@ -50,6 +50,7 @@ import {
   formatParisPeriodStartLabel,
 } from '@/lib/dispensaryWeeklyActivity/parisPeriodLabels';
 import type { SerializedDispensaryWeeklyActivityRow } from '@/lib/dispensaryWeeklyActivity/apiRow';
+import { weeklyActivityFieldVisibilityFromSettings } from '@/lib/dispensaryWeeklyActivity/fieldVisibility';
 import {
   emptyWeekdayFlags,
   WEEKDAY_KEYS,
@@ -136,8 +137,6 @@ function compareWeeklyActivityRows(
     cmp = a.patientsCount - b.patientsCount;
   } else if (columnAccessor === 'sherifCount') {
     cmp = a.sherifCount - b.sherifCount;
-  } else if (columnAccessor === 'palefrenierCount') {
-    cmp = a.palefrenierCount - b.palefrenierCount;
   } else if (columnAccessor === 'infusionsCount') {
     cmp = a.infusionsCount - b.infusionsCount;
   } else if (columnAccessor === 'poppyMilkCount') {
@@ -168,7 +167,18 @@ export default function WeeklyActivityPageClient({
   viewerDiscordId: string | null;
   defaultDisplayName: string;
 }) {
-  const { dispensarySlug } = usePermissions();
+  const { dispensarySlug, appSettings } = usePermissions();
+  const fieldVisibility = useMemo(
+    () => weeklyActivityFieldVisibilityFromSettings(appSettings),
+    [appSettings],
+  );
+  const hasWeeklyScheduleFields =
+    fieldVisibility.chestDays || fieldVisibility.presenceDays;
+  const hasWeeklyCounterFields =
+    fieldVisibility.sherifCount ||
+    fieldVisibility.patientsCount ||
+    fieldVisibility.infusionsCount ||
+    fieldVisibility.poppyMilkCount;
   const [rows, setRows] = useState<WeeklyActivityListItem[]>(initialRows);
   const [createOpen, setCreateOpen] = useState(false);
   const [editRow, setEditRow] = useState<WeeklyActivityListItem | null>(null);
@@ -184,7 +194,6 @@ export default function WeeklyActivityPageClient({
   const [cChestFlags, setCChestFlags] = useState<WeekdayFlags>(() => emptyWeekdayFlags());
   const [cPresenceFlags, setCPresenceFlags] = useState<WeekdayFlags>(() => emptyWeekdayFlags());
   const [cSheriff, setCSheriff] = useState(0);
-  const [cPalefrenier, setCPalefrenier] = useState(0);
   const [cPatients, setCPatients] = useState(0);
   const [cInfusions, setCInfusions] = useState(0);
   const [cPoppy, setCPoppy] = useState(0);
@@ -193,7 +202,6 @@ export default function WeeklyActivityPageClient({
   const [eChestFlags, setEChestFlags] = useState<WeekdayFlags>(() => emptyWeekdayFlags());
   const [ePresenceFlags, setEPresenceFlags] = useState<WeekdayFlags>(() => emptyWeekdayFlags());
   const [eSheriff, setESheriff] = useState(0);
-  const [ePalefrenier, setEPalefrenier] = useState(0);
   const [ePatients, setEPatients] = useState(0);
   const [eInfusions, setEInfusions] = useState(0);
   const [ePoppy, setEPoppy] = useState(0);
@@ -332,13 +340,12 @@ export default function WeeklyActivityPageClient({
       const payload = {
         periodStart: start,
         periodEnd: end,
-        chestDays: cChestFlags,
-        presenceDays: cPresenceFlags,
-        sherifCount: cSheriff,
-        palefrenierCount: cPalefrenier,
-        patientsCount: cPatients,
-        infusionsCount: cInfusions,
-        poppyMilkCount: cPoppy,
+        chestDays: fieldVisibility.chestDays ? cChestFlags : emptyWeekdayFlags(),
+        presenceDays: fieldVisibility.presenceDays ? cPresenceFlags : emptyWeekdayFlags(),
+        sherifCount: fieldVisibility.sherifCount ? cSheriff : 0,
+        patientsCount: fieldVisibility.patientsCount ? cPatients : 0,
+        infusionsCount: fieldVisibility.infusionsCount ? cInfusions : 0,
+        poppyMilkCount: fieldVisibility.poppyMilkCount ? cPoppy : 0,
         ...(canEditAll && cTargetUserId
           ? {
               targetUserId: cTargetUserId,
@@ -352,10 +359,11 @@ export default function WeeklyActivityPageClient({
       setCreateOpen(false);
       await refreshRows();
     } catch (e) {
+      const message = e instanceof Error ? e.message : 'Erreur';
       notifications.show({
-        title: 'Erreur',
-        message: e instanceof Error ? e.message : 'Erreur',
-        color: 'red',
+        title: message.includes('existe déjà') ? 'Entrée déjà présente' : 'Erreur',
+        message,
+        color: message.includes('existe déjà') ? 'yellow' : 'red',
       });
     }
   };
@@ -365,7 +373,6 @@ export default function WeeklyActivityPageClient({
     setEChestFlags({ ...row.chestDays });
     setEPresenceFlags({ ...row.presenceDays });
     setESheriff(row.sherifCount);
-    setEPalefrenier(row.palefrenierCount);
     setEPatients(row.patientsCount);
     setEInfusions(row.infusionsCount);
     setEPoppy(row.poppyMilkCount);
@@ -377,13 +384,12 @@ export default function WeeklyActivityPageClient({
     try {
       const base = {
         id: editRow.id,
-        chestDays: eChestFlags,
-        presenceDays: ePresenceFlags,
-        sherifCount: eSheriff,
-        palefrenierCount: ePalefrenier,
-        patientsCount: ePatients,
-        infusionsCount: eInfusions,
-        poppyMilkCount: ePoppy,
+        ...(fieldVisibility.chestDays ? { chestDays: eChestFlags } : {}),
+        ...(fieldVisibility.presenceDays ? { presenceDays: ePresenceFlags } : {}),
+        ...(fieldVisibility.sherifCount ? { sherifCount: eSheriff } : {}),
+        ...(fieldVisibility.patientsCount ? { patientsCount: ePatients } : {}),
+        ...(fieldVisibility.infusionsCount ? { infusionsCount: eInfusions } : {}),
+        ...(fieldVisibility.poppyMilkCount ? { poppyMilkCount: ePoppy } : {}),
       };
       const res = await updateDispensaryWeeklyActivity(dispensarySlug!, 
         canEditAll
@@ -426,6 +432,99 @@ export default function WeeklyActivityPageClient({
     });
   };
 
+  const tableColumns = useMemo((): DataTableColumn<WeeklyActivityListItem>[] => {
+    const cols: DataTableColumn<WeeklyActivityListItem>[] = [
+      {
+        accessor: 'resolvedDisplayName',
+        title: 'Médecin',
+        sortable: true,
+        render: (r) => r.resolvedDisplayName,
+      },
+      {
+        accessor: 'periodStart',
+        title: 'Période',
+        sortable: true,
+        render: (r) => (
+          <Text size="sm">
+            {formatParisPeriodStartLabel(new Date(r.periodStart))} —{' '}
+            {formatParisPeriodEndLabel(new Date(r.periodEnd))}
+          </Text>
+        ),
+      },
+    ];
+    if (fieldVisibility.chestDays) {
+      cols.push({
+        accessor: 'chestDaysSummary',
+        title: 'Caisses',
+        render: (r) => (
+          <Tooltip label={`${r.chestTotal} jour(s) — L→D : ${r.chestDaysSummary}`}>
+            <Text size="sm" ff="monospace">
+              {r.chestDaysSummary}
+            </Text>
+          </Tooltip>
+        ),
+      });
+    }
+    if (fieldVisibility.presenceDays) {
+      cols.push({
+        accessor: 'presenceDaysSummary',
+        title: 'Présences',
+        render: (r) => (
+          <Tooltip label={`${r.presenceTotal} jour(s) — L→D : ${r.presenceDaysSummary}`}>
+            <Text size="sm" ff="monospace">
+              {r.presenceDaysSummary}
+            </Text>
+          </Tooltip>
+        ),
+      });
+    }
+    if (fieldVisibility.patientsCount) {
+      cols.push({ accessor: 'patientsCount', title: 'Patients', sortable: true });
+    }
+    if (fieldVisibility.sherifCount) {
+      cols.push({ accessor: 'sherifCount', title: 'Shérifs', sortable: true });
+    }
+    if (fieldVisibility.infusionsCount) {
+      cols.push({ accessor: 'infusionsCount', title: 'Infusions', sortable: true });
+    }
+    if (fieldVisibility.poppyMilkCount) {
+      cols.push({ accessor: 'poppyMilkCount', title: 'Lait de pavot', sortable: true });
+    }
+    cols.push({
+      accessor: 'actions',
+      title: '',
+      render: (r) => (
+        <Group gap="xs" justify="flex-end" wrap="nowrap">
+          <Tooltip label="Historique">
+            <ActionIcon variant="subtle" onClick={() => openHistory(r)} aria-label="Historique">
+              <IconHistory size={18} />
+            </ActionIcon>
+          </Tooltip>
+          {canEditRow(r) && (
+            <>
+              <Tooltip label="Modifier">
+                <ActionIcon variant="subtle" onClick={() => startEdit(r)} aria-label="Modifier">
+                  <IconPencil size={18} />
+                </ActionIcon>
+              </Tooltip>
+              <Tooltip label="Supprimer">
+                <ActionIcon
+                  color="red"
+                  variant="subtle"
+                  onClick={() => confirmDelete(r)}
+                  aria-label="Supprimer"
+                >
+                  <IconTrash size={18} />
+                </ActionIcon>
+              </Tooltip>
+            </>
+          )}
+        </Group>
+      ),
+    });
+    return cols;
+  }, [fieldVisibility, canEdit, canEditAll, sessionUserId, viewerDiscordId]);
+
   return (
     <Container size="xl" py="xl">
       <Group justify="space-between" mb="xl" align="flex-start">
@@ -442,7 +541,6 @@ export default function WeeklyActivityPageClient({
               setCChestFlags(emptyWeekdayFlags());
               setCPresenceFlags(emptyWeekdayFlags());
               setCSheriff(0);
-              setCPalefrenier(0);
               setCPatients(0);
               setCInfusions(0);
               setCPoppy(0);
@@ -519,84 +617,7 @@ export default function WeeklyActivityPageClient({
           onSortStatusChange={setSortStatus}
           striped
           highlightOnHover
-          columns={[
-            {
-              accessor: 'resolvedDisplayName',
-              title: 'Médecin',
-              sortable: true,
-              render: (r) => r.resolvedDisplayName,
-            },
-            {
-              accessor: 'periodStart',
-              title: 'Période',
-              sortable: true,
-              render: (r) => (
-                <Text size="sm">
-                  {formatParisPeriodStartLabel(new Date(r.periodStart))} —{' '}
-                  {formatParisPeriodEndLabel(new Date(r.periodEnd))}
-                </Text>
-              ),
-            },
-            {
-              accessor: 'chestDaysSummary',
-              title: 'Caisses',
-              render: (r) => (
-                <Tooltip label={`${r.chestTotal} jour(s) — L→D : ${r.chestDaysSummary}`}>
-                  <Text size="sm" ff="monospace">
-                    {r.chestDaysSummary}
-                  </Text>
-                </Tooltip>
-              ),
-            },
-            {
-              accessor: 'presenceDaysSummary',
-              title: 'Présences',
-              render: (r) => (
-                <Tooltip label={`${r.presenceTotal} jour(s) — L→D : ${r.presenceDaysSummary}`}>
-                  <Text size="sm" ff="monospace">
-                    {r.presenceDaysSummary}
-                  </Text>
-                </Tooltip>
-              ),
-            },
-            { accessor: 'patientsCount', title: 'Patients', sortable: true },
-            { accessor: 'sherifCount', title: 'Shérifs', sortable: true },
-            { accessor: 'palefrenierCount', title: 'Palefreniers', sortable: true },
-            { accessor: 'infusionsCount', title: 'Infusions', sortable: true },
-            { accessor: 'poppyMilkCount', title: 'Lait de pavot', sortable: true },
-            {
-              accessor: 'actions',
-              title: '',
-              render: (r) => (
-                <Group gap="xs" justify="flex-end" wrap="nowrap">
-                  <Tooltip label="Historique">
-                    <ActionIcon variant="subtle" onClick={() => openHistory(r)} aria-label="Historique">
-                      <IconHistory size={18} />
-                    </ActionIcon>
-                  </Tooltip>
-                  {canEditRow(r) && (
-                    <>
-                      <Tooltip label="Modifier">
-                        <ActionIcon variant="subtle" onClick={() => startEdit(r)} aria-label="Modifier">
-                          <IconPencil size={18} />
-                        </ActionIcon>
-                      </Tooltip>
-                      <Tooltip label="Supprimer">
-                        <ActionIcon
-                          color="red"
-                          variant="subtle"
-                          onClick={() => confirmDelete(r)}
-                          aria-label="Supprimer"
-                        >
-                          <IconTrash size={18} />
-                        </ActionIcon>
-                      </Tooltip>
-                    </>
-                  )}
-                </Group>
-              ),
-            },
-          ]}
+          columns={tableColumns}
         />
       </Paper>
 
@@ -670,58 +691,70 @@ export default function WeeklyActivityPageClient({
             )}
           </div>
 
-          <Divider />
+          {hasWeeklyScheduleFields && (
+            <>
+              <Divider />
+              {fieldVisibility.chestDays && (
+                <DayFlagFields
+                  title="Caisses (par jour de semaine)"
+                  flags={cChestFlags}
+                  onToggle={(key, value) => setCChestFlags((p) => ({ ...p, [key]: value }))}
+                />
+              )}
+              {fieldVisibility.presenceDays && (
+                <DayFlagFields
+                  title="Présences (par jour)"
+                  flags={cPresenceFlags}
+                  onToggle={(key, value) => setCPresenceFlags((p) => ({ ...p, [key]: value }))}
+                />
+              )}
+            </>
+          )}
 
-          <DayFlagFields
-            title="Caisses (par jour de semaine)"
-            flags={cChestFlags}
-            onToggle={(key, value) => setCChestFlags((p) => ({ ...p, [key]: value }))}
-          />
-          <DayFlagFields
-            title="Présences (par jour)"
-            flags={cPresenceFlags}
-            onToggle={(key, value) => setCPresenceFlags((p) => ({ ...p, [key]: value }))}
-          />
-
-          <Divider />
-
-          <div>
-            <Text fw={600} size="sm" mb="xs">
-              Compteurs
-            </Text>
-            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-              <NumberInput
-                label="Shérifs"
-                value={cSheriff}
-                onChange={(v) => setCSheriff(Number(v) || 0)}
-                min={0}
-              />
-              <NumberInput
-                label="Palefreniers"
-                value={cPalefrenier}
-                onChange={(v) => setCPalefrenier(Number(v) || 0)}
-                min={0}
-              />
-              <NumberInput
-                label="Patients"
-                value={cPatients}
-                onChange={(v) => setCPatients(Number(v) || 0)}
-                min={0}
-              />
-              <NumberInput
-                label="Infusions"
-                value={cInfusions}
-                onChange={(v) => setCInfusions(Number(v) || 0)}
-                min={0}
-              />
-              <NumberInput
-                label="Lait de pavot"
-                value={cPoppy}
-                onChange={(v) => setCPoppy(Number(v) || 0)}
-                min={0}
-              />
-            </SimpleGrid>
-          </div>
+          {hasWeeklyCounterFields && (
+            <>
+              {hasWeeklyScheduleFields && <Divider />}
+              <div>
+                <Text fw={600} size="sm" mb="xs">
+                  Compteurs
+                </Text>
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+                  {fieldVisibility.sherifCount && (
+                    <NumberInput
+                      label="Shérifs"
+                      value={cSheriff}
+                      onChange={(v) => setCSheriff(Number(v) || 0)}
+                      min={0}
+                    />
+                  )}
+                  {fieldVisibility.patientsCount && (
+                    <NumberInput
+                      label="Patients"
+                      value={cPatients}
+                      onChange={(v) => setCPatients(Number(v) || 0)}
+                      min={0}
+                    />
+                  )}
+                  {fieldVisibility.infusionsCount && (
+                    <NumberInput
+                      label="Infusions"
+                      value={cInfusions}
+                      onChange={(v) => setCInfusions(Number(v) || 0)}
+                      min={0}
+                    />
+                  )}
+                  {fieldVisibility.poppyMilkCount && (
+                    <NumberInput
+                      label="Lait de pavot"
+                      value={cPoppy}
+                      onChange={(v) => setCPoppy(Number(v) || 0)}
+                      min={0}
+                    />
+                  )}
+                </SimpleGrid>
+              </div>
+            </>
+          )}
 
           <Group justify="flex-end" mt="md">
             <Button variant="default" onClick={() => setCreateOpen(false)}>
@@ -752,51 +785,60 @@ export default function WeeklyActivityPageClient({
               />
             )}
 
-            <DayFlagFields
-              title="Caisses (par jour de semaine)"
-              flags={eChestFlags}
-              onToggle={(key, value) => setEChestFlags((p) => ({ ...p, [key]: value }))}
-            />
-            <DayFlagFields
-              title="Présences (par jour)"
-              flags={ePresenceFlags}
-              onToggle={(key, value) => setEPresenceFlags((p) => ({ ...p, [key]: value }))}
-            />
+            {fieldVisibility.chestDays && (
+              <DayFlagFields
+                title="Caisses (par jour de semaine)"
+                flags={eChestFlags}
+                onToggle={(key, value) => setEChestFlags((p) => ({ ...p, [key]: value }))}
+              />
+            )}
+            {fieldVisibility.presenceDays && (
+              <DayFlagFields
+                title="Présences (par jour)"
+                flags={ePresenceFlags}
+                onToggle={(key, value) => setEPresenceFlags((p) => ({ ...p, [key]: value }))}
+              />
+            )}
 
-            <Divider />
-
-            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-              <NumberInput
-                label="Shérifs"
-                value={eSheriff}
-                onChange={(v) => setESheriff(Number(v) || 0)}
-                min={0}
-              />
-              <NumberInput
-                label="Palefreniers"
-                value={ePalefrenier}
-                onChange={(v) => setEPalefrenier(Number(v) || 0)}
-                min={0}
-              />
-              <NumberInput
-                label="Patients"
-                value={ePatients}
-                onChange={(v) => setEPatients(Number(v) || 0)}
-                min={0}
-              />
-              <NumberInput
-                label="Infusions"
-                value={eInfusions}
-                onChange={(v) => setEInfusions(Number(v) || 0)}
-                min={0}
-              />
-              <NumberInput
-                label="Lait de pavot"
-                value={ePoppy}
-                onChange={(v) => setEPoppy(Number(v) || 0)}
-                min={0}
-              />
-            </SimpleGrid>
+            {hasWeeklyCounterFields && (
+              <>
+                {hasWeeklyScheduleFields && <Divider />}
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+                  {fieldVisibility.sherifCount && (
+                    <NumberInput
+                      label="Shérifs"
+                      value={eSheriff}
+                      onChange={(v) => setESheriff(Number(v) || 0)}
+                      min={0}
+                    />
+                  )}
+                  {fieldVisibility.patientsCount && (
+                    <NumberInput
+                      label="Patients"
+                      value={ePatients}
+                      onChange={(v) => setEPatients(Number(v) || 0)}
+                      min={0}
+                    />
+                  )}
+                  {fieldVisibility.infusionsCount && (
+                    <NumberInput
+                      label="Infusions"
+                      value={eInfusions}
+                      onChange={(v) => setEInfusions(Number(v) || 0)}
+                      min={0}
+                    />
+                  )}
+                  {fieldVisibility.poppyMilkCount && (
+                    <NumberInput
+                      label="Lait de pavot"
+                      value={ePoppy}
+                      onChange={(v) => setEPoppy(Number(v) || 0)}
+                      min={0}
+                    />
+                  )}
+                </SimpleGrid>
+              </>
+            )}
 
             <Group justify="flex-end" mt="md">
               <Button variant="default" onClick={() => setEditRow(null)}>

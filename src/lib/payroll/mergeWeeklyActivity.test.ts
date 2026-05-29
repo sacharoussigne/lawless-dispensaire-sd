@@ -22,7 +22,6 @@ function row(
     chestDays: {},
     presenceDays: {},
     sherifCount: 0,
-    palefrenierCount: 0,
     patientsCount: 0,
     infusionsCount: 0,
     poppyMilkCount: 0,

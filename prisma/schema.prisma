@@ -187,6 +187,12 @@ model AppSettings {
   featureMailsEnabled          Boolean  @default(true)
   featurePayrollEnabled        Boolean  @default(true)
   featureWeeklyDispensaryActivityEnabled Boolean @default(true)
+  weeklyActivityChestDaysVisible       Boolean @default(true)
+  weeklyActivityPresenceDaysVisible    Boolean @default(true)
+  weeklyActivityPatientsVisible        Boolean @default(true)
+  weeklyActivitySherifsVisible         Boolean @default(true)
+  weeklyActivityInfusionsVisible       Boolean @default(true)
+  weeklyActivityPoppyMilkVisible       Boolean @default(true)
   createdAt                    DateTime @default(now())
   updatedAt                    DateTime @updatedAt
 
@@ -715,7 +721,6 @@ model DispensaryWeeklyActivity {
   chestDays            Json
   presenceDays         Json
   sherifCount          Int      @default(0)
-  palefrenierCount     Int      @default(0)
   patientsCount        Int      @default(0)
   infusionsCount       Int      @default(0)
   poppyMilkCount       Int      @default(0)

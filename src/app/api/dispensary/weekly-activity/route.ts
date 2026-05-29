@@ -4,7 +4,13 @@ import prisma from '@/lib/prisma';
 import { serializeDispensaryWeeklyActivityApiRow } from '@/lib/dispensaryWeeklyActivity/apiRow';
 import { mergeResolvedDisplayNames } from '@/lib/dispensaryWeeklyActivity/resolveDisplayName';
 import { dispensaryWeeklyActivityCreateSchema } from '@/lib/dispensaryWeeklyActivity/schemas';
-import { loadSerializedWeeklyActivityById } from '@/lib/dispensaryWeeklyActivity/loadSerializedRow';
+import { getAppSettings } from '@/lib/appSettings';
+import {
+  applyVisibilityToCreateInput,
+  redactSerializedWeeklyActivityRow,
+  weeklyActivityFieldVisibilityFromSettings,
+} from '@/lib/dispensaryWeeklyActivity/fieldVisibility';
+import { loadSerializedWeeklyActivityByIdForDispensary } from '@/lib/dispensaryWeeklyActivity/loadSerializedRow';
 import {
   createDispensaryWeeklyActivityWithHistory,
   syncActivityUserIdFromDiscordIfMissing,
@@ -48,11 +54,14 @@ export async function GET(request: Request) {
   });
 
   const withNames = await mergeResolvedDisplayNames(prisma, refreshed);
+  const settings = await getAppSettings(dispensaryCtx.dispensaryId);
+  const visibility = weeklyActivityFieldVisibilityFromSettings(settings);
 
   return NextResponse.json({
     status: 200,
     data: withNames.map((r) =>
-      serializeDispensaryWeeklyActivityApiRow({
+      redactSerializedWeeklyActivityRow(
+        serializeDispensaryWeeklyActivityApiRow({
         id: r.id,
         periodStart: r.periodStart,
         periodEnd: r.periodEnd,
@@ -63,13 +72,14 @@ export async function GET(request: Request) {
         chestDays: r.chestDays,
         presenceDays: r.presenceDays,
         sherifCount: r.sherifCount,
-        palefrenierCount: r.palefrenierCount,
         patientsCount: r.patientsCount,
         infusionsCount: r.infusionsCount,
         poppyMilkCount: r.poppyMilkCount,
         createdAt: r.createdAt,
         updatedAt: r.updatedAt,
       }),
+        visibility,
+      ),
     ),
   });
 }
@@ -105,14 +115,21 @@ export async function POST(request: Request) {
   }
 
   try {
-    const created = await createDispensaryWeeklyActivityWithHistory(parsed.data, {
+    const settings = await getAppSettings(dispensaryCtx.dispensaryId);
+    const visibility = weeklyActivityFieldVisibilityFromSettings(settings);
+    const createInput = applyVisibilityToCreateInput(parsed.data, visibility);
+
+    const created = await createDispensaryWeeklyActivityWithHistory(createInput, {
       source: 'DISCORD_BOT',
       actorUserId: null,
       actorDiscordUserId: discordUserId,
       dispensaryId: dispensaryCtx.dispensaryId,
     });
 
-    const data = await loadSerializedWeeklyActivityById(created.id);
+    const data = await loadSerializedWeeklyActivityByIdForDispensary(
+      created.id,
+      dispensaryCtx.dispensaryId,
+    );
     if (!data) {
       return jsonError(500, 'Erreur après création');
     }

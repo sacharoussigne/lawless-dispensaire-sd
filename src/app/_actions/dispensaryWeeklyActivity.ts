@@ -1,5 +1,6 @@
 'use server';
 
+import { Prisma } from '@prisma/client';
 import { z } from 'zod/v3';
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
@@ -25,9 +26,18 @@ import {
 import {
   createDispensaryWeeklyActivityWithHistory,
   deleteDispensaryWeeklyActivityWithHistory,
+  findWeeklyActivityByDoctorAndPeriod,
   syncActivityUserIdFromDiscordIfMissing,
   updateDispensaryWeeklyActivityWithHistory,
+  WEEKLY_ACTIVITY_DUPLICATE_MESSAGE,
 } from '@/lib/dispensaryWeeklyActivity/service';
+import { getAppSettings } from '@/lib/appSettings';
+import {
+  applyVisibilityToCreateInput,
+  applyVisibilityToUpdateInput,
+  redactSerializedWeeklyActivityRow,
+  weeklyActivityFieldVisibilityFromSettings,
+} from '@/lib/dispensaryWeeklyActivity/fieldVisibility';
 import { requireTenantServerActionContext } from '@/lib/serverActionAuth';
 import { tenantWhere } from '@/lib/dispensary/tenantWhere';
 
@@ -108,11 +118,14 @@ export async function listDispensaryWeeklyActivities(dispensarySlug: string) {
     });
 
     const withNames = await mergeResolvedDisplayNames(prisma, refreshed);
+    const settings = await getAppSettings(dispensaryId);
+    const visibility = weeklyActivityFieldVisibilityFromSettings(settings);
 
     return {
       status: 200 as const,
       data: withNames.map((r) =>
-        serializeDispensaryWeeklyActivityApiRow({
+        redactSerializedWeeklyActivityRow(
+          serializeDispensaryWeeklyActivityApiRow({
           id: r.id,
           periodStart: r.periodStart,
           periodEnd: r.periodEnd,
@@ -123,13 +136,14 @@ export async function listDispensaryWeeklyActivities(dispensarySlug: string) {
           chestDays: r.chestDays,
           presenceDays: r.presenceDays,
           sherifCount: r.sherifCount,
-          palefrenierCount: r.palefrenierCount,
           patientsCount: r.patientsCount,
           infusionsCount: r.infusionsCount,
           poppyMilkCount: r.poppyMilkCount,
           createdAt: r.createdAt,
           updatedAt: r.updatedAt,
         }),
+          visibility,
+        ),
       ),
     };
   } catch (error) {
@@ -349,7 +363,6 @@ export async function createDispensaryWeeklyActivity(
       chestDays: parsed.data.chestDays,
       presenceDays: parsed.data.presenceDays,
       sherifCount: parsed.data.sherifCount,
-      palefrenierCount: parsed.data.palefrenierCount,
       patientsCount: parsed.data.patientsCount,
       infusionsCount: parsed.data.infusionsCount,
       poppyMilkCount: parsed.data.poppyMilkCount,
@@ -358,7 +371,21 @@ export async function createDispensaryWeeklyActivity(
       return { status: 400 as const, error: validated.error.issues[0]?.message ?? 'Données invalides' };
     }
 
-    const created = await createDispensaryWeeklyActivityWithHistory(validated.data, {
+    const settings = await getAppSettings(dispensaryId);
+    const visibility = weeklyActivityFieldVisibilityFromSettings(settings);
+    const createInput = applyVisibilityToCreateInput(validated.data, visibility);
+
+    const existing = await findWeeklyActivityByDoctorAndPeriod(
+      prisma,
+      dispensaryId,
+      discordUserId,
+      parsed.data.periodStart,
+    );
+    if (existing) {
+      return { status: 409 as const, error: WEEKLY_ACTIVITY_DUPLICATE_MESSAGE };
+    }
+
+    const created = await createDispensaryWeeklyActivityWithHistory(createInput, {
       source: 'INTRANET',
       actorUserId: session.user.id,
       actorDiscordUserId: (await getDiscordAccountIdForUser(prisma, session.user.id)) ?? null,
@@ -367,6 +394,12 @@ export async function createDispensaryWeeklyActivity(
 
     return { status: 200 as const, data: { id: created.id } };
   } catch (error) {
+    if (error instanceof Error && error.message === WEEKLY_ACTIVITY_DUPLICATE_MESSAGE) {
+      return { status: 409 as const, error: error.message };
+    }
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return { status: 409 as const, error: WEEKLY_ACTIVITY_DUPLICATE_MESSAGE };
+    }
     return actionErrorParser(error, 'Erreur lors de la création');
   }
 }
@@ -412,7 +445,11 @@ export async function updateDispensaryWeeklyActivity(
       return { status: 403 as const, error: 'Permission refusée' };
     }
 
-    await updateDispensaryWeeklyActivityWithHistory(parsedId.data.id, parsedBody.data, {
+    const settings = await getAppSettings(dispensaryId);
+    const visibility = weeklyActivityFieldVisibilityFromSettings(settings);
+    const updateInput = applyVisibilityToUpdateInput(parsedBody.data, visibility);
+
+    await updateDispensaryWeeklyActivityWithHistory(parsedId.data.id, updateInput, {
       source: 'INTRANET',
       actorUserId: gate.session.user.id,
       actorDiscordUserId: (await getDiscordAccountIdForUser(prisma, gate.session.user.id)) ?? null,

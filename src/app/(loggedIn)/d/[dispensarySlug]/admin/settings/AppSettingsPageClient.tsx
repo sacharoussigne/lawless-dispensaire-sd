@@ -10,6 +10,7 @@ import {
   SimpleGrid,
   Stack,
   Switch,
+  Text,
   TextInput,
   Title,
 } from '@mantine/core';
@@ -50,6 +51,24 @@ export default function AppSettingsPageClient({
   );
   const [featureWeeklyDispensaryActivityEnabled, setFeatureWeeklyDispensaryActivityEnabled] =
     useState(initial.featureWeeklyDispensaryActivityEnabled);
+  const [weeklyActivityChestDaysVisible, setWeeklyActivityChestDaysVisible] = useState(
+    initial.weeklyActivityChestDaysVisible ?? true,
+  );
+  const [weeklyActivityPresenceDaysVisible, setWeeklyActivityPresenceDaysVisible] = useState(
+    initial.weeklyActivityPresenceDaysVisible ?? true,
+  );
+  const [weeklyActivityPatientsVisible, setWeeklyActivityPatientsVisible] = useState(
+    initial.weeklyActivityPatientsVisible ?? true,
+  );
+  const [weeklyActivitySherifsVisible, setWeeklyActivitySherifsVisible] = useState(
+    initial.weeklyActivitySherifsVisible ?? true,
+  );
+  const [weeklyActivityInfusionsVisible, setWeeklyActivityInfusionsVisible] = useState(
+    initial.weeklyActivityInfusionsVisible ?? true,
+  );
+  const [weeklyActivityPoppyMilkVisible, setWeeklyActivityPoppyMilkVisible] = useState(
+    initial.weeklyActivityPoppyMilkVisible ?? true,
+  );
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async () => {
@@ -65,6 +84,12 @@ export default function AppSettingsPageClient({
       featureMailsEnabled,
       featurePayrollEnabled,
       featureWeeklyDispensaryActivityEnabled,
+      weeklyActivityChestDaysVisible,
+      weeklyActivityPresenceDaysVisible,
+      weeklyActivityPatientsVisible,
+      weeklyActivitySherifsVisible,
+      weeklyActivityInfusionsVisible,
+      weeklyActivityPoppyMilkVisible,
     });
     setSubmitting(false);
 
@@ -198,6 +223,72 @@ export default function AppSettingsPageClient({
               />
             </Paper>
           </SimpleGrid>
+
+          {featureWeeklyDispensaryActivityEnabled && (
+            <Stack gap="md" mt="md">
+              <Title order={5}>Activité hebdomadaire — colonnes affichées</Title>
+              <Text size="sm" c="dimmed">
+                Décochez un élément pour le masquer dans le tableau et les formulaires de création /
+                modification (intranet et bot).
+              </Text>
+              <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
+                <Paper withBorder p="md" radius="md" bg="var(--mantine-color-body)">
+                  <Switch
+                    label="Caisses"
+                    checked={weeklyActivityChestDaysVisible}
+                    onChange={(e) =>
+                      setWeeklyActivityChestDaysVisible(e.currentTarget.checked)
+                    }
+                  />
+                </Paper>
+                <Paper withBorder p="md" radius="md" bg="var(--mantine-color-body)">
+                  <Switch
+                    label="Présences"
+                    checked={weeklyActivityPresenceDaysVisible}
+                    onChange={(e) =>
+                      setWeeklyActivityPresenceDaysVisible(e.currentTarget.checked)
+                    }
+                  />
+                </Paper>
+                <Paper withBorder p="md" radius="md" bg="var(--mantine-color-body)">
+                  <Switch
+                    label="Patients"
+                    checked={weeklyActivityPatientsVisible}
+                    onChange={(e) =>
+                      setWeeklyActivityPatientsVisible(e.currentTarget.checked)
+                    }
+                  />
+                </Paper>
+                <Paper withBorder p="md" radius="md" bg="var(--mantine-color-body)">
+                  <Switch
+                    label="Shérifs"
+                    checked={weeklyActivitySherifsVisible}
+                    onChange={(e) =>
+                      setWeeklyActivitySherifsVisible(e.currentTarget.checked)
+                    }
+                  />
+                </Paper>
+                <Paper withBorder p="md" radius="md" bg="var(--mantine-color-body)">
+                  <Switch
+                    label="Infusions"
+                    checked={weeklyActivityInfusionsVisible}
+                    onChange={(e) =>
+                      setWeeklyActivityInfusionsVisible(e.currentTarget.checked)
+                    }
+                  />
+                </Paper>
+                <Paper withBorder p="md" radius="md" bg="var(--mantine-color-body)">
+                  <Switch
+                    label="Lait de pavot"
+                    checked={weeklyActivityPoppyMilkVisible}
+                    onChange={(e) =>
+                      setWeeklyActivityPoppyMilkVisible(e.currentTarget.checked)
+                    }
+                  />
+                </Paper>
+              </SimpleGrid>
+            </Stack>
+          )}
         </Stack>
       </Card>
 

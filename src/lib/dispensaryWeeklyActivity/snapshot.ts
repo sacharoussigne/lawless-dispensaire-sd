@@ -10,7 +10,6 @@ export type ActivitySnapshotJson = {
   chestDays: WeekdayFlags;
   presenceDays: WeekdayFlags;
   sherifCount: number;
-  palefrenierCount: number;
   patientsCount: number;
   infusionsCount: number;
   poppyMilkCount: number;
@@ -26,7 +25,6 @@ export function activityToSnapshot(activity: DispensaryWeeklyActivity): Activity
     chestDays: parseWeekdayFlagsJson(activity.chestDays),
     presenceDays: parseWeekdayFlagsJson(activity.presenceDays),
     sherifCount: activity.sherifCount,
-    palefrenierCount: activity.palefrenierCount,
     patientsCount: activity.patientsCount,
     infusionsCount: activity.infusionsCount,
     poppyMilkCount: activity.poppyMilkCount,

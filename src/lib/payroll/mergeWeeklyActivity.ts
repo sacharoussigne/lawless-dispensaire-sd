@@ -122,7 +122,6 @@ export function mergeHtmlAndWeeklyActivity(parsed: ParsedPayrollTable, activitie
     }
 
     const sSher = Math.max(row.stats.sherifs ?? 0, wa ? wa.sherifCount : 0);
-    const sPale = Math.max(row.stats.palefreniers ?? 0, wa ? wa.palefrenierCount : 0);
     const patients = Math.max(row.stats.patients_soignes ?? 0, wa ? wa.patientsCount : 0);
 
     let schedule = row.schedule as PayrollReportResult['employees'][number]['schedule'];
@@ -149,7 +148,7 @@ export function mergeHtmlAndWeeklyActivity(parsed: ParsedPayrollTable, activitie
         poppy_milk_offertes: numMax(0, wa?.poppyMilkCount),
         infusions_ginseng_offertes: numMax(0, wa?.infusionsCount),
         sherifs: sSher > 0 ? sSher : null,
-        palefreniers: sPale > 0 ? sPale : null,
+        palefreniers: row.stats.palefreniers,
       },
     });
   }
@@ -168,7 +167,7 @@ export function mergeHtmlAndWeeklyActivity(parsed: ParsedPayrollTable, activitie
       schedule,
       stats: {
         sherifs: wa.sherifCount > 0 ? wa.sherifCount : null,
-        palefreniers: wa.palefrenierCount > 0 ? wa.palefrenierCount : null,
+        palefreniers: null,
         nombre_caisses: 0,
         nombre_presences: 0,
         patients_soignes: wa.patientsCount,

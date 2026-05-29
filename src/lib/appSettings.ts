@@ -28,6 +28,12 @@ function mapFromDb(row: {
   featureMailsEnabled: boolean;
   featurePayrollEnabled: boolean;
   featureWeeklyDispensaryActivityEnabled: boolean;
+  weeklyActivityChestDaysVisible: boolean;
+  weeklyActivityPresenceDaysVisible: boolean;
+  weeklyActivityPatientsVisible: boolean;
+  weeklyActivitySherifsVisible: boolean;
+  weeklyActivityInfusionsVisible: boolean;
+  weeklyActivityPoppyMilkVisible: boolean;
 }): AppSettingsDTO {
   return {
     dispensaryName: row.dispensaryName?.trim() || APP_SETTINGS_DEFAULTS.dispensaryName,
@@ -39,6 +45,19 @@ function mapFromDb(row: {
     featureMailsEnabled: row.featureMailsEnabled,
     featurePayrollEnabled: row.featurePayrollEnabled,
     featureWeeklyDispensaryActivityEnabled: row.featureWeeklyDispensaryActivityEnabled,
+    weeklyActivityChestDaysVisible:
+      row.weeklyActivityChestDaysVisible ?? APP_SETTINGS_DEFAULTS.weeklyActivityChestDaysVisible,
+    weeklyActivityPresenceDaysVisible:
+      row.weeklyActivityPresenceDaysVisible ??
+      APP_SETTINGS_DEFAULTS.weeklyActivityPresenceDaysVisible,
+    weeklyActivityPatientsVisible:
+      row.weeklyActivityPatientsVisible ?? APP_SETTINGS_DEFAULTS.weeklyActivityPatientsVisible,
+    weeklyActivitySherifsVisible:
+      row.weeklyActivitySherifsVisible ?? APP_SETTINGS_DEFAULTS.weeklyActivitySherifsVisible,
+    weeklyActivityInfusionsVisible:
+      row.weeklyActivityInfusionsVisible ?? APP_SETTINGS_DEFAULTS.weeklyActivityInfusionsVisible,
+    weeklyActivityPoppyMilkVisible:
+      row.weeklyActivityPoppyMilkVisible ?? APP_SETTINGS_DEFAULTS.weeklyActivityPoppyMilkVisible,
   };
 }
 

@@ -18,6 +18,12 @@ export type AppSettingsDTO = {
   featureMailsEnabled: boolean;
   featurePayrollEnabled: boolean;
   featureWeeklyDispensaryActivityEnabled: boolean;
+  weeklyActivityChestDaysVisible: boolean;
+  weeklyActivityPresenceDaysVisible: boolean;
+  weeklyActivityPatientsVisible: boolean;
+  weeklyActivitySherifsVisible: boolean;
+  weeklyActivityInfusionsVisible: boolean;
+  weeklyActivityPoppyMilkVisible: boolean;
 };
 
 export const APP_SETTINGS_DEFAULTS: AppSettingsDTO = {
@@ -30,6 +36,12 @@ export const APP_SETTINGS_DEFAULTS: AppSettingsDTO = {
   featureMailsEnabled: true,
   featurePayrollEnabled: true,
   featureWeeklyDispensaryActivityEnabled: true,
+  weeklyActivityChestDaysVisible: true,
+  weeklyActivityPresenceDaysVisible: true,
+  weeklyActivityPatientsVisible: true,
+  weeklyActivitySherifsVisible: true,
+  weeklyActivityInfusionsVisible: true,
+  weeklyActivityPoppyMilkVisible: true,
 };
 
 export function appSettingsCacheTag(dispensaryId: string): string {

@@ -38,6 +38,12 @@ const updateSchema = z.object({
   featureMailsEnabled: z.boolean(),
   featurePayrollEnabled: z.boolean(),
   featureWeeklyDispensaryActivityEnabled: z.boolean(),
+  weeklyActivityChestDaysVisible: z.boolean(),
+  weeklyActivityPresenceDaysVisible: z.boolean(),
+  weeklyActivityPatientsVisible: z.boolean(),
+  weeklyActivitySherifsVisible: z.boolean(),
+  weeklyActivityInfusionsVisible: z.boolean(),
+  weeklyActivityPoppyMilkVisible: z.boolean(),
 });
 
 export async function getAppSettingsForAdmin(
@@ -128,6 +134,12 @@ export async function updateAppSettings(
           featurePayrollEnabled: parsed.data.featurePayrollEnabled,
           featureWeeklyDispensaryActivityEnabled:
             parsed.data.featureWeeklyDispensaryActivityEnabled,
+          weeklyActivityChestDaysVisible: parsed.data.weeklyActivityChestDaysVisible,
+          weeklyActivityPresenceDaysVisible: parsed.data.weeklyActivityPresenceDaysVisible,
+          weeklyActivityPatientsVisible: parsed.data.weeklyActivityPatientsVisible,
+          weeklyActivitySherifsVisible: parsed.data.weeklyActivitySherifsVisible,
+          weeklyActivityInfusionsVisible: parsed.data.weeklyActivityInfusionsVisible,
+          weeklyActivityPoppyMilkVisible: parsed.data.weeklyActivityPoppyMilkVisible,
         },
         update: {
           dispensaryName: parsed.data.dispensaryName,
@@ -140,6 +152,12 @@ export async function updateAppSettings(
           featurePayrollEnabled: parsed.data.featurePayrollEnabled,
           featureWeeklyDispensaryActivityEnabled:
             parsed.data.featureWeeklyDispensaryActivityEnabled,
+          weeklyActivityChestDaysVisible: parsed.data.weeklyActivityChestDaysVisible,
+          weeklyActivityPresenceDaysVisible: parsed.data.weeklyActivityPresenceDaysVisible,
+          weeklyActivityPatientsVisible: parsed.data.weeklyActivityPatientsVisible,
+          weeklyActivitySherifsVisible: parsed.data.weeklyActivitySherifsVisible,
+          weeklyActivityInfusionsVisible: parsed.data.weeklyActivityInfusionsVisible,
+          weeklyActivityPoppyMilkVisible: parsed.data.weeklyActivityPoppyMilkVisible,
         },
       }),
     ]);
@@ -162,6 +180,12 @@ export async function updateAppSettings(
       featureMailsEnabled: row.featureMailsEnabled,
       featurePayrollEnabled: row.featurePayrollEnabled,
       featureWeeklyDispensaryActivityEnabled: row.featureWeeklyDispensaryActivityEnabled,
+      weeklyActivityChestDaysVisible: row.weeklyActivityChestDaysVisible ?? true,
+      weeklyActivityPresenceDaysVisible: row.weeklyActivityPresenceDaysVisible ?? true,
+      weeklyActivityPatientsVisible: row.weeklyActivityPatientsVisible ?? true,
+      weeklyActivitySherifsVisible: row.weeklyActivitySherifsVisible ?? true,
+      weeklyActivityInfusionsVisible: row.weeklyActivityInfusionsVisible ?? true,
+      weeklyActivityPoppyMilkVisible: row.weeklyActivityPoppyMilkVisible ?? true,
     };
 
     return { status: 200, data };

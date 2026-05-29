@@ -12,6 +12,7 @@ import {
 } from '@/lib/dispensaryWeeklyActivity/resolveDisplayName';
 import { activityToSnapshot } from '@/lib/dispensaryWeeklyActivity/snapshot';
 import { getBankWeekBounds } from '@/lib/bankWeek';
+import { tenantWhere } from '@/lib/dispensary/tenantWhere';
 import type { DispensaryWeeklyActivityCreateInput, DispensaryWeeklyActivityUpdateInput } from '@/lib/dispensaryWeeklyActivity/schemas';
 import {
   assertActivityInCurrentParisWeek,
@@ -27,10 +28,40 @@ import {
   parseWeekdayFlagsJson,
 } from '@/lib/dispensaryWeeklyActivity/weekdayFlags';
 
-function normalizeParisWeekBounds(anchor: Date): { periodStart: Date; periodEnd: Date } {
+export function getNormalizedWeeklyActivityPeriod(anchor: Date): {
+  periodStart: Date;
+  periodEnd: Date;
+} {
   const { start, end } = getBankWeekBounds(anchor);
   return { periodStart: start, periodEnd: end };
 }
+
+function normalizeParisWeekBounds(anchor: Date): { periodStart: Date; periodEnd: Date } {
+  return getNormalizedWeeklyActivityPeriod(anchor);
+}
+
+export async function findWeeklyActivityByDoctorAndPeriod(
+  client: WeeklyActivityDb,
+  dispensaryId: string,
+  discordUserId: string,
+  anchor: Date,
+): Promise<DispensaryWeeklyActivity | null> {
+  if (!dispensaryId.trim()) {
+    throw new Error('Dispensaire requis pour la recherche d’activité');
+  }
+  const { periodStart, periodEnd } = getNormalizedWeeklyActivityPeriod(anchor);
+  return client.dispensaryWeeklyActivity.findFirst({
+    where: {
+      ...tenantWhere(dispensaryId),
+      discordUserId,
+      periodStart,
+      periodEnd,
+    },
+  });
+}
+
+export const WEEKLY_ACTIVITY_DUPLICATE_MESSAGE =
+  'Une activité existe déjà pour ce médecin sur cette semaine dans ce dispensaire. Modifiez l’entrée existante dans le tableau.';
 
 type WeeklyActivityDb = Pick<PrismaClient, 'dispensaryWeeklyActivity' | 'account'>;
 
@@ -73,7 +104,6 @@ type ActorContext = {
 
 const COUNTER_FIELDS = [
   'sherifCount',
-  'palefrenierCount',
   'patientsCount',
   'infusionsCount',
   'poppyMilkCount',
@@ -91,8 +121,6 @@ function counterDeltaToHistoryAction(
   switch (field) {
     case 'sherifCount':
       return up ? 'INCREMENT_SHERIFF' : 'DECREMENT_SHERIFF';
-    case 'palefrenierCount':
-      return up ? 'INCREMENT_PALEFRENIER' : 'DECREMENT_PALEFRENIER';
     case 'patientsCount':
       return up ? 'INCREMENT_PATIENTS' : 'DECREMENT_PATIENTS';
     case 'infusionsCount':
@@ -125,10 +153,25 @@ export async function createDispensaryWeeklyActivityWithHistory(
   input: DispensaryWeeklyActivityCreateInput,
   actor: ActorContext,
 ): Promise<DispensaryWeeklyActivity> {
+  const dispensaryId = actor.dispensaryId;
+  if (!dispensaryId) {
+    throw new Error('Dispensaire requis');
+  }
+
   const linkedUserId =
     input.userId ?? (await findLinkedUserIdByDiscordAccount(prisma, input.discordUserId));
 
   const { periodStart, periodEnd } = normalizeParisWeekBounds(input.periodStart);
+
+  const duplicate = await findWeeklyActivityByDoctorAndPeriod(
+    prisma,
+    dispensaryId,
+    input.discordUserId,
+    input.periodStart,
+  );
+  if (duplicate) {
+    throw new Error(WEEKLY_ACTIVITY_DUPLICATE_MESSAGE);
+  }
 
   const chestDays = input.chestDays ?? emptyWeekdayFlags();
   const presenceDays = input.presenceDays ?? emptyWeekdayFlags();
@@ -136,7 +179,7 @@ export async function createDispensaryWeeklyActivityWithHistory(
   return prisma.$transaction(async (tx) => {
     const created = await tx.dispensaryWeeklyActivity.create({
       data: {
-        dispensaryId: actor.dispensaryId!,
+        dispensaryId,
         periodStart,
         periodEnd,
         displayName: input.displayName,
@@ -145,7 +188,6 @@ export async function createDispensaryWeeklyActivityWithHistory(
         chestDays: chestDays as Prisma.InputJsonValue,
         presenceDays: presenceDays as Prisma.InputJsonValue,
         sherifCount: input.sherifCount,
-        palefrenierCount: input.palefrenierCount,
         patientsCount: input.patientsCount,
         infusionsCount: input.infusionsCount,
         poppyMilkCount: input.poppyMilkCount,
@@ -192,7 +234,6 @@ export async function updateDispensaryWeeklyActivityWithHistory(
     if (input.chestDays !== undefined) data.chestDays = input.chestDays as Prisma.InputJsonValue;
     if (input.presenceDays !== undefined) data.presenceDays = input.presenceDays as Prisma.InputJsonValue;
     if (input.sherifCount !== undefined) data.sherifCount = input.sherifCount;
-    if (input.palefrenierCount !== undefined) data.palefrenierCount = input.palefrenierCount;
     if (input.patientsCount !== undefined) data.patientsCount = input.patientsCount;
     if (input.infusionsCount !== undefined) data.infusionsCount = input.infusionsCount;
     if (input.poppyMilkCount !== undefined) data.poppyMilkCount = input.poppyMilkCount;
@@ -335,7 +376,6 @@ export async function findOrCreateDispensaryActivityForParisDay(
         discordUserId,
         userId: linkedUserId,
         sherifCount: 0,
-        palefrenierCount: 0,
         patientsCount: 0,
         infusionsCount: 0,
         poppyMilkCount: 0,

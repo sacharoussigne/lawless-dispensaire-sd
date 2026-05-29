@@ -69,7 +69,6 @@ export const dispensaryWeeklyActivityBotPresenceBodySchema = z
 
 export const dispensaryWeeklyActivityMetricsSchema = z.object({
   sherifCount: z.number().int().min(0),
-  palefrenierCount: z.number().int().min(0),
   patientsCount: z.number().int().min(0),
   infusionsCount: z.number().int().min(0),
   poppyMilkCount: z.number().int().min(0),
@@ -112,7 +111,6 @@ export const dispensaryWeeklyActivityUpdateSchema = dispensaryWeeklyActivityMetr
 export const dispensaryWeeklyActivityBotPatchSchema = z
   .object({
     sherifCount: z.number().int().min(0).optional(),
-    palefrenierCount: z.number().int().min(0).optional(),
     patientsCount: z.number().int().min(0).optional(),
     infusionsCount: z.number().int().min(0).optional(),
     poppyMilkCount: z.number().int().min(0).optional(),
