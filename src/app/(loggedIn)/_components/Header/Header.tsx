@@ -26,13 +26,7 @@ import { hasRole, checkRolePermission } from '@/lib/auth/permissions';
 import { Role } from '@/types/enum/roles';
 import { isPlatformAdmin } from '@/lib/dispensary/platformAdmin';
 import { DEFAULT_DISPENSARY_SLUG } from '@/lib/dispensary/constants';
-
-function switchDispensaryInPath(pathname: string, newSlug: string): string {
-  if (pathname.match(/^\/d\/[^/]+/)) {
-    return pathname.replace(/^\/d\/[^/]+/, `/d/${encodeURIComponent(newSlug)}`);
-  }
-  return tenantRoutes(newSlug).employee.index;
-}
+import { rewritePathWithDispensarySlug } from '@/lib/dispensary/slug';
 
 export default function Header({
   session,
@@ -82,7 +76,7 @@ export default function Header({
 
   const handleDispensaryChange = (newSlug: string | null) => {
     if (!newSlug || !pathname) return;
-    router.push(switchDispensaryInPath(pathname, newSlug));
+    router.push(rewritePathWithDispensarySlug(pathname, newSlug));
   };
 
   const handleLogout = async () => {

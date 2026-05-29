@@ -9,6 +9,15 @@ export function slugifyDispensaryName(name: string): string {
   return base.length > 0 ? base : 'dispensary';
 }
 
+import { tenantRoutes } from '@/types/routes';
+
+export function rewritePathWithDispensarySlug(pathname: string, newSlug: string): string {
+  if (/^\/d\/[^/]+/.test(pathname)) {
+    return pathname.replace(/^\/d\/[^/]+/, `/d/${encodeURIComponent(newSlug)}`);
+  }
+  return tenantRoutes(newSlug).employee.index;
+}
+
 export function parseDispensarySlugFromPathname(pathname: string): string | null {
   const match = pathname.match(/^\/d\/([^/]+)/);
   if (!match?.[1]) {

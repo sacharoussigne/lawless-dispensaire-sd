@@ -6,6 +6,8 @@ type SessionLike = {
 import { isPlatformAdmin } from '@/lib/dispensary/platformAdmin';
 import { hasRole } from '@/lib/auth/permissions';
 import { Role } from '@/types/enum/roles';
+import { rewritePathWithDispensarySlug } from '@/lib/dispensary/slug';
+import { routes } from '@/types/routes';
 
 export type DispensaryContext = {
   id: string;
@@ -115,4 +117,16 @@ export async function listAccessibleDispensaries(session: SessionLike) {
 
 export function isDispensaryAdminRole(role: string | null | undefined): boolean {
   return hasRole(role, Role.ADMIN);
+}
+
+/** Redirect target when the user cannot access the requested dispensary. */
+export async function resolveDispensaryAccessDeniedRedirect(
+  session: SessionLike,
+  pathname: string,
+): Promise<string> {
+  const accessible = await listAccessibleDispensaries(session);
+  if (accessible.length === 0) {
+    return routes.auth.noDispensaryAccess;
+  }
+  return rewritePathWithDispensarySlug(pathname, accessible[0].slug);
 }

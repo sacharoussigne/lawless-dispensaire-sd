@@ -53,7 +53,11 @@ export async function middleware(req: NextRequest) {
   const middlewares = [];
 
   if (pathname.startsWith(routes.auth.index)) {
-    if (pathname !== routes.auth.noAccess && pathname !== routes.auth.noManagementAccess) {
+    if (
+      pathname !== routes.auth.noAccess &&
+      pathname !== routes.auth.noManagementAccess &&
+      pathname !== routes.auth.noDispensaryAccess
+    ) {
       middlewares.push(hasToBeLoggedOutMiddleware);
     }
   } else if (pathname.startsWith('/platform')) {

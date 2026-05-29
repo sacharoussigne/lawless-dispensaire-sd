@@ -11,9 +11,9 @@ import {
   requireDispensaryFromSlug,
   getEffectiveRoleForDispensary,
   userCanAccessDispensary,
+  resolveDispensaryAccessDeniedRedirect,
 } from '@/lib/dispensary/context';
 import { notFound, redirect } from 'next/navigation';
-import { routes } from '@/types/routes';
 
 export default async function DispensaryLayout({
   children,
@@ -31,8 +31,12 @@ export default async function DispensaryLayout({
   }
 
   const canAccess = await userCanAccessDispensary(session as AuthSession | null, dispensary.id);
-  if (!canAccess) {
-    redirect(routes.auth.noAccess);
+  if (!canAccess && session) {
+    const target = await resolveDispensaryAccessDeniedRedirect(
+      session,
+      `/d/${encodeURIComponent(dispensarySlug)}/employee`,
+    );
+    redirect(target);
   }
 
   const impersonatorDisplayName = await getImpersonatorDisplayName(session?.session?.impersonatedBy);

@@ -104,6 +104,7 @@ export const routes = {
     verifyEmail: '/auth/verify-email',
     noAccess: '/auth/no-access',
     noManagementAccess: '/auth/no-management-access',
+    noDispensaryAccess: '/auth/no-dispensary-access',
   },
   redirect: (request: NextRequest, route: string) => {
     return NextResponse.redirect(new URL(route, request.url));
