@@ -9,22 +9,28 @@ import {
   createDispensaryWeeklyActivityWithHistory,
   syncActivityUserIdFromDiscordIfMissing,
 } from '@/lib/dispensaryWeeklyActivity/service';
+import { resolveBotDispensaryContext } from '@/lib/dispensaryWeeklyActivity/botRequestContext';
 
 function jsonError(status: number, error: string) {
   return NextResponse.json({ status, error }, { status });
 }
 
 export async function GET(request: Request) {
-  if (!isDispensaryBotApiAuthorized(request as Parameters<typeof isDispensaryBotApiAuthorized>[0])) {
+  const req = request as Parameters<typeof isDispensaryBotApiAuthorized>[0];
+  if (!isDispensaryBotApiAuthorized(req)) {
     return jsonError(401, 'Non autorisé');
   }
-  const discordUserId = getDiscordUserIdFromBotRequest(request as Parameters<typeof getDiscordUserIdFromBotRequest>[0]);
+  const dispensaryCtx = await resolveBotDispensaryContext(req);
+  if (!dispensaryCtx.ok) {
+    return jsonError(dispensaryCtx.status, dispensaryCtx.error);
+  }
+  const discordUserId = getDiscordUserIdFromBotRequest(req);
   if (!discordUserId) {
     return jsonError(400, 'En-tête X-Discord-User-Id requis');
   }
 
   const initial = await prisma.dispensaryWeeklyActivity.findMany({
-    where: { discordUserId },
+    where: { dispensaryId: dispensaryCtx.dispensaryId, discordUserId },
     include: { user: { select: { name: true } } },
     orderBy: { periodStart: 'desc' },
   });
@@ -36,7 +42,7 @@ export async function GET(request: Request) {
   }
 
   const refreshed = await prisma.dispensaryWeeklyActivity.findMany({
-    where: { discordUserId },
+    where: { dispensaryId: dispensaryCtx.dispensaryId, discordUserId },
     include: { user: { select: { name: true } } },
     orderBy: { periodStart: 'desc' },
   });
@@ -69,10 +75,15 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!isDispensaryBotApiAuthorized(request as Parameters<typeof isDispensaryBotApiAuthorized>[0])) {
+  const req = request as Parameters<typeof isDispensaryBotApiAuthorized>[0];
+  if (!isDispensaryBotApiAuthorized(req)) {
     return jsonError(401, 'Non autorisé');
   }
-  const discordUserId = getDiscordUserIdFromBotRequest(request as Parameters<typeof getDiscordUserIdFromBotRequest>[0]);
+  const dispensaryCtx = await resolveBotDispensaryContext(req);
+  if (!dispensaryCtx.ok) {
+    return jsonError(dispensaryCtx.status, dispensaryCtx.error);
+  }
+  const discordUserId = getDiscordUserIdFromBotRequest(req);
   if (!discordUserId) {
     return jsonError(400, 'En-tête X-Discord-User-Id requis');
   }
@@ -98,6 +109,7 @@ export async function POST(request: Request) {
       source: 'DISCORD_BOT',
       actorUserId: null,
       actorDiscordUserId: discordUserId,
+      dispensaryId: dispensaryCtx.dispensaryId,
     });
 
     const data = await loadSerializedWeeklyActivityById(created.id);

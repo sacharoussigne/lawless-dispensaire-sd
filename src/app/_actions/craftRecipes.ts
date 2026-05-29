@@ -3,9 +3,9 @@
 import { z } from 'zod/v3';
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
-import { getAuthSession } from '@/lib/auth';
+import { requireTenantServerActionContext } from '@/lib/serverActionAuth';
+import { tenantWhere } from '@/lib/dispensary/tenantWhere';
 
-// Schéma de validation pour créer une recette de craft
 const createCraftRecipeSchema = z.object({
   name: z.string().min(1, 'Le nom de la recette est requis').max(255, 'Le nom est trop long'),
   description: z.string().max(1000, 'La description est trop longue').optional(),
@@ -18,7 +18,6 @@ const createCraftRecipeSchema = z.object({
   })).min(1, 'Au moins un ingrédient est requis'),
 });
 
-// Schéma de validation pour modifier une recette de craft
 const updateCraftRecipeSchema = z.object({
   id: z.string().uuid('ID invalide'),
   name: z.string().min(1, 'Le nom de la recette est requis').max(255, 'Le nom est trop long'),
@@ -31,29 +30,53 @@ const updateCraftRecipeSchema = z.object({
   })).min(1, 'Au moins un ingrédient est requis'),
 });
 
-// Schéma pour supprimer une recette de craft
 const deleteCraftRecipeSchema = z.object({
   id: z.string().uuid('ID invalide'),
 });
 
-/**
- * Récupère toutes les recettes de craft pour un item
- * @param itemId - ID de l'item
- * @param onlyEnabled - Si true, ne retourne que les recettes activées (par défaut: false pour la page admin)
- */
-export async function getCraftRecipesByItemId(itemId: string, onlyEnabled: boolean = false) {
+async function validateCraftRecipeItems(
+  dispensaryId: string,
+  craftedItemId: string,
+  ingredientItemIds: string[],
+): Promise<{ ok: true } | { ok: false; response: { status: number; error: string } }> {
+  const allItemIds = Array.from(new Set([craftedItemId, ...ingredientItemIds]));
+
+  const items = await prisma.item.findMany({
+    where: {
+      id: { in: allItemIds },
+      ...tenantWhere(dispensaryId),
+    },
+    select: { id: true },
+  });
+
+  if (items.length !== allItemIds.length) {
+    return { ok: false, response: { status: 400, error: 'Un ou plusieurs objets sont invalides' } };
+  }
+
+  return { ok: true };
+}
+
+export async function getCraftRecipesByItemId(
+  dispensarySlug: string,
+  itemId: string,
+  onlyEnabled: boolean = false,
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
+
+    const item = await prisma.item.findFirst({
+      where: { id: itemId, ...tenantWhere(dispensaryId) },
+    });
+    if (!item) {
+      return { status: 404, error: 'Objet introuvable' };
     }
 
     const craftRecipes = await prisma.craftRecipe.findMany({
       where: {
         craftedItemId: itemId,
+        ...tenantWhere(dispensaryId),
         ...(onlyEnabled && { isEnabled: true }),
       },
       include: {
@@ -82,30 +105,34 @@ export async function getCraftRecipesByItemId(itemId: string, onlyEnabled: boole
   }
 }
 
-/**
- * Crée une nouvelle recette de craft
- */
-export async function createCraftRecipe(data: {
-  name: string;
-  description?: string;
-  craftedItemId: string;
-  quantity: number;
-  isEnabled?: boolean;
-  ingredients: { usedItemId: string; quantity: number }[];
-}) {
+export async function createCraftRecipe(
+  dispensarySlug: string,
+  data: {
+    name: string;
+    description?: string;
+    craftedItemId: string;
+    quantity: number;
+    isEnabled?: boolean;
+    ingredients: { usedItemId: string; quantity: number }[];
+  },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = createCraftRecipeSchema.parse(data);
 
+    const itemsResult = await validateCraftRecipeItems(
+      dispensaryId,
+      validatedData.craftedItemId,
+      validatedData.ingredients.map((ing) => ing.usedItemId),
+    );
+    if (!itemsResult.ok) return itemsResult.response;
+
     const craftRecipe = await prisma.craftRecipe.create({
       data: {
+        dispensaryId,
         name: validatedData.name,
         description: validatedData.description,
         craftedItemId: validatedData.craftedItemId,
@@ -141,39 +168,50 @@ export async function createCraftRecipe(data: {
   }
 }
 
-/**
- * Modifie une recette de craft existante
- */
-export async function updateCraftRecipe(data: {
-  id: string;
-  name: string;
-  description?: string;
-  quantity: number;
-  isEnabled?: boolean;
-  ingredients: { usedItemId: string; quantity: number }[];
-}) {
+export async function updateCraftRecipe(
+  dispensarySlug: string,
+  data: {
+    id: string;
+    name: string;
+    description?: string;
+    quantity: number;
+    isEnabled?: boolean;
+    ingredients: { usedItemId: string; quantity: number }[];
+  },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = updateCraftRecipeSchema.parse(data);
 
-    // Supprimer les anciens ingrédients
+    const existingRecipe = await prisma.craftRecipe.findFirst({
+      where: { id: validatedData.id, ...tenantWhere(dispensaryId) },
+      select: { craftedItemId: true },
+    });
+    if (!existingRecipe) {
+      return { status: 404, error: 'Recette de craft introuvable' };
+    }
+
+    const itemsResult = await validateCraftRecipeItems(
+      dispensaryId,
+      existingRecipe.craftedItemId,
+      validatedData.ingredients.map((ing) => ing.usedItemId),
+    );
+    if (!itemsResult.ok) return itemsResult.response;
+
     await prisma.craftRecipeItem.deleteMany({
       where: {
         craftRecipeId: validatedData.id,
+        craftRecipe: tenantWhere(dispensaryId),
       },
     });
 
-    // Mettre à jour la recette et créer les nouveaux ingrédients
     const craftRecipe = await prisma.craftRecipe.update({
       where: {
         id: validatedData.id,
+        ...tenantWhere(dispensaryId),
       },
       data: {
         name: validatedData.name,
@@ -210,24 +248,18 @@ export async function updateCraftRecipe(data: {
   }
 }
 
-/**
- * Supprime une recette de craft
- */
-export async function deleteCraftRecipe(data: { id: string }) {
+export async function deleteCraftRecipe(dispensarySlug: string, data: { id: string }) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = deleteCraftRecipeSchema.parse(data);
 
     await prisma.craftRecipe.delete({
       where: {
         id: validatedData.id,
+        ...tenantWhere(dispensaryId),
       },
     });
 
@@ -239,4 +271,3 @@ export async function deleteCraftRecipe(data: { id: string }) {
     return actionErrorParser(error, 'Erreur lors de la suppression de la recette de craft');
   }
 }
-

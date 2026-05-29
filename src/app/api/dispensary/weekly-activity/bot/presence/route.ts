@@ -8,12 +8,19 @@ import {
 } from '@/lib/dispensaryWeeklyActivity/botRouteHandlers';
 import { dispensaryWeeklyActivityBotPresenceBodySchema } from '@/lib/dispensaryWeeklyActivity/schemas';
 import { botMarkPresenceForParisRelativeDay } from '@/lib/dispensaryWeeklyActivity/service';
+import { resolveBotDispensaryContext } from '@/lib/dispensaryWeeklyActivity/botRequestContext';
 
 export async function POST(request: Request) {
-  if (!isDispensaryBotApiAuthorized(request as Parameters<typeof isDispensaryBotApiAuthorized>[0])) {
+  const req = request as Parameters<typeof isDispensaryBotApiAuthorized>[0];
+  if (!isDispensaryBotApiAuthorized(req)) {
     return jsonBotError(401, 'Non autorisé');
   }
-  const discordUserId = getDiscordUserIdFromBotRequest(request as Parameters<typeof getDiscordUserIdFromBotRequest>[0]);
+  const dispensaryCtx = await resolveBotDispensaryContext(req);
+  if (!dispensaryCtx.ok) {
+    return jsonBotError(dispensaryCtx.status, dispensaryCtx.error);
+  }
+
+  const discordUserId = getDiscordUserIdFromBotRequest(req);
   if (!discordUserId) {
     return jsonBotError(400, 'En-tête X-Discord-User-Id requis');
   }
@@ -32,14 +39,24 @@ export async function POST(request: Request) {
 
   try {
     if (isPresenceEditBody(parsed.data)) {
-      const result = await botEditWeekdayFlag(discordUserId, 'presence', parsed.data);
+      const result = await botEditWeekdayFlag(
+        dispensaryCtx.dispensaryId,
+        discordUserId,
+        'presence',
+        parsed.data,
+      );
       return respondToBotWeekdayFlagResult(result);
     }
 
     const relative = parsed.data.day ?? 'today';
-    const result = await botMarkPresenceForParisRelativeDay(discordUserId, relative, {
-      displayName: parsed.data.displayName,
-    });
+    const result = await botMarkPresenceForParisRelativeDay(
+      dispensaryCtx.dispensaryId,
+      discordUserId,
+      relative,
+      {
+        displayName: parsed.data.displayName,
+      },
+    );
     return respondToBotWeekdayFlagResult(result);
   } catch (e) {
     const mapped = mapBotRouteError(e);

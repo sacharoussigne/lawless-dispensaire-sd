@@ -3,9 +3,9 @@
 import { z } from 'zod/v3';
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
-import { getAuthSession } from '@/lib/auth';
+import { requireTenantServerActionContext } from '@/lib/serverActionAuth';
+import { tenantWhere } from '@/lib/dispensary/tenantWhere';
 
-// Schéma de validation pour créer un item
 const createItemSchema = z.object({
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
   description: z.string().max(1000, 'La description est trop longue').optional(),
@@ -19,7 +19,6 @@ const createItemSchema = z.object({
   companyGroupId: z.string().uuid('ID de groupe d\'entreprise invalide').optional(),
 });
 
-// Schéma de validation pour modifier un item
 const updateItemSchema = z.object({
   id: z.string().uuid('ID invalide'),
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
@@ -34,41 +33,74 @@ const updateItemSchema = z.object({
   companyGroupId: z.string().uuid('ID de groupe d\'entreprise invalide').optional(),
 });
 
-// Schéma pour supprimer un item
 const deleteItemSchema = z.object({
   id: z.string().uuid('ID invalide'),
 });
 
-/**
- * Crée un nouvel item
- */
-export async function createItem(data: {
-  name: string;
-  description?: string;
-  minimalQuantity: number;
-  isCraftable?: boolean;
-  isEnabled?: boolean;
-  canBeSold?: boolean;
-  price?: number | null;
-  weight?: number | null;
-  categoryId: string;
-  companyGroupId?: string;
-}) {
-  try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
+const reorderItemsSchema = z.object({
+  items: z.array(z.object({
+    id: z.string().uuid('ID invalide'),
+    order: z.number().int(),
+  })),
+});
+
+async function validateItemRelations(
+  dispensaryId: string,
+  categoryId: string,
+  companyGroupId?: string,
+): Promise<{ ok: true } | { ok: false; response: { status: number; error: string } }> {
+  const category = await prisma.categoryItem.findFirst({
+    where: { id: categoryId, ...tenantWhere(dispensaryId) },
+  });
+  if (!category) {
+    return { ok: false, response: { status: 400, error: 'Catégorie invalide' } };
+  }
+
+  if (companyGroupId) {
+    const companyGroup = await prisma.companyGroup.findFirst({
+      where: { id: companyGroupId, ...tenantWhere(dispensaryId) },
+    });
+    if (!companyGroup) {
+      return { ok: false, response: { status: 400, error: 'Groupe d\'entreprises invalide' } };
     }
+  }
+
+  return { ok: true };
+}
+
+export async function createItem(
+  dispensarySlug: string,
+  data: {
+    name: string;
+    description?: string;
+    minimalQuantity: number;
+    isCraftable?: boolean;
+    isEnabled?: boolean;
+    canBeSold?: boolean;
+    price?: number | null;
+    weight?: number | null;
+    categoryId: string;
+    companyGroupId?: string;
+  },
+) {
+  try {
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = createItemSchema.parse(data);
 
-    // Récupérer le dernier ordre pour cette catégorie
+    const relationsResult = await validateItemRelations(
+      dispensaryId,
+      validatedData.categoryId,
+      validatedData.companyGroupId,
+    );
+    if (!relationsResult.ok) return relationsResult.response;
+
     const lastItem = await prisma.item.findFirst({
       where: {
         categoryId: validatedData.categoryId,
+        ...tenantWhere(dispensaryId),
       },
       orderBy: {
         order: 'desc',
@@ -82,6 +114,7 @@ export async function createItem(data: {
 
     const item = await prisma.item.create({
       data: {
+        dispensaryId,
         name: validatedData.name,
         description: validatedData.description,
         minimalQuantity: validatedData.minimalQuantity,
@@ -96,7 +129,6 @@ export async function createItem(data: {
       },
     });
 
-    // Convertir le Decimal en number pour la sérialisation
     return {
       status: 201,
       data: {
@@ -109,20 +141,14 @@ export async function createItem(data: {
   }
 }
 
-/**
- * Récupère tous les items
- */
-export async function getItems() {
+export async function getItems(dispensarySlug: string) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const items = await prisma.item.findMany({
+      where: tenantWhere(dispensaryId),
       orderBy: [
         {
           category: {
@@ -154,7 +180,6 @@ export async function getItems() {
       },
     });
 
-    // Convertir les Decimal en number pour la sérialisation
     const serializedItems = items.map((item) => ({
       ...item,
       price: item.price ? Number(item.price) : null,
@@ -169,36 +194,40 @@ export async function getItems() {
   }
 }
 
-/**
- * Modifie un item existant
- */
-export async function updateItem(data: {
-  id: string;
-  name: string;
-  description?: string;
-  minimalQuantity: number;
-  isCraftable?: boolean;
-  isEnabled?: boolean;
-  canBeSold?: boolean;
-  price?: number | null;
-  weight?: number | null;
-  categoryId: string;
-  companyGroupId?: string;
-}) {
+export async function updateItem(
+  dispensarySlug: string,
+  data: {
+    id: string;
+    name: string;
+    description?: string;
+    minimalQuantity: number;
+    isCraftable?: boolean;
+    isEnabled?: boolean;
+    canBeSold?: boolean;
+    price?: number | null;
+    weight?: number | null;
+    categoryId: string;
+    companyGroupId?: string;
+  },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = updateItemSchema.parse(data);
+
+    const relationsResult = await validateItemRelations(
+      dispensaryId,
+      validatedData.categoryId,
+      validatedData.companyGroupId,
+    );
+    if (!relationsResult.ok) return relationsResult.response;
 
     const item = await prisma.item.update({
       where: {
         id: validatedData.id,
+        ...tenantWhere(dispensaryId),
       },
       data: {
         name: validatedData.name,
@@ -214,7 +243,6 @@ export async function updateItem(data: {
       },
     });
 
-    // Convertir le Decimal en number pour la sérialisation
     return {
       status: 200,
       data: {
@@ -227,24 +255,18 @@ export async function updateItem(data: {
   }
 }
 
-/**
- * Supprime un item
- */
-export async function deleteItem(data: { id: string }) {
+export async function deleteItem(dispensarySlug: string, data: { id: string }) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = deleteItemSchema.parse(data);
 
     await prisma.item.delete({
       where: {
         id: validatedData.id,
+        ...tenantWhere(dispensaryId),
       },
     });
 
@@ -257,37 +279,24 @@ export async function deleteItem(data: { id: string }) {
   }
 }
 
-// Schéma pour réordonner les items
-const reorderItemsSchema = z.object({
-  items: z.array(z.object({
-    id: z.string().uuid('ID invalide'),
-    order: z.number().int(),
-  })),
-});
-
-/**
- * Réordonne les items
- */
-export async function reorderItems(data: { items: { id: string; order: number }[] }) {
+export async function reorderItems(
+  dispensarySlug: string,
+  data: { items: { id: string; order: number }[] },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = reorderItemsSchema.parse(data);
 
-    // Mettre à jour l'ordre de chaque item
     await Promise.all(
       validatedData.items.map(({ id, order }) =>
         prisma.item.update({
-          where: { id },
+          where: { id, ...tenantWhere(dispensaryId) },
           data: { order },
-        })
-      )
+        }),
+      ),
     );
 
     return {
@@ -298,4 +307,3 @@ export async function reorderItems(data: { items: { id: string; order: number }[
     return actionErrorParser(error, 'Erreur lors du réordonnancement des objets');
   }
 }
-

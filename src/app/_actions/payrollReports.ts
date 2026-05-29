@@ -1,10 +1,9 @@
 'use server';
 
 import { randomUUID } from 'crypto';
-import { getAuthSession } from '@/lib/auth';
 import prisma from '@/lib/prisma';
-import { checkRolePermission } from '@/lib/auth/permissions';
-import { getAppFeatureActionBlock } from '@/lib/appSettings';
+import { requireTenantServerActionContext } from '@/lib/serverActionAuth';
+import { tenantWhere } from '@/lib/dispensary/tenantWhere';
 import { mergeResolvedDisplayNames } from '@/lib/dispensaryWeeklyActivity/resolveDisplayName';
 import {
   PAYROLL_CAISSE_SALE_USD,
@@ -35,19 +34,19 @@ const emptyGlobalStats = () => ({
   total_offered_retail_value_usd: 0,
 });
 
-export async function createPayrollReportFromForm(formData: FormData) {
-  const session = await getAuthSession();
-  if (!session?.user) {
-    return { status: 401, error: 'Non autorisé' };
-  }
-  if (!checkRolePermission(session.user.role, 'payroll_reports', 'create')) {
-    return { status: 403, error: 'Accès refusé' };
-  }
+const payrollGuardOptions = {
+  feature: 'payroll' as const,
+  permission: {
+    resource: 'payroll_reports' as const,
+    action: 'create',
+    message: 'Accès refusé',
+  },
+};
 
-  const payrollFeatureBlock = await getAppFeatureActionBlock('payroll');
-  if (payrollFeatureBlock) {
-    return payrollFeatureBlock;
-  }
+export async function createPayrollReportFromForm(dispensarySlug: string, formData: FormData) {
+  const ctx = await requireTenantServerActionContext(dispensarySlug, payrollGuardOptions);
+  if (!ctx.ok) return ctx.response;
+  const { dispensaryId } = ctx.tenant;
 
   const weekRef = formData.get('weekStart');
   const weekStartStr = typeof weekRef === 'string' ? weekRef : null;
@@ -151,7 +150,11 @@ export async function createPayrollReportFromForm(formData: FormData) {
     waImportStart = range.weekStart;
     waImportEnd = range.weekEnd;
     const rawActivities = await prisma.dispensaryWeeklyActivity.findMany({
-      where: { periodStart: waImportStart, periodEnd: waImportEnd },
+      where: {
+        periodStart: waImportStart,
+        periodEnd: waImportEnd,
+        ...tenantWhere(dispensaryId),
+      },
       include: { user: { select: { name: true } } },
     });
     activitiesWithNames = (await mergeResolvedDisplayNames(
@@ -174,7 +177,13 @@ export async function createPayrollReportFromForm(formData: FormData) {
   const { weekStart, weekEnd } = weekRangeFromIsoDate(weekStartStr);
 
   const existing = await prisma.payrollWeeklyReport.findUnique({
-    where: { weekStart_reportType: { weekStart, reportType } },
+    where: {
+      dispensaryId_weekStart_reportType: {
+        dispensaryId,
+        weekStart,
+        reportType,
+      },
+    },
   });
   if (existing) {
     return { status: 409, error: 'Un rapport de ce type existe déjà pour cette semaine.' };
@@ -185,10 +194,11 @@ export async function createPayrollReportFromForm(formData: FormData) {
   await prisma.payrollWeeklyReport.create({
     data: {
       id: reportId,
+      dispensaryId,
       weekStart,
       weekEnd,
       reportType,
-      createdById: session.user.id,
+      createdById: ctx.session.user.id,
     },
   });
 
@@ -234,22 +244,17 @@ export async function createPayrollReportFromForm(formData: FormData) {
   }
 }
 
-export async function updatePayrollReportResultJson(id: string, resultJson: unknown) {
-  const session = await getAuthSession();
-  if (!session?.user) {
-    return { status: 401, error: 'Non autorisé' };
-  }
-  if (!checkRolePermission(session.user.role, 'payroll_reports', 'create')) {
-    return { status: 403, error: 'Accès refusé' };
-  }
+export async function updatePayrollReportResultJson(
+  dispensarySlug: string,
+  id: string,
+  resultJson: unknown,
+) {
+  const ctx = await requireTenantServerActionContext(dispensarySlug, payrollGuardOptions);
+  if (!ctx.ok) return ctx.response;
+  const { dispensaryId } = ctx.tenant;
 
-  const payrollFeatureBlock = await getAppFeatureActionBlock('payroll');
-  if (payrollFeatureBlock) {
-    return payrollFeatureBlock;
-  }
-
-  const existing = await prisma.payrollWeeklyReport.findUnique({
-    where: { id },
+  const existing = await prisma.payrollWeeklyReport.findFirst({
+    where: { id, ...tenantWhere(dispensaryId) },
     select: { id: true, errorMessage: true, resultJson: true },
   });
 
@@ -280,22 +285,13 @@ export async function updatePayrollReportResultJson(id: string, resultJson: unkn
   return { status: 200, data: { resultJson: recalculated } };
 }
 
-export async function deletePayrollReport(id: string) {
-  const session = await getAuthSession();
-  if (!session?.user) {
-    return { status: 401, error: 'Non autorisé' };
-  }
-  if (!checkRolePermission(session.user.role, 'payroll_reports', 'create')) {
-    return { status: 403, error: 'Accès refusé' };
-  }
+export async function deletePayrollReport(dispensarySlug: string, id: string) {
+  const ctx = await requireTenantServerActionContext(dispensarySlug, payrollGuardOptions);
+  if (!ctx.ok) return ctx.response;
+  const { dispensaryId } = ctx.tenant;
 
-  const payrollFeatureBlock = await getAppFeatureActionBlock('payroll');
-  if (payrollFeatureBlock) {
-    return payrollFeatureBlock;
-  }
-
-  const report = await prisma.payrollWeeklyReport.findUnique({
-    where: { id },
+  const report = await prisma.payrollWeeklyReport.findFirst({
+    where: { id, ...tenantWhere(dispensaryId) },
     select: { id: true },
   });
 
@@ -308,17 +304,14 @@ export async function deletePayrollReport(id: string) {
   return { status: 200 };
 }
 
-export async function listPayrollImportableActivityWeeks() {
-  const session = await getAuthSession();
-  if (!session?.user) {
-    return { status: 401, error: 'Non autorisé' };
-  }
-  if (!checkRolePermission(session.user.role, 'payroll_reports', 'create')) {
-    return { status: 403, error: 'Accès refusé' };
-  }
+export async function listPayrollImportableActivityWeeks(dispensarySlug: string) {
+  const ctx = await requireTenantServerActionContext(dispensarySlug, payrollGuardOptions);
+  if (!ctx.ok) return ctx.response;
+  const { dispensaryId } = ctx.tenant;
 
   const groups = await prisma.dispensaryWeeklyActivity.groupBy({
     by: ['periodStart', 'periodEnd'],
+    where: tenantWhere(dispensaryId),
     _count: { _all: true },
     orderBy: { periodStart: 'desc' },
     take: 52,

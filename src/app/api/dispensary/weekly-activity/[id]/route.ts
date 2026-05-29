@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import type { DispensaryWeeklyActivity } from '@prisma/client';
 import { isDispensaryBotApiAuthorized, getDiscordUserIdFromBotRequest } from '@/lib/dispensaryWeeklyActivityApiAuth';
 import { loadSerializedWeeklyActivityById } from '@/lib/dispensaryWeeklyActivity/loadSerializedRow';
 import prisma from '@/lib/prisma';
@@ -8,6 +10,7 @@ import {
   syncActivityUserIdFromDiscordIfMissing,
   updateDispensaryWeeklyActivityWithHistory,
 } from '@/lib/dispensaryWeeklyActivity/service';
+import { resolveBotDispensaryContext } from '@/lib/dispensaryWeeklyActivity/botRequestContext';
 
 function jsonError(status: number, error: string) {
   return NextResponse.json({ status, error }, { status });
@@ -15,31 +18,57 @@ function jsonError(status: number, error: string) {
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-export async function GET(request: Request, context: RouteContext) {
-  if (!isDispensaryBotApiAuthorized(request as Parameters<typeof isDispensaryBotApiAuthorized>[0])) {
+type LoadActivityForBotResult =
+  | { error: NextResponse }
+  | { activity: DispensaryWeeklyActivity };
+
+async function loadActivityForBot(
+  request: NextRequest,
+  id: string,
+  discordUserId: string,
+  dispensaryId: string,
+): Promise<LoadActivityForBotResult> {
+  const initial = await prisma.dispensaryWeeklyActivity.findFirst({
+    where: { id, dispensaryId },
+  });
+
+  if (!initial) {
+    return { error: jsonError(404, 'Activité introuvable') };
+  }
+
+  if (initial.discordUserId !== discordUserId) {
+    return { error: jsonError(403, 'Accès refusé') };
+  }
+
+  if (!initial.userId) {
+    await syncActivityUserIdFromDiscordIfMissing(prisma, initial);
+  }
+
+  return { activity: initial };
+}
+
+export async function GET(request: NextRequest, context: RouteContext) {
+  if (!isDispensaryBotApiAuthorized(request)) {
     return jsonError(401, 'Non autorisé');
   }
-  const discordUserId = getDiscordUserIdFromBotRequest(request as Parameters<typeof getDiscordUserIdFromBotRequest>[0]);
+  const dispensaryCtx = await resolveBotDispensaryContext(request);
+  if (!dispensaryCtx.ok) {
+    return jsonError(dispensaryCtx.status, dispensaryCtx.error);
+  }
+  const discordUserId = getDiscordUserIdFromBotRequest(request);
   if (!discordUserId) {
     return jsonError(400, 'En-tête X-Discord-User-Id requis');
   }
 
   const { id } = await context.params;
-
-  const initial = await prisma.dispensaryWeeklyActivity.findUnique({
-    where: { id },
-  });
-
-  if (!initial) {
-    return jsonError(404, 'Activité introuvable');
-  }
-
-  if (initial.discordUserId !== discordUserId) {
-    return jsonError(403, 'Accès refusé');
-  }
-
-  if (!initial.userId) {
-    await syncActivityUserIdFromDiscordIfMissing(prisma, initial);
+  const loaded = await loadActivityForBot(
+    request,
+    id,
+    discordUserId,
+    dispensaryCtx.dispensaryId,
+  );
+  if ('error' in loaded) {
+    return loaded.error;
   }
 
   const data = await loadSerializedWeeklyActivityById(id);
@@ -49,23 +78,28 @@ export async function GET(request: Request, context: RouteContext) {
   return NextResponse.json({ status: 200, data });
 }
 
-export async function PATCH(request: Request, context: RouteContext) {
-  if (!isDispensaryBotApiAuthorized(request as Parameters<typeof isDispensaryBotApiAuthorized>[0])) {
+export async function PATCH(request: NextRequest, context: RouteContext) {
+  if (!isDispensaryBotApiAuthorized(request)) {
     return jsonError(401, 'Non autorisé');
   }
-  const discordUserId = getDiscordUserIdFromBotRequest(request as Parameters<typeof getDiscordUserIdFromBotRequest>[0]);
+  const dispensaryCtx = await resolveBotDispensaryContext(request);
+  if (!dispensaryCtx.ok) {
+    return jsonError(dispensaryCtx.status, dispensaryCtx.error);
+  }
+  const discordUserId = getDiscordUserIdFromBotRequest(request);
   if (!discordUserId) {
     return jsonError(400, 'En-tête X-Discord-User-Id requis');
   }
 
   const { id } = await context.params;
-
-  const existing = await prisma.dispensaryWeeklyActivity.findUnique({ where: { id } });
-  if (!existing) {
-    return jsonError(404, 'Activité introuvable');
-  }
-  if (existing.discordUserId !== discordUserId) {
-    return jsonError(403, 'Accès refusé');
+  const loaded = await loadActivityForBot(
+    request,
+    id,
+    discordUserId,
+    dispensaryCtx.dispensaryId,
+  );
+  if ('error' in loaded) {
+    return loaded.error;
   }
 
   let body: unknown;
@@ -85,6 +119,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       source: 'DISCORD_BOT',
       actorUserId: null,
       actorDiscordUserId: discordUserId,
+      dispensaryId: dispensaryCtx.dispensaryId,
     });
 
     const data = await loadSerializedWeeklyActivityById(id);
@@ -101,23 +136,28 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 }
 
-export async function DELETE(request: Request, context: RouteContext) {
-  if (!isDispensaryBotApiAuthorized(request as Parameters<typeof isDispensaryBotApiAuthorized>[0])) {
+export async function DELETE(request: NextRequest, context: RouteContext) {
+  if (!isDispensaryBotApiAuthorized(request)) {
     return jsonError(401, 'Non autorisé');
   }
-  const discordUserId = getDiscordUserIdFromBotRequest(request as Parameters<typeof getDiscordUserIdFromBotRequest>[0]);
+  const dispensaryCtx = await resolveBotDispensaryContext(request);
+  if (!dispensaryCtx.ok) {
+    return jsonError(dispensaryCtx.status, dispensaryCtx.error);
+  }
+  const discordUserId = getDiscordUserIdFromBotRequest(request);
   if (!discordUserId) {
     return jsonError(400, 'En-tête X-Discord-User-Id requis');
   }
 
   const { id } = await context.params;
-
-  const existing = await prisma.dispensaryWeeklyActivity.findUnique({ where: { id } });
-  if (!existing) {
-    return jsonError(404, 'Activité introuvable');
-  }
-  if (existing.discordUserId !== discordUserId) {
-    return jsonError(403, 'Accès refusé');
+  const loaded = await loadActivityForBot(
+    request,
+    id,
+    discordUserId,
+    dispensaryCtx.dispensaryId,
+  );
+  if ('error' in loaded) {
+    return loaded.error;
   }
 
   try {
@@ -125,6 +165,7 @@ export async function DELETE(request: Request, context: RouteContext) {
       source: 'DISCORD_BOT',
       actorUserId: null,
       actorDiscordUserId: discordUserId,
+      dispensaryId: dispensaryCtx.dispensaryId,
     });
     return NextResponse.json({ status: 200, data: { ok: true } });
   } catch (e) {

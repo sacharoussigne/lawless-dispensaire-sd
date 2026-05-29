@@ -3,8 +3,8 @@
 import { z } from 'zod/v3';
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
-import { getAuthSession } from '@/lib/auth';
-import { checkRolePermission } from '@/lib/auth/permissions';
+import { requireTenantServerActionContext } from '@/lib/serverActionAuth';
+import { tenantWhere } from '@/lib/dispensary/tenantWhere';
 
 const upsertChestStockCheckConfigSchema = z.object({
   chestId: z.string().uuid('ID de coffre invalide'),
@@ -31,31 +31,29 @@ export type ChestStockCheckConfigsResponse = {
   configsByChestId: Record<string, ChestStockCheckConfigDTO>;
 };
 
-/**
- * Gets chests + categories + current stock check configs (admin only).
- */
-export async function getChestStockCheckConfigs() {
+export async function getChestStockCheckConfigs(dispensarySlug: string) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return { status: 401, error: 'Non autorisé' };
-    }
-
-    const userRole = session.user?.role;
-    if (!checkRolePermission(userRole, 'application', 'management')) {
-      return { status: 403, error: 'Permission refusée' };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      permission: { resource: 'application', action: 'management' },
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const [chests, categories, configs] = await Promise.all([
       prisma.chest.findMany({
+        where: tenantWhere(dispensaryId),
         orderBy: [{ order: 'asc' }, { createdAt: 'desc' }],
         select: { id: true, name: true, isEnabled: true, order: true },
       }),
       prisma.categoryItem.findMany({
+        where: tenantWhere(dispensaryId),
         orderBy: [{ order: 'asc' }, { name: 'asc' }],
         select: { id: true, name: true, color: true, order: true },
       }),
       prisma.chestStockCheckConfig.findMany({
+        where: {
+          chest: tenantWhere(dispensaryId),
+        },
         select: {
           chestId: true,
           isEnabled: true,
@@ -87,26 +85,43 @@ export async function getChestStockCheckConfigs() {
   }
 }
 
-/**
- * Creates or updates a chest stock check config, replacing category selection (admin only).
- */
-export async function upsertChestStockCheckConfig(input: {
-  chestId: string;
-  isEnabled: boolean;
-  categoryIds: string[];
-}) {
+export async function upsertChestStockCheckConfig(
+  dispensarySlug: string,
+  input: {
+    chestId: string;
+    isEnabled: boolean;
+    categoryIds: string[];
+  },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return { status: 401, error: 'Non autorisé' };
-    }
-
-    const userRole = session.user?.role;
-    if (!checkRolePermission(userRole, 'application', 'management')) {
-      return { status: 403, error: 'Permission refusée' };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      permission: { resource: 'application', action: 'management' },
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validated = upsertChestStockCheckConfigSchema.parse(input);
+
+    const chest = await prisma.chest.findFirst({
+      where: { id: validated.chestId, ...tenantWhere(dispensaryId) },
+    });
+    if (!chest) {
+      return { status: 404, error: 'Coffre introuvable' };
+    }
+
+    const uniqueCategoryIds = Array.from(new Set(validated.categoryIds));
+    if (uniqueCategoryIds.length > 0) {
+      const categories = await prisma.categoryItem.findMany({
+        where: {
+          id: { in: uniqueCategoryIds },
+          ...tenantWhere(dispensaryId),
+        },
+        select: { id: true },
+      });
+      if (categories.length !== uniqueCategoryIds.length) {
+        return { status: 400, error: 'Une ou plusieurs catégories sont invalides' };
+      }
+    }
 
     const config = await prisma.$transaction(async (tx) => {
       const upserted = await tx.chestStockCheckConfig.upsert({
@@ -125,7 +140,6 @@ export async function upsertChestStockCheckConfig(input: {
         where: { configId: upserted.id },
       });
 
-      const uniqueCategoryIds = Array.from(new Set(validated.categoryIds));
       if (uniqueCategoryIds.length > 0) {
         await tx.chestStockCheckCategory.createMany({
           data: uniqueCategoryIds.map((categoryId) => ({
@@ -149,27 +163,26 @@ export type StockChecksSummary = {
   configsByChestId: Record<string, ChestStockCheckConfigDTO>;
 };
 
-/**
- * Gets a lightweight summary for the stock page (stock view permission).
- */
-export async function getStockChecksSummary() {
+export async function getStockChecksSummary(dispensarySlug: string) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return { status: 401, error: 'Non autorisé' };
-    }
-
-    const userRole = session.user?.role;
-    if (!checkRolePermission(userRole, 'stock', 'view')) {
-      return { status: 403, error: 'Permission refusée' };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      permission: { resource: 'stock', action: 'view' },
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const [enabledChests, configs] = await Promise.all([
       prisma.chest.findMany({
-        where: { isEnabled: true },
+        where: {
+          isEnabled: true,
+          ...tenantWhere(dispensaryId),
+        },
         select: { id: true },
       }),
       prisma.chestStockCheckConfig.findMany({
+        where: {
+          chest: tenantWhere(dispensaryId),
+        },
         select: {
           chestId: true,
           isEnabled: true,
@@ -199,4 +212,3 @@ export async function getStockChecksSummary() {
     return actionErrorParser(error, 'Erreur lors du chargement des vérifications de stock');
   }
 }
-

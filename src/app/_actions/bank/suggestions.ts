@@ -2,24 +2,19 @@
 
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
-import { getAuthSession } from '@/lib/auth';
-import { getAppFeatureActionBlock } from '@/lib/appSettings';
+import { requireTenantServerActionContext } from '@/lib/serverActionAuth';
+import { tenantWhere } from '@/lib/dispensary/tenantWhere';
 
-
-export async function getNameSuggestions() {
+export async function getNameSuggestions(dispensarySlug: string) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
-    if (bankFeatureBlock) return bankFeatureBlock;
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'bank',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const suggestions = await prisma.transactionNameSuggestion.findMany({
+      where: tenantWhere(dispensaryId),
       orderBy: {
         createdAt: 'desc',
       },
@@ -28,30 +23,23 @@ export async function getNameSuggestions() {
 
     return {
       status: 200,
-      data: suggestions.map(s => s.value),
+      data: suggestions.map((s) => s.value),
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la récupération des suggestions de noms');
   }
 }
 
-/**
- * Gets description suggestions
- */
-export async function getDescriptionSuggestions() {
+export async function getDescriptionSuggestions(dispensarySlug: string) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
-    if (bankFeatureBlock) return bankFeatureBlock;
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'bank',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const suggestions = await prisma.transactionDescriptionSuggestion.findMany({
+      where: tenantWhere(dispensaryId),
       orderBy: {
         createdAt: 'desc',
       },
@@ -60,28 +48,23 @@ export async function getDescriptionSuggestions() {
 
     return {
       status: 200,
-      data: suggestions.map(s => s.value),
+      data: suggestions.map((s) => s.value),
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la récupération des suggestions de descriptions');
   }
 }
 
-/**
- * Adds a name suggestion
- */
-export async function addNameSuggestion(data: { value: string }) {
+export async function addNameSuggestion(
+  dispensarySlug: string,
+  data: { value: string },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
-    if (bankFeatureBlock) return bankFeatureBlock;
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'bank',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     if (!data.value || data.value.trim().length === 0) {
       return {
@@ -90,10 +73,19 @@ export async function addNameSuggestion(data: { value: string }) {
       };
     }
 
+    const trimmedValue = data.value.trim();
     const suggestion = await prisma.transactionNameSuggestion.upsert({
-      where: { value: data.value.trim() },
+      where: {
+        dispensaryId_value: {
+          dispensaryId,
+          value: trimmedValue,
+        },
+      },
       update: {},
-      create: { value: data.value.trim() },
+      create: {
+        dispensaryId,
+        value: trimmedValue,
+      },
     });
 
     return {
@@ -105,21 +97,16 @@ export async function addNameSuggestion(data: { value: string }) {
   }
 }
 
-/**
- * Adds a description suggestion
- */
-export async function addDescriptionSuggestion(data: { value: string }) {
+export async function addDescriptionSuggestion(
+  dispensarySlug: string,
+  data: { value: string },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
-    if (bankFeatureBlock) return bankFeatureBlock;
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'bank',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     if (!data.value || data.value.trim().length === 0) {
       return {
@@ -128,10 +115,19 @@ export async function addDescriptionSuggestion(data: { value: string }) {
       };
     }
 
+    const trimmedValue = data.value.trim();
     const suggestion = await prisma.transactionDescriptionSuggestion.upsert({
-      where: { value: data.value.trim() },
+      where: {
+        dispensaryId_value: {
+          dispensaryId,
+          value: trimmedValue,
+        },
+      },
       update: {},
-      create: { value: data.value.trim() },
+      create: {
+        dispensaryId,
+        value: trimmedValue,
+      },
     });
 
     return {
@@ -143,21 +139,16 @@ export async function addDescriptionSuggestion(data: { value: string }) {
   }
 }
 
-/**
- * Deletes a name suggestion
- */
-export async function deleteNameSuggestion(data: { value: string }) {
+export async function deleteNameSuggestion(
+  dispensarySlug: string,
+  data: { value: string },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
-    if (bankFeatureBlock) return bankFeatureBlock;
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'bank',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     if (!data.value || data.value.trim().length === 0) {
       return {
@@ -167,7 +158,12 @@ export async function deleteNameSuggestion(data: { value: string }) {
     }
 
     await prisma.transactionNameSuggestion.delete({
-      where: { value: data.value.trim() },
+      where: {
+        dispensaryId_value: {
+          dispensaryId,
+          value: data.value.trim(),
+        },
+      },
     });
 
     return {
@@ -179,21 +175,16 @@ export async function deleteNameSuggestion(data: { value: string }) {
   }
 }
 
-/**
- * Deletes a description suggestion
- */
-export async function deleteDescriptionSuggestion(data: { value: string }) {
+export async function deleteDescriptionSuggestion(
+  dispensarySlug: string,
+  data: { value: string },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
-    if (bankFeatureBlock) return bankFeatureBlock;
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'bank',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     if (!data.value || data.value.trim().length === 0) {
       return {
@@ -203,7 +194,12 @@ export async function deleteDescriptionSuggestion(data: { value: string }) {
     }
 
     await prisma.transactionDescriptionSuggestion.delete({
-      where: { value: data.value.trim() },
+      where: {
+        dispensaryId_value: {
+          dispensaryId,
+          value: data.value.trim(),
+        },
+      },
     });
 
     return {

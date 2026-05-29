@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { listUsers } from '@/app/_actions/users';
 import UsersPageClient from './UsersPageClient';
 import { SuspenseLoader } from '@/app/_components/SuspenseLoader/SuspenseLoader';

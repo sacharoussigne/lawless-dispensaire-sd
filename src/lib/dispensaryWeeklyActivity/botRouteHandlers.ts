@@ -33,12 +33,13 @@ export function mapBotRouteError(e: unknown): NextResponse | null {
 }
 
 export async function botEditWeekdayFlag(
+  dispensaryId: string,
   discordUserId: string,
   field: 'chest' | 'presence',
   input: BotDayEditRequestBody,
 ) {
   const dayAnchor = resolveParisDayAnchor({ weekday: input.weekday, date: input.date });
-  return botSetWeekdayFlag(discordUserId, field, dayAnchor, input.value, {
+  return botSetWeekdayFlag(dispensaryId, discordUserId, field, dayAnchor, input.value, {
     displayName: input.displayName,
   });
 }

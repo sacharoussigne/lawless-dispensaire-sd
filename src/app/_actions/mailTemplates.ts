@@ -3,9 +3,8 @@
 import { z } from 'zod/v3';
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
-import { getAuthSession } from '@/lib/auth';
-import { checkRolePermission } from '@/lib/auth/permissions';
-import { getAppFeatureActionBlock } from '@/lib/appSettings';
+import { requirePermission, requireTenantServerActionContext } from '@/lib/serverActionAuth';
+import { tenantWhere } from '@/lib/dispensary/tenantWhere';
 
 const optionalDefaultMailName = z
   .string()
@@ -35,28 +34,27 @@ const deleteMailTemplateSchema = z.object({
   id: z.string().uuid('ID invalide'),
 });
 
-export async function createMailTemplate(data: {
-  name: string;
-  description?: string;
-  content: string;
-  defaultMailName?: string;
-}) {
+export async function createMailTemplate(
+  dispensarySlug: string,
+  data: {
+    name: string;
+    description?: string;
+    content: string;
+    defaultMailName?: string;
+  },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const mailsFeatureBlock = await getAppFeatureActionBlock('mails');
-    if (mailsFeatureBlock) return mailsFeatureBlock;
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'mails',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = createMailTemplateSchema.parse(data);
 
     const mailTemplate = await prisma.mailTemplate.create({
       data: {
+        dispensaryId,
         name: validatedData.name,
         description: validatedData.description,
         content: validatedData.content,
@@ -74,22 +72,18 @@ export async function createMailTemplate(data: {
   }
 }
 
-export async function getMailTemplates() {
+export async function getMailTemplates(dispensarySlug: string) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const mailsFeatureBlock = await getAppFeatureActionBlock('mails');
-    if (mailsFeatureBlock) return mailsFeatureBlock;
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'mails',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const mailTemplates = await prisma.mailTemplate.findMany({
       where: {
         userId: null,
+        ...tenantWhere(dispensaryId),
       },
       orderBy: {
         createdAt: 'desc',
@@ -105,30 +99,29 @@ export async function getMailTemplates() {
   }
 }
 
-export async function updateMailTemplate(data: {
-  id: string;
-  name: string;
-  description?: string;
-  content: string;
-  defaultMailName?: string;
-}) {
+export async function updateMailTemplate(
+  dispensarySlug: string,
+  data: {
+    id: string;
+    name: string;
+    description?: string;
+    content: string;
+    defaultMailName?: string;
+  },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const mailsFeatureBlock = await getAppFeatureActionBlock('mails');
-    if (mailsFeatureBlock) return mailsFeatureBlock;
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'mails',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = updateMailTemplateSchema.parse(data);
 
-    const existingTemplate = await prisma.mailTemplate.findUnique({
+    const existingTemplate = await prisma.mailTemplate.findFirst({
       where: {
         id: validatedData.id,
+        ...tenantWhere(dispensaryId),
       },
     });
 
@@ -149,6 +142,7 @@ export async function updateMailTemplate(data: {
     const mailTemplate = await prisma.mailTemplate.update({
       where: {
         id: validatedData.id,
+        ...tenantWhere(dispensaryId),
       },
       data: {
         name: validatedData.name,
@@ -167,24 +161,20 @@ export async function updateMailTemplate(data: {
   }
 }
 
-export async function deleteMailTemplate(data: { id: string }) {
+export async function deleteMailTemplate(dispensarySlug: string, data: { id: string }) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const mailsFeatureBlock = await getAppFeatureActionBlock('mails');
-    if (mailsFeatureBlock) return mailsFeatureBlock;
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'mails',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = deleteMailTemplateSchema.parse(data);
 
-    const existingTemplate = await prisma.mailTemplate.findUnique({
+    const existingTemplate = await prisma.mailTemplate.findFirst({
       where: {
         id: validatedData.id,
+        ...tenantWhere(dispensaryId),
       },
     });
 
@@ -205,6 +195,7 @@ export async function deleteMailTemplate(data: { id: string }) {
     await prisma.mailTemplate.delete({
       where: {
         id: validatedData.id,
+        ...tenantWhere(dispensaryId),
       },
     });
 
@@ -217,23 +208,21 @@ export async function deleteMailTemplate(data: { id: string }) {
   }
 }
 
-export async function generateOrderMailPreview(data: {
-  orderId: string;
-}) {
+export async function generateOrderMailPreview(
+  dispensarySlug: string,
+  data: {
+    orderId: string;
+  },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'mails',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
-    const mailsFeatureBlock = await getAppFeatureActionBlock('mails');
-    if (mailsFeatureBlock) return mailsFeatureBlock;
-
-    const order = await prisma.order.findUnique({
-      where: { id: data.orderId },
+    const order = await prisma.order.findFirst({
+      where: { id: data.orderId, ...tenantWhere(dispensaryId) },
       include: {
         company: {
           select: {
@@ -270,7 +259,8 @@ export async function generateOrderMailPreview(data: {
 
     const assignment = await prisma.orderMailTemplateAssignment.findUnique({
       where: {
-        orderType_orderStatus: {
+        dispensaryId_orderType_orderStatus: {
+          dispensaryId,
           orderType: order.type,
           orderStatus: order.status,
         },
@@ -299,7 +289,7 @@ export async function generateOrderMailPreview(data: {
 
     const priceText = order.price != null ? `${order.price.toFixed(2)} $` : 'Non spécifié';
 
-    const username = session.user.name || 'Utilisateur';
+    const username = ctx.session.user.name || 'Utilisateur';
 
     let preview = template.content;
     const clientName =
@@ -350,22 +340,18 @@ export async function generateOrderMailPreview(data: {
   }
 }
 
-export async function getUserMailTemplates() {
+export async function getUserMailTemplates(dispensarySlug: string) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const mailsFeatureBlock = await getAppFeatureActionBlock('mails');
-    if (mailsFeatureBlock) return mailsFeatureBlock;
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'mails',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const mailTemplates = await prisma.mailTemplate.findMany({
       where: {
-        userId: session.user.id,
+        userId: ctx.session.user.id,
+        ...tenantWhere(dispensaryId),
       },
       orderBy: {
         createdAt: 'desc',
@@ -381,33 +367,32 @@ export async function getUserMailTemplates() {
   }
 }
 
-export async function createUserMailTemplate(data: {
-  name: string;
-  description?: string;
-  content: string;
-  defaultMailName?: string;
-}) {
+export async function createUserMailTemplate(
+  dispensarySlug: string,
+  data: {
+    name: string;
+    description?: string;
+    content: string;
+    defaultMailName?: string;
+  },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const mailsFeatureBlock = await getAppFeatureActionBlock('mails');
-    if (mailsFeatureBlock) return mailsFeatureBlock;
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'mails',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = createMailTemplateSchema.parse(data);
 
     const mailTemplate = await prisma.mailTemplate.create({
       data: {
+        dispensaryId,
         name: validatedData.name,
         description: validatedData.description,
         content: validatedData.content,
         defaultMailName: validatedData.defaultMailName ?? null,
-        userId: session.user.id,
+        userId: ctx.session.user.id,
       },
     });
 
@@ -420,30 +405,29 @@ export async function createUserMailTemplate(data: {
   }
 }
 
-export async function updateUserMailTemplate(data: {
-  id: string;
-  name: string;
-  description?: string;
-  content: string;
-  defaultMailName?: string;
-}) {
+export async function updateUserMailTemplate(
+  dispensarySlug: string,
+  data: {
+    id: string;
+    name: string;
+    description?: string;
+    content: string;
+    defaultMailName?: string;
+  },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const mailsFeatureBlock = await getAppFeatureActionBlock('mails');
-    if (mailsFeatureBlock) return mailsFeatureBlock;
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'mails',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId, effectiveRole } = ctx.tenant;
 
     const validatedData = updateMailTemplateSchema.parse(data);
 
-    const existingTemplate = await prisma.mailTemplate.findUnique({
+    const existingTemplate = await prisma.mailTemplate.findFirst({
       where: {
         id: validatedData.id,
+        ...tenantWhere(dispensaryId),
       },
     });
 
@@ -454,7 +438,7 @@ export async function updateUserMailTemplate(data: {
       };
     }
 
-    if (existingTemplate.userId !== null && existingTemplate.userId !== session.user.id) {
+    if (existingTemplate.userId !== null && existingTemplate.userId !== ctx.session.user.id) {
       return {
         status: 403,
         error: 'Vous n\'êtes pas autorisé à modifier ce template',
@@ -462,18 +446,19 @@ export async function updateUserMailTemplate(data: {
     }
 
     if (existingTemplate.userId === null) {
-      const hasManagementPermission = checkRolePermission(session.user.role, 'application', 'management');
-      if (!hasManagementPermission) {
-        return {
-          status: 403,
-          error: 'Vous n\'êtes pas autorisé à modifier un template global',
-        };
-      }
+      const permResult = requirePermission(
+        effectiveRole,
+        'application',
+        'management',
+        'Vous n\'êtes pas autorisé à modifier un template global',
+      );
+      if (!permResult.ok) return permResult.response;
     }
 
     const mailTemplate = await prisma.mailTemplate.update({
       where: {
         id: validatedData.id,
+        ...tenantWhere(dispensaryId),
       },
       data: {
         name: validatedData.name,
@@ -492,24 +477,20 @@ export async function updateUserMailTemplate(data: {
   }
 }
 
-export async function deleteUserMailTemplate(data: { id: string }) {
+export async function deleteUserMailTemplate(dispensarySlug: string, data: { id: string }) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const mailsFeatureBlock = await getAppFeatureActionBlock('mails');
-    if (mailsFeatureBlock) return mailsFeatureBlock;
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'mails',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId, effectiveRole } = ctx.tenant;
 
     const validatedData = deleteMailTemplateSchema.parse(data);
 
-    const existingTemplate = await prisma.mailTemplate.findUnique({
+    const existingTemplate = await prisma.mailTemplate.findFirst({
       where: {
         id: validatedData.id,
+        ...tenantWhere(dispensaryId),
       },
     });
 
@@ -520,7 +501,7 @@ export async function deleteUserMailTemplate(data: { id: string }) {
       };
     }
 
-    if (existingTemplate.userId !== null && existingTemplate.userId !== session.user.id) {
+    if (existingTemplate.userId !== null && existingTemplate.userId !== ctx.session.user.id) {
       return {
         status: 403,
         error: 'Vous n\'êtes pas autorisé à supprimer ce template',
@@ -528,18 +509,19 @@ export async function deleteUserMailTemplate(data: { id: string }) {
     }
 
     if (existingTemplate.userId === null) {
-      const hasManagementPermission = checkRolePermission(session.user.role, 'application', 'management');
-      if (!hasManagementPermission) {
-        return {
-          status: 403,
-          error: 'Vous n\'êtes pas autorisé à supprimer un template global',
-        };
-      }
+      const permResult = requirePermission(
+        effectiveRole,
+        'application',
+        'management',
+        'Vous n\'êtes pas autorisé à supprimer un template global',
+      );
+      if (!permResult.ok) return permResult.response;
     }
 
     await prisma.mailTemplate.delete({
       where: {
         id: validatedData.id,
+        ...tenantWhere(dispensaryId),
       },
     });
 

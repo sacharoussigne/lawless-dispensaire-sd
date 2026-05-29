@@ -1,6 +1,8 @@
 # API HTTP — Activité hebdomadaire (bot Discord)
 
-Cette API permet au bot Discord de lire et de modifier les lignes d’activité hebdomadaire du dispensaire. Elle est **distincte** de l’authentification utilisateur (cookies / Better Auth) : seule une **clé secrète** partagée est utilisée.
+Cette API permet au bot Discord de lire et de modifier les lignes d’activité hebdomadaire **d’un dispensaire donné**. Elle est **distincte** de l’authentification utilisateur (cookies / Better Auth) : une **clé secrète** partagée + l’identifiant du dispensaire cible.
+
+En mode multi-dispensaire, chaque requête doit cibler **un seul tenant** : les données (liste, récap, création, caisse, présence) sont isolées par `dispensaryId`.
 
 ## URL de base
 
@@ -10,14 +12,30 @@ Tous les chemins ci-dessous sont relatifs à cette base.
 
 ## Authentification
 
-| En-tête | Obligatoire | Description |
-|--------|-------------|-------------|
-| `Authorization` | Oui | `Bearer <secret>` où `<secret>` est la valeur de la variable d’environnement **`DISPENSARY_BOT_API_SECRET`** côté serveur. |
-| `X-Discord-User-Id` | Oui sauf `GET …/recap` (là il est optionnel) | ID Discord (snowflake) de l’utilisateur dont le bot agit **au nom**. Les écritures ne sont autorisées que pour les lignes dont le champ `discordUserId` est égal à cet ID. |
+| En-tête / paramètre | Obligatoire | Description |
+|---------------------|-------------|-------------|
+| `Authorization` | Oui | `Bearer <secret>` où `<secret>` est la valeur de **`DISPENSARY_BOT_API_SECRET`** côté serveur. |
+| `X-Dispensary-Id` | Oui (toutes les routes) | UUID du dispensaire cible (ex. `00000000-0000-4000-8000-000000000001` pour le dispensaire migré par défaut). Alternative : query `?dispensaryId=<uuid>` sur la même URL. |
+| `X-Discord-User-Id` | Oui sauf `GET …/recap` (là optionnel) | ID Discord (snowflake) de l’utilisateur dont le bot agit **au nom**. Les écritures ne sont autorisées que pour les lignes dont `discordUserId` est égal à cet ID. |
 
-En cas d’échec d’authentification par clé : réponse **401** avec un corps JSON `{ "status": 401, "error": "Non autorisé" }`.
+**Erreurs liées au dispensaire :**
 
-Si `X-Discord-User-Id` est absent alors qu’il est requis par la route : **400** (sauf `GET …/recap` où l’en-tête est optionnel).
+| Code | Cas |
+|------|-----|
+| **400** | `X-Dispensary-Id` / `dispensaryId` absent |
+| **401** | Secret invalide |
+| **403** | Feature « activité hebdomadaire » désactivée pour ce dispensaire (`AppSettings.featureWeeklyDispensaryActivityEnabled`) |
+| **404** | `dispensaryId` inconnu |
+
+En cas d’échec d’authentification par clé : **401** avec `{ "status": 401, "error": "Non autorisé" }`.
+
+Si `X-Discord-User-Id` est absent alors qu’il est requis : **400** (sauf `GET …/recap` où l’en-tête reste optionnel pour filtrer un médecin).
+
+### Obtenir le `dispensaryId`
+
+- Après migration : dispensaire par défaut = UUID fixe `00000000-0000-4000-8000-000000000001` (slug intranet `saint-denis`).
+- Super-admin : liste dans l’intranet `/platform/dispensaries`, ou table `dispensary` en base.
+- Le bot peut stocker **un `dispensaryId` par serveur Discord** (guild) si plusieurs dispensaires RP partagent la même instance.
 
 ## Format des réponses
 
@@ -73,9 +91,11 @@ WHERE "periodEnd" = "periodStart" + interval '7 days';
 
 Liste **toutes** les activités dont `discordUserId` correspond à `X-Discord-User-Id` (tri par `periodStart` décroissant).
 
-**En-têtes :** `Authorization`, `X-Discord-User-Id`
+**En-têtes :** `Authorization`, `X-Dispensary-Id`, `X-Discord-User-Id`
 
 **Corps :** aucun
+
+Ne retourne que les activités du dispensaire indiqué par `X-Dispensary-Id`.
 
 **Réponse 200 — `data` :** tableau d’objets :
 
@@ -105,6 +125,7 @@ Liste **toutes** les activités dont `discordUserId` correspond à `X-Discord-Us
 ```bash
 curl -sS \
   -H "Authorization: Bearer VOTRE_SECRET" \
+  -H "X-Dispensary-Id: 00000000-0000-4000-8000-000000000001" \
   -H "X-Discord-User-Id: 123456789012345678" \
   "https://votre-domaine/api/dispensary/weekly-activity"
 ```
@@ -117,7 +138,7 @@ Récapitulatif pour la **semaine Europe/Paris** (lundi → dimanche, voir sectio
 
 Les lignes renvoyées sont celles dont la période **chevauche** cette semaine (inclut d’éventuelles anciennes lignes aux bornes UTC si elles intersectent encore la fenêtre Paris demandée).
 
-**En-têtes :** `Authorization` obligatoire ; **`X-Discord-User-Id` optionnel** — s’il est présent, seules les lignes de ce médecin qui chevauchent la semaine sont renvoyées ; s’il est absent, **toutes** les lignes concernées sont renvoyées (récap équipe).
+**En-têtes :** `Authorization`, **`X-Dispensary-Id`** obligatoires ; **`X-Discord-User-Id` optionnel** — s’il est présent, seules les lignes de ce médecin (dans ce dispensaire) qui chevauchent la semaine sont renvoyées ; s’il est absent, **toutes** les lignes du dispensaire pour cette semaine sont renvoyées (récap équipe).
 
 **Query :**
 
@@ -139,7 +160,8 @@ Les lignes renvoyées sont celles dont la période **chevauche** cette semaine (
 ```bash
 curl -sS \
   -H "Authorization: Bearer VOTRE_SECRET" \
-  "/api/dispensary/weekly-activity/recap?date=2026-04-15"
+  -H "X-Dispensary-Id: 00000000-0000-4000-8000-000000000001" \
+  "https://votre-domaine/api/dispensary/weekly-activity/recap?date=2026-04-15"
 ```
 
 ---
@@ -148,7 +170,9 @@ curl -sS \
 
 Crée une nouvelle ligne pour le médecin identifié par le **Discord ID** (corps + en-tête doivent coïncider).
 
-**En-têtes :** `Authorization`, `X-Discord-User-Id`
+**En-têtes :** `Authorization`, `X-Dispensary-Id`, `X-Discord-User-Id`
+
+La ligne créée est rattachée au dispensaire `X-Dispensary-Id`.
 
 **Corps JSON (tous les champs sont requis sauf `userId`, `chestDays`, `presenceDays`) :**
 
@@ -174,7 +198,7 @@ Chaque objet `chestDays` / `presenceDays` doit contenir **exactement** les sept 
 **Erreurs fréquentes :**
 
 - **403** — `discordUserId` dans le corps ≠ `X-Discord-User-Id`
-- **409** — une ligne existe déjà pour la même combinaison `(discordUserId, periodStart, periodEnd)`
+- **409** — une ligne existe déjà pour la même combinaison `(dispensaryId, discordUserId, periodStart, periodEnd)`
 - **422** — validation Zod (dates, types, etc.)
 
 **Exemple :**
@@ -182,6 +206,7 @@ Chaque objet `chestDays` / `presenceDays` doit contenir **exactement** les sept 
 ```bash
 curl -sS -X POST \
   -H "Authorization: Bearer VOTRE_SECRET" \
+  -H "X-Dispensary-Id: 00000000-0000-4000-8000-000000000001" \
   -H "X-Discord-User-Id: 123456789012345678" \
   -H "Content-Type: application/json" \
   -d '{
@@ -204,11 +229,13 @@ curl -sS -X POST \
 
 Récupère **une** ligne par son `id` (UUID).
 
-**Règle d’accès :** la ligne doit avoir `discordUserId` égal à `X-Discord-User-Id`, sinon **403**.
+**En-têtes :** `Authorization`, `X-Dispensary-Id`, `X-Discord-User-Id`
+
+**Règle d’accès :** la ligne doit appartenir au dispensaire `X-Dispensary-Id` et avoir `discordUserId` égal à `X-Discord-User-Id`, sinon **403**.
 
 **Réponse 200 — `data` :** même structure qu’un élément de liste.
 
-**404** — id inconnu.
+**404** — id inconnu ou ligne d’un autre dispensaire.
 
 ---
 
@@ -216,7 +243,7 @@ Récupère **une** ligne par son `id` (UUID).
 
 Met à jour la **caisse** (`chestDays`) du médecin identifié par `X-Discord-User-Id`. Deux modes selon le corps JSON.
 
-**En-têtes :** `Authorization`, `X-Discord-User-Id`
+**En-têtes :** `Authorization`, `X-Dispensary-Id`, `X-Discord-User-Id`
 
 ### Mode legacy (raccourci)
 
@@ -253,6 +280,7 @@ Corps avec **`value`** (booléen) et **exactement un** de **`weekday`** ou **`da
 ```bash
 curl -sS -X POST \
   -H "Authorization: Bearer VOTRE_SECRET" \
+  -H "X-Dispensary-Id: 00000000-0000-4000-8000-000000000001" \
   -H "X-Discord-User-Id: 123456789012345678" \
   -H "Content-Type: application/json" \
   -d '{"displayName": "Dr. H. Morgan"}' \
@@ -264,6 +292,7 @@ curl -sS -X POST \
 ```bash
 curl -sS -X POST \
   -H "Authorization: Bearer VOTRE_SECRET" \
+  -H "X-Dispensary-Id: 00000000-0000-4000-8000-000000000001" \
   -H "X-Discord-User-Id: 123456789012345678" \
   -H "Content-Type: application/json" \
   -d '{"weekday": "jeudi", "value": false}' \
@@ -275,6 +304,7 @@ curl -sS -X POST \
 ```bash
 curl -sS -X POST \
   -H "Authorization: Bearer VOTRE_SECRET" \
+  -H "X-Dispensary-Id: 00000000-0000-4000-8000-000000000001" \
   -H "X-Discord-User-Id: 123456789012345678" \
   -H "Content-Type: application/json" \
   -d '{"date": "2026-05-14", "value": true}' \
@@ -287,7 +317,7 @@ curl -sS -X POST \
 
 Met à jour la **présence** (`presenceDays`). Deux modes selon le corps JSON.
 
-**En-têtes :** `Authorization`, `X-Discord-User-Id`
+**En-têtes :** `Authorization`, `X-Dispensary-Id`, `X-Discord-User-Id`
 
 ### Mode legacy (raccourci)
 
@@ -310,6 +340,7 @@ Mêmes champs que **`bot/caisse`** (`value`, `weekday` ou `date`, `displayName` 
 ```bash
 curl -sS -X POST \
   -H "Authorization: Bearer VOTRE_SECRET" \
+  -H "X-Dispensary-Id: 00000000-0000-4000-8000-000000000001" \
   -H "X-Discord-User-Id: 123456789012345678" \
   -H "Content-Type: application/json" \
   -d '{"day": "yesterday"}' \
@@ -321,6 +352,7 @@ curl -sS -X POST \
 ```bash
 curl -sS -X POST \
   -H "Authorization: Bearer VOTRE_SECRET" \
+  -H "X-Dispensary-Id: 00000000-0000-4000-8000-000000000001" \
   -H "X-Discord-User-Id: 123456789012345678" \
   -H "Content-Type: application/json" \
   -d '{"weekday": "mardi", "value": true}' \
@@ -342,15 +374,18 @@ Les caisses et présences **par jour** ne sont pas modifiables via ce `PATCH` c�
 
 **Comportement côté historique (bot) :** pour chaque compteur dont la valeur change, une entrée d’historique de type **incrément** ou **décrément** est enregistrée (shérifs, palefreniers, patients, infusions, lait de pavot) ; si la période ou le `displayName` change, une entrée **UPDATE** est aussi enregistrée. Les valeurs envoyées sont des **absolus** (pas des deltas) : l’API calcule la différence pour classer incrément / décrément.
 
-**403** — la ligne n’appartient pas au `X-Discord-User-Id`.
+**En-têtes :** `Authorization`, `X-Dispensary-Id`, `X-Discord-User-Id`
 
-**409** — conflit d’unicité sur la période (changement de dates qui entre en collision avec une autre ligne).
+**403** — la ligne n’appartient pas au dispensaire ou au `X-Discord-User-Id`.
+
+**409** — conflit d’unicité sur la période (changement de dates qui entre en collision avec une autre ligne du même dispensaire).
 
 **Exemple (modifier seulement les compteurs) :**
 
 ```bash
 curl -sS -X PATCH \
   -H "Authorization: Bearer VOTRE_SECRET" \
+  -H "X-Dispensary-Id: 00000000-0000-4000-8000-000000000001" \
   -H "X-Discord-User-Id: 123456789012345678" \
   -H "Content-Type: application/json" \
   -d '{"sherifCount": 3, "palefrenierCount": 1, "patientsCount": 8}' \
@@ -372,6 +407,7 @@ Supprime la ligne. L’historique est conservé en base (référence vers l’ac
 ```bash
 curl -sS -X DELETE \
   -H "Authorization: Bearer VOTRE_SECRET" \
+  -H "X-Dispensary-Id: 00000000-0000-4000-8000-000000000001" \
   -H "X-Discord-User-Id: 123456789012345678" \
   "https://votre-domaine/api/dispensary/weekly-activity/<UUID>"
 ```
@@ -380,10 +416,15 @@ curl -sS -X DELETE \
 
 ## Checklist bot Discord
 
-1. Stocker **`DISPENSARY_BOT_API_SECRET`** dans l’environnement du serveur qui héberge Next.js (et une copie chiffrée côté bot si besoin).
-2. À chaque requête : envoyer **`Authorization: Bearer …`**. Ajouter **`X-Discord-User-Id`** (sauf pour **`GET …/recap`** sans filtre médecin) = l’ID Discord de l’utilisateur qui déclenche l’action dans Discord.
-3. Pour **POST**, aligner **`discordUserId`** du JSON sur cet en-tête.
-4. Utiliser l’**URL HTTPS** de prod dans le bot ; ne pas exposer le secret dans le dépôt ou le client web.
+1. Stocker **`DISPENSARY_BOT_API_SECRET`** côté Next.js et côté bot (chiffré).
+2. Configurer **`DISPENSARY_ID`** (ou équivalent) par instance / guild Discord — UUID du dispensaire cible.
+3. À **chaque** requête :
+   - **`Authorization: Bearer …`**
+   - **`X-Dispensary-Id: <uuid>`** (ou `?dispensaryId=` sur l’URL)
+   - **`X-Discord-User-Id`** (sauf `GET …/recap` sans filtre médecin)
+4. Pour **POST** création, aligner **`discordUserId`** du JSON sur `X-Discord-User-Id`.
+5. Vérifier que l’activité hebdo est activée pour ce dispensaire dans l’intranet (sinon **403**).
+6. URL **HTTPS** de prod ; ne jamais committer le secret.
 
 ---
 
@@ -392,4 +433,4 @@ curl -sS -X DELETE \
 - Routes : `src/app/api/dispensary/weekly-activity/route.ts`, `src/app/api/dispensary/weekly-activity/recap/route.ts`, `src/app/api/dispensary/weekly-activity/[id]/route.ts`, `src/app/api/dispensary/weekly-activity/bot/caisse/route.ts`, `src/app/api/dispensary/weekly-activity/bot/presence/route.ts`
 - Validation : `src/lib/dispensaryWeeklyActivity/schemas.ts` (dont schémas corps `bot/caisse` et `bot/presence`), `src/lib/dispensaryWeeklyActivity/weekdayFlags.ts`, `src/lib/dispensaryWeeklyActivity/botDayEdit.ts`
 - Sérialisation : `src/lib/dispensaryWeeklyActivity/apiRow.ts`, `src/lib/dispensaryWeeklyActivity/loadSerializedRow.ts`
-- Vérification du secret : `src/lib/dispensaryWeeklyActivityApiAuth.ts`
+- Vérification du secret et du dispensaire : `src/lib/dispensaryWeeklyActivityApiAuth.ts`, `src/lib/dispensaryWeeklyActivity/botRequestContext.ts`

@@ -6,6 +6,7 @@ import { serializeDispensaryWeeklyActivityApiRow } from '@/lib/dispensaryWeeklyA
 import { mergeResolvedDisplayNames } from '@/lib/dispensaryWeeklyActivity/resolveDisplayName';
 import { syncActivityUserIdFromDiscordIfMissing } from '@/lib/dispensaryWeeklyActivity/service';
 import { getBankWeekBounds } from '@/lib/bankWeek';
+import { resolveBotDispensaryContext } from '@/lib/dispensaryWeeklyActivity/botRequestContext';
 import dayjs from '@/lib/dayjs';
 
 function jsonError(status: number, error: string) {
@@ -17,6 +18,11 @@ const YMD = /^\d{4}-\d{2}-\d{2}$/;
 export async function GET(request: NextRequest) {
   if (!isDispensaryBotApiAuthorized(request)) {
     return jsonError(401, 'Non autorisé');
+  }
+
+  const dispensaryCtx = await resolveBotDispensaryContext(request);
+  if (!dispensaryCtx.ok) {
+    return jsonError(dispensaryCtx.status, dispensaryCtx.error);
   }
 
   const dateParam = request.nextUrl.searchParams.get('date')?.trim() ?? '';
@@ -33,6 +39,7 @@ export async function GET(request: NextRequest) {
   const optionalDiscord = getDiscordUserIdFromBotRequest(request);
 
   const overlapWhere = {
+    dispensaryId: dispensaryCtx.dispensaryId,
     periodStart: { lte: periodEnd },
     periodEnd: { gte: periodStart },
     ...(optionalDiscord ? { discordUserId: optionalDiscord } : {}),
@@ -61,8 +68,6 @@ export async function GET(request: NextRequest) {
     a.resolvedDisplayName.localeCompare(b.resolvedDisplayName, 'fr', { sensitivity: 'base' }),
   );
 
-  
-
   return NextResponse.json({
     status: 200,
     data: {
@@ -86,9 +91,8 @@ export async function GET(request: NextRequest) {
           poppyMilkCount: r.poppyMilkCount,
           createdAt: r.createdAt,
           updatedAt: r.updatedAt,
-        })
-      },
-      ),
+        });
+      }),
     },
   });
 }

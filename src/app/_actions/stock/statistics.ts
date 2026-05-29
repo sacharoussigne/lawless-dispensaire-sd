@@ -2,9 +2,8 @@
 
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
-import { getAuthSession } from '@/lib/auth';
-import { checkRolePermission } from '@/lib/auth/permissions';
-import { getAppFeatureActionBlock } from '@/lib/appSettings';
+import { requireTenantServerActionContext } from '@/lib/serverActionAuth';
+import { tenantWhere } from '@/lib/dispensary/tenantWhere';
 import { getStartOfDay, getDayAfter } from '@/lib/date';
 import type { StockStatsItemRow } from '@/lib/stock/movements';
 
@@ -17,23 +16,21 @@ export type StockConsumptionStatsResult = {
   };
 };
 
-export async function getStockConsumptionStats(data: { from: Date; to: Date }) {
+export async function getStockConsumptionStats(
+  dispensarySlug: string,
+  data: { from: Date; to: Date },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return { status: 401, error: 'Non autorisé' };
-    }
-
-    const featureBlock = await getAppFeatureActionBlock('stock');
-    if (featureBlock) return featureBlock;
-
-    const userRole = session.user?.role;
-    if (!checkRolePermission(userRole, 'stock_statistics', 'view')) {
-      return {
-        status: 403,
-        error: 'Permission refusée : vous n\'avez pas accès aux statistiques de stock',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'stock',
+      permission: {
+        resource: 'stock_statistics',
+        action: 'view',
+        message: 'Permission refusée : vous n\'avez pas accès aux statistiques de stock',
+      },
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const fromStart = getStartOfDay(data.from);
     const toEndExclusive = getDayAfter(getStartOfDay(data.to));
@@ -48,7 +45,10 @@ export async function getStockConsumptionStats(data: { from: Date; to: Date }) {
           gte: fromStart,
           lt: toEndExclusive,
         },
-        item: { isEnabled: true },
+        item: {
+          isEnabled: true,
+          ...tenantWhere(dispensaryId),
+        },
       },
       select: {
         itemId: true,

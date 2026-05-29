@@ -2,8 +2,8 @@
 
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
-import { getAuthSession } from '@/lib/auth';
-import { getAppFeatureActionBlock } from '@/lib/appSettings';
+import { requireTenantServerActionContext } from '@/lib/serverActionAuth';
+import { tenantWhere } from '@/lib/dispensary/tenantWhere';
 
 import {
   createBankAccountSchema,
@@ -12,23 +12,23 @@ import {
 } from '@/app/_actions/bank/schemas';
 import { checkAccountAccess } from '@/app/_actions/bank/internals';
 
-export async function createBankAccount(data: { name: string }) {
+export async function createBankAccount(
+  dispensarySlug: string,
+  data: { name: string },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
-    if (bankFeatureBlock) return bankFeatureBlock;
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'bank',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
+    const { session } = ctx;
 
     const validatedData = createBankAccountSchema.parse(data);
 
     const account = await prisma.bankAccount.create({
       data: {
+        dispensaryId,
         name: validatedData.name,
         ownerId: session.user.id,
       },
@@ -63,24 +63,18 @@ export async function createBankAccount(data: { name: string }) {
   }
 }
 
-/**
- * Gets all bank accounts accessible by the user
- */
-export async function getBankAccounts() {
+export async function getBankAccounts(dispensarySlug: string) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
-    if (bankFeatureBlock) return bankFeatureBlock;
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'bank',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
+    const { session } = ctx;
 
     const accounts = await prisma.bankAccount.findMany({
       where: {
+        ...tenantWhere(dispensaryId),
         OR: [
           { ownerId: session.user.id },
           {
@@ -126,23 +120,16 @@ export async function getBankAccounts() {
   }
 }
 
-/**
- * Gets a bank account by its ID
- */
-export async function getBankAccount(accountId: string) {
+export async function getBankAccount(dispensarySlug: string, accountId: string) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'bank',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
+    const { session } = ctx;
 
-    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
-    if (bankFeatureBlock) return bankFeatureBlock;
-
-    const accessCheck = await checkAccountAccess(accountId, session.user.id);
+    const accessCheck = await checkAccountAccess(dispensaryId, accountId, session.user.id);
     if (!accessCheck.hasAccess) {
       return {
         status: 403,
@@ -150,8 +137,8 @@ export async function getBankAccount(accountId: string) {
       };
     }
 
-    const account = await prisma.bankAccount.findUnique({
-      where: { id: accountId },
+    const account = await prisma.bankAccount.findFirst({
+      where: { id: accountId, ...tenantWhere(dispensaryId) },
       include: {
         owner: {
           select: {
@@ -190,25 +177,26 @@ export async function getBankAccount(accountId: string) {
   }
 }
 
-/**
- * Updates a bank account
- */
-export async function updateBankAccount(data: { id: string; name: string }) {
+export async function updateBankAccount(
+  dispensarySlug: string,
+  data: { id: string; name: string },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
-    if (bankFeatureBlock) return bankFeatureBlock;
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'bank',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
+    const { session } = ctx;
 
     const validatedData = updateBankAccountSchema.parse(data);
 
-    const accessCheck = await checkAccountAccess(validatedData.id, session.user.id, true);
+    const accessCheck = await checkAccountAccess(
+      dispensaryId,
+      validatedData.id,
+      session.user.id,
+      true,
+    );
     if (!accessCheck.hasAccess) {
       return {
         status: 403,
@@ -252,27 +240,22 @@ export async function updateBankAccount(data: { id: string; name: string }) {
   }
 }
 
-/**
- * Deletes a bank account
- */
-export async function deleteBankAccount(data: { id: string }) {
+export async function deleteBankAccount(
+  dispensarySlug: string,
+  data: { id: string },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
-    if (bankFeatureBlock) return bankFeatureBlock;
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'bank',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
+    const { session } = ctx;
 
     const validatedData = deleteBankAccountSchema.parse(data);
 
-    // Seul le propriétaire peut supprimer
-    const account = await prisma.bankAccount.findUnique({
-      where: { id: validatedData.id },
+    const account = await prisma.bankAccount.findFirst({
+      where: { id: validatedData.id, ...tenantWhere(dispensaryId) },
       select: { ownerId: true },
     });
 
@@ -302,7 +285,3 @@ export async function deleteBankAccount(data: { id: string }) {
     return actionErrorParser(error, 'Erreur lors de la suppression du compte bancaire');
   }
 }
-
-/**
- * Creates access to a bank account
- */

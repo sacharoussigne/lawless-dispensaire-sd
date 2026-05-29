@@ -2,27 +2,23 @@
 
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
-import { getAuthSession } from '@/lib/auth';
-import { getAppFeatureActionBlock } from '@/lib/appSettings';
+import { requireTenantServerActionContext } from '@/lib/serverActionAuth';
 import { getTodayStart, getTomorrowStart } from '@/lib/date';
 
-export async function transferStock(data: {
-  itemId: string;
-  quantity: number;
-  sourceChestId: string;
-  destinationChestId: string;
-}) {
+export async function transferStock(
+  dispensarySlug: string,
+  data: {
+    itemId: string;
+    quantity: number;
+    sourceChestId: string;
+    destinationChestId: string;
+  },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const featureBlock = await getAppFeatureActionBlock('stock');
-    if (featureBlock) return featureBlock;
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'stock',
+    });
+    if (!ctx.ok) return ctx.response;
 
     if (data.sourceChestId === data.destinationChestId) {
       return {
@@ -90,17 +86,17 @@ export async function transferStock(data: {
         orderBy: {
           timestamp: 'desc',
         },
-        });
+      });
 
-        if (destinationStock) {
-          await tx.stockHistory.update({
+      if (destinationStock) {
+        await tx.stockHistory.update({
           where: { id: destinationStock.id },
           data: {
             quantity: destinationStock.quantity + data.quantity,
-            },
-          });
-        } else {
-          await tx.stockHistory.create({
+          },
+        });
+      } else {
+        await tx.stockHistory.create({
           data: {
             itemId: data.itemId,
             chestId: data.destinationChestId,
@@ -119,28 +115,19 @@ export async function transferStock(data: {
   }
 }
 
-/**
- * Transfers multiple items from a source chest to a destination chest
- * Checks that the source chest has enough stock for each item before transferring
- * The operation is transactional: either all transfers succeed, or none are applied
- */
-
-export async function transferMultipleStock(data: {
-  sourceChestId: string;
-  destinationChestId: string;
-  items: { itemId: string; quantity: number }[];
-}) {
+export async function transferMultipleStock(
+  dispensarySlug: string,
+  data: {
+    sourceChestId: string;
+    destinationChestId: string;
+    items: { itemId: string; quantity: number }[];
+  },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const featureBlock = await getAppFeatureActionBlock('stock');
-    if (featureBlock) return featureBlock;
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'stock',
+    });
+    if (!ctx.ok) return ctx.response;
 
     const { sourceChestId, destinationChestId, items } = data;
 
@@ -188,7 +175,7 @@ export async function transferMultipleStock(data: {
 
         if (sourceStock.quantity < quantity) {
           throw new Error(
-            `Stock insuffisant dans le coffre source pour l'item ${itemId}. Stock disponible: ${sourceStock.quantity}, quantité demandée: ${quantity}`
+            `Stock insuffisant dans le coffre source pour l'item ${itemId}. Stock disponible: ${sourceStock.quantity}, quantité demandée: ${quantity}`,
           );
         }
 
@@ -241,5 +228,3 @@ export async function transferMultipleStock(data: {
     return actionErrorParser(error, 'Erreur lors du transfert des items');
   }
 }
-
-

@@ -4,14 +4,12 @@ import { updateTag } from 'next/cache';
 import { z } from 'zod/v3';
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
-import { getAuthSession } from '@/lib/auth';
-import { hasRole } from '@/lib/auth/permissions';
 import {
-  APP_SETTINGS_CACHE_TAG,
+  appSettingsCacheTag,
   getAppSettings,
   type AppSettingsDTO,
 } from '@/lib/appSettings';
-import { Role } from '@/types/enum/roles';
+import { requireTenantServerActionContext } from '@/lib/serverActionAuth';
 
 const updateSchema = z.object({
   dispensaryName: z
@@ -29,19 +27,23 @@ const updateSchema = z.object({
   featureWeeklyDispensaryActivityEnabled: z.boolean(),
 });
 
-export async function getAppSettingsForAdmin(): Promise<
+export async function getAppSettingsForAdmin(
+  dispensarySlug: string,
+): Promise<
   | { status: 200; data: AppSettingsDTO }
-  | { status: 401 | 403 | 500; error: string }
+  | { status: number; error: string }
 > {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return { status: 401, error: 'Non autorisé' };
-    }
-    if (!hasRole(session.user?.role, Role.ADMIN)) {
-      return { status: 403, error: 'Accès réservé aux administrateurs' };
-    }
-    const data = await getAppSettings();
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      permission: {
+        resource: 'application',
+        action: 'management',
+        message: 'Accès réservé aux administrateurs',
+      },
+    });
+    if (!ctx.ok) return ctx.response;
+
+    const data = await getAppSettings(ctx.tenant.dispensaryId);
     return { status: 200, data };
   } catch (error) {
     const parsed = actionErrorParser(
@@ -59,19 +61,22 @@ export async function getAppSettingsForAdmin(): Promise<
 }
 
 export async function updateAppSettings(
+  dispensarySlug: string,
   input: z.infer<typeof updateSchema>,
 ): Promise<
   | { status: 200; data: AppSettingsDTO }
-  | { status: 400 | 401 | 403 | 500; error: string }
+  | { status: number; error: string }
 > {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return { status: 401, error: 'Non autorisé' };
-    }
-    if (!hasRole(session.user?.role, Role.ADMIN)) {
-      return { status: 403, error: 'Accès réservé aux administrateurs' };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      permission: {
+        resource: 'application',
+        action: 'management',
+        message: 'Accès réservé aux administrateurs',
+      },
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const parsed = updateSchema.safeParse(input);
     if (!parsed.success) {
@@ -82,9 +87,9 @@ export async function updateAppSettings(
     }
 
     const row = await prisma.appSettings.upsert({
-      where: { id: 'default' },
+      where: { dispensaryId },
       create: {
-        id: 'default',
+        dispensaryId,
         dispensaryName: parsed.data.dispensaryName,
         featureStockEnabled: parsed.data.featureStockEnabled,
         featureBankEnabled: parsed.data.featureBankEnabled,
@@ -110,7 +115,7 @@ export async function updateAppSettings(
       },
     });
 
-    updateTag(APP_SETTINGS_CACHE_TAG);
+    updateTag(appSettingsCacheTag(dispensaryId));
 
     const data: AppSettingsDTO = {
       dispensaryName: row.dispensaryName,

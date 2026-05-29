@@ -3,7 +3,6 @@
 import { z } from 'zod/v3';
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
-import { getAuthSession } from '@/lib/auth';
 import { checkRolePermission } from '@/lib/auth/permissions';
 import {
   canEditAllWeeklyDispensaryActivity,
@@ -29,63 +28,66 @@ import {
   syncActivityUserIdFromDiscordIfMissing,
   updateDispensaryWeeklyActivityWithHistory,
 } from '@/lib/dispensaryWeeklyActivity/service';
-import { getAppFeatureActionBlock } from '@/lib/appSettings';
+import { requireTenantServerActionContext } from '@/lib/serverActionAuth';
+import { tenantWhere } from '@/lib/dispensary/tenantWhere';
 
-async function requireWeeklyActivityView() {
-  const session = await getAuthSession();
-  if (!session) {
-    return { ok: false as const, response: { status: 401 as const, error: 'Non autorisé' } };
+async function requireWeeklyActivityView(dispensarySlug: string) {
+  const ctx = await requireTenantServerActionContext(dispensarySlug, {
+    feature: 'weeklyDispensaryActivity',
+  });
+  if (!ctx.ok) {
+    return { ok: false as const, response: ctx.response };
   }
-  const block = await getAppFeatureActionBlock('weeklyDispensaryActivity');
-  if (block) {
-    return { ok: false as const, response: block };
-  }
-  if (!canViewWeeklyDispensaryActivity(session.user?.role)) {
+  if (!canViewWeeklyDispensaryActivity(ctx.tenant.effectiveRole)) {
     return { ok: false as const, response: { status: 403 as const, error: 'Permission refusée' } };
   }
-  return { ok: true as const, session };
+  return { ok: true as const, session: ctx.session, tenant: ctx.tenant };
 }
 
-async function requireWeeklyActivityEdit() {
-  const session = await getAuthSession();
-  if (!session) {
-    return { ok: false as const, response: { status: 401 as const, error: 'Non autorisé' } };
+async function requireWeeklyActivityEdit(dispensarySlug: string) {
+  const ctx = await requireTenantServerActionContext(dispensarySlug, {
+    feature: 'weeklyDispensaryActivity',
+  });
+  if (!ctx.ok) {
+    return { ok: false as const, response: ctx.response };
   }
-  const block = await getAppFeatureActionBlock('weeklyDispensaryActivity');
-  if (block) {
-    return { ok: false as const, response: block };
-  }
-  const role = session.user?.role;
+  const role = ctx.tenant.effectiveRole;
   const can =
     checkRolePermission(role, 'weekly_dispensary_activity', 'edit_all') ||
     checkRolePermission(role, 'weekly_dispensary_activity', 'edit_own');
   if (!can) {
     return { ok: false as const, response: { status: 403 as const, error: 'Permission refusée' } };
   }
-  return { ok: true as const, session };
+  return { ok: true as const, session: ctx.session, tenant: ctx.tenant };
 }
 
-async function listWhereForSession(sessionUserId: string, role: string | null | undefined) {
+async function listWhereForSession(
+  dispensaryId: string,
+  sessionUserId: string,
+  role: string | null | undefined,
+) {
+  const tenantFilter = tenantWhere(dispensaryId);
   if (canEditAllWeeklyDispensaryActivity(role)) {
-    return {};
+    return tenantFilter;
   }
   const discordId = await getDiscordAccountIdForUser(prisma, sessionUserId);
   const or: { userId?: string; discordUserId?: string }[] = [{ userId: sessionUserId }];
   if (discordId) {
     or.push({ discordUserId: discordId });
   }
-  return { OR: or };
+  return { ...tenantFilter, OR: or };
 }
 
-export async function listDispensaryWeeklyActivities() {
+export async function listDispensaryWeeklyActivities(dispensarySlug: string) {
   try {
-    const gate = await requireWeeklyActivityView();
+    const gate = await requireWeeklyActivityView(dispensarySlug);
     if (!gate.ok) {
       return gate.response;
     }
-    const { session } = gate;
+    const { session, tenant } = gate;
+    const { dispensaryId } = tenant;
 
-    const where = await listWhereForSession(session.user.id, session.user.role);
+    const where = await listWhereForSession(dispensaryId, session.user.id, tenant.effectiveRole);
 
     const rows = await prisma.dispensaryWeeklyActivity.findMany({
       where,
@@ -137,9 +139,12 @@ export async function listDispensaryWeeklyActivities() {
 
 const idSchema = z.object({ id: z.string().uuid('ID invalide') });
 
-export async function getDispensaryWeeklyActivityHistory(input: z.infer<typeof idSchema>) {
+export async function getDispensaryWeeklyActivityHistory(
+  dispensarySlug: string,
+  input: z.infer<typeof idSchema>,
+) {
   try {
-    const gate = await requireWeeklyActivityView();
+    const gate = await requireWeeklyActivityView(dispensarySlug);
     if (!gate.ok) {
       return gate.response;
     }
@@ -148,14 +153,16 @@ export async function getDispensaryWeeklyActivityHistory(input: z.infer<typeof i
       return { status: 400 as const, error: parsed.error.issues[0]?.message ?? 'ID invalide' };
     }
 
-    const activity = await prisma.dispensaryWeeklyActivity.findUnique({
-      where: { id: parsed.data.id },
+    const { dispensaryId } = gate.tenant;
+
+    const activity = await prisma.dispensaryWeeklyActivity.findFirst({
+      where: { id: parsed.data.id, ...tenantWhere(dispensaryId) },
     });
     if (!activity) {
       return { status: 404 as const, error: 'Activité introuvable' };
     }
 
-    const role = gate.session.user.role;
+    const role = gate.tenant.effectiveRole;
     const isAll = canEditAllWeeklyDispensaryActivity(role);
     const own = await isWeeklyActivityOwner(prisma, gate.session.user.id, activity);
     if (!isAll && !own) {
@@ -196,7 +203,7 @@ export async function getDispensaryWeeklyActivityHistory(input: z.infer<typeof i
         const latestByDiscord = await Promise.all(
           stillMissing.map(async (discordUserId) => {
             const row = await prisma.dispensaryWeeklyActivity.findFirst({
-              where: { discordUserId },
+              where: { discordUserId, ...tenantWhere(dispensaryId) },
               orderBy: { periodStart: 'desc' },
               include: { user: { select: { name: true } } },
             });
@@ -247,13 +254,13 @@ const createIntranetSchema = dispensaryWeeklyActivityMetricsSchema
     path: ['periodEnd'],
   });
 
-export async function listDispensaryWeeklyActivityTargets() {
+export async function listDispensaryWeeklyActivityTargets(dispensarySlug: string) {
   try {
-    const gate = await requireWeeklyActivityEdit();
+    const gate = await requireWeeklyActivityEdit(dispensarySlug);
     if (!gate.ok) {
       return gate.response;
     }
-    if (!canEditAllWeeklyDispensaryActivity(gate.session.user.role)) {
+    if (!canEditAllWeeklyDispensaryActivity(gate.tenant.effectiveRole)) {
       return { status: 403 as const, error: 'Permission refusée' };
     }
 
@@ -273,9 +280,12 @@ export async function listDispensaryWeeklyActivityTargets() {
   }
 }
 
-export async function createDispensaryWeeklyActivity(input: z.infer<typeof createIntranetSchema>) {
+export async function createDispensaryWeeklyActivity(
+  dispensarySlug: string,
+  input: z.infer<typeof createIntranetSchema>,
+) {
   try {
-    const gate = await requireWeeklyActivityEdit();
+    const gate = await requireWeeklyActivityEdit(dispensarySlug);
     if (!gate.ok) {
       return gate.response;
     }
@@ -284,8 +294,9 @@ export async function createDispensaryWeeklyActivity(input: z.infer<typeof creat
       return { status: 400 as const, error: parsed.error.issues[0]?.message ?? 'Données invalides' };
     }
 
-    const { session } = gate;
-    const role = session.user.role;
+    const { session, tenant } = gate;
+    const { dispensaryId } = tenant;
+    const role = tenant.effectiveRole;
     const editAll = canEditAllWeeklyDispensaryActivity(role);
 
     let discordUserId: string;
@@ -351,6 +362,7 @@ export async function createDispensaryWeeklyActivity(input: z.infer<typeof creat
       source: 'INTRANET',
       actorUserId: session.user.id,
       actorDiscordUserId: (await getDiscordAccountIdForUser(prisma, session.user.id)) ?? null,
+      dispensaryId,
     });
 
     return { status: 200 as const, data: { id: created.id } };
@@ -360,10 +372,11 @@ export async function createDispensaryWeeklyActivity(input: z.infer<typeof creat
 }
 
 export async function updateDispensaryWeeklyActivity(
+  dispensarySlug: string,
   input: z.infer<typeof idSchema> & z.infer<typeof dispensaryWeeklyActivityUpdateSchema>,
 ) {
   try {
-    const gate = await requireWeeklyActivityEdit();
+    const gate = await requireWeeklyActivityEdit(dispensarySlug);
     if (!gate.ok) {
       return gate.response;
     }
@@ -380,8 +393,10 @@ export async function updateDispensaryWeeklyActivity(
       return { status: 400 as const, error: parsedBody.error.issues[0]?.message ?? 'Données invalides' };
     }
 
-    const existing = await prisma.dispensaryWeeklyActivity.findUnique({
-      where: { id: parsedId.data.id },
+    const { dispensaryId } = gate.tenant;
+
+    const existing = await prisma.dispensaryWeeklyActivity.findFirst({
+      where: { id: parsedId.data.id, ...tenantWhere(dispensaryId) },
     });
     if (!existing) {
       return { status: 404 as const, error: 'Activité introuvable' };
@@ -390,7 +405,7 @@ export async function updateDispensaryWeeklyActivity(
     const allowed = await canEditWeeklyActivity(
       prisma,
       gate.session.user.id,
-      gate.session.user.role,
+      gate.tenant.effectiveRole,
       existing,
     );
     if (!allowed) {
@@ -409,9 +424,12 @@ export async function updateDispensaryWeeklyActivity(
   }
 }
 
-export async function deleteDispensaryWeeklyActivity(input: z.infer<typeof idSchema>) {
+export async function deleteDispensaryWeeklyActivity(
+  dispensarySlug: string,
+  input: z.infer<typeof idSchema>,
+) {
   try {
-    const gate = await requireWeeklyActivityEdit();
+    const gate = await requireWeeklyActivityEdit(dispensarySlug);
     if (!gate.ok) {
       return gate.response;
     }
@@ -421,8 +439,10 @@ export async function deleteDispensaryWeeklyActivity(input: z.infer<typeof idSch
       return { status: 400 as const, error: 'ID invalide' };
     }
 
-    const existing = await prisma.dispensaryWeeklyActivity.findUnique({
-      where: { id: parsed.data.id },
+    const { dispensaryId } = gate.tenant;
+
+    const existing = await prisma.dispensaryWeeklyActivity.findFirst({
+      where: { id: parsed.data.id, ...tenantWhere(dispensaryId) },
     });
     if (!existing) {
       return { status: 404 as const, error: 'Activité introuvable' };
@@ -431,7 +451,7 @@ export async function deleteDispensaryWeeklyActivity(input: z.infer<typeof idSch
     const allowed = await canEditWeeklyActivity(
       prisma,
       gate.session.user.id,
-      gate.session.user.role,
+      gate.tenant.effectiveRole,
       existing,
     );
     if (!allowed) {

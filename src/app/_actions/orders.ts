@@ -3,9 +3,8 @@
 import { z } from 'zod/v3';
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
-import { getAuthSession } from '@/lib/auth';
-import { checkRolePermission } from '@/lib/auth/permissions';
-import { getAppFeatureActionBlock } from '@/lib/appSettings';
+import { requireTenantServerActionContext } from '@/lib/serverActionAuth';
+import { tenantWhere } from '@/lib/dispensary/tenantWhere';
 import type { OrderStatus } from '@prisma/client';
 import type { OrderWithRelations } from '@/types/orders';
 
@@ -39,7 +38,6 @@ function serializeOrderForClient(order: {
   } as OrderWithRelations;
 }
 
-// Schéma de validation pour créer une commande
 const createOrderSchema = z
   .object({
     name: z.string().max(255, 'Le nom est trop long').optional(),
@@ -68,48 +66,39 @@ const createOrderSchema = z
     { message: 'Indiquez une entreprise ou un particulier', path: ['companyId'] }
   );
 
-/**
- * Crée une nouvelle commande
- */
-export async function createOrder(data: {
-  name?: string;
-  status?: 'DRAFT' | 'LETTER_SENT' | 'PROCESSING' | 'READY' | 'COMPLETED' | 'CANCELLED';
-  type?: 'INCOMING' | 'OUTGOING';
-  details?: string;
-  price?: number;
-  companyId?: string;
-  individualCustomerId?: string;
-  companyGroupId?: string | null;
-  items: { itemId: string; quantity: number }[];
-}) {
+export async function createOrder(
+  dispensarySlug: string,
+  data: {
+    name?: string;
+    status?: 'DRAFT' | 'LETTER_SENT' | 'PROCESSING' | 'READY' | 'COMPLETED' | 'CANCELLED';
+    type?: 'INCOMING' | 'OUTGOING';
+    details?: string;
+    price?: number;
+    companyId?: string;
+    individualCustomerId?: string;
+    companyGroupId?: string | null;
+    items: { itemId: string; quantity: number }[];
+  },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const featureBlock = await getAppFeatureActionBlock('orders');
-    if (featureBlock) return featureBlock;
-
-    const userRole = session.user?.role;
-    if (!checkRolePermission(userRole, 'orders', 'create')) {
-      return {
-        status: 403,
-        error: 'Permission refusée : vous n\'avez pas la permission de créer une commande',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'orders',
+      permission: {
+        resource: 'orders',
+        action: 'create',
+        message: 'Permission refusée : vous n\'avez pas la permission de créer une commande',
+      },
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = createOrderSchema.parse(data);
 
-    // Générer le nom automatiquement si non fourni
     let orderName = validatedData.name;
     if (!orderName) {
       if (validatedData.companyId) {
-        const company = await prisma.company.findUnique({
-          where: { id: validatedData.companyId },
+        const company = await prisma.company.findFirst({
+          where: { id: validatedData.companyId, ...tenantWhere(dispensaryId) },
           select: { name: true },
         });
 
@@ -121,14 +110,14 @@ export async function createOrder(data: {
         }
 
         const orderCount = await prisma.order.count({
-          where: { companyId: validatedData.companyId },
+          where: { companyId: validatedData.companyId, ...tenantWhere(dispensaryId) },
         });
 
         const sequentialNumber = String(orderCount + 1).padStart(4, '0');
         orderName = `${slugifyOrderNameSegment(company.name)}-${sequentialNumber}`;
       } else if (validatedData.individualCustomerId) {
-        const customer = await prisma.individualCustomer.findUnique({
-          where: { id: validatedData.individualCustomerId },
+        const customer = await prisma.individualCustomer.findFirst({
+          where: { id: validatedData.individualCustomerId, ...tenantWhere(dispensaryId) },
           select: { name: true },
         });
 
@@ -140,7 +129,10 @@ export async function createOrder(data: {
         }
 
         const orderCount = await prisma.order.count({
-          where: { individualCustomerId: validatedData.individualCustomerId },
+          where: {
+            individualCustomerId: validatedData.individualCustomerId,
+            ...tenantWhere(dispensaryId),
+          },
         });
 
         const sequentialNumber = String(orderCount + 1).padStart(4, '0');
@@ -148,14 +140,13 @@ export async function createOrder(data: {
       }
     }
 
-    // Calculer le prix selon le type de commande
     let orderPrice: number | null = null;
-    
+
     if (validatedData.type === 'OUTGOING') {
-      // Pour les commandes sortantes, calculer le prix à partir des items
       const itemsWithPrices = await prisma.item.findMany({
         where: {
           id: { in: validatedData.items.map((item) => item.itemId) },
+          ...tenantWhere(dispensaryId),
         },
         select: {
           id: true,
@@ -174,7 +165,6 @@ export async function createOrder(data: {
 
       orderPrice = totalPrice > 0 ? totalPrice : null;
     } else if (validatedData.type === 'INCOMING') {
-      // Pour les commandes entrantes, utiliser le prix fourni
       orderPrice = validatedData.price ?? null;
     }
 
@@ -187,6 +177,7 @@ export async function createOrder(data: {
 
     const order = await prisma.order.create({
       data: {
+        dispensaryId,
         name: orderName,
         status: validatedData.status,
         type: validatedData.type,
@@ -237,7 +228,6 @@ export async function createOrder(data: {
   }
 }
 
-// Schéma de validation pour modifier une commande
 const updateOrderSchema = z.object({
   id: z.string().uuid('ID invalide'),
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long').optional(),
@@ -253,36 +243,25 @@ const updateOrderSchema = z.object({
   ).min(1, 'Au moins un objet est requis').optional(),
 });
 
-// Schéma pour supprimer une commande
 const deleteOrderSchema = z.object({
   id: z.string().uuid('ID invalide'),
 });
 
-/**
- * Récupère toutes les commandes
- */
-export async function getOrders() {
+export async function getOrders(dispensarySlug: string) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const featureBlock = await getAppFeatureActionBlock('orders');
-    if (featureBlock) return featureBlock;
-
-    const userRole = session.user?.role;
-    if (!checkRolePermission(userRole, 'orders', 'view')) {
-      return {
-        status: 403,
-        error: 'Permission refusée : vous n\'avez pas la permission de voir les commandes',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'orders',
+      permission: {
+        resource: 'orders',
+        action: 'view',
+        message: 'Permission refusée : vous n\'avez pas la permission de voir les commandes',
+      },
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const orders = await prisma.order.findMany({
+      where: tenantWhere(dispensaryId),
       orderBy: {
         createdAt: 'desc',
       },
@@ -322,44 +301,36 @@ export async function getOrders() {
   }
 }
 
-/**
- * Modifie une commande existante
- */
-export async function updateOrder(data: {
-  id: string;
-  name?: string;
-  status?: 'DRAFT' | 'LETTER_SENT' | 'PROCESSING' | 'READY' | 'COMPLETED' | 'CANCELLED';
-  type?: 'INCOMING' | 'OUTGOING';
-  details?: string;
-  price?: number;
-  items?: { itemId: string; quantity: number }[];
-}) {
+export async function updateOrder(
+  dispensarySlug: string,
+  data: {
+    id: string;
+    name?: string;
+    status?: 'DRAFT' | 'LETTER_SENT' | 'PROCESSING' | 'READY' | 'COMPLETED' | 'CANCELLED';
+    type?: 'INCOMING' | 'OUTGOING';
+    details?: string;
+    price?: number;
+    items?: { itemId: string; quantity: number }[];
+  },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const featureBlock = await getAppFeatureActionBlock('orders');
-    if (featureBlock) return featureBlock;
-
-    const userRole = session.user?.role;
-    if (!checkRolePermission(userRole, 'orders', 'update')) {
-      return {
-        status: 403,
-        error: 'Permission refusée : vous n\'avez pas la permission de modifier une commande',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'orders',
+      permission: {
+        resource: 'orders',
+        action: 'update',
+        message: 'Permission refusée : vous n\'avez pas la permission de modifier une commande',
+      },
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = updateOrderSchema.parse(data);
 
-    const oldOrder = await prisma.order.findUnique({
-      where: { id: validatedData.id },
-      select: { 
-        status: true, 
+    const oldOrder = await prisma.order.findFirst({
+      where: { id: validatedData.id, ...tenantWhere(dispensaryId) },
+      select: {
+        status: true,
         type: true,
         items: {
           select: {
@@ -377,7 +348,6 @@ export async function updateOrder(data: {
       };
     }
 
-    // Empêcher la modification d'une commande terminée
     if (oldOrder.status === ('COMPLETED' as OrderStatus)) {
       return {
         status: 403,
@@ -385,23 +355,20 @@ export async function updateOrder(data: {
       };
     }
 
-    // Déterminer le type de commande (utiliser le nouveau type si fourni, sinon l'ancien)
     const orderType = validatedData.type || oldOrder.type;
-    
-    // Utiliser les nouveaux items si fournis, sinon les anciens
+
     const itemsToUse = validatedData.items || oldOrder.items.map((item) => ({
       itemId: item.itemId,
       quantity: item.quantity,
     }));
 
-    // Calculer le prix selon le type de commande
     let orderPrice: number | null | undefined = undefined;
-    
+
     if (orderType === 'OUTGOING') {
-      // Pour les commandes sortantes, calculer le prix à partir des items
       const itemsWithPrices = await prisma.item.findMany({
         where: {
           id: { in: itemsToUse.map((item) => item.itemId) },
+          ...tenantWhere(dispensaryId),
         },
         select: {
           id: true,
@@ -420,21 +387,18 @@ export async function updateOrder(data: {
 
       orderPrice = totalPrice > 0 ? totalPrice : null;
     } else if (orderType === 'INCOMING') {
-      // Pour les commandes entrantes, utiliser le prix fourni (ou garder l'ancien si non fourni)
       if (validatedData.price !== undefined) {
         orderPrice = validatedData.price ?? null;
       }
-      // Si price n'est pas fourni, on ne modifie pas le prix existant (undefined)
     }
 
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       name: validatedData.name,
       status: validatedData.status,
       type: validatedData.type,
       details: validatedData.details,
     };
 
-    // Ne mettre à jour le prix que s'il a été calculé ou fourni
     if (orderPrice !== undefined) {
       updateData.price = orderPrice !== null ? orderPrice : undefined;
     }
@@ -443,7 +407,7 @@ export async function updateOrder(data: {
       await prisma.orderItem.deleteMany({
         where: { orderId: validatedData.id },
       });
-      
+
       updateData.items = {
         create: itemsToUse.map((item) => ({
           itemId: item.itemId,
@@ -455,6 +419,7 @@ export async function updateOrder(data: {
     const order = await prisma.order.update({
       where: {
         id: validatedData.id,
+        ...tenantWhere(dispensaryId),
       },
       data: updateData,
       include: {
@@ -495,34 +460,23 @@ export async function updateOrder(data: {
   }
 }
 
-/**
- * Supprime une commande
- */
-export async function deleteOrder(data: { id: string }) {
+export async function deleteOrder(dispensarySlug: string, data: { id: string }) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const featureBlock = await getAppFeatureActionBlock('orders');
-    if (featureBlock) return featureBlock;
-
-    const userRole = session.user?.role;
-    if (!checkRolePermission(userRole, 'orders', 'delete')) {
-      return {
-        status: 403,
-        error: 'Permission refusée : vous n\'avez pas la permission de supprimer une commande',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'orders',
+      permission: {
+        resource: 'orders',
+        action: 'delete',
+        message: 'Permission refusée : vous n\'avez pas la permission de supprimer une commande',
+      },
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = deleteOrderSchema.parse(data);
 
-    const order = await prisma.order.findUnique({
-      where: { id: validatedData.id },
+    const order = await prisma.order.findFirst({
+      where: { id: validatedData.id, ...tenantWhere(dispensaryId) },
       select: { status: true },
     });
 
@@ -533,7 +487,6 @@ export async function deleteOrder(data: { id: string }) {
       };
     }
 
-    // Empêcher la suppression d'une commande terminée
     if (order.status === ('COMPLETED' as OrderStatus)) {
       return {
         status: 403,
@@ -544,6 +497,7 @@ export async function deleteOrder(data: { id: string }) {
     await prisma.order.delete({
       where: {
         id: validatedData.id,
+        ...tenantWhere(dispensaryId),
       },
     });
 
@@ -555,4 +509,3 @@ export async function deleteOrder(data: { id: string }) {
     return actionErrorParser(error, 'Erreur lors de la suppression de la commande');
   }
 }
-

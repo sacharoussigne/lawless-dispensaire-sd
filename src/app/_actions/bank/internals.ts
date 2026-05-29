@@ -1,16 +1,19 @@
 import prisma from '@/lib/prisma';
+import { tenantWhere } from '@/lib/dispensary/tenantWhere';
 import { getBankWeekBounds } from '@/lib/bankWeek';
 
 export function getWeekBounds(date: Date) {
   return getBankWeekBounds(date);
 }
 
-/**
- * Checks if the user has access to the account (owner or access)
- */
-export async function checkAccountAccess(accountId: string, userId: string, requireWrite: boolean = false) {
-  const account = await prisma.bankAccount.findUnique({
-    where: { id: accountId },
+export async function checkAccountAccess(
+  dispensaryId: string,
+  accountId: string,
+  userId: string,
+  requireWrite: boolean = false,
+) {
+  const account = await prisma.bankAccount.findFirst({
+    where: { id: accountId, ...tenantWhere(dispensaryId) },
     include: {
       accesses: {
         where: { userId },
@@ -22,12 +25,10 @@ export async function checkAccountAccess(accountId: string, userId: string, requ
     return { hasAccess: false, error: 'Compte introuvable' };
   }
 
-  // Owner always has access
   if (account.ownerId === userId) {
     return { hasAccess: true };
   }
 
-  // Check access
   const access = account.accesses[0];
   if (!access) {
     return { hasAccess: false, error: 'Accès non autorisé' };
@@ -40,9 +41,12 @@ export async function checkAccountAccess(accountId: string, userId: string, requ
   return { hasAccess: true };
 }
 
-export async function recalculateWeekBalance(weekId: string) {
-  const week = await prisma.bankAccountWeek.findUnique({
-    where: { id: weekId },
+export async function recalculateWeekBalance(dispensaryId: string, weekId: string) {
+  const week = await prisma.bankAccountWeek.findFirst({
+    where: {
+      id: weekId,
+      account: tenantWhere(dispensaryId),
+    },
     include: {
       transactions: {
         orderBy: [
@@ -55,10 +59,10 @@ export async function recalculateWeekBalance(weekId: string) {
 
   if (!week) return;
 
-  // Get previous week balance
   const previousWeek = await prisma.bankAccountWeek.findFirst({
     where: {
       accountId: week.accountId,
+      account: tenantWhere(dispensaryId),
       weekStart: {
         lt: week.weekStart,
       },
@@ -70,18 +74,15 @@ export async function recalculateWeekBalance(weekId: string) {
 
   let balance = previousWeek ? Number(previousWeek.balance) : 0;
 
-  // Compute balance from transactions by type
   for (const transaction of week.transactions) {
     const amount = Number(transaction.amount);
     if (transaction.type === 'DEPOSIT' || transaction.type === 'TRANSFER_IN') {
       balance += amount;
     } else {
-      // WITHDRAWAL or TRANSFER_OUT
       balance -= amount;
     }
   }
 
-  // Persist week balance
   await prisma.bankAccountWeek.update({
     where: { id: weekId },
     data: {
@@ -89,10 +90,10 @@ export async function recalculateWeekBalance(weekId: string) {
     },
   });
 
-  // Recompute following weeks (each depends on the previous week's closing balance)
   const followingWeeks = await prisma.bankAccountWeek.findMany({
     where: {
       accountId: week.accountId,
+      account: tenantWhere(dispensaryId),
       weekStart: {
         gt: week.weekStart,
       },
@@ -110,24 +111,19 @@ export async function recalculateWeekBalance(weekId: string) {
     },
   });
 
-  // Walk weeks in order and propagate balances
   let currentBalance = balance;
   for (const followingWeek of followingWeeks) {
-    // Opening balance for this week is the previous week's closing balance
     let weekBalance = currentBalance;
 
-    // Compute balance from transactions by type
     for (const transaction of followingWeek.transactions) {
       const amount = Number(transaction.amount);
       if (transaction.type === 'DEPOSIT' || transaction.type === 'TRANSFER_IN') {
         weekBalance += amount;
       } else {
-        // WITHDRAWAL or TRANSFER_OUT
         weekBalance -= amount;
       }
     }
 
-    // Persist week balance
     await prisma.bankAccountWeek.update({
       where: { id: followingWeek.id },
       data: {
@@ -135,7 +131,6 @@ export async function recalculateWeekBalance(weekId: string) {
       },
     });
 
-    // Closing balance seeds the next iteration
     currentBalance = weekBalance;
   }
 }

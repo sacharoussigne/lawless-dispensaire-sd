@@ -7,6 +7,7 @@ import {
   Group,
   Menu,
   SegmentedControl,
+  Select,
   UnstyledButton,
 } from '@mantine/core';
 import classes from './Header.module.scss';
@@ -15,7 +16,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { notifications } from '@mantine/notifications';
 import { AuthSession } from '@/types/session';
-import { routes } from '@/types/routes';
+import { routes, tenantRoutes } from '@/types/routes';
 import Link from 'next/link';
 import Image from 'next/image';
 import { IconArrowBackUp, IconLogout, IconSearch, IconSettings } from '@tabler/icons-react';
@@ -23,32 +24,60 @@ import { usePermissions } from '@/app/_contexts/PermissionsContext';
 import { dispensarySiteTitle } from '@/lib/appSettingsShared';
 import { hasRole, checkRolePermission } from '@/lib/auth/permissions';
 import { Role } from '@/types/enum/roles';
+import { isPlatformAdmin } from '@/lib/dispensary/platformAdmin';
+
+function switchDispensaryInPath(pathname: string, newSlug: string): string {
+  if (pathname.match(/^\/d\/[^/]+/)) {
+    return pathname.replace(/^\/d\/[^/]+/, `/d/${encodeURIComponent(newSlug)}`);
+  }
+  return tenantRoutes(newSlug).employee.index;
+}
 
 export default function Header({
   session,
   impersonatorDisplayName,
+  dispensarySlug: dispensarySlugProp,
 }: Readonly<{
   session: AuthSession | null;
   impersonatorDisplayName?: string | null;
+  dispensarySlug?: string;
 }>) {
   const router = useRouter();
   const pathname = usePathname();
   const [userMenuOpened, setUserMenuOpened] = useState(false);
   const [stoppingImpersonation, setStoppingImpersonation] = useState(false);
-  const { permissions, userRole, appSettings } = usePermissions();
+  const {
+    permissions,
+    userRole,
+    appSettings,
+    dispensarySlug: ctxSlug,
+    accessibleDispensaries,
+  } = usePermissions();
+
+  const dispensarySlug = dispensarySlugProp ?? ctxSlug;
+  const t = dispensarySlug ? tenantRoutes(dispensarySlug) : null;
+  const isPlatformAdminUser = isPlatformAdmin(session?.user?.role);
 
   const isImpersonating = Boolean(session?.session.impersonatedBy);
 
-  const isAdminSpace = pathname?.startsWith(routes.admin.index) || false;
-  const isManagementSpace = pathname?.startsWith(routes.management.index) || false;
-  const isAdminOrManagementSpace = isAdminSpace || isManagementSpace;
+  const isManagementSpace =
+    Boolean(t && pathname?.startsWith(t.management.index)) ||
+    pathname?.startsWith('/management') ||
+    false;
+  const isAdminOrManagementSpace = isManagementSpace;
 
   const handleSpaceChange = (value: string) => {
+    if (!t) return;
     if (value === 'employee') {
-      router.push(routes.employee.index);
+      router.push(t.employee.index);
     } else if (value === 'management') {
-      router.push(routes.management.index);
+      router.push(t.management.index);
     }
+  };
+
+  const handleDispensaryChange = (newSlug: string | null) => {
+    if (!newSlug || !pathname) return;
+    router.push(switchDispensaryInPath(pathname, newSlug));
   };
 
   const handleLogout = async () => {
@@ -91,44 +120,55 @@ export default function Header({
     }
   };
 
-  // Determine if user can see SegmentedControl
-  // Only if user has management permission (access to admin space)
   const canSwitchSpaces = permissions?.application.management === true;
 
-  // Check if a route is active
   const isRouteActive = (route: string) => {
     if (!pathname) return false;
-    // Exact match
     if (pathname === route) return true;
-    // Starts with route + '/' (for sub-routes)
     if (pathname.startsWith(`${route}/`)) return true;
     return false;
   };
+
+  const logoHref = t
+    ? isManagementSpace
+      ? t.management.index
+      : t.employee.index
+    : routes.platform.dispensaries;
 
   return (
     <header className={`${classes.header} mb-10`}>
       <Container size={'xl'}>
         <div className={'flex justify-between items-center w-full h-[60px]'}>
-          <Link
-            href={isManagementSpace ? routes.management.index : routes.employee.index}
-            className={classes.logoLink}
-          >
-            <Image
-              src="/logo_dispensaire.png"
-              alt={dispensarySiteTitle(appSettings)}
-              width={50}
-              height={50}
-              className="rounded-full"
-              style={{ borderRadius: '50%' }}
-            />
-          </Link>
-
-          {session && <div className="flex gap-4"></div>}
+          <Group gap="md">
+            <Link href={logoHref} className={classes.logoLink}>
+              <Image
+                src="/logo_dispensaire.png"
+                alt={dispensarySiteTitle(appSettings)}
+                width={50}
+                height={50}
+                className="rounded-full"
+                style={{ borderRadius: '50%' }}
+              />
+            </Link>
+            {session && accessibleDispensaries.length > 0 && (
+              <Select
+                aria-label="Dispensaire"
+                data={accessibleDispensaries.map((d) => ({
+                  value: d.slug,
+                  label: d.name,
+                }))}
+                value={dispensarySlug ?? accessibleDispensaries[0]?.slug ?? null}
+                onChange={handleDispensaryChange}
+                allowDeselect={false}
+                w={200}
+                size="sm"
+              />
+            )}
+          </Group>
 
           <Group>
-            {session ? (
+            {session && t ? (
               <>
-                
                 {isAdminOrManagementSpace && permissions?.application.management ? (
                   <Menu
                     width={260}
@@ -144,49 +184,33 @@ export default function Header({
                     <Menu.Dropdown>
                       <Menu.Label>Gestion</Menu.Label>
                       {appSettings.featurePayrollEnabled && permissions?.payrollReports.view && (
-                        <Link href={routes.employee.payroll}>
-                          <Menu.Item>
-                            Rapports salaires
-                          </Menu.Item>
+                        <Link href={t.employee.payroll}>
+                          <Menu.Item>Rapports salaires</Menu.Item>
                         </Link>
                       )}
                       {appSettings.featureStockEnabled && permissions?.stockStatistics.view && (
-                        <Link href={routes.employee.stockStatistics}>
-                          <Menu.Item>
-                            Statistiques de stock
-                          </Menu.Item>
+                        <Link href={t.employee.stockStatistics}>
+                          <Menu.Item>Statistiques de stock</Menu.Item>
                         </Link>
                       )}
-                      <Link href={routes.management.categoryItems}>
-                        <Menu.Item>
-                          Catégories d'objets
-                        </Menu.Item>
+                      <Link href={t.management.categoryItems}>
+                        <Menu.Item>Catégories d&apos;objets</Menu.Item>
                       </Link>
-                      <Link href={routes.management.items}>
-                        <Menu.Item>
-                          Objets
-                        </Menu.Item>
+                      <Link href={t.management.items}>
+                        <Menu.Item>Objets</Menu.Item>
                       </Link>
-                      <Link href={routes.management.chests}>
-                        <Menu.Item>
-                          Coffres
-                        </Menu.Item>
+                      <Link href={t.management.chests}>
+                        <Menu.Item>Coffres</Menu.Item>
                       </Link>
-                      <Link href={routes.management.companyGroups}>
-                        <Menu.Item>
-                          Groupes d'entreprises
-                        </Menu.Item>
+                      <Link href={t.management.companyGroups}>
+                        <Menu.Item>Groupes d&apos;entreprises</Menu.Item>
                       </Link>
-                      <Link href={routes.management.companies}>
-                        <Menu.Item>
-                          Entreprises
-                        </Menu.Item>
+                      <Link href={t.management.companies}>
+                        <Menu.Item>Entreprises</Menu.Item>
                       </Link>
                       {appSettings.featureMailsEnabled && (
-                        <Link href={routes.management.mails}>
-                          <Menu.Item>
-                            Courriers
-                          </Menu.Item>
+                        <Link href={t.management.mails}>
+                          <Menu.Item>Courriers</Menu.Item>
                         </Link>
                       )}
                     </Menu.Dropdown>
@@ -196,8 +220,8 @@ export default function Header({
                     {appSettings.featureBankEnabled &&
                       checkRolePermission(userRole, 'bank', 'access') && (
                         <Link
-                          href={routes.bank.index}
-                          className={`${classes.link} ${isRouteActive(routes.bank.index) ? classes.linkActive : ''}`}
+                          href={t.bank.index}
+                          className={`${classes.link} ${isRouteActive(t.bank.index) ? classes.linkActive : ''}`}
                         >
                           Banque
                         </Link>
@@ -205,8 +229,8 @@ export default function Header({
                     {appSettings.featurePrivatePracticeEnabled &&
                       checkRolePermission(userRole, 'private_practice', 'access') && (
                         <Link
-                          href={routes.privatePractice.index}
-                          className={`${classes.link} ${isRouteActive(routes.privatePractice.index) ? classes.linkActive : ''}`}
+                          href={t.privatePractice.index}
+                          className={`${classes.link} ${isRouteActive(t.privatePractice.index) ? classes.linkActive : ''}`}
                         >
                           Cabinet privé
                         </Link>
@@ -214,8 +238,8 @@ export default function Header({
                     {appSettings.featureWeeklyDispensaryActivityEnabled &&
                       permissions?.weeklyDispensaryActivity.view && (
                         <Link
-                          href={routes.weeklyActivity.index}
-                          className={`${classes.link} ${isRouteActive(routes.weeklyActivity.index) ? classes.linkActive : ''}`}
+                          href={t.weeklyActivity.index}
+                          className={`${classes.link} ${isRouteActive(t.weeklyActivity.index) ? classes.linkActive : ''}`}
                         >
                           Activité hebdo
                         </Link>
@@ -223,8 +247,8 @@ export default function Header({
                     {appSettings.featureOrdersEnabled &&
                       checkRolePermission(userRole, 'orders', 'view') && (
                         <Link
-                          href={routes.orders.index}
-                          className={`${classes.link} ${isRouteActive(routes.orders.index) ? classes.linkActive : ''}`}
+                          href={t.orders.index}
+                          className={`${classes.link} ${isRouteActive(t.orders.index) ? classes.linkActive : ''}`}
                         >
                           Commandes
                         </Link>
@@ -232,37 +256,36 @@ export default function Header({
                     {appSettings.featureStockEnabled &&
                       checkRolePermission(userRole, 'stock', 'view') && (
                         <Link
-                          href={routes.stock.index}
-                          className={`${classes.link} ${isRouteActive(routes.stock.index) ? classes.linkActive : ''}`}
+                          href={t.stock.index}
+                          className={`${classes.link} ${isRouteActive(t.stock.index) ? classes.linkActive : ''}`}
                         >
                           Stocks
                         </Link>
                       )}
                     {appSettings.featurePayrollEnabled && permissions?.payrollReports.view && (
                       <Link
-                        href={routes.employee.payroll}
-                        className={`${classes.link} ${isRouteActive(routes.employee.payroll) ? classes.linkActive : ''}`}
+                        href={t.employee.payroll}
+                        className={`${classes.link} ${isRouteActive(t.employee.payroll) ? classes.linkActive : ''}`}
                       >
                         Salaires
                       </Link>
                     )}
                     {appSettings.featureStockEnabled && permissions?.stockStatistics.view && (
                       <Link
-                        href={routes.employee.stockStatistics}
-                        className={`${classes.link} ${isRouteActive(routes.employee.stockStatistics) ? classes.linkActive : ''}`}
+                        href={t.employee.stockStatistics}
+                        className={`${classes.link} ${isRouteActive(t.employee.stockStatistics) ? classes.linkActive : ''}`}
                       >
                         Stats stock
                       </Link>
                     )}
                   </>
                 )}
-                {/* Search icon: employee space or payroll-only (Direction) */}
                 {(!isAdminOrManagementSpace || !permissions?.application.management) &&
                   appSettings.featureSearchEnabled &&
                   checkRolePermission(userRole, 'search', 'access') && (
                     <Link
-                      href={routes.searchItems.index}
-                      className={`${classes.link} ${isRouteActive(routes.searchItems.index) ? classes.linkActive : ''}`}
+                      href={t.searchItems.index}
+                      className={`${classes.link} ${isRouteActive(t.searchItems.index) ? classes.linkActive : ''}`}
                       aria-label="Recherche"
                     >
                       <IconSearch size={20} />
@@ -287,9 +310,7 @@ export default function Header({
                   withinPortal
                 >
                   <Menu.Target>
-                    <UnstyledButton
-                      className={`user ${userMenuOpened ? 'userActive' : ''}`}
-                    >
+                    <UnstyledButton className={`user ${userMenuOpened ? 'userActive' : ''}`}>
                       <Group gap={7}>
                         <Avatar
                           alt={session.user.name}
@@ -301,32 +322,38 @@ export default function Header({
                     </UnstyledButton>
                   </Menu.Target>
                   <Menu.Dropdown>
-                    {hasRole(userRole, Role.ADMIN) && (
+                    {isPlatformAdminUser && (
                       <>
-                        <Menu.Label>Admin</Menu.Label>
+                        <Menu.Label>Plateforme</Menu.Label>
+                        <Link href={routes.platform.dispensaries}>
+                          <Menu.Item>Dispensaires</Menu.Item>
+                        </Link>
                         <Link href={routes.admin.users}>
-                          <Menu.Item>
-                            Gestion Utilisateur
-                          </Menu.Item>
+                          <Menu.Item>Comptes utilisateurs</Menu.Item>
+                        </Link>
+                        <Menu.Divider />
+                      </>
+                    )}
+                    {hasRole(userRole, Role.ADMIN) && t && (
+                      <>
+                        <Menu.Label>Admin dispensaire</Menu.Label>
+                        <Link href={t.admin.members}>
+                          <Menu.Item>Membres</Menu.Item>
                         </Link>
                         {appSettings.featureStockEnabled && (
-                          <Link href={routes.admin.overwriteStock}>
-                            <Menu.Item>
-                              Écraser les stocks
-                            </Menu.Item>
+                          <Link href={t.admin.overwriteStock}>
+                            <Menu.Item>Écraser les stocks</Menu.Item>
                           </Link>
                         )}
-                        <Link href={routes.admin.settings}>
-                          <Menu.Item>
-                            Paramètres application
-                          </Menu.Item>
+                        <Link href={t.admin.settings}>
+                          <Menu.Item>Paramètres du dispensaire</Menu.Item>
                         </Link>
                         <Menu.Divider />
                       </>
                     )}
                     <Link href={routes.settings.index}>
                       <Menu.Item leftSection={<IconSettings size={16} stroke={1.5} />}>
-                        Paramètres
+                        Paramètres compte
                       </Menu.Item>
                     </Link>
                     <Menu.Item
@@ -344,20 +371,31 @@ export default function Header({
                     leftSection={<IconArrowBackUp size={18} />}
                     loading={stoppingImpersonation}
                     onClick={handleStopImpersonating}
-                    aria-label={
-                      impersonatorDisplayName?.trim()
-                        ? `Revenir au compte ${impersonatorDisplayName.trim()}`
-                        : 'Revenir à votre compte'
-                    }
                   >
                     {impersonatorDisplayName?.trim() || 'Compte'}
                   </Button>
                 )}
               </>
+            ) : session ? (
+              <Group>
+                {isPlatformAdminUser && (
+                  <Button component={Link} href={routes.platform.dispensaries} variant="light">
+                    Dispensaires
+                  </Button>
+                )}
+                <Menu withinPortal>
+                  <Menu.Target>
+                    <Avatar alt={session.user.name} radius="xl" size={40} src={session.user.image ?? null} />
+                  </Menu.Target>
+                  <Menu.Dropdown>
+                    <Menu.Item onClick={handleLogout}>Déconnexion</Menu.Item>
+                  </Menu.Dropdown>
+                </Menu>
+              </Group>
             ) : (
               <>
                 <Button variant="default">Se connecter</Button>
-                <Button>S'inscrire</Button>
+                <Button>S&apos;inscrire</Button>
               </>
             )}
           </Group>

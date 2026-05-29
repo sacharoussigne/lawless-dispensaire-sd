@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { checkRolePermission } from '@/lib/auth/permissions';
 import { routes } from '@/types/routes';
 import type { AppMiddlewareSession } from '@/types/middlewareSession';
+import { getMiddlewareRole } from '@/types/middlewareSession';
 
 export async function hasStockStatisticsAccessMiddleware(
   request: NextRequest,
@@ -11,7 +12,7 @@ export async function hasStockStatisticsAccessMiddleware(
     return NextResponse.next();
   }
 
-  const userRole = session.user?.role;
+  const userRole = getMiddlewareRole(session);
   const allowed = checkRolePermission(userRole, 'stock_statistics', 'view');
 
   if (!allowed) {

@@ -1,9 +1,9 @@
 import { unstable_cache } from 'next/cache';
 import prisma from '@/lib/prisma';
 import {
-  APP_SETTINGS_CACHE_TAG,
   APP_SETTINGS_DEFAULTS,
   APP_FEATURE_DISABLED_MESSAGE,
+  appSettingsCacheTag,
   isAppFeatureEnabled,
   type AppFeatureKey,
   type AppSettingsDTO,
@@ -11,9 +11,9 @@ import {
 
 export type { AppFeatureKey, AppSettingsDTO } from '@/lib/appSettingsShared';
 export {
-  APP_SETTINGS_CACHE_TAG,
   APP_SETTINGS_DEFAULTS,
   APP_FEATURE_DISABLED_MESSAGE,
+  appSettingsCacheTag,
   isAppFeatureEnabled,
   dispensarySiteTitle,
 } from '@/lib/appSettingsShared';
@@ -42,10 +42,10 @@ function mapFromDb(row: {
   };
 }
 
-export async function loadAppSettingsFromDb(): Promise<AppSettingsDTO> {
+export async function loadAppSettingsFromDb(dispensaryId: string): Promise<AppSettingsDTO> {
   try {
     const row = await prisma.appSettings.findUnique({
-      where: { id: 'default' },
+      where: { dispensaryId },
     });
     if (!row) {
       return { ...APP_SETTINGS_DEFAULTS };
@@ -56,15 +56,22 @@ export async function loadAppSettingsFromDb(): Promise<AppSettingsDTO> {
   }
 }
 
-export const getAppSettings = unstable_cache(loadAppSettingsFromDb, ['app-settings-singleton'], {
-  tags: [APP_SETTINGS_CACHE_TAG],
-  revalidate: 86400,
-});
+export function getAppSettings(dispensaryId: string) {
+  return unstable_cache(
+    () => loadAppSettingsFromDb(dispensaryId),
+    ['app-settings', dispensaryId],
+    {
+      tags: [appSettingsCacheTag(dispensaryId)],
+      revalidate: 86400,
+    },
+  )();
+}
 
 export async function getAppFeatureActionBlock(
+  dispensaryId: string,
   feature: AppFeatureKey,
 ): Promise<{ status: 403; error: string } | null> {
-  const settings = await getAppSettings();
+  const settings = await getAppSettings(dispensaryId);
   if (isAppFeatureEnabled(settings, feature)) {
     return null;
   }
@@ -72,9 +79,10 @@ export async function getAppFeatureActionBlock(
 }
 
 export async function getAppFeaturesActionBlock(
+  dispensaryId: string,
   features: AppFeatureKey[],
 ): Promise<{ status: 403; error: string } | null> {
-  const settings = await getAppSettings();
+  const settings = await getAppSettings(dispensaryId);
   const hasDisabled = features.some((f) => !isAppFeatureEnabled(settings, f));
   if (!hasDisabled) {
     return null;

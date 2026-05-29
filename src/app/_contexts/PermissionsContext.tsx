@@ -1,15 +1,19 @@
 'use client';
 
 import { createContext, useContext, ReactNode } from 'react';
-import type { Permissions, PermissionsContextType } from '@/types/permissions';
+import type { Permissions, PermissionsContextType, AccessibleDispensary } from '@/types/permissions';
 import type { AppSettingsDTO } from '@/lib/appSettingsShared';
 import { APP_SETTINGS_DEFAULTS } from '@/lib/appSettingsShared';
+import { tenantRoutes } from '@/types/routes';
 
 const PermissionsContext = createContext<PermissionsContextType>({
   permissions: null,
   userRole: null,
   loading: false,
   appSettings: APP_SETTINGS_DEFAULTS,
+  dispensarySlug: null,
+  dispensaryId: null,
+  accessibleDispensaries: [],
 });
 
 interface PermissionsProviderProps {
@@ -17,6 +21,9 @@ interface PermissionsProviderProps {
   initialPermissions: Permissions | null;
   initialRole: string | null;
   initialAppSettings: AppSettingsDTO;
+  dispensarySlug?: string | null;
+  dispensaryId?: string | null;
+  accessibleDispensaries?: AccessibleDispensary[];
 }
 
 export function PermissionsProvider({
@@ -24,14 +31,20 @@ export function PermissionsProvider({
   initialPermissions,
   initialRole,
   initialAppSettings,
+  dispensarySlug = null,
+  dispensaryId = null,
+  accessibleDispensaries = [],
 }: PermissionsProviderProps) {
   return (
-    <PermissionsContext.Provider 
-      value={{ 
-        permissions: initialPermissions, 
-        userRole: initialRole, 
+    <PermissionsContext.Provider
+      value={{
+        permissions: initialPermissions,
+        userRole: initialRole,
         loading: false,
         appSettings: initialAppSettings,
+        dispensarySlug,
+        dispensaryId,
+        accessibleDispensaries,
       }}
     >
       {children}
@@ -47,3 +60,10 @@ export function usePermissions() {
   return context;
 }
 
+export function useTenantRoutes() {
+  const { dispensarySlug } = usePermissions();
+  if (!dispensarySlug) {
+    throw new Error('useTenantRoutes requires an active dispensary context');
+  }
+  return tenantRoutes(dispensarySlug);
+}
