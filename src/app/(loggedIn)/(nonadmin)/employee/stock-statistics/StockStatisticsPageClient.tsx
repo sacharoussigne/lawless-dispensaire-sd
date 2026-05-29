@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Checkbox,
-  Group,
   Paper,
   SegmentedControl,
   Select,
@@ -14,7 +13,6 @@ import {
   TextInput,
   Title,
 } from '@mantine/core';
-import { BarChart } from '@mantine/charts';
 import { DatePickerInput, DatesProvider } from '@mantine/dates';
 import { notifications } from '@mantine/notifications';
 import { DataTable, type DataTableSortStatus } from 'mantine-datatable';
@@ -28,6 +26,7 @@ import {
   type StockStatsDisplayMode,
   type StockStatsItemRowWithDisplay,
 } from '@/lib/stock/movements';
+import { StockStatsTopChart } from './StockStatsTopChart';
 
 const PAGE_SIZE = 25;
 const TOP_N_OPTIONS = ['10', '15', '20'];
@@ -159,19 +158,27 @@ export default function StockStatisticsPageClient() {
 
   const topItem = useMemo(() => {
     if (filteredRows.length === 0) return null;
+    if (displayMode === 'net') {
+      return filteredRows.reduce((best, row) =>
+        Math.abs(row.displayValue) > Math.abs(best.displayValue) ? row : best,
+      );
+    }
     return filteredRows.reduce((best, row) =>
       row.displayValue > best.displayValue ? row : best,
     );
-  }, [filteredRows]);
+  }, [filteredRows, displayMode]);
 
-  const chartData = useMemo(() => {
+  const chartRows = useMemo(() => {
     const n = parseInt(topN, 10);
-    const sorted = [...filteredRows].sort((a, b) => b.displayValue - a.displayValue);
-    const top = displayMode === 'net'
-      ? sorted.sort((a, b) => Math.abs(b.displayValue) - Math.abs(a.displayValue))
-      : sorted;
-    return top.slice(0, n).map((row) => ({
-      item: row.itemName.length > 24 ? `${row.itemName.slice(0, 22)}…` : row.itemName,
+    const sorted =
+      displayMode === 'net'
+        ? [...filteredRows].sort(
+            (a, b) => Math.abs(b.displayValue) - Math.abs(a.displayValue),
+          )
+        : [...filteredRows].sort((a, b) => b.displayValue - a.displayValue);
+    return sorted.slice(0, n).map((row) => ({
+      itemId: row.itemId,
+      itemName: row.itemName,
       value: row.displayValue,
     }));
   }, [filteredRows, topN, displayMode]);
@@ -184,7 +191,7 @@ export default function StockStatisticsPageClient() {
       <Stack gap="lg">
         <Paper withBorder p="md" radius="md">
           <Stack gap="md">
-            <Group align="flex-end" wrap="wrap">
+            <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="md" verticalSpacing="md">
               <DatePickerInput
                 type="range"
                 label="Période"
@@ -196,51 +203,58 @@ export default function StockStatisticsPageClient() {
                 }}
                 valueFormat="D MMM YYYY"
                 clearable={false}
-                style={{ flex: 1, minWidth: 280 }}
               />
-              <SegmentedControl
-                value={displayMode}
-                onChange={(v) => setDisplayMode(v as StockStatsDisplayMode)}
-                data={[
-                  { label: 'Consommation', value: 'consumed' },
-                  { label: 'Ajouts', value: 'added' },
-                  { label: 'Stat réelle', value: 'net' },
-                ]}
-              />
-            </Group>
-            <Group wrap="wrap">
+              <Stack gap={6}>
+                <Text component="label" size="sm" fw={500}>
+                  Affichage
+                </Text>
+                <SegmentedControl
+                  fullWidth
+                  value={displayMode}
+                  onChange={(v) => setDisplayMode(v as StockStatsDisplayMode)}
+                  data={[
+                    { label: 'Consommation', value: 'consumed' },
+                    { label: 'Ajouts', value: 'added' },
+                    { label: 'Stat réelle', value: 'net' },
+                  ]}
+                />
+              </Stack>
+            </SimpleGrid>
+
+            <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="md" verticalSpacing="md">
               <TextInput
+                label="Recherche"
                 placeholder="Rechercher un objet…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.currentTarget.value)}
-                style={{ flex: 1, minWidth: 200 }}
               />
               <Select
+                label="Catégorie"
                 placeholder="Toutes les catégories"
                 clearable
                 data={categoryOptions}
                 value={categoryFilter}
                 onChange={setCategoryFilter}
-                style={{ minWidth: 200 }}
               />
               <Select
                 label="Top graphique"
                 data={TOP_N_OPTIONS.map((v) => ({ value: v, label: `Top ${v}` }))}
                 value={topN}
                 onChange={(v) => setTopN(v ?? '15')}
-                w={120}
               />
-              <Checkbox
-                label="Afficher les items à zéro"
-                checked={showZeroItems}
-                onChange={(e) => setShowZeroItems(e.currentTarget.checked)}
-              />
-              <Checkbox
-                label="Détail complet"
-                checked={showFullDetail}
-                onChange={(e) => setShowFullDetail(e.currentTarget.checked)}
-              />
-            </Group>
+              <Stack gap="sm" justify="flex-end" h="100%" pb={4}>
+                <Checkbox
+                  label="Afficher les items à zéro"
+                  checked={showZeroItems}
+                  onChange={(e) => setShowZeroItems(e.currentTarget.checked)}
+                />
+                <Checkbox
+                  label="Détail complet"
+                  checked={showFullDetail}
+                  onChange={(e) => setShowFullDetail(e.currentTarget.checked)}
+                />
+              </Stack>
+            </SimpleGrid>
           </Stack>
         </Paper>
 
@@ -271,20 +285,12 @@ export default function StockStatisticsPageClient() {
           </Paper>
         </SimpleGrid>
 
-        {chartData.length > 0 && (
+        {chartRows.length > 0 && (
           <Paper withBorder p="md" radius="md">
             <Title order={4} mb="md">
               Top {topN} — {modeLabel}
             </Title>
-            <BarChart
-              h={Math.max(280, chartData.length * 28)}
-              data={chartData}
-              dataKey="item"
-              series={[{ name: 'value', color: displayMode === 'consumed' ? 'red.6' : displayMode === 'added' ? 'green.6' : 'blue.6' }]}
-              tickLine="y"
-              gridAxis="y"
-              orientation="vertical"
-            />
+            <StockStatsTopChart rows={chartRows} displayMode={displayMode} />
           </Paper>
         )}
 

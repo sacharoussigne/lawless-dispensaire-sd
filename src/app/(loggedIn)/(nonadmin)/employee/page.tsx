@@ -3,7 +3,6 @@ import { Button, Card, Container, Group, SimpleGrid, Text, Title } from '@mantin
 import {
   IconBox,
   IconClipboardList,
-  IconSearch,
   IconBuildingBank,
   IconUserHeart,
   IconMail,
