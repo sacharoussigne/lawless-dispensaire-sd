@@ -2,7 +2,8 @@ import { Container, Title } from '@mantine/core';
 import { redirect } from 'next/navigation';
 import { getAuthSession } from '@/lib/auth';
 import { checkRolePermission } from '@/lib/auth/permissions';
-import { requireDispensaryFromSlug } from '@/lib/dispensary/context';
+import { getEffectiveRoleForDispensary, requireDispensaryFromSlug } from '@/lib/dispensary/context';
+import type { AuthSession } from '@/types/session';
 import { getAppSettings } from '@/lib/appSettings';
 import { routes, tenantRoutes } from '@/types/routes';
 import StockStatisticsPageClient from './StockStatisticsPageClient';
@@ -20,7 +21,8 @@ export default async function StockStatisticsPage({ params }: { params: Promise<
     redirect(tenantRoutes(dispensarySlug).employee.index);
   }
 
-  if (!checkRolePermission(session.user.role, 'stock_statistics', 'view')) {
+  const effectiveRole = await getEffectiveRoleForDispensary(session as AuthSession, dispensary.id);
+  if (!checkRolePermission(effectiveRole, 'stock_statistics', 'view')) {
     redirect(routes.auth.noManagementAccess);
   }
 

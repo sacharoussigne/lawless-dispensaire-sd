@@ -42,6 +42,7 @@ const user = ac.newRole({
 const admin = ac.newRole({
     ...adminAc.statements,
     ...defaultApplicationPermissions,
+    stock_statistics: ["view"],
 });
 
 const employee = ac.newRole({
@@ -67,7 +68,7 @@ const inventory_manager = ac.newRole({
     mails: ["access"],
     payroll_reports: [],
     weekly_dispensary_activity: [],
-    stock_statistics: [],
+    stock_statistics: ["view"],
 });
 
 const inventory_viewer = ac.newRole({
