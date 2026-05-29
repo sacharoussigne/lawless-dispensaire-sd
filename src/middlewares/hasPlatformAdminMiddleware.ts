@@ -8,7 +8,7 @@ export async function hasPlatformAdminMiddleware(
   session: AppMiddlewareSession,
 ) {
   if (!session) {
-    return NextResponse.next();
+    return routes.redirect(request, routes.auth.login);
   }
   if (!isPlatformAdmin(session.user?.role)) {
     return routes.redirect(request, routes.auth.noManagementAccess);

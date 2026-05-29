@@ -55,10 +55,12 @@ export const routes = {
   },
   platform: {
     dispensaries: '/platform/dispensaries',
+    users: '/platform/users',
   },
   admin: {
     index: '/admin',
-    users: '/admin/users',
+    /** @deprecated Use routes.platform.users */
+    users: '/platform/users',
   },
   /** Legacy paths — redirect to default dispensary */
   management: {
@@ -131,9 +133,12 @@ export function legacyPathToTenant(pathname: string, slug: string = DEFAULT_DISP
       return `/d/${slug}${pathname}`;
     }
   }
+  if (pathname.startsWith('/platform')) {
+    return null;
+  }
   if (pathname === '/admin' || pathname.startsWith('/admin/')) {
     if (pathname === '/admin/users' || pathname.startsWith('/admin/users/')) {
-      return null;
+      return `/platform/users${pathname.slice('/admin/users'.length)}`;
     }
     return `/d/${slug}${pathname}`;
   }

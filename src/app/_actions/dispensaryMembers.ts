@@ -5,20 +5,13 @@ import { z } from 'zod';
 import { actionErrorParser } from '@/lib/action';
 import { requireDispensaryAdminContext } from '@/lib/dispensary/serverActionContext';
 import { tenantWhere } from '@/lib/dispensary/tenantWhere';
+import { DISPENSARY_MEMBER_ROLES, serializeRoleList } from '@/types/enum/roles';
 
-const roleEnum = z.enum([
-  'user',
-  'admin',
-  'employee',
-  'inventory_manager',
-  'inventory_viewer',
-  'private_practitioner',
-  'direction',
-]);
+const dispensaryRoleEnum = z.enum(DISPENSARY_MEMBER_ROLES);
 
 const upsertMemberSchema = z.object({
   userId: z.string().min(1),
-  role: roleEnum,
+  roles: z.array(dispensaryRoleEnum).min(1, 'Au moins un rôle est requis'),
 });
 
 export async function listDispensaryMembers(dispensarySlug: string) {
@@ -40,7 +33,7 @@ export async function listDispensaryMembers(dispensarySlug: string) {
 
 export async function upsertDispensaryMember(
   dispensarySlug: string,
-  data: { userId: string; role: z.infer<typeof roleEnum> },
+  data: { userId: string; roles: z.infer<typeof dispensaryRoleEnum>[] },
 ) {
   try {
     const auth = await requireDispensaryAdminContext(dispensarySlug);
@@ -54,6 +47,8 @@ export async function upsertDispensaryMember(
       return { status: 404, error: 'Utilisateur introuvable' };
     }
 
+    const role = serializeRoleList(validated.roles);
+
     const member = await prisma.dispensaryMember.upsert({
       where: {
         dispensaryId_userId: {
@@ -64,9 +59,9 @@ export async function upsertDispensaryMember(
       create: {
         dispensaryId: auth.ctx.dispensaryId,
         userId: validated.userId,
-        role: validated.role,
+        role,
       },
-      update: { role: validated.role },
+      update: { role },
     });
 
     return { status: 200, data: member };

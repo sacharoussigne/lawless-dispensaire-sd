@@ -25,6 +25,7 @@ import { dispensarySiteTitle } from '@/lib/appSettingsShared';
 import { hasRole, checkRolePermission } from '@/lib/auth/permissions';
 import { Role } from '@/types/enum/roles';
 import { isPlatformAdmin } from '@/lib/dispensary/platformAdmin';
+import { DEFAULT_DISPENSARY_SLUG } from '@/lib/dispensary/constants';
 
 function switchDispensaryInPath(pathname: string, newSlug: string): string {
   if (pathname.match(/^\/d\/[^/]+/)) {
@@ -57,6 +58,10 @@ export default function Header({
   const dispensarySlug = dispensarySlugProp ?? ctxSlug;
   const t = dispensarySlug ? tenantRoutes(dispensarySlug) : null;
   const isPlatformAdminUser = isPlatformAdmin(session?.user?.role);
+  const defaultTenantSlug =
+    accessibleDispensaries.find((d) => d.slug === DEFAULT_DISPENSARY_SLUG)?.slug ??
+    accessibleDispensaries[0]?.slug ??
+    null;
 
   const isImpersonating = Boolean(session?.session.impersonatedBy);
 
@@ -108,7 +113,7 @@ export default function Header({
         color: 'green',
       });
       router.refresh();
-      router.push(routes.admin.users);
+      router.push(routes.platform.users);
     } catch {
       notifications.show({
         title: 'Erreur',
@@ -133,7 +138,9 @@ export default function Header({
     ? isManagementSpace
       ? t.management.index
       : t.employee.index
-    : routes.platform.dispensaries;
+    : defaultTenantSlug
+      ? tenantRoutes(defaultTenantSlug).employee.index
+      : routes.platform.dispensaries;
 
   return (
     <header className={`${classes.header} mb-10`}>
@@ -157,7 +164,7 @@ export default function Header({
                   value: d.slug,
                   label: d.name,
                 }))}
-                value={dispensarySlug ?? accessibleDispensaries[0]?.slug ?? null}
+                value={dispensarySlug ?? defaultTenantSlug ?? null}
                 onChange={handleDispensaryChange}
                 allowDeselect={false}
                 w={200}
@@ -328,12 +335,12 @@ export default function Header({
                     {isPlatformAdminUser && (
                       <>
                         <Menu.Label>Plateforme</Menu.Label>
-                        <Link href={routes.platform.dispensaries}>
-                          <Menu.Item>Dispensaires</Menu.Item>
-                        </Link>
-                        <Link href={routes.admin.users}>
-                          <Menu.Item>Comptes utilisateurs</Menu.Item>
-                        </Link>
+                        <Menu.Item component={Link} href={routes.platform.dispensaries}>
+                          Dispensaires
+                        </Menu.Item>
+                        <Menu.Item component={Link} href={routes.platform.users}>
+                          Comptes utilisateurs
+                        </Menu.Item>
                         <Menu.Divider />
                       </>
                     )}
@@ -382,9 +389,18 @@ export default function Header({
             </>
           ) : session ? (
             <Group gap="sm" wrap="nowrap" className={`${classes.headerSide} ms-auto`}>
+              {defaultTenantSlug && (
+                <Button
+                  component={Link}
+                  href={tenantRoutes(defaultTenantSlug).employee.index}
+                  variant="filled"
+                >
+                  Retour à l&apos;application
+                </Button>
+              )}
               {isPlatformAdminUser && (
                 <>
-                  <Button component={Link} href={routes.admin.users} variant="light">
+                  <Button component={Link} href={routes.platform.users} variant="light">
                     Comptes utilisateurs
                   </Button>
                   <Button component={Link} href={routes.platform.dispensaries} variant="light">

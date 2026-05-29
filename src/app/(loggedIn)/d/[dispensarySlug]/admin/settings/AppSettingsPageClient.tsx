@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   Button,
   Card,
+  Group,
   Paper,
   SimpleGrid,
   Stack,
@@ -13,18 +14,20 @@ import {
   Title,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { updateAppSettings } from '@/app/_actions/appSettings';
-import type { AppSettingsDTO } from '@/lib/appSettingsShared';
+import { updateAppSettings, type DispensarySettingsAdminDTO } from '@/app/_actions/appSettings';
+import { slugifyDispensaryName } from '@/lib/dispensary/slug';
+import { tenantRoutes } from '@/types/routes';
 
 export default function AppSettingsPageClient({
   dispensarySlug,
   initial,
 }: {
   dispensarySlug: string;
-  initial: AppSettingsDTO;
+  initial: DispensarySettingsAdminDTO;
 }) {
   const router = useRouter();
   const [dispensaryName, setDispensaryName] = useState(initial.dispensaryName);
+  const [slug, setSlug] = useState(initial.slug);
   const [featureStockEnabled, setFeatureStockEnabled] = useState(
     initial.featureStockEnabled,
   );
@@ -53,6 +56,7 @@ export default function AppSettingsPageClient({
     setSubmitting(true);
     const res = await updateAppSettings(dispensarySlug, {
       dispensaryName,
+      slug: slug.trim().toLowerCase(),
       featureStockEnabled,
       featureBankEnabled,
       featurePrivatePracticeEnabled,
@@ -64,7 +68,7 @@ export default function AppSettingsPageClient({
     });
     setSubmitting(false);
 
-    if (res.status !== 200) {
+    if (res.status !== 200 || !('data' in res)) {
       notifications.show({
         title: 'Erreur',
         message: 'error' in res ? res.error : 'Échec de la mise à jour',
@@ -78,6 +82,13 @@ export default function AppSettingsPageClient({
       message: 'Les paramètres ont été mis à jour.',
       color: 'green',
     });
+
+    if (res.data.slug !== dispensarySlug) {
+      router.push(tenantRoutes(res.data.slug).admin.settings);
+      router.refresh();
+      return;
+    }
+
     router.refresh();
   };
 
@@ -90,10 +101,25 @@ export default function AppSettingsPageClient({
           <Title order={4}>Identité</Title>
           <TextInput
             label="Nom du dispensaire"
-            description='Utilisé dans le titre du site (ex. « Dispensaire » + ce nom).'
+            description="Affiché dans le sélecteur du header et le titre du site."
             value={dispensaryName}
             onChange={(e) => setDispensaryName(e.currentTarget.value)}
           />
+          <Group align="flex-end" wrap="nowrap">
+            <TextInput
+              label="Slug (URL)"
+              description={`Chemin d'accès : /d/${slug || '…'}`}
+              className="flex-1"
+              value={slug}
+              onChange={(e) => setSlug(e.currentTarget.value)}
+            />
+            <Button
+              variant="default"
+              onClick={() => setSlug(slugifyDispensaryName(dispensaryName))}
+            >
+              Générer depuis le nom
+            </Button>
+          </Group>
         </Stack>
       </Card>
 

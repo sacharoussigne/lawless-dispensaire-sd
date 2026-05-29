@@ -91,19 +91,26 @@ export async function listAccessibleDispensaries(session: SessionLike) {
   if (!session?.user?.id) {
     return [];
   }
-  if (isPlatformAdmin(session.user.role)) {
-    return prisma.dispensary.findMany({
-      orderBy: { name: 'asc' },
-      select: { id: true, slug: true, name: true },
-    });
-  }
-  return prisma.dispensary.findMany({
-    where: {
-      members: { some: { userId: session.user.id } },
-    },
-    orderBy: { name: 'asc' },
-    select: { id: true, slug: true, name: true },
-  });
+  const select = {
+    id: true,
+    slug: true,
+    name: true,
+    settings: { select: { dispensaryName: true } },
+  } as const;
+
+  const rows = isPlatformAdmin(session.user.role)
+    ? await prisma.dispensary.findMany({ orderBy: { name: 'asc' }, select })
+    : await prisma.dispensary.findMany({
+        where: { members: { some: { userId: session.user.id } } },
+        orderBy: { name: 'asc' },
+        select,
+      });
+
+  return rows.map((d) => ({
+    id: d.id,
+    slug: d.slug,
+    name: d.settings?.dispensaryName?.trim() || d.name,
+  }));
 }
 
 export function isDispensaryAdminRole(role: string | null | undefined): boolean {

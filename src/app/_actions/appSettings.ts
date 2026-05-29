@@ -1,5 +1,6 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
 import { updateTag } from 'next/cache';
 import { z } from 'zod/v3';
 import prisma from '@/lib/prisma';
@@ -9,7 +10,18 @@ import {
   getAppSettings,
   type AppSettingsDTO,
 } from '@/lib/appSettings';
-import { requireTenantServerActionContext } from '@/lib/serverActionAuth';
+import { requireDispensaryAdminContext } from '@/lib/dispensary/serverActionContext';
+
+export type DispensarySettingsAdminDTO = AppSettingsDTO & {
+  slug: string;
+};
+
+const slugSchema = z
+  .string()
+  .trim()
+  .min(1, 'Le slug est requis')
+  .max(80, 'Le slug est trop long')
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug invalide (lettres minuscules, chiffres et tirets)');
 
 const updateSchema = z.object({
   dispensaryName: z
@@ -17,6 +29,7 @@ const updateSchema = z.object({
     .trim()
     .min(1, 'Le nom est requis')
     .max(120, 'Le nom est trop long'),
+  slug: slugSchema,
   featureStockEnabled: z.boolean(),
   featureBankEnabled: z.boolean(),
   featurePrivatePracticeEnabled: z.boolean(),
@@ -30,20 +43,20 @@ const updateSchema = z.object({
 export async function getAppSettingsForAdmin(
   dispensarySlug: string,
 ): Promise<
-  | { status: 200; data: AppSettingsDTO }
+  | { status: 200; data: DispensarySettingsAdminDTO }
   | { status: number; error: string }
 > {
   try {
-    const ctx = await requireTenantServerActionContext(dispensarySlug, {
-      permission: {
-        resource: 'application',
-        action: 'management',
-        message: 'Accès réservé aux administrateurs',
-      },
-    });
-    if (!ctx.ok) return ctx.response;
+    const auth = await requireDispensaryAdminContext(dispensarySlug);
+    if (!auth.ok) {
+      return { status: auth.status, error: auth.error };
+    }
 
-    const data = await getAppSettings(ctx.tenant.dispensaryId);
+    const settings = await getAppSettings(auth.ctx.dispensaryId);
+    const data: DispensarySettingsAdminDTO = {
+      ...settings,
+      slug: auth.ctx.dispensary.slug,
+    };
     return { status: 200, data };
   } catch (error) {
     const parsed = actionErrorParser(
@@ -64,19 +77,15 @@ export async function updateAppSettings(
   dispensarySlug: string,
   input: z.infer<typeof updateSchema>,
 ): Promise<
-  | { status: 200; data: AppSettingsDTO }
+  | { status: 200; data: DispensarySettingsAdminDTO }
   | { status: number; error: string }
 > {
   try {
-    const ctx = await requireTenantServerActionContext(dispensarySlug, {
-      permission: {
-        resource: 'application',
-        action: 'management',
-        message: 'Accès réservé aux administrateurs',
-      },
-    });
-    if (!ctx.ok) return ctx.response;
-    const { dispensaryId } = ctx.tenant;
+    const auth = await requireDispensaryAdminContext(dispensarySlug);
+    if (!auth.ok) {
+      return { status: auth.status, error: auth.error };
+    }
+    const { dispensaryId, dispensary } = auth.ctx;
 
     const parsed = updateSchema.safeParse(input);
     if (!parsed.success) {
@@ -86,39 +95,65 @@ export async function updateAppSettings(
       };
     }
 
-    const row = await prisma.appSettings.upsert({
-      where: { dispensaryId },
-      create: {
-        dispensaryId,
-        dispensaryName: parsed.data.dispensaryName,
-        featureStockEnabled: parsed.data.featureStockEnabled,
-        featureBankEnabled: parsed.data.featureBankEnabled,
-        featurePrivatePracticeEnabled: parsed.data.featurePrivatePracticeEnabled,
-        featureOrdersEnabled: parsed.data.featureOrdersEnabled,
-        featureSearchEnabled: parsed.data.featureSearchEnabled,
-        featureMailsEnabled: parsed.data.featureMailsEnabled,
-        featurePayrollEnabled: parsed.data.featurePayrollEnabled,
-        featureWeeklyDispensaryActivityEnabled:
-          parsed.data.featureWeeklyDispensaryActivityEnabled,
-      },
-      update: {
-        dispensaryName: parsed.data.dispensaryName,
-        featureStockEnabled: parsed.data.featureStockEnabled,
-        featureBankEnabled: parsed.data.featureBankEnabled,
-        featurePrivatePracticeEnabled: parsed.data.featurePrivatePracticeEnabled,
-        featureOrdersEnabled: parsed.data.featureOrdersEnabled,
-        featureSearchEnabled: parsed.data.featureSearchEnabled,
-        featureMailsEnabled: parsed.data.featureMailsEnabled,
-        featurePayrollEnabled: parsed.data.featurePayrollEnabled,
-        featureWeeklyDispensaryActivityEnabled:
-          parsed.data.featureWeeklyDispensaryActivityEnabled,
-      },
-    });
+    const newSlug = parsed.data.slug;
+    if (newSlug !== dispensary.slug) {
+      const taken = await prisma.dispensary.findFirst({
+        where: { slug: newSlug, id: { not: dispensaryId } },
+        select: { id: true },
+      });
+      if (taken) {
+        return { status: 409, error: 'Ce slug est déjà utilisé par un autre dispensaire' };
+      }
+    }
+
+    const [, row] = await prisma.$transaction([
+      prisma.dispensary.update({
+        where: { id: dispensaryId },
+        data: {
+          name: parsed.data.dispensaryName,
+          slug: newSlug,
+        },
+      }),
+      prisma.appSettings.upsert({
+        where: { dispensaryId },
+        create: {
+          dispensaryId,
+          dispensaryName: parsed.data.dispensaryName,
+          featureStockEnabled: parsed.data.featureStockEnabled,
+          featureBankEnabled: parsed.data.featureBankEnabled,
+          featurePrivatePracticeEnabled: parsed.data.featurePrivatePracticeEnabled,
+          featureOrdersEnabled: parsed.data.featureOrdersEnabled,
+          featureSearchEnabled: parsed.data.featureSearchEnabled,
+          featureMailsEnabled: parsed.data.featureMailsEnabled,
+          featurePayrollEnabled: parsed.data.featurePayrollEnabled,
+          featureWeeklyDispensaryActivityEnabled:
+            parsed.data.featureWeeklyDispensaryActivityEnabled,
+        },
+        update: {
+          dispensaryName: parsed.data.dispensaryName,
+          featureStockEnabled: parsed.data.featureStockEnabled,
+          featureBankEnabled: parsed.data.featureBankEnabled,
+          featurePrivatePracticeEnabled: parsed.data.featurePrivatePracticeEnabled,
+          featureOrdersEnabled: parsed.data.featureOrdersEnabled,
+          featureSearchEnabled: parsed.data.featureSearchEnabled,
+          featureMailsEnabled: parsed.data.featureMailsEnabled,
+          featurePayrollEnabled: parsed.data.featurePayrollEnabled,
+          featureWeeklyDispensaryActivityEnabled:
+            parsed.data.featureWeeklyDispensaryActivityEnabled,
+        },
+      }),
+    ]);
 
     updateTag(appSettingsCacheTag(dispensaryId));
+    revalidatePath(`/d/${dispensary.slug}`, 'layout');
+    if (newSlug !== dispensary.slug) {
+      revalidatePath(`/d/${newSlug}`, 'layout');
+    }
+    revalidatePath('/platform/dispensaries');
 
-    const data: AppSettingsDTO = {
+    const data: DispensarySettingsAdminDTO = {
       dispensaryName: row.dispensaryName,
+      slug: newSlug,
       featureStockEnabled: row.featureStockEnabled,
       featureBankEnabled: row.featureBankEnabled,
       featurePrivatePracticeEnabled: row.featurePrivatePracticeEnabled,
