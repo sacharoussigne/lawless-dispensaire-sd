@@ -152,7 +152,7 @@ export function checkRolePermission(
             continue;
         }
 
-        if (resourcePermissions.includes(action as any)) {
+        if ((resourcePermissions as readonly string[]).includes(action)) {
             return true;
         }
     }
