@@ -13,10 +13,9 @@ import {
 import { getAuthSession } from '@/lib/auth';
 import { calculatePermissions } from '@/lib/auth/calculatePermissions';
 import { checkRolePermission } from '@/lib/auth/permissions';
-import { getAppSettings } from '@/lib/appSettings';
+import { dispensarySiteTitle, getAppSettings } from '@/lib/appSettings';
 import type { AuthSession } from '@/types/session';
 import { getEffectiveRoleForDispensary, requireDispensaryFromSlug } from '@/lib/dispensary/context';
-import Link from 'next/link';
 
 export default async function EmployeePage({
   params,
@@ -30,6 +29,7 @@ export default async function EmployeePage({
   const permissions = calculatePermissions(effectiveRole);
   const appSettings = await getAppSettings(dispensary.id);
   const t = tenantRoutes(dispensarySlug);
+  const siteTitle = dispensarySiteTitle(appSettings);
 
   const employeeSections = [
     {
@@ -102,30 +102,51 @@ export default async function EmployeePage({
       hasAccess: appSettings.featureStockEnabled && (permissions?.stockStatistics.view ?? false),
       color: 'cyan',
     },
-  ].filter((s) => s.hasAccess);
+  ] as const;
+
+  const visibleSections = employeeSections.filter((s) => s.hasAccess);
 
   return (
-    <Container size="xl">
-      <Title order={2} mb="md">
-        Espace employé
-      </Title>
-      <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
-        {employeeSections.map((section) => (
-          <Card key={section.title} withBorder padding="lg" radius="md">
-            <Group mb="md">
-              <section.icon size={28} stroke={1.5} />
-              <Text fw={600}>{section.title}</Text>
-            </Group>
-            <Text size="sm" c="dimmed" mb="lg">
-              {section.description}
-            </Text>
-            <Link href={section.href} style={{ textDecoration: 'none' }}>
-              <Button variant="light" fullWidth>
-                Accéder
-              </Button>
-            </Link>
-          </Card>
-        ))}
+    <Container size="xl" py="xl">
+      <Group justify="space-between" mb="xl">
+        <div>
+          <Title order={1}>Espace employé</Title>
+          <Text c="dimmed" mt="xs">
+            Retrouvez ici les outils du quotidien pour le {siteTitle}.
+          </Text>
+        </div>
+      </Group>
+
+      <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="lg">
+        {visibleSections.map((section) => {
+          const Icon = section.icon;
+          return (
+            <Card key={section.title} withBorder shadow="sm" radius="md" padding="lg">
+              <Group mb="md" align="flex-start">
+                <div className="rounded-full p-2" style={{ backgroundColor: 'rgba(0,0,0,0.02)' }}>
+                  <Icon size={24} stroke={1.8} />
+                </div>
+                <div>
+                  <Text fw={600}>{section.title}</Text>
+                  <Text size="sm" c="dimmed" mt={4}>
+                    {section.description}
+                  </Text>
+                </div>
+              </Group>
+
+              <Group justify="flex-end" mt="md">
+                <Button
+                  component="a"
+                  href={section.href}
+                  variant="light"
+                  color={section.color}
+                >
+                  Accéder
+                </Button>
+              </Group>
+            </Card>
+          );
+        })}
       </SimpleGrid>
     </Container>
   );

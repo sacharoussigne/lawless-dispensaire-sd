@@ -138,8 +138,8 @@ export default function Header({
   return (
     <header className={`${classes.header} mb-10`}>
       <Container size={'xl'}>
-        <div className={'flex justify-between items-center w-full h-[60px]'}>
-          <Group gap="md">
+        <div className={classes.headerInner}>
+          <Group gap="md" wrap="nowrap" className={classes.headerSide}>
             <Link href={logoHref} className={classes.logoLink}>
               <Image
                 src="/logo_dispensaire.png"
@@ -166,9 +166,9 @@ export default function Header({
             )}
           </Group>
 
-          <Group>
-            {session && t ? (
-              <>
+          {session && t ? (
+            <>
+              <nav className={classes.headerNav} aria-label="Navigation principale">
                 {isAdminOrManagementSpace && permissions?.application.management ? (
                   <Menu
                     width={260}
@@ -291,6 +291,9 @@ export default function Header({
                       <IconSearch size={20} />
                     </Link>
                   )}
+              </nav>
+
+              <Group gap="sm" wrap="nowrap" className={classes.headerSide}>
                 {canSwitchSpaces && (
                   <SegmentedControl
                     value={isAdminOrManagementSpace ? 'management' : 'employee'}
@@ -375,30 +378,35 @@ export default function Header({
                     {impersonatorDisplayName?.trim() || 'Compte'}
                   </Button>
                 )}
-              </>
-            ) : session ? (
-              <Group>
-                {isPlatformAdminUser && (
+              </Group>
+            </>
+          ) : session ? (
+            <Group gap="sm" wrap="nowrap" className={`${classes.headerSide} ms-auto`}>
+              {isPlatformAdminUser && (
+                <>
+                  <Button component={Link} href={routes.admin.users} variant="light">
+                    Comptes utilisateurs
+                  </Button>
                   <Button component={Link} href={routes.platform.dispensaries} variant="light">
                     Dispensaires
                   </Button>
-                )}
-                <Menu withinPortal>
-                  <Menu.Target>
-                    <Avatar alt={session.user.name} radius="xl" size={40} src={session.user.image ?? null} />
-                  </Menu.Target>
-                  <Menu.Dropdown>
-                    <Menu.Item onClick={handleLogout}>Déconnexion</Menu.Item>
-                  </Menu.Dropdown>
-                </Menu>
-              </Group>
-            ) : (
-              <>
-                <Button variant="default">Se connecter</Button>
-                <Button>S&apos;inscrire</Button>
-              </>
-            )}
-          </Group>
+                </>
+              )}
+              <Menu withinPortal>
+                <Menu.Target>
+                  <Avatar alt={session.user.name} radius="xl" size={40} src={session.user.image ?? null} />
+                </Menu.Target>
+                <Menu.Dropdown>
+                  <Menu.Item onClick={handleLogout}>Déconnexion</Menu.Item>
+                </Menu.Dropdown>
+              </Menu>
+            </Group>
+          ) : (
+            <Group gap="sm" wrap="nowrap" className={`${classes.headerSide} ms-auto`}>
+              <Button variant="default">Se connecter</Button>
+              <Button>S&apos;inscrire</Button>
+            </Group>
+          )}
         </div>
       </Container>
     </header>

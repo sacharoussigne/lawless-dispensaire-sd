@@ -30,7 +30,7 @@ export async function listDispensaryMembers(dispensarySlug: string) {
   const members = await prisma.dispensaryMember.findMany({
     where: { dispensaryId: auth.ctx.dispensaryId },
     include: {
-      user: { select: { id: true, name: true, email: true, image: true } },
+      user: { select: { id: true, name: true, image: true } },
     },
     orderBy: { user: { name: 'asc' } },
   });
@@ -108,12 +108,9 @@ export async function searchUsersForDispensaryInvite(dispensarySlug: string, que
 
   const users = await prisma.user.findMany({
     where: {
-      OR: [
-        { email: { contains: q, mode: 'insensitive' } },
-        { name: { contains: q, mode: 'insensitive' } },
-      ],
+      name: { contains: q, mode: 'insensitive' },
     },
-    select: { id: true, name: true, email: true },
+    select: { id: true, name: true },
     take: 20,
   });
 

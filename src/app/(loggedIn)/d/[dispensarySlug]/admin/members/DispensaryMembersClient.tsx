@@ -18,7 +18,7 @@ import {
   searchUsersForDispensaryInvite,
   upsertDispensaryMember,
 } from '@/app/_actions/dispensaryMembers';
-import { Role } from '@/types/enum/roles';
+import { Role, rolesAsString } from '@/types/enum/roles';
 
 const ROLE_OPTIONS = [
   { value: Role.EMPLOYEE, label: 'Employé' },
@@ -32,7 +32,7 @@ const ROLE_OPTIONS = [
 type MemberRow = {
   id: string;
   role: string;
-  user: { id: string; name: string; email: string };
+  user: { id: string; name: string };
 };
 
 export function DispensaryMembersClient({
@@ -46,7 +46,7 @@ export function DispensaryMembersClient({
 }) {
   const [members, setMembers] = useState(initialMembers);
   const [search, setSearch] = useState('');
-  const [searchResults, setSearchResults] = useState<{ id: string; name: string; email: string }[]>([]);
+  const [searchResults, setSearchResults] = useState<{ id: string; name: string }[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState<string>(Role.EMPLOYEE);
   const [loading, setLoading] = useState(false);
@@ -117,7 +117,7 @@ export function DispensaryMembersClient({
           <Text fw={600}>Ajouter un membre</Text>
           <Group align="flex-end">
             <TextInput
-              label="Rechercher (email ou nom)"
+              label="Rechercher par nom"
               className="flex-1"
               value={search}
               onChange={(e) => setSearch(e.currentTarget.value)}
@@ -131,7 +131,7 @@ export function DispensaryMembersClient({
               label="Utilisateur"
               data={searchResults.map((u) => ({
                 value: u.id,
-                label: `${u.name} (${u.email})`,
+                label: u.name,
               }))}
               value={selectedUserId}
               onChange={setSelectedUserId}
@@ -156,7 +156,7 @@ export function DispensaryMembersClient({
               <div>
                 <Text fw={600}>{m.user.name}</Text>
                 <Text size="sm" c="dimmed">
-                  {m.user.email} — {m.role}
+                  {rolesAsString(m.role as Role)}
                 </Text>
               </div>
               <Button color="red" variant="light" onClick={() => handleRemove(m.user.id)}>
