@@ -151,7 +151,7 @@ export default function Header({
                 style={{ borderRadius: '50%' }}
               />
             </Link>
-            {session && accessibleDispensaries.length > 0 && (
+            {session && accessibleDispensaries.length > 1 && (
               <Select
                 aria-label="Dispensaire"
                 data={accessibleDispensaries.map((d) => ({
