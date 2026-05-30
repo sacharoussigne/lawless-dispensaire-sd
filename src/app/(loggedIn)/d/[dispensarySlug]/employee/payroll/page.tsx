@@ -3,20 +3,26 @@ import { redirect } from 'next/navigation';
 import { getAuthSession } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { checkRolePermission } from '@/lib/auth/permissions';
+import { getEffectiveRoleForDispensary, requireDispensaryFromSlug } from '@/lib/dispensary/context';
+import type { AuthSession } from '@/types/session';
 import { routes } from '@/types/routes';
 import PayrollNewReportButton from './PayrollNewReportButton';
 import PayrollReportsList from './PayrollReportsList';
 
 export default async function PayrollReportsPage({ params }: { params: Promise<{ dispensarySlug: string }> }) {
+  const { dispensarySlug } = await params;
+  const dispensary = await requireDispensaryFromSlug(dispensarySlug);
   const session = await getAuthSession();
   if (!session?.user) {
     redirect(routes.auth.login);
   }
-  if (!checkRolePermission(session.user.role, 'payroll_reports', 'view')) {
+
+  const effectiveRole = await getEffectiveRoleForDispensary(session as AuthSession, dispensary.id);
+  if (!checkRolePermission(effectiveRole, 'payroll_reports', 'view')) {
     redirect(routes.auth.noManagementAccess);
   }
 
-  const canCreate = checkRolePermission(session.user.role, 'payroll_reports', 'create');
+  const canCreate = checkRolePermission(effectiveRole, 'payroll_reports', 'create');
 
   const rows = await prisma.payrollWeeklyReport.findMany({
     orderBy: [{ weekStart: 'desc' }, { reportType: 'asc' }],
