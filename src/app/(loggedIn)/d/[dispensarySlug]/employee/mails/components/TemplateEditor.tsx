@@ -70,7 +70,38 @@ export function TemplateEditor({
               <br />
               JavaScript: {'{js:code:endjs}'}
               <br />
-              Input: {'{input:[type="text"][name="nom"][label="Label"][placeholder="..."][required="true"][default="valeur" ou default={js:code:endjs}]}'}
+              Input texte:{' '}
+              {
+                '{input:[type="text"][name="nom"][label="Label"][placeholder="..."][required="true"]}'
+              }
+              <br />
+              Input textarea:{' '}
+              {
+                '{input:[type="textarea"][name="corps"][label="Corps"][placeholder="..."]}'
+              }
+              <br />
+              Checkbox:{' '}
+              {
+                "{input:[type=\"checkbox\"][name=\"adr\"][label=\"Seringue d'Adrénaline\"][checkedValue=\"- Seringue d'Adrénaline:\\n\"]}"
+              }
+              <br />
+              Complément conditionnel (inline):{' '}
+              {
+                '{input:[type="text"][name="adr_detail"][dependsOn="adr"][placeholder="Préciser..."]}'
+              }
+              <br />
+              Complément conditionnel (sous la checkbox):{' '}
+              {
+                '{input:[type="text"][name="adr_detail"][dependsOn="adr"][layout="below"][placeholder="Préciser..."]}'
+              }
+              <br />
+              Catégorie (formulaire uniquement):{' '}
+              {'{category:"Signes observés"}'}
+              <br />
+              Échappements dans les valeurs : \\n (retour ligne), \\t (tabulation), \\\\ (antislash)
+              <br />
+              Valeur par défaut dynamique:{' '}
+              {'default={js:(()=>"valeur")():endjs}'}
             </Text>
           </Stack>
         </Paper>

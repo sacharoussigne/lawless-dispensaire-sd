@@ -1,7 +1,7 @@
 'use client';
 
 import { usePermissions, useTenantRoutes } from '@/app/_contexts/PermissionsContext';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Container,
@@ -13,10 +13,11 @@ import {
   Select,
   Paper,
   Text,
+  Textarea,
   ScrollArea,
   Grid,
 } from '@mantine/core';
-import { IconArrowLeft, IconCopy, IconCheck } from '@tabler/icons-react';
+import { IconArrowLeft, IconCopy, IconCheck, IconRefresh } from '@tabler/icons-react';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { createMail } from '@/app/_actions/mails';
@@ -25,10 +26,12 @@ import { handleApiZodError } from '@/lib/services/zod';
 import { ParsedZodError } from '@/lib/errors/ParsedZodError';
 import type { MailTemplate } from '@/types/mailTemplates';
 import { TemplateEditor } from '../components/TemplateEditor';
-import { TemplateFormGenerator } from '../components/TemplateFormGenerator';
+import {
+  TemplateFormGenerator,
+  type TemplateFormGeneratorHandle,
+} from '../components/TemplateFormGenerator';
 import { renderTemplate, RenderContext } from '@/lib/mailTemplate/renderer';
 import { extractInputs } from '@/lib/mailTemplate/parser';
-
 
 interface NewMailPageClientProps {
   initialMailTemplates: MailTemplate[];
@@ -40,9 +43,11 @@ export default function NewMailPageClient({
   const routes = useTenantRoutes();
   const { dispensarySlug } = usePermissions();
   const router = useRouter();
+  const formRef = useRef<TemplateFormGeneratorHandle>(null);
   const [mailTemplates] = useState<MailTemplate[]>(initialMailTemplates);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
-  const [renderedContent, setRenderedContent] = useState<string>('');
+  const [formContent, setFormContent] = useState('');
+  const [editedContent, setEditedContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -69,38 +74,58 @@ export default function NewMailPageClient({
     return extractInputs(selectedTemplate.content).length > 0;
   }, [selectedTemplate?.content]);
 
+  const staticContent = useMemo(() => {
+    if (!selectedTemplate || hasInputs) return '';
+    const context: RenderContext = { inputs: {} };
+    return renderTemplate(selectedTemplate.content, context);
+  }, [selectedTemplate?.content, hasInputs]);
+
+  const autoContent = hasInputs ? formContent : staticContent;
+  const resultContent = editedContent ?? autoContent;
+  const isManuallyEdited = editedContent !== null;
+
   useEffect(() => {
-    if (selectedTemplate && !hasInputs) {
-      const context: RenderContext = { inputs: {} };
-      const rendered = renderTemplate(selectedTemplate.content, context);
-      setRenderedContent(rendered);
-      form.setFieldValue('content', rendered);
-    } else if (selectedTemplate && hasInputs) {
-      form.setFieldValue('content', '');
-      setRenderedContent('');
+    if (selectedTemplate && (hasInputs || staticContent)) {
+      form.setFieldValue('content', resultContent);
     } else if (!selectedTemplate) {
-      setRenderedContent('');
+      form.setFieldValue('content', '');
     }
-  }, [selectedTemplate, hasInputs]);
+  }, [resultContent, selectedTemplate, hasInputs, staticContent]);
 
   const handleTemplateChange = (templateId: string | null) => {
     setSelectedTemplateId(templateId);
+    setFormContent('');
+    setEditedContent(null);
+    formRef.current?.reset();
+
     if (templateId) {
       const t = mailTemplates.find((tpl) => tpl.id === templateId);
       form.setFieldValue('name', t?.defaultMailName ?? '');
     } else {
       form.setFieldValue('content', '');
-      setRenderedContent('');
     }
   };
 
-  const handleTemplateContentChange = (content: string) => {
-    setRenderedContent(content);
-    form.setFieldValue('content', content);
+  const handleFormChange = (content: string) => {
+    setFormContent(content);
+  };
+
+  const handleResultChange = (value: string) => {
+    setEditedContent(value);
+    form.setFieldValue('content', value);
+  };
+
+  const handleRegenerate = () => {
+    setEditedContent(null);
+  };
+
+  const handleResetTemplateForm = () => {
+    formRef.current?.reset();
+    setEditedContent(null);
   };
 
   const handleCopy = async () => {
-    const contentToCopy = renderedContent || form.values.content;
+    const contentToCopy = resultContent || form.values.content;
     if (!contentToCopy) return;
 
     try {
@@ -112,7 +137,7 @@ export default function NewMailPageClient({
         color: 'green',
       });
       setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
+    } catch {
       notifications.show({
         title: 'Erreur',
         message: 'Impossible de copier le courrier',
@@ -122,12 +147,14 @@ export default function NewMailPageClient({
   };
 
   const handleSubmit = async (values: typeof form.values) => {
+    const content = editedContent ?? (hasInputs ? formContent : values.content);
+
     try {
       setLoading(true);
       const result = await createMail(dispensarySlug!, {
         name: values.name,
         receiver: values.receiver,
-        content: values.content,
+        content,
       });
 
       handleAction(result);
@@ -137,13 +164,16 @@ export default function NewMailPageClient({
         color: 'green',
       });
       router.push(routes.employee.mails);
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof ParsedZodError) {
         handleApiZodError(error.error, form);
       } else {
         notifications.show({
           title: 'Erreur',
-          message: error.message || 'Erreur lors de la sauvegarde',
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Erreur lors de la sauvegarde',
           color: 'red',
         });
       }
@@ -164,7 +194,16 @@ export default function NewMailPageClient({
             Retour
           </Button>
           <Group>
-            {(renderedContent || form.values.content) && (
+            {selectedTemplate && hasInputs && (
+              <Button
+                variant="subtle"
+                leftSection={<IconRefresh size={16} />}
+                onClick={handleResetTemplateForm}
+              >
+                Réinitialiser
+              </Button>
+            )}
+            {(resultContent || form.values.content) && (
               <Button
                 leftSection={copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
                 onClick={handleCopy}
@@ -221,11 +260,11 @@ export default function NewMailPageClient({
                       Formulaire
                     </Text>
                     <Paper p="md" withBorder>
-                      <ScrollArea h={600}>
+                      <ScrollArea h={600} scrollbars="y" type="auto">
                         <TemplateFormGenerator
+                          ref={formRef}
                           template={selectedTemplate.content}
-                          onChange={handleTemplateContentChange}
-                          onCancel={() => {}}
+                          onChange={handleFormChange}
                         />
                       </ScrollArea>
                     </Paper>
@@ -233,15 +272,30 @@ export default function NewMailPageClient({
                 </Grid.Col>
                 <Grid.Col span={7}>
                   <Stack gap="md">
-                    <Text size="sm" fw={600}>
-                      Aperçu
-                    </Text>
+                    <Group justify="space-between">
+                      <Text size="sm" fw={600}>
+                        Aperçu
+                      </Text>
+                      {isManuallyEdited && (
+                        <Button variant="subtle" size="xs" onClick={handleRegenerate}>
+                          Réappliquer le formulaire
+                        </Button>
+                      )}
+                    </Group>
                     <Paper p="md" withBorder>
-                      <ScrollArea h={600}>
-                        <Text style={{ whiteSpace: 'pre-wrap' }}>
-                          {renderedContent || 'Remplissez le formulaire pour voir l\'aperçu...'}
-                        </Text>
-                      </ScrollArea>
+                      <Textarea
+                        value={resultContent}
+                        onChange={(e) => handleResultChange(e.currentTarget.value)}
+                        placeholder="Remplissez le formulaire pour générer le résultat…"
+                        minRows={24}
+                        autosize
+                        styles={{
+                          input: {
+                            fontFamily: 'inherit',
+                            lineHeight: 1.5,
+                          },
+                        }}
+                      />
                     </Paper>
                   </Stack>
                 </Grid.Col>
@@ -252,8 +306,17 @@ export default function NewMailPageClient({
                 placeholder="Contenu du courrier"
                 required
                 minRows={15}
-                value={form.values.content}
-                onChange={(value) => form.setFieldValue('content', value)}
+                value={
+                  selectedTemplate && !hasInputs
+                    ? resultContent
+                    : form.values.content
+                }
+                onChange={(value) => {
+                  if (selectedTemplate && !hasInputs) {
+                    setEditedContent(value);
+                  }
+                  form.setFieldValue('content', value);
+                }}
               />
             )}
           </Stack>
