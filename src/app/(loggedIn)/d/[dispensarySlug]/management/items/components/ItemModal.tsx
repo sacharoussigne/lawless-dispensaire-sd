@@ -60,10 +60,9 @@ export function ItemModal({
       minimalQuantity: (value) =>
         value < 0 ? 'La quantité minimale doit être positive' : null,
       categoryId: (value) => (!value ? 'La catégorie est requise' : null),
-      price: (value, values) => {
-        const requirePrice = values.canBeSold;
-        if (requirePrice && (value === null || value === undefined || value <= 0)) {
-          return 'Le prix est requis et doit être positif';
+      price: (value) => {
+        if (value !== null && value !== undefined && value <= 0) {
+          return 'Le prix doit être positif';
         }
         return null;
       },
@@ -76,12 +75,6 @@ export function ItemModal({
       form.setFieldValue('companyGroupId', '');
     }
   }, [form.values.isCraftable]);
-
-  useEffect(() => {
-    if (!form.values.canBeSold && form.values.price !== null) {
-      form.setFieldValue('price', null);
-    }
-  }, [form.values.canBeSold]);
 
   // Initialiser le formulaire quand l'item change
   useEffect(() => {
@@ -111,7 +104,8 @@ export function ItemModal({
         ? undefined
         : values.companyGroupId || undefined;
 
-      const priceToSave = values.canBeSold ? values.price : null;
+      const priceToSave =
+        values.price !== null && values.price !== undefined ? values.price : null;
 
       if (editingItem) {
         result = await updateItem(dispensarySlug!, {
@@ -277,32 +271,28 @@ export function ItemModal({
             )}
           </Stack>
 
-          {/* Section: vente */}
           <Stack gap="sm" mt="xs">
             <Text fw={600} size="xs" c="dimmed" tt="uppercase">
-              Vente
+              Vente et tarification
             </Text>
-            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-              <Switch
-                label="Peut être vendu"
-                description="Si activé, cet objet peut être vendu dans les commandes"
-                {...form.getInputProps('canBeSold', { type: 'checkbox' })}
-              />
-              {form.values.canBeSold && (
-                <NumberInput
-                  label="Prix"
-                  placeholder="Prix de vente"
-                  required
-                  min={0}
-                  step={0.01}
-                  decimalScale={2}
-                  fixedDecimalScale
-                  leftSection="$"
-                  description="Prix de vente de l'objet"
-                  {...form.getInputProps('price')}
-                />
-              )}
-            </SimpleGrid>
+            <NumberInput
+              label="Prix de référence"
+              placeholder="0,00"
+              min={0}
+              step={0.01}
+              decimalScale={2}
+              fixedDecimalScale
+              leftSection={<Text size="sm" c="dimmed">$</Text>}
+              leftSectionWidth={28}
+              description="Optionnel"
+              {...form.getInputProps('price')}
+            />
+            <Switch
+              mt="xs"
+              label="Peut être vendu"
+              description="Inclut cet objet dans les commandes sortantes (vente)"
+              {...form.getInputProps('canBeSold', { type: 'checkbox' })}
+            />
           </Stack>
           <Group justify="flex-end" mt="md">
             <Button

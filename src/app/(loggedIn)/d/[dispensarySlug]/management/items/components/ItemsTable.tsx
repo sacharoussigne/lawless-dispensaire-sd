@@ -219,15 +219,8 @@ export function ItemsTable({
           {
             accessor: 'price',
             title: 'Prix',
-            render: (item: ItemWithRelations) => {
-              // Le prix peut être affiché si canBeSold est activé OU si l'item n'est pas craftable
-              const canHavePrice = item.canBeSold || !item.isCraftable;
-              return canHavePrice && item.price ? (
-                `$${Number(item.price).toFixed(2)}`
-              ) : (
-                '-'
-              );
-            },
+            render: (item: ItemWithRelations) =>
+              item.price != null ? `$${Number(item.price).toFixed(2)}` : '-',
           },
           {
             accessor: 'weight',

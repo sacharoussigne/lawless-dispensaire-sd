@@ -30,6 +30,10 @@ import {
 } from '@/app/_actions/individualCustomers';
 import { SuggestionAutocomplete } from '@/app/_components/SuggestionAutocomplete/SuggestionAutocomplete';
 import { handleAction } from '@/lib/action';
+import {
+  calculateOrderPriceFromItems,
+  normalizeItemPrice,
+} from '@/lib/orders/calculateOrderPriceFromItems';
 import type { ItemWithRelations } from '@/types/stock';
 import {
   getOrderTypeLabel,
@@ -79,14 +83,6 @@ interface ExistingOrder {
   }>;
 }
 
-// Fonction utilitaire pour convertir le prix en nombre
-const normalizePrice = (price: unknown): number | null => {
-  if (price == null) return null;
-  if (typeof price === 'number') return price;
-  const numPrice = Number(price);
-  return isNaN(numPrice) ? null : numPrice;
-};
-
 function orderClientLabel(order: ExistingOrder): string {
   return order.individualCustomer?.name ?? order.company?.name ?? '—';
 }
@@ -108,6 +104,7 @@ export default function OrderModal({
   const [orderType, setOrderType] = useState<OrderTypeEnum>(OrderTypeEnum.INCOMING);
   const [orderDetails, setOrderDetails] = useState('');
   const [orderPrice, setOrderPrice] = useState<number | ''>('');
+  const [priceManuallyEdited, setPriceManuallyEdited] = useState(false);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
@@ -150,7 +147,7 @@ export default function OrderModal({
               ...item,
               stockToday: null,
               stockYesterday: null,
-              price: normalizePrice(item.price),
+              price: normalizeItemPrice(item.price),
               canBeSold: item.canBeSold ?? false,
             }))
           );
@@ -160,7 +157,7 @@ export default function OrderModal({
         setAllItems(
           items.map((item: any) => ({
             ...item,
-            price: normalizePrice(item.price),
+            price: normalizeItemPrice(item.price),
             canBeSold: item.canBeSold ?? false,
           }))
         );
@@ -290,6 +287,7 @@ export default function OrderModal({
     setClientMode('company');
     setOrderItems([]);
     setOrderPrice('');
+    setPriceManuallyEdited(false);
   }, [orderType]);
 
   useEffect(() => {
@@ -342,21 +340,26 @@ export default function OrderModal({
     setSelectedCompanyId(null);
   }, [selectedCompanyGroupId, prefillItemsNeedingRestock, itemsToUse, orderType, clientMode]);
 
-  // Calculer le prix total pour les commandes sortantes
-  const calculatedPrice = useMemo(() => {
-    if (orderType !== OrderTypeEnum.OUTGOING) return null;
-    
-    const total = orderItems.reduce((sum, orderItem) => {
-      const item = itemsToUse.find((i) => i.id === orderItem.itemId) || orderItem.item;
-      const price = normalizePrice(item.price);
-      if (price != null && price > 0) {
-        return sum + price * orderItem.quantity;
-      }
-      return sum;
-    }, 0);
-    
-    return total > 0 ? total : null;
-  }, [orderItems, orderType, itemsToUse]);
+  const suggestedPrice = useMemo(
+    () =>
+      calculateOrderPriceFromItems(
+        orderItems.map((orderItem) => {
+          const item =
+            itemsToUse.find((i) => i.id === orderItem.itemId) || orderItem.item;
+          return {
+            quantity: orderItem.quantity,
+            price: item.price,
+          };
+        })
+      ),
+    [orderItems, itemsToUse]
+  );
+
+  useEffect(() => {
+    if (!priceManuallyEdited) {
+      setOrderPrice(suggestedPrice ?? '');
+    }
+  }, [suggestedPrice, priceManuallyEdited]);
 
   // Réinitialiser le formulaire quand la modal se ferme
   useEffect(() => {
@@ -369,6 +372,7 @@ export default function OrderModal({
       setOrderType(OrderTypeEnum.INCOMING);
       setOrderDetails('');
       setOrderPrice('');
+      setPriceManuallyEdited(false);
       setOrderItems([]);
     }
   }, [opened]);
@@ -384,7 +388,7 @@ export default function OrderModal({
         // 1. canBeSold est explicitement true (peut être craftable ou non)
         // 2. OU il n'est pas craftable ET il a un prix défini
         const hasCanBeSold = item.canBeSold === true;
-        const price = normalizePrice(item.price);
+        const price = normalizeItemPrice(item.price);
         const hasPrice = price != null && price > 0;
         const isNotCraftableWithPrice = !item.isCraftable && hasPrice;
         
@@ -556,7 +560,7 @@ export default function OrderModal({
       const result = await createOrder(dispensarySlug!, {
         type: orderType,
         details: orderDetails || undefined,
-        price: orderType === OrderTypeEnum.INCOMING && orderPrice !== '' ? Number(orderPrice) : undefined,
+        price: orderPrice !== '' ? Number(orderPrice) : undefined,
         ...(selectedCompanyGroupId ? { companyGroupId: selectedCompanyGroupId } : {}),
         ...(orderType === OrderTypeEnum.INCOMING || clientMode === 'company'
           ? { companyId: selectedCompanyId! }
@@ -736,27 +740,19 @@ export default function OrderModal({
               minRows={3}
             />
 
-            {orderType === OrderTypeEnum.INCOMING && (
-              <NumberInput
-                label="Prix (optionnel)"
-                placeholder="Prix de la commande"
-                value={orderPrice}
-                onChange={(value) => setOrderPrice(value === '' ? '' : Number(value))}
-                min={0}
-                decimalScale={2}
-                fixedDecimalScale
-                prefix="$ "
-              />
-            )}
-
-            {orderType === OrderTypeEnum.OUTGOING && calculatedPrice !== null && (
-              <TextInput
-                label="Prix total"
-                value={`${calculatedPrice.toFixed(2)} $`}
-                readOnly
-                styles={{ input: { fontWeight: 500 } }}
-              />
-            )}
+            <NumberInput
+              label="Prix (optionnel)"
+              placeholder="Prix de la commande"
+              value={orderPrice}
+              onChange={(value) => {
+                setPriceManuallyEdited(true);
+                setOrderPrice(value === '' ? '' : Number(value));
+              }}
+              min={0}
+              decimalScale={2}
+              fixedDecimalScale
+              prefix="$ "
+            />
 
             <Text fw={500}>Objets de la commande</Text>
 

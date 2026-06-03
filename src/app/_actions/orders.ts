@@ -7,6 +7,7 @@ import { requireTenantServerActionContext } from '@/lib/serverActionAuth';
 import { tenantWhere } from '@/lib/dispensary/tenantWhere';
 import type { OrderStatus } from '@prisma/client';
 import type { OrderWithRelations } from '@/types/orders';
+import { calculateOrderPriceFromItems } from '@/lib/orders/calculateOrderPriceFromItems';
 
 function slugifyOrderNameSegment(name: string): string {
   const slug = name
@@ -38,6 +39,43 @@ function serializeOrderForClient(order: {
   } as OrderWithRelations;
 }
 
+async function computeOrderPriceFromItemIds(
+  dispensaryId: string,
+  items: { itemId: string; quantity: number }[]
+): Promise<number | null> {
+  const itemsWithPrices = await prisma.item.findMany({
+    where: {
+      id: { in: items.map((item) => item.itemId) },
+      ...tenantWhere(dispensaryId),
+    },
+    select: {
+      id: true,
+      price: true,
+    },
+  });
+
+  return calculateOrderPriceFromItems(
+    items.map((orderItem) => {
+      const item = itemsWithPrices.find((i) => i.id === orderItem.itemId);
+      return {
+        quantity: orderItem.quantity,
+        price: item?.price ?? null,
+      };
+    })
+  );
+}
+
+async function resolveOrderPrice(
+  dispensaryId: string,
+  items: { itemId: string; quantity: number }[],
+  clientPrice: number | null | undefined
+): Promise<number | null> {
+  if (clientPrice !== undefined) {
+    return clientPrice;
+  }
+  return computeOrderPriceFromItemIds(dispensaryId, items);
+}
+
 const createOrderSchema = z
   .object({
     name: z.string().max(255, 'Le nom est trop long').optional(),
@@ -46,7 +84,11 @@ const createOrderSchema = z
       .default('DRAFT'),
     type: z.enum(['INCOMING', 'OUTGOING']).default('INCOMING'),
     details: z.string().max(1000, 'Les détails sont trop longs').optional(),
-    price: z.number().positive('Le prix doit être positif').optional(),
+    price: z
+      .number()
+      .positive('Le prix doit être positif')
+      .optional()
+      .nullable(),
     companyId: z.string().uuid('ID d\'entreprise invalide').optional(),
     individualCustomerId: z.string().uuid('ID de particulier invalide').optional(),
     companyGroupId: z.string().uuid('ID de groupe invalide').optional().nullable(),
@@ -140,33 +182,11 @@ export async function createOrder(
       }
     }
 
-    let orderPrice: number | null = null;
-
-    if (validatedData.type === 'OUTGOING') {
-      const itemsWithPrices = await prisma.item.findMany({
-        where: {
-          id: { in: validatedData.items.map((item) => item.itemId) },
-          ...tenantWhere(dispensaryId),
-        },
-        select: {
-          id: true,
-          price: true,
-        },
-      });
-
-      const totalPrice = validatedData.items.reduce((sum, orderItem) => {
-        const item = itemsWithPrices.find((i) => i.id === orderItem.itemId);
-        if (item && item.price) {
-          const itemPrice = Number(item.price);
-          return sum + itemPrice * orderItem.quantity;
-        }
-        return sum;
-      }, 0);
-
-      orderPrice = totalPrice > 0 ? totalPrice : null;
-    } else if (validatedData.type === 'INCOMING') {
-      orderPrice = validatedData.price ?? null;
-    }
+    const orderPrice = await resolveOrderPrice(
+      dispensaryId,
+      validatedData.items,
+      validatedData.price
+    );
 
     if (!orderName) {
       return {
@@ -234,7 +254,11 @@ const updateOrderSchema = z.object({
   status: z.enum(['DRAFT', 'LETTER_SENT', 'PROCESSING', 'READY', 'COMPLETED', 'CANCELLED']).optional(),
   type: z.enum(['INCOMING', 'OUTGOING']).optional(),
   details: z.string().max(1000, 'Les détails sont trop longs').optional(),
-  price: z.number().positive('Le prix doit être positif').optional(),
+  price: z
+    .number()
+    .positive('Le prix doit être positif')
+    .optional()
+    .nullable(),
   items: z.array(
     z.object({
       itemId: z.string().uuid('ID d\'item invalide'),
@@ -309,7 +333,7 @@ export async function updateOrder(
     status?: 'DRAFT' | 'LETTER_SENT' | 'PROCESSING' | 'READY' | 'COMPLETED' | 'CANCELLED';
     type?: 'INCOMING' | 'OUTGOING';
     details?: string;
-    price?: number;
+    price?: number | null;
     items?: { itemId: string; quantity: number }[];
   },
 ) {
@@ -355,42 +379,10 @@ export async function updateOrder(
       };
     }
 
-    const orderType = validatedData.type || oldOrder.type;
-
     const itemsToUse = validatedData.items || oldOrder.items.map((item) => ({
       itemId: item.itemId,
       quantity: item.quantity,
     }));
-
-    let orderPrice: number | null | undefined = undefined;
-
-    if (orderType === 'OUTGOING') {
-      const itemsWithPrices = await prisma.item.findMany({
-        where: {
-          id: { in: itemsToUse.map((item) => item.itemId) },
-          ...tenantWhere(dispensaryId),
-        },
-        select: {
-          id: true,
-          price: true,
-        },
-      });
-
-      const totalPrice = itemsToUse.reduce((sum, orderItem) => {
-        const item = itemsWithPrices.find((i) => i.id === orderItem.itemId);
-        if (item && item.price) {
-          const itemPrice = Number(item.price);
-          return sum + itemPrice * orderItem.quantity;
-        }
-        return sum;
-      }, 0);
-
-      orderPrice = totalPrice > 0 ? totalPrice : null;
-    } else if (orderType === 'INCOMING') {
-      if (validatedData.price !== undefined) {
-        orderPrice = validatedData.price ?? null;
-      }
-    }
 
     const updateData: Record<string, unknown> = {
       name: validatedData.name,
@@ -399,8 +391,13 @@ export async function updateOrder(
       details: validatedData.details,
     };
 
-    if (orderPrice !== undefined) {
-      updateData.price = orderPrice !== null ? orderPrice : undefined;
+    if (validatedData.price !== undefined || validatedData.items) {
+      const orderPrice = await resolveOrderPrice(
+        dispensaryId,
+        itemsToUse,
+        validatedData.price
+      );
+      updateData.price = orderPrice;
     }
 
     if (validatedData.items) {

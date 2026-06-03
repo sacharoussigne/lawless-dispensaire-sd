@@ -23,6 +23,10 @@ import { notifications } from '@mantine/notifications';
 import { updateOrder } from '@/app/_actions/orders';
 import { getItems } from '@/app/_actions/items';
 import { handleAction } from '@/lib/action';
+import {
+  calculateOrderPriceFromItems,
+  normalizeItemPrice,
+} from '@/lib/orders/calculateOrderPriceFromItems';
 import { handleApiZodError } from '@/lib/services/zod';
 import { ParsedZodError } from '@/lib/errors/ParsedZodError';
 import {
@@ -89,14 +93,7 @@ export function EditOrderModal({
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [allItems, setAllItems] = useState<ItemWithRelations[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
-
-  // Utility function to convert price to number
-  const normalizePrice = (price: unknown): number | null => {
-    if (price == null) return null;
-    if (typeof price === 'number') return price;
-    const numPrice = Number(price);
-    return isNaN(numPrice) ? null : numPrice;
-  };
+  const [priceManuallyEdited, setPriceManuallyEdited] = useState(false);
 
   const form = useForm({
     initialValues: {
@@ -124,7 +121,7 @@ export function EditOrderModal({
                 ...item,
                 stockToday: null,
                 stockYesterday: null,
-                price: normalizePrice(item.price),
+                price: normalizeItemPrice(item.price),
                 canBeSold: item.canBeSold ?? false,
               }))
             );
@@ -159,24 +156,26 @@ export function EditOrderModal({
     }
   }, [editingOrder, opened]);
 
-  // Calculate total price for outgoing orders
-  const calculatedPrice = useMemo(() => {
-    const orderType = form.values.type || (editingOrder?.type as OrderTypeEnum);
-    if (orderType !== OrderTypeEnum.OUTGOING) return null;
-    
-    const total = orderItems.reduce((sum, orderItem) => {
-      const itemPrice = orderItem.item.price;
-      if (itemPrice != null && itemPrice > 0) {
-        return sum + itemPrice * orderItem.quantity;
-      }
-      return sum;
-    }, 0);
-    
-    return total > 0 ? total : null;
-  }, [orderItems, form.values.type, editingOrder]);
+  const suggestedPrice = useMemo(
+    () =>
+      calculateOrderPriceFromItems(
+        orderItems.map((orderItem) => ({
+          quantity: orderItem.quantity,
+          price: orderItem.item.price,
+        }))
+      ),
+    [orderItems]
+  );
+
+  useEffect(() => {
+    if (!priceManuallyEdited) {
+      form.setFieldValue('price', suggestedPrice ?? '');
+    }
+  }, [suggestedPrice, priceManuallyEdited]);
 
   useEffect(() => {
     if (editingOrder) {
+      setPriceManuallyEdited(editingOrder.price != null);
       form.setValues({
         name: editingOrder.name,
         status: editingOrder.status as OrderStatusEnum,
@@ -194,7 +193,7 @@ export function EditOrderModal({
       // For outgoing orders, can choose items that can be sold
       return allItems.filter((item) => {
         const hasCanBeSold = item.canBeSold === true;
-        const price = normalizePrice(item.price);
+        const price = normalizeItemPrice(item.price);
         const hasPrice = price != null && price > 0;
         const isNotCraftableWithPrice = !item.isCraftable && hasPrice;
         
@@ -242,7 +241,7 @@ export function EditOrderModal({
           item: {
             id: itemToAdd.id,
             name: itemToAdd.name,
-            price: normalizePrice(itemToAdd.price),
+            price: normalizeItemPrice(itemToAdd.price),
           },
         },
       ]);
@@ -268,7 +267,7 @@ export function EditOrderModal({
         status: values.status,
         type: values.type,
         details: values.details || undefined,
-        price: values.type === OrderTypeEnum.INCOMING && values.price !== '' ? Number(values.price) : undefined,
+        price: values.price !== '' ? Number(values.price) : null,
         items: orderItems.map((oi) => ({
           itemId: oi.itemId,
           quantity: oi.quantity,
@@ -308,6 +307,7 @@ export function EditOrderModal({
         onClose();
         form.reset();
         setOrderItems([]);
+        setPriceManuallyEdited(false);
       }}
       title={editingOrder ? 'Modifier la commande' : 'Créer une commande'}
       size="xl"
@@ -331,7 +331,10 @@ export function EditOrderModal({
                 data={typeOptions}
                 required
                 value={form.values.type}
-                onChange={(value) => form.setFieldValue('type', value as OrderTypeEnum)}
+                onChange={(value) => {
+                  form.setFieldValue('type', value as OrderTypeEnum);
+                  setPriceManuallyEdited(false);
+                }}
                 disabled={isCompleted}
               />
             </SimpleGrid>
@@ -347,25 +350,20 @@ export function EditOrderModal({
                 }
                 disabled={isCompleted}
               />
-              {form.values.type === OrderTypeEnum.INCOMING ? (
-                <NumberInput
-                  label="Prix (optionnel)"
-                  placeholder="Prix de la commande"
-                  {...form.getInputProps('price')}
-                  min={0}
-                  decimalScale={2}
-                  fixedDecimalScale
-                  prefix="$ "
-                  disabled={isCompleted}
-                />
-              ) : (
-                <TextInput
-                  label="Prix total"
-                  value={calculatedPrice !== null ? `${calculatedPrice.toFixed(2)} $` : '-'}
-                  readOnly
-                  styles={{ input: { fontWeight: 500 } }}
-                />
-              )}
+              <NumberInput
+                label="Prix (optionnel)"
+                placeholder="Prix de la commande"
+                min={0}
+                decimalScale={2}
+                fixedDecimalScale
+                prefix="$ "
+                value={form.values.price}
+                onChange={(value) => {
+                  setPriceManuallyEdited(true);
+                  form.setFieldValue('price', value === '' ? '' : Number(value));
+                }}
+                disabled={isCompleted}
+              />
             </SimpleGrid>
 
             <Textarea
@@ -389,8 +387,8 @@ export function EditOrderModal({
                 <Table.Tr>
                   <Table.Th>Objet</Table.Th>
                   <Table.Th>Quantité</Table.Th>
-                  {form.values.type === OrderTypeEnum.OUTGOING && <Table.Th>Prix unitaire</Table.Th>}
-                  {form.values.type === OrderTypeEnum.OUTGOING && <Table.Th>Total</Table.Th>}
+                  <Table.Th>Prix unitaire</Table.Th>
+                  <Table.Th>Total</Table.Th>
                   <Table.Th style={{ width: 50 }}></Table.Th>
                 </Table.Tr>
               </Table.Thead>
@@ -410,12 +408,8 @@ export function EditOrderModal({
                           disabled={isCompleted}
                         />
                       </Table.Td>
-                      {form.values.type === OrderTypeEnum.OUTGOING && (
-                        <>
-                          <Table.Td>{itemPrice > 0 ? `${itemPrice.toFixed(2)} $` : '-'}</Table.Td>
-                          <Table.Td>{itemTotal > 0 ? `${itemTotal.toFixed(2)} $` : '-'}</Table.Td>
-                        </>
-                      )}
+                      <Table.Td>{itemPrice > 0 ? `${itemPrice.toFixed(2)} $` : '-'}</Table.Td>
+                      <Table.Td>{itemTotal > 0 ? `${itemTotal.toFixed(2)} $` : '-'}</Table.Td>
                       <Table.Td>
                         <ActionIcon
                           color="red"
