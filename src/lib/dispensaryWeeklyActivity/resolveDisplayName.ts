@@ -2,25 +2,74 @@ import type { PrismaClient } from '@prisma/client';
 import { DISCORD_ACCOUNT_PROVIDER_ID } from '@/lib/dispensaryWeeklyActivity/constants';
 
 type AccountDelegate = Pick<PrismaClient, 'account'>;
+type WeeklyActivityDelegate = Pick<PrismaClient, 'dispensaryWeeklyActivity'>;
+type ResolveDisplayNameDelegate = AccountDelegate & WeeklyActivityDelegate;
+
+export function genericDoctorFallbackName(discordUserId: string): string {
+  const fallback = `Médecin ${discordUserId}`;
+  return fallback.length > 200 ? fallback.slice(0, 200) : fallback;
+}
+
+function isGenericDoctorFallbackName(displayName: string, discordUserId: string): boolean {
+  const trimmed = displayName.trim();
+  return trimmed.length === 0 || trimmed === genericDoctorFallbackName(discordUserId);
+}
+
+function trimDisplayName(name: string): string {
+  const trimmed = name.trim();
+  return trimmed.length > 200 ? trimmed.slice(0, 200) : trimmed;
+}
+
+export async function getLatestDiscordDisplayName(
+  prisma: WeeklyActivityDelegate,
+  discordUserId: string,
+): Promise<string | null> {
+  const row = await prisma.dispensaryWeeklyActivity.findFirst({
+    where: { discordUserId },
+    orderBy: { updatedAt: 'desc' },
+    select: { displayName: true },
+  });
+  const name = row?.displayName?.trim();
+  if (!name || isGenericDoctorFallbackName(name, discordUserId)) {
+    return null;
+  }
+  return trimDisplayName(name);
+}
+
+export async function getLatestDiscordDisplayNames(
+  prisma: WeeklyActivityDelegate,
+  discordUserIds: string[],
+): Promise<Map<string, string>> {
+  const unique = [...new Set(discordUserIds)];
+  if (unique.length === 0) return new Map();
+
+  const map = new Map<string, string>();
+  await Promise.all(
+    unique.map(async (discordUserId) => {
+      const name = await getLatestDiscordDisplayName(prisma, discordUserId);
+      if (name) {
+        map.set(discordUserId, name);
+      }
+    }),
+  );
+  return map;
+}
+
+export async function resolveDiscordDisplayName(
+  prisma: ResolveDisplayNameDelegate,
+  discordUserId: string,
+): Promise<string> {
+  const latest = await getLatestDiscordDisplayName(prisma, discordUserId);
+  if (latest) return latest;
+  return genericDoctorFallbackName(discordUserId);
+}
 
 /** Default `displayName` when the Discord bot auto-creates a weekly activity row. */
 export async function resolveBotWeeklyActivityDisplayName(
-  prisma: AccountDelegate,
+  prisma: ResolveDisplayNameDelegate,
   discordUserId: string,
 ): Promise<string> {
-  const acc = await prisma.account.findFirst({
-    where: {
-      providerId: DISCORD_ACCOUNT_PROVIDER_ID,
-      accountId: discordUserId,
-    },
-    include: { user: { select: { name: true } } },
-  });
-  const name = acc?.user?.name?.trim();
-  if (name && name.length > 0) {
-    return name.length > 200 ? name.slice(0, 200) : name;
-  }
-  const fallback = `Médecin ${discordUserId}`;
-  return fallback.length > 200 ? fallback.slice(0, 200) : fallback;
+  return resolveDiscordDisplayName(prisma, discordUserId);
 }
 
 export async function findLinkedUserIdByDiscordAccount(
@@ -51,36 +100,30 @@ export async function getDiscordAccountIdForUser(
   return acc?.accountId ?? null;
 }
 
-type RowWithUser = {
-  id: string;
+type RowWithDisplayName = {
   displayName: string;
   discordUserId: string;
-  userId: string | null;
-  user?: { name: string } | null;
 };
 
-export async function mergeResolvedDisplayNames<T extends RowWithUser>(
-  prisma: AccountDelegate,
+export async function mergeResolvedDisplayNames<T extends RowWithDisplayName>(
+  prisma: WeeklyActivityDelegate,
   rows: T[],
 ): Promise<(T & { resolvedDisplayName: string })[]> {
   if (rows.length === 0) return [];
 
-  const needLookup = rows.filter((r) => !r.user?.name);
+  const needLookup = rows.filter((r) => isGenericDoctorFallbackName(r.displayName, r.discordUserId));
   const discordIds = [...new Set(needLookup.map((r) => r.discordUserId))];
-  let discordToName = new Map<string, string>();
-  if (discordIds.length > 0) {
-    const accounts = await prisma.account.findMany({
-      where: {
-        providerId: DISCORD_ACCOUNT_PROVIDER_ID,
-        accountId: { in: discordIds },
-      },
-      include: { user: { select: { name: true } } },
-    });
-    discordToName = new Map(accounts.map((a) => [a.accountId, a.user.name]));
-  }
+  const latestByDiscord = await getLatestDiscordDisplayNames(prisma, discordIds);
 
-  return rows.map((r) => ({
-    ...r,
-    resolvedDisplayName: r.user?.name ?? discordToName.get(r.discordUserId) ?? r.displayName,
-  }));
+  return rows.map((r) => {
+    const stored = trimDisplayName(r.displayName);
+    if (!isGenericDoctorFallbackName(stored, r.discordUserId)) {
+      return { ...r, resolvedDisplayName: stored };
+    }
+    const latest = latestByDiscord.get(r.discordUserId);
+    return {
+      ...r,
+      resolvedDisplayName: latest ?? genericDoctorFallbackName(r.discordUserId),
+    };
+  });
 }

@@ -3,8 +3,8 @@
 import { z } from 'zod/v3';
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
-import { getAuthSession } from '@/lib/auth';
-import { getAppFeatureActionBlock } from '@/lib/appSettings';
+import { requireTenantServerActionContext } from '@/lib/serverActionAuth';
+import { tenantWhere } from '@/lib/dispensary/tenantWhere';
 
 const createMailSchema = z.object({
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
@@ -23,31 +23,30 @@ const deleteMailSchema = z.object({
   id: z.string().uuid('ID invalide'),
 });
 
-export async function createMail(data: {
-  name: string;
-  receiver: string;
-  content: string;
-}) {
+export async function createMail(
+  dispensarySlug: string,
+  data: {
+    name: string;
+    receiver: string;
+    content: string;
+  },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const mailsFeatureBlock = await getAppFeatureActionBlock('mails');
-    if (mailsFeatureBlock) return mailsFeatureBlock;
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'mails',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = createMailSchema.parse(data);
 
     const mail = await prisma.mail.create({
       data: {
+        dispensaryId,
         name: validatedData.name,
         receiver: validatedData.receiver,
         content: validatedData.content,
-        senderId: session.user.id,
+        senderId: ctx.session.user.id,
       },
     });
 
@@ -60,22 +59,18 @@ export async function createMail(data: {
   }
 }
 
-export async function getMails() {
+export async function getMails(dispensarySlug: string) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const mailsFeatureBlock = await getAppFeatureActionBlock('mails');
-    if (mailsFeatureBlock) return mailsFeatureBlock;
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'mails',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const mails = await prisma.mail.findMany({
       where: {
-        senderId: session.user.id,
+        senderId: ctx.session.user.id,
+        ...tenantWhere(dispensaryId),
       },
       orderBy: {
         createdAt: 'desc',
@@ -91,29 +86,28 @@ export async function getMails() {
   }
 }
 
-export async function updateMail(data: {
-  id: string;
-  name: string;
-  receiver: string;
-  content: string;
-}) {
+export async function updateMail(
+  dispensarySlug: string,
+  data: {
+    id: string;
+    name: string;
+    receiver: string;
+    content: string;
+  },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const mailsFeatureBlock = await getAppFeatureActionBlock('mails');
-    if (mailsFeatureBlock) return mailsFeatureBlock;
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'mails',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = updateMailSchema.parse(data);
 
-    const existingMail = await prisma.mail.findUnique({
+    const existingMail = await prisma.mail.findFirst({
       where: {
         id: validatedData.id,
+        ...tenantWhere(dispensaryId),
       },
     });
 
@@ -124,7 +118,7 @@ export async function updateMail(data: {
       };
     }
 
-    if (existingMail.senderId !== session.user.id) {
+    if (existingMail.senderId !== ctx.session.user.id) {
       return {
         status: 403,
         error: 'Vous n\'êtes pas autorisé à modifier ce courrier',
@@ -134,6 +128,7 @@ export async function updateMail(data: {
     const mail = await prisma.mail.update({
       where: {
         id: validatedData.id,
+        ...tenantWhere(dispensaryId),
       },
       data: {
         name: validatedData.name,
@@ -151,24 +146,20 @@ export async function updateMail(data: {
   }
 }
 
-export async function deleteMail(data: { id: string }) {
+export async function deleteMail(dispensarySlug: string, data: { id: string }) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const mailsFeatureBlock = await getAppFeatureActionBlock('mails');
-    if (mailsFeatureBlock) return mailsFeatureBlock;
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'mails',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = deleteMailSchema.parse(data);
 
-    const existingMail = await prisma.mail.findUnique({
+    const existingMail = await prisma.mail.findFirst({
       where: {
         id: validatedData.id,
+        ...tenantWhere(dispensaryId),
       },
     });
 
@@ -179,7 +170,7 @@ export async function deleteMail(data: { id: string }) {
       };
     }
 
-    if (existingMail.senderId !== session.user.id) {
+    if (existingMail.senderId !== ctx.session.user.id) {
       return {
         status: 403,
         error: 'Vous n\'êtes pas autorisé à supprimer ce courrier',
@@ -189,6 +180,7 @@ export async function deleteMail(data: { id: string }) {
     await prisma.mail.delete({
       where: {
         id: validatedData.id,
+        ...tenantWhere(dispensaryId),
       },
     });
 

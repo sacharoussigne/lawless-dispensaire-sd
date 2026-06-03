@@ -2,8 +2,8 @@
 
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
-import { getAuthSession } from '@/lib/auth';
-import { getAppFeatureActionBlock } from '@/lib/appSettings';
+import { requireTenantServerActionContext } from '@/lib/serverActionAuth';
+import { tenantWhere } from '@/lib/dispensary/tenantWhere';
 import {
   getTodayStart,
   getYesterdayStart,
@@ -12,18 +12,16 @@ import {
   getStartOfDay,
 } from '@/lib/date';
 
-export async function getItemsWithStock(chestId?: string | null) {
+export async function getItemsWithStock(
+  dispensarySlug: string,
+  chestId?: string | null,
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const featureBlock = await getAppFeatureActionBlock('stock');
-    if (featureBlock) return featureBlock;
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'stock',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const today = getTodayStart();
     const yesterday = getYesterdayStart();
@@ -32,6 +30,7 @@ export async function getItemsWithStock(chestId?: string | null) {
     const items = await prisma.item.findMany({
       where: {
         isEnabled: true,
+        ...tenantWhere(dispensaryId),
       },
       orderBy: {
         createdAt: 'desc',
@@ -73,6 +72,7 @@ export async function getItemsWithStock(chestId?: string | null) {
             },
             chest: {
               isEnabled: true,
+              ...tenantWhere(dispensaryId),
             },
           },
           select: {
@@ -97,7 +97,7 @@ export async function getItemsWithStock(chestId?: string | null) {
           const todayStr = formatDate(today);
           return shDateStr === todayStr;
         });
-        const stockToday = stockHistoryToday.length > 0 
+        const stockToday = stockHistoryToday.length > 0
           ? stockHistoryToday.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0]
           : null;
 
@@ -116,46 +116,46 @@ export async function getItemsWithStock(chestId?: string | null) {
           stockYesterday: stockYesterday?.quantity ?? null,
           price: item.price ? Number(item.price) : null,
         };
-      } else {
-        const stockHistoryToday = item.stockHistory.filter((sh) => {
-          const shDateStr = formatDate(new Date(sh.timestamp));
-          const todayStr = formatDate(today);
-          return shDateStr === todayStr;
-        });
-
-        const stocksByChestToday = new Map<string, typeof stockHistoryToday[0]>();
-        stockHistoryToday.forEach((sh) => {
-          const existing = stocksByChestToday.get(sh.chestId);
-          if (!existing || new Date(sh.timestamp).getTime() > new Date(existing.timestamp).getTime()) {
-            stocksByChestToday.set(sh.chestId, sh);
-          }
-        });
-
-        const totalStockToday = Array.from(stocksByChestToday.values()).reduce((sum, sh) => sum + sh.quantity, 0);
-
-        const stockHistoryYesterday = item.stockHistory.filter((sh) => {
-          const shDateStr = formatDate(new Date(sh.timestamp));
-          const yesterdayStr = formatDate(yesterday);
-          return shDateStr === yesterdayStr;
-        });
-
-        const stocksByChestYesterday = new Map<string, typeof stockHistoryYesterday[0]>();
-        stockHistoryYesterday.forEach((sh) => {
-          const existing = stocksByChestYesterday.get(sh.chestId);
-          if (!existing || new Date(sh.timestamp).getTime() > new Date(existing.timestamp).getTime()) {
-            stocksByChestYesterday.set(sh.chestId, sh);
-          }
-        });
-
-        const totalStockYesterday = Array.from(stocksByChestYesterday.values()).reduce((sum, sh) => sum + sh.quantity, 0);
-
-        return {
-          ...item,
-          stockToday: stocksByChestToday.size > 0 ? totalStockToday : null,
-          stockYesterday: stocksByChestYesterday.size > 0 ? totalStockYesterday : null,
-          price: item.price ? Number(item.price) : null,
-        };
       }
+
+      const stockHistoryToday = item.stockHistory.filter((sh) => {
+        const shDateStr = formatDate(new Date(sh.timestamp));
+        const todayStr = formatDate(today);
+        return shDateStr === todayStr;
+      });
+
+      const stocksByChestToday = new Map<string, typeof stockHistoryToday[0]>();
+      stockHistoryToday.forEach((sh) => {
+        const existing = stocksByChestToday.get(sh.chestId);
+        if (!existing || new Date(sh.timestamp).getTime() > new Date(existing.timestamp).getTime()) {
+          stocksByChestToday.set(sh.chestId, sh);
+        }
+      });
+
+      const totalStockToday = Array.from(stocksByChestToday.values()).reduce((sum, sh) => sum + sh.quantity, 0);
+
+      const stockHistoryYesterday = item.stockHistory.filter((sh) => {
+        const shDateStr = formatDate(new Date(sh.timestamp));
+        const yesterdayStr = formatDate(yesterday);
+        return shDateStr === yesterdayStr;
+      });
+
+      const stocksByChestYesterday = new Map<string, typeof stockHistoryYesterday[0]>();
+      stockHistoryYesterday.forEach((sh) => {
+        const existing = stocksByChestYesterday.get(sh.chestId);
+        if (!existing || new Date(sh.timestamp).getTime() > new Date(existing.timestamp).getTime()) {
+          stocksByChestYesterday.set(sh.chestId, sh);
+        }
+      });
+
+      const totalStockYesterday = Array.from(stocksByChestYesterday.values()).reduce((sum, sh) => sum + sh.quantity, 0);
+
+      return {
+        ...item,
+        stockToday: stocksByChestToday.size > 0 ? totalStockToday : null,
+        stockYesterday: stocksByChestYesterday.size > 0 ? totalStockYesterday : null,
+        price: item.price ? Number(item.price) : null,
+      };
     });
 
     return {
@@ -167,26 +167,17 @@ export async function getItemsWithStock(chestId?: string | null) {
   }
 }
 
-/**
- * Updates stock for multiple items
- * If stock already exists today for the specified chest, it is updated
- * Otherwise, a new stock is created for this chest
- * @param data - Array of items with their quantities
- * @param chestId - Chest ID (optional, if null or not provided, uses the "foure tout" chest)
- */
-
-export async function getItemsWithStockForDate(date: Date, chestId?: string | null) {
+export async function getItemsWithStockForDate(
+  dispensarySlug: string,
+  date: Date,
+  chestId?: string | null,
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const featureBlock = await getAppFeatureActionBlock('stock');
-    if (featureBlock) return featureBlock;
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'stock',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const dayStart = getStartOfDay(date);
     const dayEnd = new Date(dayStart);
@@ -195,6 +186,7 @@ export async function getItemsWithStockForDate(date: Date, chestId?: string | nu
     const items = await prisma.item.findMany({
       where: {
         isEnabled: true,
+        ...tenantWhere(dispensaryId),
       },
       orderBy: {
         createdAt: 'desc',
@@ -236,6 +228,7 @@ export async function getItemsWithStockForDate(date: Date, chestId?: string | nu
             ...(chestId ? { chestId: chestId } : {}),
             chest: {
               isEnabled: true,
+              ...tenantWhere(dispensaryId),
             },
           },
           orderBy: {
@@ -246,8 +239,8 @@ export async function getItemsWithStockForDate(date: Date, chestId?: string | nu
     });
 
     const itemsWithStock = items.map((item) => {
-      const stockForDate = item.stockHistory.length > 0 
-        ? item.stockHistory[0] // Le plus récent du jour pour ce coffre
+      const stockForDate = item.stockHistory.length > 0
+        ? item.stockHistory[0]
         : null;
 
       return {
@@ -267,23 +260,16 @@ export async function getItemsWithStockForDate(date: Date, chestId?: string | nu
   }
 }
 
-/**
- * Overwrites stocks for a given date and specific chest
- * Deletes all existing stocks for this date and chest, then creates new stocks
- */
-
-export async function getItemsWithDetailedStock(itemIds?: string[]) {
+export async function getItemsWithDetailedStock(
+  dispensarySlug: string,
+  itemIds?: string[],
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const featureBlock = await getAppFeatureActionBlock('search');
-    if (featureBlock) return featureBlock;
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'search',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const today = getTodayStart();
     const yesterday = getYesterdayStart();
@@ -291,6 +277,7 @@ export async function getItemsWithDetailedStock(itemIds?: string[]) {
     const items = await prisma.item.findMany({
       where: {
         isEnabled: true,
+        ...tenantWhere(dispensaryId),
         ...(itemIds && itemIds.length > 0 ? { id: { in: itemIds } } : {}),
       },
       orderBy: {
@@ -328,6 +315,7 @@ export async function getItemsWithDetailedStock(itemIds?: string[]) {
             },
             chest: {
               isEnabled: true,
+              ...tenantWhere(dispensaryId),
             },
           },
           select: {
@@ -352,6 +340,7 @@ export async function getItemsWithDetailedStock(itemIds?: string[]) {
     const allChests = await prisma.chest.findMany({
       where: {
         isEnabled: true,
+        ...tenantWhere(dispensaryId),
       },
       orderBy: {
         name: 'asc',
@@ -363,7 +352,6 @@ export async function getItemsWithDetailedStock(itemIds?: string[]) {
     });
 
     const itemsWithDetailedStock = items.map((item) => {
-      // Group stocks by chest for today
       const stocksByChestToday = new Map<string, { quantity: number; timestamp: Date }>();
       const stocksByChestYesterday = new Map<string, { quantity: number; timestamp: Date }>();
 
@@ -385,7 +373,6 @@ export async function getItemsWithDetailedStock(itemIds?: string[]) {
         }
       });
 
-      // Calculate total stock today and yesterday
       const totalStockToday = Array.from(stocksByChestToday.values()).reduce((sum, sh) => sum + sh.quantity, 0);
       const totalStockYesterday = Array.from(stocksByChestYesterday.values()).reduce((sum, sh) => sum + sh.quantity, 0);
 
@@ -418,8 +405,3 @@ export async function getItemsWithDetailedStock(itemIds?: string[]) {
     return actionErrorParser(error, 'Erreur lors de la récupération des items avec stocks détaillés');
   }
 }
-
-/**
- * Checks if all order items have today's stock
- */
-

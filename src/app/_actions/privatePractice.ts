@@ -3,9 +3,8 @@
 import { z } from 'zod/v3';
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
-import { getAuthSession } from '@/lib/auth';
-import { checkRolePermission } from '@/lib/auth/permissions';
-import { getAppFeatureActionBlock } from '@/lib/appSettings';
+import { requireTenantServerActionContext } from '@/lib/serverActionAuth';
+import { tenantWhere } from '@/lib/dispensary/tenantWhere';
 import { startOfWeek, endOfWeek } from 'date-fns';
 import { PatientTypeEnumValues } from '@/types/enum/patientType';
 
@@ -47,54 +46,27 @@ function getWeekBounds(date: Date) {
   return { start, end };
 }
 
-async function checkPrivatePracticeAccess() {
-  const session = await getAuthSession();
-  if (!session) {
-    return {
-      hasAccess: false,
-      error: 'Non autorisé',
-    };
-  }
-
-  const featureBlock = await getAppFeatureActionBlock('privatePractice');
-  if (featureBlock) {
-    return {
-      hasAccess: false,
-      error: featureBlock.error,
-    };
-  }
-
-  const userRole = session.user?.role;
-  const hasAccess = checkRolePermission(userRole, 'private_practice', 'access');
-
-  if (!hasAccess) {
-    return {
-      hasAccess: false,
-      error: 'Accès au cabinet privé refusé',
-    };
-  }
-
-  return { hasAccess: true };
-}
-
-/**
- * Gets or creates a week for private practice
- */
-export async function getOrCreateWeek(date: Date) {
+export async function getOrCreateWeek(dispensarySlug: string, date: Date) {
   try {
-    const accessCheck = await checkPrivatePracticeAccess();
-    if (!accessCheck.hasAccess) {
-      return {
-        status: 403,
-        error: accessCheck.error || 'Accès non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'privatePractice',
+      permission: {
+        resource: 'private_practice',
+        action: 'access',
+        message: 'Accès au cabinet privé refusé',
+      },
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const { start, end } = getWeekBounds(date);
 
     let week = await prisma.privatePracticeWeek.findUnique({
       where: {
-        weekStart: start,
+        dispensaryId_weekStart: {
+          dispensaryId,
+          weekStart: start,
+        },
       },
       include: {
         patients: {
@@ -109,6 +81,7 @@ export async function getOrCreateWeek(date: Date) {
     if (!week) {
       week = await prisma.privatePracticeWeek.create({
         data: {
+          dispensaryId,
           weekStart: start,
           weekEnd: end,
         },
@@ -140,20 +113,21 @@ export async function getOrCreateWeek(date: Date) {
   }
 }
 
-/**
- * Gets all weeks
- */
-export async function getWeeks() {
+export async function getWeeks(dispensarySlug: string) {
   try {
-    const accessCheck = await checkPrivatePracticeAccess();
-    if (!accessCheck.hasAccess) {
-      return {
-        status: 403,
-        error: accessCheck.error || 'Accès non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'privatePractice',
+      permission: {
+        resource: 'private_practice',
+        action: 'access',
+        message: 'Accès au cabinet privé refusé',
+      },
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const weeks = await prisma.privatePracticeWeek.findMany({
+      where: tenantWhere(dispensaryId),
       orderBy: {
         weekStart: 'desc',
       },
@@ -179,32 +153,47 @@ export async function getWeeks() {
   }
 }
 
-/**
- * Creates a new patient
- */
-export async function createPatient(data: {
-  weekId: string;
-  date: Date | string;
-  type: string;
-  identity: string;
-  description?: string;
-  consultationPrice: number;
-  otherPrice: number;
-  amountForCashRegister: number;
-  depositedInCashRegister?: boolean;
-  retrievedFromCashRegister?: boolean;
-  order?: number;
-}) {
+export async function createPatient(
+  dispensarySlug: string,
+  data: {
+    weekId: string;
+    date: Date | string;
+    type: string;
+    identity: string;
+    description?: string;
+    consultationPrice: number;
+    otherPrice: number;
+    amountForCashRegister: number;
+    depositedInCashRegister?: boolean;
+    retrievedFromCashRegister?: boolean;
+    order?: number;
+  },
+) {
   try {
-    const accessCheck = await checkPrivatePracticeAccess();
-    if (!accessCheck.hasAccess) {
-      return {
-        status: 403,
-        error: accessCheck.error || 'Accès non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'privatePractice',
+      permission: {
+        resource: 'private_practice',
+        action: 'access',
+        message: 'Accès au cabinet privé refusé',
+      },
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = createPatientSchema.parse(data);
+
+    const week = await prisma.privatePracticeWeek.findFirst({
+      where: { id: validatedData.weekId, ...tenantWhere(dispensaryId) },
+      select: { id: true },
+    });
+
+    if (!week) {
+      return {
+        status: 404,
+        error: 'Semaine introuvable',
+      };
+    }
 
     const patient = await prisma.privatePracticePatient.create({
       data: {
@@ -236,34 +225,52 @@ export async function createPatient(data: {
   }
 }
 
-/**
- * Updates a patient
- */
-export async function updatePatient(data: {
-  id: string;
-  date?: Date | string;
-  type?: string;
-  identity?: string;
-  description?: string;
-  consultationPrice?: number;
-  otherPrice?: number;
-  amountForCashRegister?: number;
-  depositedInCashRegister?: boolean;
-  retrievedFromCashRegister?: boolean;
-  order?: number;
-}) {
+export async function updatePatient(
+  dispensarySlug: string,
+  data: {
+    id: string;
+    date?: Date | string;
+    type?: string;
+    identity?: string;
+    description?: string;
+    consultationPrice?: number;
+    otherPrice?: number;
+    amountForCashRegister?: number;
+    depositedInCashRegister?: boolean;
+    retrievedFromCashRegister?: boolean;
+    order?: number;
+  },
+) {
   try {
-    const accessCheck = await checkPrivatePracticeAccess();
-    if (!accessCheck.hasAccess) {
-      return {
-        status: 403,
-        error: accessCheck.error || 'Accès non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'privatePractice',
+      permission: {
+        resource: 'private_practice',
+        action: 'access',
+        message: 'Accès au cabinet privé refusé',
+      },
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = updatePatientSchema.parse(data);
 
-    const updateData: any = {};
+    const existing = await prisma.privatePracticePatient.findFirst({
+      where: {
+        id: validatedData.id,
+        week: tenantWhere(dispensaryId),
+      },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      return {
+        status: 404,
+        error: 'Patient introuvable',
+      };
+    }
+
+    const updateData: Record<string, unknown> = {};
     if (validatedData.date !== undefined) {
       updateData.date = validatedData.date instanceof Date ? validatedData.date : new Date(validatedData.date);
     }
@@ -296,20 +303,35 @@ export async function updatePatient(data: {
   }
 }
 
-/**
- * Deletes a patient
- */
-export async function deletePatient(data: { id: string }) {
+export async function deletePatient(dispensarySlug: string, data: { id: string }) {
   try {
-    const accessCheck = await checkPrivatePracticeAccess();
-    if (!accessCheck.hasAccess) {
-      return {
-        status: 403,
-        error: accessCheck.error || 'Accès non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'privatePractice',
+      permission: {
+        resource: 'private_practice',
+        action: 'access',
+        message: 'Accès au cabinet privé refusé',
+      },
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = deletePatientSchema.parse(data);
+
+    const existing = await prisma.privatePracticePatient.findFirst({
+      where: {
+        id: validatedData.id,
+        week: tenantWhere(dispensaryId),
+      },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      return {
+        status: 404,
+        error: 'Patient introuvable',
+      };
+    }
 
     await prisma.privatePracticePatient.delete({
       where: { id: validatedData.id },
@@ -324,20 +346,21 @@ export async function deletePatient(data: { id: string }) {
   }
 }
 
-/**
- * Gets identity suggestions
- */
-export async function getIdentitySuggestions() {
+export async function getIdentitySuggestions(dispensarySlug: string) {
   try {
-    const accessCheck = await checkPrivatePracticeAccess();
-    if (!accessCheck.hasAccess) {
-      return {
-        status: 403,
-        error: accessCheck.error || 'Accès non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'privatePractice',
+      permission: {
+        resource: 'private_practice',
+        action: 'access',
+        message: 'Accès au cabinet privé refusé',
+      },
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const suggestions = await prisma.patientIdentitySuggestion.findMany({
+      where: tenantWhere(dispensaryId),
       orderBy: {
         createdAt: 'desc',
       },
@@ -346,25 +369,25 @@ export async function getIdentitySuggestions() {
 
     return {
       status: 200,
-      data: suggestions.map(s => s.value),
+      data: suggestions.map((s) => s.value),
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la récupération des suggestions d\'identité');
   }
 }
 
-/**
- * Adds an identity suggestion
- */
-export async function addIdentitySuggestion(data: { value: string }) {
+export async function addIdentitySuggestion(dispensarySlug: string, data: { value: string }) {
   try {
-    const accessCheck = await checkPrivatePracticeAccess();
-    if (!accessCheck.hasAccess) {
-      return {
-        status: 403,
-        error: accessCheck.error || 'Accès non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'privatePractice',
+      permission: {
+        resource: 'private_practice',
+        action: 'access',
+        message: 'Accès au cabinet privé refusé',
+      },
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     if (!data.value || data.value.trim().length === 0) {
       return {
@@ -373,10 +396,17 @@ export async function addIdentitySuggestion(data: { value: string }) {
       };
     }
 
+    const trimmed = data.value.trim();
+
     const suggestion = await prisma.patientIdentitySuggestion.upsert({
-      where: { value: data.value.trim() },
+      where: {
+        dispensaryId_value: {
+          dispensaryId,
+          value: trimmed,
+        },
+      },
       update: {},
-      create: { value: data.value.trim() },
+      create: { dispensaryId, value: trimmed },
     });
 
     return {
@@ -388,18 +418,18 @@ export async function addIdentitySuggestion(data: { value: string }) {
   }
 }
 
-/**
- * Deletes an identity suggestion
- */
-export async function deleteIdentitySuggestion(data: { value: string }) {
+export async function deleteIdentitySuggestion(dispensarySlug: string, data: { value: string }) {
   try {
-    const accessCheck = await checkPrivatePracticeAccess();
-    if (!accessCheck.hasAccess) {
-      return {
-        status: 403,
-        error: accessCheck.error || 'Accès non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'privatePractice',
+      permission: {
+        resource: 'private_practice',
+        action: 'access',
+        message: 'Accès au cabinet privé refusé',
+      },
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     if (!data.value || data.value.trim().length === 0) {
       return {
@@ -408,8 +438,31 @@ export async function deleteIdentitySuggestion(data: { value: string }) {
       };
     }
 
+    const trimmed = data.value.trim();
+
+    const existing = await prisma.patientIdentitySuggestion.findUnique({
+      where: {
+        dispensaryId_value: {
+          dispensaryId,
+          value: trimmed,
+        },
+      },
+    });
+
+    if (!existing) {
+      return {
+        status: 404,
+        error: 'Suggestion introuvable',
+      };
+    }
+
     await prisma.patientIdentitySuggestion.delete({
-      where: { value: data.value.trim() },
+      where: {
+        dispensaryId_value: {
+          dispensaryId,
+          value: trimmed,
+        },
+      },
     });
 
     return {

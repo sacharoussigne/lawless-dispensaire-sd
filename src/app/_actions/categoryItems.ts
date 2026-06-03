@@ -3,27 +3,24 @@
 import { z } from 'zod/v3';
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
-import { getAuthSession } from '@/lib/auth';
+import { requireTenantServerActionContext } from '@/lib/serverActionAuth';
+import { tenantWhere } from '@/lib/dispensary/tenantWhere';
 
-// Schéma de validation pour créer une catégorie d'item
 const createCategoryItemSchema = z.object({
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
   color: z.string().min(1, 'La couleur est requise').max(7, 'La couleur doit être au format hexadécimal').default('#ffffff'),
 });
 
-// Schéma de validation pour modifier une catégorie d'item
 const updateCategoryItemSchema = z.object({
   id: z.string().uuid('ID invalide'),
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
   color: z.string().min(1, 'La couleur est requise').max(7, 'La couleur doit être au format hexadécimal').default('#ffffff'),
 });
 
-// Schéma pour supprimer une catégorie d'item
 const deleteCategoryItemSchema = z.object({
   id: z.string().uuid('ID invalide'),
 });
 
-// Schéma pour réordonner les catégories
 const reorderCategoryItemsSchema = z.object({
   items: z.array(z.object({
     id: z.string().uuid('ID invalide'),
@@ -31,26 +28,22 @@ const reorderCategoryItemsSchema = z.object({
   })),
 });
 
-/**
- * Crée une nouvelle catégorie d'item
- */
-export async function createCategoryItem(data: {
-  name: string;
-  color?: string;
-}) {
+export async function createCategoryItem(
+  dispensarySlug: string,
+  data: {
+    name: string;
+    color?: string;
+  },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = createCategoryItemSchema.parse(data);
 
-    // Récupérer le dernier ordre pour définir le nouvel ordre
     const lastCategory = await prisma.categoryItem.findFirst({
+      where: tenantWhere(dispensaryId),
       orderBy: {
         order: 'desc',
       },
@@ -63,6 +56,7 @@ export async function createCategoryItem(data: {
 
     const categoryItem = await prisma.categoryItem.create({
       data: {
+        dispensaryId,
         name: validatedData.name,
         color: validatedData.color || '#ffffff',
         order: newOrder,
@@ -78,20 +72,14 @@ export async function createCategoryItem(data: {
   }
 }
 
-/**
- * Récupère toutes les catégories d'items
- */
-export async function getCategoryItems() {
+export async function getCategoryItems(dispensarySlug: string) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const categoryItems = await prisma.categoryItem.findMany({
+      where: tenantWhere(dispensaryId),
       orderBy: {
         order: 'asc',
       },
@@ -114,28 +102,25 @@ export async function getCategoryItems() {
   }
 }
 
-/**
- * Modifie une catégorie d'item existante
- */
-export async function updateCategoryItem(data: {
-  id: string;
-  name: string;
-  color?: string;
-}) {
+export async function updateCategoryItem(
+  dispensarySlug: string,
+  data: {
+    id: string;
+    name: string;
+    color?: string;
+  },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = updateCategoryItemSchema.parse(data);
 
     const categoryItem = await prisma.categoryItem.update({
       where: {
         id: validatedData.id,
+        ...tenantWhere(dispensaryId),
       },
       data: {
         name: validatedData.name,
@@ -152,24 +137,18 @@ export async function updateCategoryItem(data: {
   }
 }
 
-/**
- * Supprime une catégorie d'item
- */
-export async function deleteCategoryItem(data: { id: string }) {
+export async function deleteCategoryItem(dispensarySlug: string, data: { id: string }) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = deleteCategoryItemSchema.parse(data);
 
     await prisma.categoryItem.delete({
       where: {
         id: validatedData.id,
+        ...tenantWhere(dispensaryId),
       },
     });
 
@@ -182,29 +161,24 @@ export async function deleteCategoryItem(data: { id: string }) {
   }
 }
 
-/**
- * Réordonne les catégories d'items
- */
-export async function reorderCategoryItems(data: { items: { id: string; order: number }[] }) {
+export async function reorderCategoryItems(
+  dispensarySlug: string,
+  data: { items: { id: string; order: number }[] },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = reorderCategoryItemsSchema.parse(data);
 
-    // Mettre à jour l'ordre de chaque catégorie
     await Promise.all(
       validatedData.items.map(({ id, order }) =>
         prisma.categoryItem.update({
-          where: { id },
+          where: { id, ...tenantWhere(dispensaryId) },
           data: { order },
-        })
-      )
+        }),
+      ),
     );
 
     return {
@@ -215,4 +189,3 @@ export async function reorderCategoryItems(data: { items: { id: string; order: n
     return actionErrorParser(error, 'Erreur lors du réordonnancement des catégories d\'objets');
   }
 }
-

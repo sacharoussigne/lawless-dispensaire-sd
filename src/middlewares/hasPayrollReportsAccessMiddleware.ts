@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRolePermission } from "@/lib/auth/permissions";
 import { routes } from "@/types/routes";
-import type { AppMiddlewareSession } from "@/types/middlewareSession";
+import type { AppMiddlewareSession } from '@/types/middlewareSession';
+import { getMiddlewareRole } from '@/types/middlewareSession';
 
 export async function hasPayrollReportsAccessMiddleware(
   request: NextRequest,
@@ -11,7 +12,7 @@ export async function hasPayrollReportsAccessMiddleware(
     return NextResponse.next();
   }
 
-  const userRole = session.user?.role;
+  const userRole = getMiddlewareRole(session);
   const allowed = checkRolePermission(userRole, "payroll_reports", "view");
 
   if (!allowed) {

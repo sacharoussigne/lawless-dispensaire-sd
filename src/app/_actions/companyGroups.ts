@@ -3,16 +3,15 @@
 import { z } from 'zod/v3';
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
-import { getAuthSession } from '@/lib/auth';
+import { requireTenantServerActionContext } from '@/lib/serverActionAuth';
+import { tenantWhere } from '@/lib/dispensary/tenantWhere';
 
-// Schéma de validation pour créer un groupe d'entreprises
 const createCompanyGroupSchema = z.object({
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
   description: z.string().max(1000, 'La description est trop longue').optional(),
   companyIds: z.array(z.string().uuid('ID d\'entreprise invalide')).optional(),
 });
 
-// Schéma de validation pour modifier un groupe d'entreprises
 const updateCompanyGroupSchema = z.object({
   id: z.string().uuid('ID invalide'),
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
@@ -20,32 +19,56 @@ const updateCompanyGroupSchema = z.object({
   companyIds: z.array(z.string().uuid('ID d\'entreprise invalide')).optional(),
 });
 
-// Schéma pour supprimer un groupe d'entreprises
 const deleteCompanyGroupSchema = z.object({
   id: z.string().uuid('ID invalide'),
 });
 
-/**
- * Crée un nouveau groupe d'entreprises
- */
-export async function createCompanyGroup(data: {
-  name: string;
-  description?: string;
-  companyIds?: string[];
-}) {
+async function validateCompanyIds(
+  dispensaryId: string,
+  companyIds: string[],
+): Promise<{ ok: true } | { ok: false; response: { status: number; error: string } }> {
+  if (companyIds.length === 0) {
+    return { ok: true };
+  }
+
+  const companies = await prisma.company.findMany({
+    where: {
+      id: { in: companyIds },
+      ...tenantWhere(dispensaryId),
+    },
+    select: { id: true },
+  });
+
+  if (companies.length !== companyIds.length) {
+    return { ok: false, response: { status: 400, error: 'Une ou plusieurs entreprises sont invalides' } };
+  }
+
+  return { ok: true };
+}
+
+export async function createCompanyGroup(
+  dispensarySlug: string,
+  data: {
+    name: string;
+    description?: string;
+    companyIds?: string[];
+  },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = createCompanyGroupSchema.parse(data);
 
+    if (validatedData.companyIds && validatedData.companyIds.length > 0) {
+      const companiesResult = await validateCompanyIds(dispensaryId, validatedData.companyIds);
+      if (!companiesResult.ok) return companiesResult.response;
+    }
+
     const companyGroup = await prisma.companyGroup.create({
       data: {
+        dispensaryId,
         name: validatedData.name,
         description: validatedData.description,
         companies: validatedData.companyIds
@@ -79,20 +102,14 @@ export async function createCompanyGroup(data: {
   }
 }
 
-/**
- * Récupère tous les groupes d'entreprises
- */
-export async function getCompanyGroups() {
+export async function getCompanyGroups(dispensarySlug: string) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const companyGroups = await prisma.companyGroup.findMany({
+      where: tenantWhere(dispensaryId),
       orderBy: {
         createdAt: 'desc',
       },
@@ -119,29 +136,24 @@ export async function getCompanyGroups() {
   }
 }
 
-/**
- * Modifie un groupe d'entreprises existant
- */
-export async function updateCompanyGroup(data: {
-  id: string;
-  name: string;
-  description?: string;
-  companyIds?: string[];
-}) {
+export async function updateCompanyGroup(
+  dispensarySlug: string,
+  data: {
+    id: string;
+    name: string;
+    description?: string;
+    companyIds?: string[];
+  },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = updateCompanyGroupSchema.parse(data);
 
-    // Récupérer les relations existantes
-    const existingCompanyGroup = await prisma.companyGroup.findUnique({
-      where: { id: validatedData.id },
+    const existingCompanyGroup = await prisma.companyGroup.findFirst({
+      where: { id: validatedData.id, ...tenantWhere(dispensaryId) },
       include: {
         companies: {
           select: {
@@ -151,14 +163,22 @@ export async function updateCompanyGroup(data: {
       },
     });
 
-    const existingCompanyIds = existingCompanyGroup?.companies.map((c) => c.companyId) || [];
+    if (!existingCompanyGroup) {
+      return { status: 404, error: 'Groupe d\'entreprises introuvable' };
+    }
+
     const newCompanyIds = validatedData.companyIds || [];
+    const companiesResult = await validateCompanyIds(dispensaryId, newCompanyIds);
+    if (!companiesResult.ok) return companiesResult.response;
+
+    const existingCompanyIds = existingCompanyGroup.companies.map((c) => c.companyId);
     const companyIdsToAdd = newCompanyIds.filter((id) => !existingCompanyIds.includes(id));
     const companyIdsToRemove = existingCompanyIds.filter((id) => !newCompanyIds.includes(id));
 
     const companyGroup = await prisma.companyGroup.update({
       where: {
         id: validatedData.id,
+        ...tenantWhere(dispensaryId),
       },
       data: {
         name: validatedData.name,
@@ -193,24 +213,18 @@ export async function updateCompanyGroup(data: {
   }
 }
 
-/**
- * Supprime un groupe d'entreprises
- */
-export async function deleteCompanyGroup(data: { id: string }) {
+export async function deleteCompanyGroup(dispensarySlug: string, data: { id: string }) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = deleteCompanyGroupSchema.parse(data);
 
     await prisma.companyGroup.delete({
       where: {
         id: validatedData.id,
+        ...tenantWhere(dispensaryId),
       },
     });
 
@@ -222,4 +236,3 @@ export async function deleteCompanyGroup(data: { id: string }) {
     return actionErrorParser(error, 'Erreur lors de la suppression du groupe d\'entreprises');
   }
 }
-

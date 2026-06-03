@@ -1,7 +1,6 @@
 import type { AppSettingsDTO } from '@/lib/appSettingsShared';
 
 export interface Permissions {
-  // Stock permissions
   stock: {
     view: boolean;
     create: boolean;
@@ -10,14 +9,12 @@ export interface Permissions {
     craftRead: boolean;
     craftWrite: boolean;
   };
-  // Orders permissions
   orders: {
     view: boolean;
     create: boolean;
     update: boolean;
     delete: boolean;
   };
-  // Application permissions
   application: {
     access: boolean;
     management: boolean;
@@ -36,10 +33,18 @@ export interface Permissions {
   };
 }
 
+export type AccessibleDispensary = {
+  id: string;
+  slug: string;
+  name: string;
+};
+
 export interface PermissionsContextType {
   permissions: Permissions | null;
   userRole: string | null;
   loading: boolean;
   appSettings: AppSettingsDTO;
+  dispensarySlug: string | null;
+  dispensaryId: string | null;
+  accessibleDispensaries: AccessibleDispensary[];
 }
-

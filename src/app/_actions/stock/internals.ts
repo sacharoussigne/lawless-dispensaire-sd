@@ -1,10 +1,12 @@
 import prisma from '@/lib/prisma';
+import { tenantWhere } from '@/lib/dispensary/tenantWhere';
 
-export async function getDefaultChestId(): Promise<string> {
+export async function getDefaultChestId(dispensaryId: string): Promise<string> {
   const defaultChest = await prisma.chest.findFirst({
     where: {
       name: 'Foure tout',
       isEnabled: true,
+      ...tenantWhere(dispensaryId),
     },
   });
   if (!defaultChest) {

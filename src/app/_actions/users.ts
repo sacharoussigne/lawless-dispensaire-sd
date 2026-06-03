@@ -8,6 +8,7 @@ import prisma from '@/lib/prisma';
 import { checkRolePermission } from '@/lib/auth/permissions';
 import { Role } from '@/types/enum/roles';
 import { actionErrorParser } from '@/lib/action';
+import { requirePlatformAdminContext } from '@/lib/dispensary/serverActionContext';
 
 const roleEnum = z.enum(['user', 'admin', 'employee', 'inventory_manager', 'inventory_viewer', 'private_practitioner', 'direction']);
 
@@ -42,6 +43,11 @@ export async function listUsers(params?: {
   sortDirection?: 'asc' | 'desc';
 }) {
   try {
+    const authCtx = await requirePlatformAdminContext();
+    if (!authCtx.ok) {
+      return { status: authCtx.status, error: authCtx.error };
+    }
+
     const result = await auth.api.listUsers({
       query: {
         searchValue: params?.searchValue,

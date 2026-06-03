@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { parseTemplateParameters, extractJsCode } from './parser';
+import {
+  parseTemplateParameters,
+  extractJsCode,
+  extractFormSections,
+} from './parser';
 
 describe('parseTemplateParameters', () => {
   it('still extracts standalone {js} and {input}', () => {
@@ -21,6 +25,59 @@ describe('parseTemplateParameters', () => {
     expect(params[0].type).toBe('input');
     expect(params[0].input?.defaultValue).toContain('{js:');
     expect(params[0].input?.defaultValue).toContain(':endjs');
+  });
+
+  it('unescapes \\n in quoted attribute values', () => {
+    const content =
+      '{input:[type="checkbox"][name="x"][label="X"][checkedValue="- Ligne 1\\n- Ligne 2:"]}';
+    const params = parseTemplateParameters(content);
+    expect(params[0].input?.checkedValue).toBe('- Ligne 1\n- Ligne 2:');
+  });
+
+  it('parses dependsOn attribute', () => {
+    const content =
+      '{input:[type="text"][name="hematomes_detail"][dependsOn="hematomes"][placeholder="Préciser..."]}';
+    const params = parseTemplateParameters(content);
+    expect(params[0].input?.dependsOn).toBe('hematomes');
+    expect(params[0].input?.placeholder).toBe('Préciser...');
+  });
+
+  it('parses layout attribute', () => {
+    const content =
+      '{input:[type="text"][name="hematomes_detail"][dependsOn="hematomes"][layout="below"]}';
+    const params = parseTemplateParameters(content);
+    expect(params[0].input?.layout).toBe('below');
+  });
+
+  it('parses category tags', () => {
+    const content =
+      '{category:"Signes observés"}\n{input:[type="text"][name="obs"][label="Observation"]}';
+    const params = parseTemplateParameters(content);
+    expect(params[0].type).toBe('category');
+    expect(params[0].categoryTitle).toBe('Signes observés');
+    expect(params[1].type).toBe('input');
+  });
+});
+
+describe('extractFormSections', () => {
+  it('groups root inputs by category in template order', () => {
+    const content = [
+      '{input:[type="text"][name="nom"][label="Nom"]}',
+      '{category:"Signes"}',
+      '{input:[type="checkbox"][name="hematomes"][label="Hématomes"]}',
+      '{input:[type="text"][name="hematomes_detail"][dependsOn="hematomes"]}',
+      '{category:"Observation"}',
+      '{input:[type="textarea"][name="obs"][label="Observation"]}',
+    ].join('\n');
+
+    const sections = extractFormSections(content);
+    expect(sections).toHaveLength(3);
+    expect(sections[0].title).toBeUndefined();
+    expect(sections[0].inputs.map((input) => input.name)).toEqual(['nom']);
+    expect(sections[1].title).toBe('Signes');
+    expect(sections[1].inputs.map((input) => input.name)).toEqual(['hematomes']);
+    expect(sections[2].title).toBe('Observation');
+    expect(sections[2].inputs.map((input) => input.name)).toEqual(['obs']);
   });
 });
 

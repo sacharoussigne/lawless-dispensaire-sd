@@ -12,6 +12,7 @@ import {
 } from '@/lib/dispensaryWeeklyActivity/resolveDisplayName';
 import { activityToSnapshot } from '@/lib/dispensaryWeeklyActivity/snapshot';
 import { getBankWeekBounds } from '@/lib/bankWeek';
+import { tenantWhere } from '@/lib/dispensary/tenantWhere';
 import type { DispensaryWeeklyActivityCreateInput, DispensaryWeeklyActivityUpdateInput } from '@/lib/dispensaryWeeklyActivity/schemas';
 import {
   assertActivityInCurrentParisWeek,
@@ -27,10 +28,40 @@ import {
   parseWeekdayFlagsJson,
 } from '@/lib/dispensaryWeeklyActivity/weekdayFlags';
 
-function normalizeParisWeekBounds(anchor: Date): { periodStart: Date; periodEnd: Date } {
+export function getNormalizedWeeklyActivityPeriod(anchor: Date): {
+  periodStart: Date;
+  periodEnd: Date;
+} {
   const { start, end } = getBankWeekBounds(anchor);
   return { periodStart: start, periodEnd: end };
 }
+
+function normalizeParisWeekBounds(anchor: Date): { periodStart: Date; periodEnd: Date } {
+  return getNormalizedWeeklyActivityPeriod(anchor);
+}
+
+export async function findWeeklyActivityByDoctorAndPeriod(
+  client: WeeklyActivityDb,
+  dispensaryId: string,
+  discordUserId: string,
+  anchor: Date,
+): Promise<DispensaryWeeklyActivity | null> {
+  if (!dispensaryId.trim()) {
+    throw new Error('Dispensaire requis pour la recherche d’activité');
+  }
+  const { periodStart, periodEnd } = getNormalizedWeeklyActivityPeriod(anchor);
+  return client.dispensaryWeeklyActivity.findFirst({
+    where: {
+      ...tenantWhere(dispensaryId),
+      discordUserId,
+      periodStart,
+      periodEnd,
+    },
+  });
+}
+
+export const WEEKLY_ACTIVITY_DUPLICATE_MESSAGE =
+  'Une activité existe déjà pour ce médecin sur cette semaine dans ce dispensaire. Modifiez l’entrée existante dans le tableau.';
 
 type WeeklyActivityDb = Pick<PrismaClient, 'dispensaryWeeklyActivity' | 'account'>;
 
@@ -49,12 +80,14 @@ export async function syncActivityUserIdFromDiscordIfMissing(
 
 export async function findDispensaryActivityOverlappingParisDay(
   client: WeeklyActivityDb,
+  dispensaryId: string,
   discordUserId: string,
   dayAnchor: Date,
 ): Promise<DispensaryWeeklyActivity | null> {
   const { start, end } = parisCalendarDayRangeUtc(dayAnchor);
   return client.dispensaryWeeklyActivity.findFirst({
     where: {
+      dispensaryId,
       discordUserId,
       periodStart: { lte: end },
       periodEnd: { gte: start },
@@ -66,11 +99,11 @@ type ActorContext = {
   source: DispensaryWeeklyActivityHistorySource;
   actorUserId: string | null;
   actorDiscordUserId: string | null;
+  dispensaryId?: string;
 };
 
 const COUNTER_FIELDS = [
   'sherifCount',
-  'palefrenierCount',
   'patientsCount',
   'infusionsCount',
   'poppyMilkCount',
@@ -88,8 +121,6 @@ function counterDeltaToHistoryAction(
   switch (field) {
     case 'sherifCount':
       return up ? 'INCREMENT_SHERIFF' : 'DECREMENT_SHERIFF';
-    case 'palefrenierCount':
-      return up ? 'INCREMENT_PALEFRENIER' : 'DECREMENT_PALEFRENIER';
     case 'patientsCount':
       return up ? 'INCREMENT_PATIENTS' : 'DECREMENT_PATIENTS';
     case 'infusionsCount':
@@ -122,10 +153,25 @@ export async function createDispensaryWeeklyActivityWithHistory(
   input: DispensaryWeeklyActivityCreateInput,
   actor: ActorContext,
 ): Promise<DispensaryWeeklyActivity> {
+  const dispensaryId = actor.dispensaryId;
+  if (!dispensaryId) {
+    throw new Error('Dispensaire requis');
+  }
+
   const linkedUserId =
     input.userId ?? (await findLinkedUserIdByDiscordAccount(prisma, input.discordUserId));
 
   const { periodStart, periodEnd } = normalizeParisWeekBounds(input.periodStart);
+
+  const duplicate = await findWeeklyActivityByDoctorAndPeriod(
+    prisma,
+    dispensaryId,
+    input.discordUserId,
+    input.periodStart,
+  );
+  if (duplicate) {
+    throw new Error(WEEKLY_ACTIVITY_DUPLICATE_MESSAGE);
+  }
 
   const chestDays = input.chestDays ?? emptyWeekdayFlags();
   const presenceDays = input.presenceDays ?? emptyWeekdayFlags();
@@ -133,6 +179,7 @@ export async function createDispensaryWeeklyActivityWithHistory(
   return prisma.$transaction(async (tx) => {
     const created = await tx.dispensaryWeeklyActivity.create({
       data: {
+        dispensaryId,
         periodStart,
         periodEnd,
         displayName: input.displayName,
@@ -141,7 +188,6 @@ export async function createDispensaryWeeklyActivityWithHistory(
         chestDays: chestDays as Prisma.InputJsonValue,
         presenceDays: presenceDays as Prisma.InputJsonValue,
         sherifCount: input.sherifCount,
-        palefrenierCount: input.palefrenierCount,
         patientsCount: input.patientsCount,
         infusionsCount: input.infusionsCount,
         poppyMilkCount: input.poppyMilkCount,
@@ -188,7 +234,6 @@ export async function updateDispensaryWeeklyActivityWithHistory(
     if (input.chestDays !== undefined) data.chestDays = input.chestDays as Prisma.InputJsonValue;
     if (input.presenceDays !== undefined) data.presenceDays = input.presenceDays as Prisma.InputJsonValue;
     if (input.sherifCount !== undefined) data.sherifCount = input.sherifCount;
-    if (input.palefrenierCount !== undefined) data.palefrenierCount = input.palefrenierCount;
     if (input.patientsCount !== undefined) data.patientsCount = input.patientsCount;
     if (input.infusionsCount !== undefined) data.infusionsCount = input.infusionsCount;
     if (input.poppyMilkCount !== undefined) data.poppyMilkCount = input.poppyMilkCount;
@@ -288,6 +333,7 @@ export async function deleteDispensaryWeeklyActivityWithHistory(
 
 export async function findOrCreateDispensaryActivityForParisDay(
   client: WeeklyActivityDb,
+  dispensaryId: string,
   discordUserId: string,
   dayAnchor: Date,
   preferredDisplayName?: string,
@@ -301,9 +347,15 @@ export async function findOrCreateDispensaryActivityForParisDay(
     source: 'DISCORD_BOT',
     actorUserId: null,
     actorDiscordUserId: discordUserId,
+    dispensaryId,
   };
 
-  const found = await findDispensaryActivityOverlappingParisDay(client, discordUserId, dayAnchor);
+  const found = await findDispensaryActivityOverlappingParisDay(
+    client,
+    dispensaryId,
+    discordUserId,
+    dayAnchor,
+  );
   if (found) {
     if (preferred && preferred !== found.displayName) {
       return updateDispensaryWeeklyActivityWithHistory(found.id, { displayName: preferred }, actor);
@@ -324,7 +376,6 @@ export async function findOrCreateDispensaryActivityForParisDay(
         discordUserId,
         userId: linkedUserId,
         sherifCount: 0,
-        palefrenierCount: 0,
         patientsCount: 0,
         infusionsCount: 0,
         poppyMilkCount: 0,
@@ -333,7 +384,12 @@ export async function findOrCreateDispensaryActivityForParisDay(
     );
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-      const raced = await findDispensaryActivityOverlappingParisDay(client, discordUserId, dayAnchor);
+      const raced = await findDispensaryActivityOverlappingParisDay(
+        client,
+        dispensaryId,
+        discordUserId,
+        dayAnchor,
+      );
       if (raced) {
         if (preferred && preferred !== raced.displayName) {
           return updateDispensaryWeeklyActivityWithHistory(
@@ -372,6 +428,7 @@ function alreadyDoneMessage(field: 'chest' | 'presence', value: boolean): string
 }
 
 export async function botSetWeekdayFlag(
+  dispensaryId: string,
   discordUserId: string,
   field: 'chest' | 'presence',
   dayAnchor: Date,
@@ -387,6 +444,7 @@ export async function botSetWeekdayFlag(
 
   const existing = await findOrCreateDispensaryActivityForParisDay(
     prisma,
+    dispensaryId,
     discordUserId,
     createAnchor,
     options?.displayName,
@@ -457,19 +515,21 @@ export async function botSetWeekdayFlag(
 }
 
 export async function botMarkChestForParisToday(
+  dispensaryId: string,
   discordUserId: string,
   options?: BotWeeklyActivityRequestOptions,
 ): Promise<BotWeekdayFlagMarkResult> {
-  return botSetWeekdayFlag(discordUserId, 'chest', new Date(), true, options);
+  return botSetWeekdayFlag(dispensaryId, discordUserId, 'chest', new Date(), true, options);
 }
 
 export async function botMarkPresenceForParisRelativeDay(
+  dispensaryId: string,
   discordUserId: string,
   relative: 'today' | 'yesterday',
   options?: BotWeeklyActivityRequestOptions,
 ): Promise<BotWeekdayFlagMarkResult> {
   const dayAnchor = relative === 'today' ? parisTodayStartUtc() : parisYesterdayStartUtc();
-  return botSetWeekdayFlag(discordUserId, 'presence', dayAnchor, true, {
+  return botSetWeekdayFlag(dispensaryId, discordUserId, 'presence', dayAnchor, true, {
     ...options,
     requireCurrentParisWeek: relative === 'today',
   });

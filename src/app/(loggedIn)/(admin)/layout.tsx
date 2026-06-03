@@ -1,37 +1,33 @@
+import Header from '@/app/(loggedIn)/_components/Header/Header';
 import { getAuthSession } from '@/lib/auth';
-import type { AuthSession } from '@/types/session';
 import { Container } from '@mantine/core';
-import Header from '../_components/Header/Header';
-import { PermissionsProvider } from '@/app/_contexts/PermissionsContext';
-import { calculatePermissions } from '@/lib/auth/calculatePermissions';
-import { getAppSettings } from '@/lib/appSettings';
+import type { AuthSession } from '@/types/session';
 import { getImpersonatorDisplayName } from '@/lib/auth/impersonationDisplay';
+import { PermissionsProvider } from '@/app/_contexts/PermissionsContext';
+import { APP_SETTINGS_DEFAULTS } from '@/lib/appSettingsShared';
+import { listAccessibleDispensaries } from '@/lib/dispensary/context';
 
-export default async function LanguageLayout({
+export default async function AdminPlatformLayout({
   children,
-  params,
 }: {
   children: React.ReactNode;
-  params: Promise<{ userLanguageAlias?: string }>;
 }) {
   const session = await getAuthSession();
   const impersonatorDisplayName = await getImpersonatorDisplayName(session?.session?.impersonatedBy);
-  const role = session?.user?.role || null;
-  const permissions = calculatePermissions(role);
-  const appSettings = await getAppSettings();
+  const accessibleDispensaries = await listAccessibleDispensaries(session as AuthSession | null);
 
   return (
     <PermissionsProvider
-      initialPermissions={permissions}
-      initialRole={role}
-      initialAppSettings={appSettings}
+      initialPermissions={null}
+      initialRole={session?.user?.role ?? null}
+      initialAppSettings={APP_SETTINGS_DEFAULTS}
+      accessibleDispensaries={accessibleDispensaries}
     >
       <Header
         session={session as AuthSession | null}
         impersonatorDisplayName={impersonatorDisplayName}
       />
-
-      <Container size={'xl'} className={'flex-1 pb-[72px] sm:pb-0'}>
+      <Container size="xl" className="flex-1 pb-[72px] sm:pb-0">
         {children}
       </Container>
     </PermissionsProvider>

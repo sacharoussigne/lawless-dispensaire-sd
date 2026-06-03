@@ -1,5 +1,3 @@
-export const APP_SETTINGS_CACHE_TAG = 'app-settings';
-
 export type AppFeatureKey =
   | 'stock'
   | 'bank'
@@ -20,6 +18,12 @@ export type AppSettingsDTO = {
   featureMailsEnabled: boolean;
   featurePayrollEnabled: boolean;
   featureWeeklyDispensaryActivityEnabled: boolean;
+  weeklyActivityChestDaysVisible: boolean;
+  weeklyActivityPresenceDaysVisible: boolean;
+  weeklyActivityPatientsVisible: boolean;
+  weeklyActivitySherifsVisible: boolean;
+  weeklyActivityInfusionsVisible: boolean;
+  weeklyActivityPoppyMilkVisible: boolean;
 };
 
 export const APP_SETTINGS_DEFAULTS: AppSettingsDTO = {
@@ -32,7 +36,20 @@ export const APP_SETTINGS_DEFAULTS: AppSettingsDTO = {
   featureMailsEnabled: true,
   featurePayrollEnabled: true,
   featureWeeklyDispensaryActivityEnabled: true,
+  weeklyActivityChestDaysVisible: true,
+  weeklyActivityPresenceDaysVisible: true,
+  weeklyActivityPatientsVisible: true,
+  weeklyActivitySherifsVisible: true,
+  weeklyActivityInfusionsVisible: true,
+  weeklyActivityPoppyMilkVisible: true,
 };
+
+export function appSettingsCacheTag(dispensaryId: string): string {
+  return `app-settings-${dispensaryId}`;
+}
+
+export const APP_FEATURE_DISABLED_MESSAGE =
+  'Cette fonctionnalité est désactivée pour ce dispensaire.';
 
 export function isAppFeatureEnabled(
   settings: AppSettingsDTO,
@@ -61,9 +78,6 @@ export function isAppFeatureEnabled(
     }
   }
 }
-
-export const APP_FEATURE_DISABLED_MESSAGE =
-  'Cette fonctionnalité est désactivée.';
 
 export function dispensarySiteTitle(settings: AppSettingsDTO): string {
   const name =
