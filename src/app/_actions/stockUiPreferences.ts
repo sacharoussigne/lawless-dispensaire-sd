@@ -2,9 +2,8 @@
 
 import { z } from 'zod/v3';
 import prisma from '@/lib/prisma';
-import { getAuthSession } from '@/lib/auth';
-import { getAppFeatureActionBlock } from '@/lib/appSettings';
 import { actionErrorParser } from '@/lib/action';
+import { requireSession } from '@/lib/serverActionAuth';
 import type { StockUiPreferences } from '@/types/stockUiPreferences';
 import { STOCK_UI_DEFAULTS } from '@/types/stockUiPreferences';
 
@@ -15,7 +14,10 @@ const hexColor = z
 const nullableHexColor = z
   .string()
   .nullable()
-  .refine((value) => value === null || /^#[0-9a-fA-F]{6}$/.test(value), 'Couleur invalide (format attendu: #RRGGBB)');
+  .refine(
+    (value) => value === null || /^#[0-9a-fA-F]{6}$/.test(value),
+    'Couleur invalide (format attendu: #RRGGBB)',
+  );
 
 const updateMyStockUiPreferencesSchema = z.object({
   lowStockCraftableBg: hexColor,
@@ -27,16 +29,11 @@ const updateMyStockUiPreferencesSchema = z.object({
 
 export async function getMyStockUiPreferences() {
   try {
-    const session = await getAuthSession();
-    if (!session?.user?.id) {
-      return { status: 401, error: 'Non autorisé' as const };
-    }
-
-    const featureBlock = await getAppFeatureActionBlock('stock');
-    if (featureBlock) return featureBlock;
+    const sessionResult = await requireSession();
+    if (!sessionResult.ok) return sessionResult.response;
 
     const prefs = await prisma.userUiPreferences.findUnique({
-      where: { userId: session.user.id },
+      where: { userId: sessionResult.session.user.id },
       select: {
         lowStockCraftableBg: true,
         lowStockNormalBg: true,
@@ -60,22 +57,19 @@ export async function getMyStockUiPreferences() {
   }
 }
 
-export async function updateMyStockUiPreferences(input: z.infer<typeof updateMyStockUiPreferencesSchema>) {
+export async function updateMyStockUiPreferences(
+  input: z.infer<typeof updateMyStockUiPreferencesSchema>,
+) {
   try {
-    const session = await getAuthSession();
-    if (!session?.user?.id) {
-      return { status: 401, error: 'Non autorisé' as const };
-    }
-
-    const featureBlock = await getAppFeatureActionBlock('stock');
-    if (featureBlock) return featureBlock;
+    const sessionResult = await requireSession();
+    if (!sessionResult.ok) return sessionResult.response;
 
     const validated = updateMyStockUiPreferencesSchema.parse(input);
 
     const result = await prisma.userUiPreferences.upsert({
-      where: { userId: session.user.id },
+      where: { userId: sessionResult.session.user.id },
       create: {
-        userId: session.user.id,
+        userId: sessionResult.session.user.id,
         lowStockCraftableBg: validated.lowStockCraftableBg,
         lowStockNormalBg: validated.lowStockNormalBg,
         okStockBg: validated.okStockBg,
@@ -111,4 +105,3 @@ export async function updateMyStockUiPreferences(input: z.infer<typeof updateMyS
     return actionErrorParser(error, 'Erreur lors de la sauvegarde des préférences de stock');
   }
 }
-

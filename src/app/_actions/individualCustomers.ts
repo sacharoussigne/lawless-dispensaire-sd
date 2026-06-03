@@ -3,7 +3,8 @@
 import { z } from 'zod/v3';
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
-import { requireServerActionContext } from '@/lib/serverActionAuth';
+import { requireTenantServerActionContext } from '@/lib/serverActionAuth';
+import { tenantWhere } from '@/lib/dispensary/tenantWhere';
 
 const createIndividualCustomerSchema = z.object({
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
@@ -13,15 +14,17 @@ const deleteIndividualCustomerByNameSchema = z.object({
   name: z.string().min(1).max(255),
 });
 
-export async function getIndividualCustomers() {
+export async function getIndividualCustomers(dispensarySlug: string) {
   try {
-    const ctx = await requireServerActionContext({
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
       feature: 'orders',
       permission: { resource: 'orders', action: 'view' },
     });
     if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const customers = await prisma.individualCustomer.findMany({
+      where: tenantWhere(dispensaryId),
       orderBy: { name: 'asc' },
       select: {
         id: true,
@@ -40,18 +43,22 @@ export async function getIndividualCustomers() {
   }
 }
 
-export async function createIndividualCustomer(data: { name: string }) {
+export async function createIndividualCustomer(
+  dispensarySlug: string,
+  data: { name: string },
+) {
   try {
-    const ctx = await requireServerActionContext({
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
       feature: 'orders',
       permission: { resource: 'orders', action: 'create' },
     });
     if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validated = createIndividualCustomerSchema.parse(data);
 
     const customer = await prisma.individualCustomer.create({
-      data: { name: validated.name },
+      data: { dispensaryId, name: validated.name },
       select: {
         id: true,
         name: true,
@@ -69,13 +76,17 @@ export async function createIndividualCustomer(data: { name: string }) {
   }
 }
 
-export async function deleteIndividualCustomerByName(data: { name: string }) {
+export async function deleteIndividualCustomerByName(
+  dispensarySlug: string,
+  data: { name: string },
+) {
   try {
-    const ctx = await requireServerActionContext({
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
       feature: 'orders',
       permission: { resource: 'orders', action: 'delete' },
     });
     if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validated = deleteIndividualCustomerByNameSchema.parse(data);
     const trimmed = validated.name.trim();
@@ -83,6 +94,7 @@ export async function deleteIndividualCustomerByName(data: { name: string }) {
     const customer = await prisma.individualCustomer.findFirst({
       where: {
         name: { equals: trimmed, mode: 'insensitive' },
+        ...tenantWhere(dispensaryId),
       },
       select: { id: true },
     });
@@ -95,7 +107,7 @@ export async function deleteIndividualCustomerByName(data: { name: string }) {
     }
 
     const orderCount = await prisma.order.count({
-      where: { individualCustomerId: customer.id },
+      where: { individualCustomerId: customer.id, ...tenantWhere(dispensaryId) },
     });
 
     if (orderCount > 0) {
@@ -106,7 +118,7 @@ export async function deleteIndividualCustomerByName(data: { name: string }) {
     }
 
     await prisma.individualCustomer.delete({
-      where: { id: customer.id },
+      where: { id: customer.id, ...tenantWhere(dispensaryId) },
     });
 
     return {

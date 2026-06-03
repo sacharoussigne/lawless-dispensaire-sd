@@ -1,90 +1,127 @@
 'use server';
 
+import { StockMovementKind } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
-import { getAuthSession } from '@/lib/auth';
-import { checkRolePermission } from '@/lib/auth/permissions';
-import { getAppFeatureActionBlock } from '@/lib/appSettings';
-import { getTodayStart, getTomorrowStart, getStartOfDay } from '@/lib/date';
+import { requireTenantServerActionContext } from '@/lib/serverActionAuth';
+import { tenantWhere } from '@/lib/dispensary/tenantWhere';
+import { getTodayStart, getTomorrowStart, getYesterdayStart, getStartOfDay } from '@/lib/date';
 import { getDefaultChestId } from '@/app/_actions/stock/internals';
+import { buildManualMovements } from '@/lib/stock/movements';
 
-export async function updateStock(data: { itemId: string; quantity: number }[], chestId?: string | null) {
+export async function updateStock(
+  dispensarySlug: string,
+  data: { itemId: string; quantity: number }[],
+  chestId?: string | null,
+  options?: { skipHistory?: boolean },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const featureBlock = await getAppFeatureActionBlock('stock');
-    if (featureBlock) return featureBlock;
-
-    const userRole = session.user?.role;
-    if (!checkRolePermission(userRole, 'stock', 'update')) {
-      return {
-        status: 403,
-        error: 'Permission refusée : vous n\'avez pas la permission de mettre à jour le stock',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'stock',
+      permission: {
+        resource: 'stock',
+        action: 'update',
+        message: 'Permission refusée : vous n\'avez pas la permission de mettre à jour le stock',
+      },
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
+    const { session } = ctx;
 
     const today = getTodayStart();
     const tomorrow = getTomorrowStart();
+    const yesterday = getYesterdayStart();
+    const skipHistory = options?.skipHistory ?? false;
+    const userId = session.user.id;
 
     let targetChestId = chestId;
     if (!targetChestId) {
-      const defaultChest = await prisma.chest.findFirst({
-        where: {
-          name: 'Foure tout',
-          isEnabled: true,
-        },
-      });
-      if (!defaultChest) {
+      try {
+        targetChestId = await getDefaultChestId(dispensaryId);
+      } catch {
         return {
           status: 404,
           error: 'Coffre par défaut "Foure tout" non trouvé ou désactivé',
         };
       }
-      targetChestId = defaultChest.id;
     }
 
-    const results = await Promise.all(
-      data.map(async ({ itemId, quantity }) => {
-        const existingStock = await prisma.stockHistory.findFirst({
-          where: {
-            itemId,
-            chestId: targetChestId,
-            timestamp: {
-              gte: today,
-              lt: tomorrow,
-            },
-          },
-          orderBy: {
-            timestamp: 'desc',
-          },
-        });
+    const results = await prisma.$transaction(async (tx) => {
+      const movementInputs: {
+        itemId: string;
+        newQty: number;
+        stockToday: number | null;
+        stockYesterday: number | null;
+      }[] = [];
 
-        if (existingStock) {
-          return prisma.stockHistory.update({
+      const stockResults = await Promise.all(
+        data.map(async ({ itemId, quantity }) => {
+          const existingStock = await tx.stockHistory.findFirst({
             where: {
-              id: existingStock.id,
+              itemId,
+              chestId: targetChestId!,
+              timestamp: {
+                gte: today,
+                lt: tomorrow,
+              },
             },
-            data: {
-              quantity,
+            orderBy: {
+              timestamp: 'desc',
             },
           });
-        } else {
-          return prisma.stockHistory.create({
+
+          const yesterdayStock = await tx.stockHistory.findFirst({
+            where: {
+              itemId,
+              chestId: targetChestId!,
+              timestamp: {
+                gte: yesterday,
+                lt: today,
+              },
+            },
+            orderBy: {
+              timestamp: 'desc',
+            },
+          });
+
+          movementInputs.push({
+            itemId,
+            newQty: quantity,
+            stockToday: existingStock?.quantity ?? null,
+            stockYesterday: yesterdayStock?.quantity ?? null,
+          });
+
+          if (existingStock) {
+            return tx.stockHistory.update({
+              where: { id: existingStock.id },
+              data: { quantity },
+            });
+          }
+
+          return tx.stockHistory.create({
             data: {
               itemId,
-              chestId: targetChestId,
+              chestId: targetChestId!,
               quantity,
             },
           });
-        }
-      })
-    );
+        }),
+      );
+
+      const movements = buildManualMovements(movementInputs, skipHistory);
+      if (movements.length > 0) {
+        await tx.stockItemMovement.createMany({
+          data: movements.map((m) => ({
+            itemId: m.itemId,
+            quantity: m.quantity,
+            kind: m.kind,
+            userId,
+          })),
+        });
+      }
+
+      return stockResults;
+    });
 
     return {
       status: 200,
@@ -95,43 +132,34 @@ export async function updateStock(data: { itemId: string; quantity: number }[], 
   }
 }
 
-/**
- * Performs a craft: adds the crafted item to stock and removes ingredients
- */
-
-export async function craftItem(data: {
-  craftedItemId: string;
-  recipeId: string;
-  times: number;
-  sourceChestId: string | null;
-  ingredientChests: { ingredientId: string; chestId: string }[];
-  destinationChestId: string | null;
-}) {
+export async function craftItem(
+  dispensarySlug: string,
+  data: {
+    craftedItemId: string;
+    recipeId: string;
+    times: number;
+    sourceChestId: string | null;
+    ingredientChests: { ingredientId: string; chestId: string }[];
+    destinationChestId: string | null;
+  },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'stock',
+      permission: {
+        resource: 'stock',
+        action: 'craft-write',
+        message: 'Permission refusée : vous n\'avez pas la permission d\'effectuer un craft',
+      },
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
+    const { session } = ctx;
 
-    const featureBlock = await getAppFeatureActionBlock('stock');
-    if (featureBlock) return featureBlock;
+    const destinationChestId = data.destinationChestId || await getDefaultChestId(dispensaryId);
 
-    const userRole = session.user?.role;
-    if (!checkRolePermission(userRole, 'stock', 'craft-write')) {
-      return {
-        status: 403,
-        error: 'Permission refusée : vous n\'avez pas la permission d\'effectuer un craft',
-      };
-    }
-
-    // Determine the destination chest
-    const destinationChestId = data.destinationChestId || await getDefaultChestId();
-
-    const recipe = await prisma.craftRecipe.findUnique({
-      where: { id: data.recipeId },
+    const recipe = await prisma.craftRecipe.findFirst({
+      where: { id: data.recipeId, ...tenantWhere(dispensaryId) },
       include: {
         ingredients: true,
       },
@@ -157,9 +185,9 @@ export async function craftItem(data: {
     const ingredientChecks = await Promise.all(
       recipe.ingredients.map(async (ingredient) => {
         const requiredQuantity = ingredient.quantity * data.times;
-        
+
         const sourceChestId = ingredientChestMap.get(ingredient.id) || data.sourceChestId;
-        
+
         if (!sourceChestId) {
           return {
             itemId: ingredient.usedItemId,
@@ -170,7 +198,7 @@ export async function craftItem(data: {
             error: 'Aucun coffre source sélectionné',
           };
         }
-        
+
         const stockToday = await prisma.stockHistory.findFirst({
           where: {
             itemId: ingredient.usedItemId,
@@ -204,7 +232,7 @@ export async function craftItem(data: {
           required: requiredQuantity,
           hasEnough: true,
         };
-      })
+      }),
     );
 
     const allHaveEnough = ingredientChecks.every((check) => check.hasEnough);
@@ -215,6 +243,8 @@ export async function craftItem(data: {
         data: ingredientChecks,
       };
     }
+
+    const userId = session.user.id;
 
     await prisma.$transaction(async (tx) => {
       const existingCraftedStock = await tx.stockHistory.findFirst({
@@ -229,34 +259,34 @@ export async function craftItem(data: {
         orderBy: {
           timestamp: 'desc',
         },
-        });
+      });
 
-        if (existingCraftedStock) {
-          await tx.stockHistory.update({
+      if (existingCraftedStock) {
+        await tx.stockHistory.update({
           where: { id: existingCraftedStock.id },
           data: {
             quantity: existingCraftedStock.quantity + totalQuantityProduced,
-            },
-          });
-        } else {
-          await tx.stockHistory.create({
+          },
+        });
+      } else {
+        await tx.stockHistory.create({
           data: {
             itemId: data.craftedItemId,
             chestId: destinationChestId,
             quantity: totalQuantityProduced,
           },
-          });
-        }
+        });
+      }
 
       for (const ingredient of recipe.ingredients) {
         const requiredQuantity = ingredient.quantity * data.times;
-        
+
         const sourceChestId = ingredientChestMap.get(ingredient.id) || data.sourceChestId;
-        
+
         if (!sourceChestId) {
           throw new Error(`Aucun coffre source pour l'ingrédient ${ingredient.id}`);
         }
-        
+
         const existingIngredientStock = await tx.stockHistory.findFirst({
           where: {
             itemId: ingredient.usedItemId,
@@ -289,6 +319,27 @@ export async function craftItem(data: {
           });
         }
       }
+
+      await tx.stockItemMovement.create({
+        data: {
+          itemId: data.craftedItemId,
+          quantity: totalQuantityProduced,
+          kind: StockMovementKind.CRAFT_PRODUCE,
+          userId,
+        },
+      });
+
+      for (const ingredient of recipe.ingredients) {
+        const requiredQuantity = ingredient.quantity * data.times;
+        await tx.stockItemMovement.create({
+          data: {
+            itemId: ingredient.usedItemId,
+            quantity: -requiredQuantity,
+            kind: StockMovementKind.CRAFT_CONSUME,
+            userId,
+          },
+        });
+      }
     });
 
     return {
@@ -300,35 +351,26 @@ export async function craftItem(data: {
   }
 }
 
-/**
- * Adds order items to today's stock
- * Adds quantities to existing stocks
- * @param orderId - Order ID
- * @param chestId - Chest ID where to add stocks (optional, uses "foure tout" by default)
- */
-
-export async function overwriteStockForDate(data: {
-  date: Date;
-  stocks: { itemId: string; quantity: number }[];
-  chestId?: string | null;
-}) {
+export async function overwriteStockForDate(
+  dispensarySlug: string,
+  data: {
+    date: Date;
+    stocks: { itemId: string; quantity: number }[];
+    chestId?: string | null;
+  },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const featureBlock = await getAppFeatureActionBlock('stock');
-    if (featureBlock) return featureBlock;
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'stock',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const dayStart = getStartOfDay(data.date);
     const dayEnd = new Date(dayStart);
     dayEnd.setDate(dayEnd.getDate() + 1);
 
-    const targetChestId = data.chestId || await getDefaultChestId();
+    const targetChestId = data.chestId || await getDefaultChestId(dispensaryId);
 
     await prisma.stockHistory.deleteMany({
       where: {
@@ -352,7 +394,7 @@ export async function overwriteStockForDate(data: {
               timestamp: dayStart,
             },
           });
-        })
+        }),
     );
 
     return {
@@ -363,9 +405,3 @@ export async function overwriteStockForDate(data: {
     return actionErrorParser(error, 'Erreur lors de l\'écrasement des stocks');
   }
 }
-
-/**
- * Gets items with their detailed stocks by chest
- * Useful for item search with complete information
- */
-

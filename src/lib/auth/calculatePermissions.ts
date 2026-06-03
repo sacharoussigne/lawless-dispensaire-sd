@@ -39,6 +39,9 @@ export function calculatePermissions(role: string | null | undefined): Permissio
       editOwn: checkRolePermission(role, 'weekly_dispensary_activity', 'edit_own'),
       editAll: checkRolePermission(role, 'weekly_dispensary_activity', 'edit_all'),
     },
+    stockStatistics: {
+      view: checkRolePermission(role, 'stock_statistics', 'view'),
+    },
   };
 }
 

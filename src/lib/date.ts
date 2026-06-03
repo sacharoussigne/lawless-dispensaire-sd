@@ -40,6 +40,16 @@ export function getTomorrowStart(): Date {
   return dayjs.tz().add(1, 'day').startOf('day').toDate();
 }
 
+/** Start of Monday of the current week (ISO week, Paris timezone). */
+export function getMondayOfCurrentWeek(): Date {
+  return dayjs.tz().startOf('isoWeek').toDate();
+}
+
+/** End of range for stats: start of day after `to` (exclusive upper bound). */
+export function getDayAfter(date: Date): Date {
+  return dayjs(date).tz().add(1, 'day').startOf('day').toDate();
+}
+
 /**
  * Converts a date to formatted string (YYYY-MM-DD)
  */

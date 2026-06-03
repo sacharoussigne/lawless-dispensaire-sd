@@ -2,25 +2,25 @@
 
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
-import { getAuthSession } from '@/lib/auth';
-import { getAppFeatureActionBlock } from '@/lib/appSettings';
+import { requireTenantServerActionContext } from '@/lib/serverActionAuth';
+import { tenantWhere } from '@/lib/dispensary/tenantWhere';
 
 import { checkAccountAccess, getWeekBounds } from '@/app/_actions/bank/internals';
 
-export async function getOrCreateWeek(accountId: string, date: Date) {
+export async function getOrCreateWeek(
+  dispensarySlug: string,
+  accountId: string,
+  date: Date,
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'bank',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
+    const { session } = ctx;
 
-    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
-    if (bankFeatureBlock) return bankFeatureBlock;
-
-    const accessCheck = await checkAccountAccess(accountId, session.user.id);
+    const accessCheck = await checkAccountAccess(dispensaryId, accountId, session.user.id);
     if (!accessCheck.hasAccess) {
       return {
         status: 403,
@@ -30,11 +30,10 @@ export async function getOrCreateWeek(accountId: string, date: Date) {
 
     const { start, end } = getWeekBounds(date);
 
-    // Range lookup: weekStart must fall in the Paris calendar week [start, end].
-    // Older rows may use a different instant for "Monday" (e.g. UTC startOfWeek) but still lie in this window.
     let week = await prisma.bankAccountWeek.findFirst({
       where: {
         accountId,
+        account: tenantWhere(dispensaryId),
         weekStart: {
           gte: start,
           lte: end,
@@ -51,12 +50,11 @@ export async function getOrCreateWeek(accountId: string, date: Date) {
       },
     });
 
-    // If it doesn't exist, create it
     if (!week) {
-      // Get previous week balance
       const previousWeek = await prisma.bankAccountWeek.findFirst({
         where: {
           accountId,
+          account: tenantWhere(dispensaryId),
           weekStart: {
             lt: start,
           },
@@ -102,23 +100,16 @@ export async function getOrCreateWeek(accountId: string, date: Date) {
   }
 }
 
-/**
- * Gets all weeks of an account
- */
-export async function getAccountWeeks(accountId: string) {
+export async function getAccountWeeks(dispensarySlug: string, accountId: string) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'bank',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
+    const { session } = ctx;
 
-    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
-    if (bankFeatureBlock) return bankFeatureBlock;
-
-    const accessCheck = await checkAccountAccess(accountId, session.user.id);
+    const accessCheck = await checkAccountAccess(dispensaryId, accountId, session.user.id);
     if (!accessCheck.hasAccess) {
       return {
         status: 403,
@@ -127,7 +118,10 @@ export async function getAccountWeeks(accountId: string) {
     }
 
     const weeks = await prisma.bankAccountWeek.findMany({
-      where: { accountId },
+      where: {
+        accountId,
+        account: tenantWhere(dispensaryId),
+      },
       orderBy: {
         weekStart: 'desc',
       },
@@ -158,7 +152,3 @@ export async function getAccountWeeks(accountId: string) {
     return actionErrorParser(error, 'Erreur lors de la récupération des semaines');
   }
 }
-
-/**
- * Creates a transaction
- */

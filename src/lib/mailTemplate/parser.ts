@@ -5,19 +5,29 @@ export interface TemplateInput {
   placeholder?: string;
   required?: boolean;
   defaultValue?: string;
+  checkedValue?: string;
+  dependsOn?: string;
+  layout?: 'inline' | 'below';
+}
+
+export interface FormSection {
+  title?: string;
+  inputs: TemplateInput[];
 }
 
 export interface TemplateParameter {
-  type: 'js' | 'input';
+  type: 'js' | 'input' | 'category';
   raw: string;
   startIndex: number;
   endIndex: number;
   jsCode?: string;
   input?: TemplateInput;
+  categoryTitle?: string;
 }
 
 const JS_PATTERN = /\{js:(.*?):endjs\}/g;
 const INPUT_PATTERN = /\{input:\[(.*?)\]\}/g;
+const CATEGORY_PATTERN = /\{category:"([^"]*)"\}/g;
 
 function collectInputSpans(content: string): { start: number; end: number }[] {
   const spans: { start: number; end: number }[] = [];
@@ -40,6 +50,23 @@ function overlapsInputSpan(
   return inputSpans.some((s) => start < s.end && end > s.start);
 }
 
+function unescapeAttributeValue(value: string): string {
+  return value.replace(/\\([ntr\\])/g, (_, char) => {
+    switch (char) {
+      case 'n':
+        return '\n';
+      case 't':
+        return '\t';
+      case 'r':
+        return '\r';
+      case '\\':
+        return '\\';
+      default:
+        return char;
+    }
+  });
+}
+
 function parseInputAttributes(attributesString: string): TemplateInput {
   const input: TemplateInput = {
     type: 'text',
@@ -47,16 +74,16 @@ function parseInputAttributes(attributesString: string): TemplateInput {
     label: '',
   };
 
-  // Pattern pour accepter à la fois key="value" et key=value (avec ou sans guillemets)
-  // Gère aussi les blocs JS avec {js:...:endjs}
   const attributePattern =
     /(\w+)=(?:"([^"]*)"|((?:\{js:.*?:endjs\}|[^\]]*?))(?=\]|\[|$))/g;
   let match;
 
   while ((match = attributePattern.exec(attributesString)) !== null) {
     const [, key, quotedValue, unquotedValue] = match;
-    const value = quotedValue !== undefined ? quotedValue : (unquotedValue || '').trim();
-    
+    const rawValue =
+      quotedValue !== undefined ? quotedValue : (unquotedValue || '').trim();
+    const value = unescapeAttributeValue(rawValue);
+
     switch (key) {
       case 'type':
         input.type = value || 'text';
@@ -79,6 +106,20 @@ function parseInputAttributes(attributesString: string): TemplateInput {
       case 'default':
         input.defaultValue = value;
         break;
+      case 'checkedValue':
+        input.checkedValue = value;
+        break;
+      case 'checked':
+        input.checkedValue = value;
+        break;
+      case 'dependsOn':
+        input.dependsOn = value;
+        break;
+      case 'layout':
+        if (value === 'below' || value === 'inline') {
+          input.layout = value;
+        }
+        break;
     }
   }
 
@@ -96,7 +137,6 @@ export function parseTemplateParameters(content: string): TemplateParameter[] {
   const parameters: TemplateParameter[] = [];
   const inputSpans = collectInputSpans(content);
 
-  // Parse {js:...:endjs} outside {input:[...]} only (default={js:...} stays inside the input block)
   let match;
   JS_PATTERN.lastIndex = 0;
 
@@ -129,6 +169,17 @@ export function parseTemplateParameters(content: string): TemplateParameter[] {
     });
   }
 
+  CATEGORY_PATTERN.lastIndex = 0;
+  while ((match = CATEGORY_PATTERN.exec(content)) !== null) {
+    parameters.push({
+      type: 'category',
+      raw: match[0],
+      startIndex: match.index,
+      endIndex: match.index + match[0].length,
+      categoryTitle: unescapeAttributeValue(match[1]),
+    });
+  }
+
   return parameters.sort((a, b) => a.startIndex - b.startIndex);
 }
 
@@ -137,9 +188,32 @@ export function extractInputs(content: string): TemplateInput[] {
   return parameters
     .filter((p) => p.type === 'input' && p.input)
     .map((p) => p.input!)
-    .filter((input, index, self) => 
-      index === self.findIndex((i) => i.name === input.name)
+    .filter(
+      (input, index, self) =>
+        index === self.findIndex((i) => i.name === input.name)
     );
+}
+
+export function extractFormSections(content: string): FormSection[] {
+  const parameters = parseTemplateParameters(content);
+  const sections: FormSection[] = [{ inputs: [] }];
+  const seenInputNames = new Set<string>();
+
+  for (const param of parameters) {
+    if (param.type === 'category') {
+      sections.push({ title: param.categoryTitle, inputs: [] });
+      continue;
+    }
+
+    if (param.type !== 'input' || !param.input) continue;
+    if (param.input.dependsOn) continue;
+    if (seenInputNames.has(param.input.name)) continue;
+
+    seenInputNames.add(param.input.name);
+    sections[sections.length - 1].inputs.push(param.input);
+  }
+
+  return sections.filter((section) => section.title || section.inputs.length > 0);
 }
 
 export function extractJsCode(content: string): string[] {

@@ -1,9 +1,9 @@
 'use server';
 
+import { Prisma } from '@prisma/client';
 import { z } from 'zod/v3';
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
-import { getAuthSession } from '@/lib/auth';
 import { checkRolePermission } from '@/lib/auth/permissions';
 import {
   canEditAllWeeklyDispensaryActivity,
@@ -14,8 +14,11 @@ import {
 import { DISCORD_ACCOUNT_PROVIDER_ID } from '@/lib/dispensaryWeeklyActivity/constants';
 import {
   findLinkedUserIdByDiscordAccount,
+  genericDoctorFallbackName,
   getDiscordAccountIdForUser,
+  getLatestDiscordDisplayNames,
   mergeResolvedDisplayNames,
+  resolveDiscordDisplayName,
 } from '@/lib/dispensaryWeeklyActivity/resolveDisplayName';
 import { serializeDispensaryWeeklyActivityApiRow } from '@/lib/dispensaryWeeklyActivity/apiRow';
 import {
@@ -26,70 +29,81 @@ import {
 import {
   createDispensaryWeeklyActivityWithHistory,
   deleteDispensaryWeeklyActivityWithHistory,
+  findWeeklyActivityByDoctorAndPeriod,
   syncActivityUserIdFromDiscordIfMissing,
   updateDispensaryWeeklyActivityWithHistory,
+  WEEKLY_ACTIVITY_DUPLICATE_MESSAGE,
 } from '@/lib/dispensaryWeeklyActivity/service';
-import { getAppFeatureActionBlock } from '@/lib/appSettings';
+import { getAppSettings } from '@/lib/appSettings';
+import {
+  applyVisibilityToCreateInput,
+  applyVisibilityToUpdateInput,
+  redactSerializedWeeklyActivityRow,
+  weeklyActivityFieldVisibilityFromSettings,
+} from '@/lib/dispensaryWeeklyActivity/fieldVisibility';
+import { requireTenantServerActionContext } from '@/lib/serverActionAuth';
+import { tenantWhere } from '@/lib/dispensary/tenantWhere';
 
-async function requireWeeklyActivityView() {
-  const session = await getAuthSession();
-  if (!session) {
-    return { ok: false as const, response: { status: 401 as const, error: 'Non autorisé' } };
+async function requireWeeklyActivityView(dispensarySlug: string) {
+  const ctx = await requireTenantServerActionContext(dispensarySlug, {
+    feature: 'weeklyDispensaryActivity',
+  });
+  if (!ctx.ok) {
+    return { ok: false as const, response: ctx.response };
   }
-  const block = await getAppFeatureActionBlock('weeklyDispensaryActivity');
-  if (block) {
-    return { ok: false as const, response: block };
-  }
-  if (!canViewWeeklyDispensaryActivity(session.user?.role)) {
+  if (!canViewWeeklyDispensaryActivity(ctx.tenant.effectiveRole)) {
     return { ok: false as const, response: { status: 403 as const, error: 'Permission refusée' } };
   }
-  return { ok: true as const, session };
+  return { ok: true as const, session: ctx.session, tenant: ctx.tenant };
 }
 
-async function requireWeeklyActivityEdit() {
-  const session = await getAuthSession();
-  if (!session) {
-    return { ok: false as const, response: { status: 401 as const, error: 'Non autorisé' } };
+async function requireWeeklyActivityEdit(dispensarySlug: string) {
+  const ctx = await requireTenantServerActionContext(dispensarySlug, {
+    feature: 'weeklyDispensaryActivity',
+  });
+  if (!ctx.ok) {
+    return { ok: false as const, response: ctx.response };
   }
-  const block = await getAppFeatureActionBlock('weeklyDispensaryActivity');
-  if (block) {
-    return { ok: false as const, response: block };
-  }
-  const role = session.user?.role;
+  const role = ctx.tenant.effectiveRole;
   const can =
     checkRolePermission(role, 'weekly_dispensary_activity', 'edit_all') ||
     checkRolePermission(role, 'weekly_dispensary_activity', 'edit_own');
   if (!can) {
     return { ok: false as const, response: { status: 403 as const, error: 'Permission refusée' } };
   }
-  return { ok: true as const, session };
+  return { ok: true as const, session: ctx.session, tenant: ctx.tenant };
 }
 
-async function listWhereForSession(sessionUserId: string, role: string | null | undefined) {
+async function listWhereForSession(
+  dispensaryId: string,
+  sessionUserId: string,
+  role: string | null | undefined,
+) {
+  const tenantFilter = tenantWhere(dispensaryId);
   if (canEditAllWeeklyDispensaryActivity(role)) {
-    return {};
+    return tenantFilter;
   }
   const discordId = await getDiscordAccountIdForUser(prisma, sessionUserId);
   const or: { userId?: string; discordUserId?: string }[] = [{ userId: sessionUserId }];
   if (discordId) {
     or.push({ discordUserId: discordId });
   }
-  return { OR: or };
+  return { ...tenantFilter, OR: or };
 }
 
-export async function listDispensaryWeeklyActivities() {
+export async function listDispensaryWeeklyActivities(dispensarySlug: string) {
   try {
-    const gate = await requireWeeklyActivityView();
+    const gate = await requireWeeklyActivityView(dispensarySlug);
     if (!gate.ok) {
       return gate.response;
     }
-    const { session } = gate;
+    const { session, tenant } = gate;
+    const { dispensaryId } = tenant;
 
-    const where = await listWhereForSession(session.user.id, session.user.role);
+    const where = await listWhereForSession(dispensaryId, session.user.id, tenant.effectiveRole);
 
     const rows = await prisma.dispensaryWeeklyActivity.findMany({
       where,
-      include: { user: { select: { name: true } } },
       orderBy: { periodStart: 'desc' },
     });
 
@@ -101,16 +115,18 @@ export async function listDispensaryWeeklyActivities() {
 
     const refreshed = await prisma.dispensaryWeeklyActivity.findMany({
       where,
-      include: { user: { select: { name: true } } },
       orderBy: { periodStart: 'desc' },
     });
 
     const withNames = await mergeResolvedDisplayNames(prisma, refreshed);
+    const settings = await getAppSettings(dispensaryId);
+    const visibility = weeklyActivityFieldVisibilityFromSettings(settings);
 
     return {
       status: 200 as const,
       data: withNames.map((r) =>
-        serializeDispensaryWeeklyActivityApiRow({
+        redactSerializedWeeklyActivityRow(
+          serializeDispensaryWeeklyActivityApiRow({
           id: r.id,
           periodStart: r.periodStart,
           periodEnd: r.periodEnd,
@@ -121,13 +137,14 @@ export async function listDispensaryWeeklyActivities() {
           chestDays: r.chestDays,
           presenceDays: r.presenceDays,
           sherifCount: r.sherifCount,
-          palefrenierCount: r.palefrenierCount,
           patientsCount: r.patientsCount,
           infusionsCount: r.infusionsCount,
           poppyMilkCount: r.poppyMilkCount,
           createdAt: r.createdAt,
           updatedAt: r.updatedAt,
         }),
+          visibility,
+        ),
       ),
     };
   } catch (error) {
@@ -137,9 +154,12 @@ export async function listDispensaryWeeklyActivities() {
 
 const idSchema = z.object({ id: z.string().uuid('ID invalide') });
 
-export async function getDispensaryWeeklyActivityHistory(input: z.infer<typeof idSchema>) {
+export async function getDispensaryWeeklyActivityHistory(
+  dispensarySlug: string,
+  input: z.infer<typeof idSchema>,
+) {
   try {
-    const gate = await requireWeeklyActivityView();
+    const gate = await requireWeeklyActivityView(dispensarySlug);
     if (!gate.ok) {
       return gate.response;
     }
@@ -148,14 +168,16 @@ export async function getDispensaryWeeklyActivityHistory(input: z.infer<typeof i
       return { status: 400 as const, error: parsed.error.issues[0]?.message ?? 'ID invalide' };
     }
 
-    const activity = await prisma.dispensaryWeeklyActivity.findUnique({
-      where: { id: parsed.data.id },
+    const { dispensaryId } = gate.tenant;
+
+    const activity = await prisma.dispensaryWeeklyActivity.findFirst({
+      where: { id: parsed.data.id, ...tenantWhere(dispensaryId) },
     });
     if (!activity) {
       return { status: 404 as const, error: 'Activité introuvable' };
     }
 
-    const role = gate.session.user.role;
+    const role = gate.tenant.effectiveRole;
     const isAll = canEditAllWeeklyDispensaryActivity(role);
     const own = await isWeeklyActivityOwner(prisma, gate.session.user.id, activity);
     if (!isAll && !own) {
@@ -168,65 +190,66 @@ export async function getDispensaryWeeklyActivityHistory(input: z.infer<typeof i
       include: { actorUser: { select: { name: true } } },
     });
 
-    const missingDiscordIds = [
+    const actorUserIdsWithoutDiscord = [
       ...new Set(
         history
-          .filter((h) => !h.actorUser?.name && h.actorDiscordUserId)
-          .map((h) => h.actorDiscordUserId as string),
+          .filter((h) => h.actorUserId && !h.actorDiscordUserId)
+          .map((h) => h.actorUserId as string),
       ),
     ];
 
-    const discordIdToName = new Map<string, string>();
-    if (missingDiscordIds.length > 0) {
+    const userIdToDiscordId = new Map<string, string>();
+    if (actorUserIdsWithoutDiscord.length > 0) {
       const accounts = await prisma.account.findMany({
         where: {
+          userId: { in: actorUserIdsWithoutDiscord },
           providerId: DISCORD_ACCOUNT_PROVIDER_ID,
-          accountId: { in: missingDiscordIds },
         },
-        include: { user: { select: { name: true } } },
+        select: { userId: true, accountId: true },
       });
-      for (const a of accounts) {
-        if (a.user?.name) {
-          discordIdToName.set(a.accountId, a.user.name);
-        }
+      for (const account of accounts) {
+        userIdToDiscordId.set(account.userId, account.accountId);
       }
+    }
 
-      const stillMissing = missingDiscordIds.filter((id) => !discordIdToName.has(id));
-      if (stillMissing.length > 0) {
-        const latestByDiscord = await Promise.all(
-          stillMissing.map(async (discordUserId) => {
-            const row = await prisma.dispensaryWeeklyActivity.findFirst({
-              where: { discordUserId },
-              orderBy: { periodStart: 'desc' },
-              include: { user: { select: { name: true } } },
-            });
-            const name = row?.user?.name ?? row?.displayName ?? null;
-            return { discordUserId, name };
-          }),
-        );
-        for (const item of latestByDiscord) {
-          if (item.name) {
-            discordIdToName.set(item.discordUserId, item.name);
-          }
+    const actorDiscordIds = new Set<string>();
+    for (const h of history) {
+      if (h.actorDiscordUserId) {
+        actorDiscordIds.add(h.actorDiscordUserId);
+        continue;
+      }
+      if (h.actorUserId) {
+        const discordId = userIdToDiscordId.get(h.actorUserId);
+        if (discordId) {
+          actorDiscordIds.add(discordId);
         }
       }
     }
 
+    const discordIdToName = await getLatestDiscordDisplayNames(prisma, [...actorDiscordIds]);
+
     return {
       status: 200 as const,
-      data: history.map((h) => ({
-        id: h.id,
-        action: h.action,
-        source: h.source,
-        actorUserName: h.actorUser?.name ?? null,
-        actorDiscordUserId: h.actorDiscordUserId,
-        actorResolvedName:
-          h.actorUser?.name ??
-          (h.actorDiscordUserId ? discordIdToName.get(h.actorDiscordUserId) ?? null : null),
-        previousValues: h.previousValues,
-        nextValues: h.nextValues,
-        createdAt: h.createdAt.toISOString(),
-      })),
+      data: history.map((h) => {
+        const actorDiscordUserId =
+          h.actorDiscordUserId ??
+          (h.actorUserId ? userIdToDiscordId.get(h.actorUserId) ?? null : null);
+        const actorResolvedName = actorDiscordUserId
+          ? discordIdToName.get(actorDiscordUserId) ?? genericDoctorFallbackName(actorDiscordUserId)
+          : null;
+
+        return {
+          id: h.id,
+          action: h.action,
+          source: h.source,
+          actorUserName: h.actorUser?.name ?? null,
+          actorDiscordUserId,
+          actorResolvedName,
+          previousValues: h.previousValues,
+          nextValues: h.nextValues,
+          createdAt: h.createdAt.toISOString(),
+        };
+      }),
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors du chargement de l’historique');
@@ -247,13 +270,13 @@ const createIntranetSchema = dispensaryWeeklyActivityMetricsSchema
     path: ['periodEnd'],
   });
 
-export async function listDispensaryWeeklyActivityTargets() {
+export async function listDispensaryWeeklyActivityTargets(dispensarySlug: string) {
   try {
-    const gate = await requireWeeklyActivityEdit();
+    const gate = await requireWeeklyActivityEdit(dispensarySlug);
     if (!gate.ok) {
       return gate.response;
     }
-    if (!canEditAllWeeklyDispensaryActivity(gate.session.user.role)) {
+    if (!canEditAllWeeklyDispensaryActivity(gate.tenant.effectiveRole)) {
       return { status: 403 as const, error: 'Permission refusée' };
     }
 
@@ -263,19 +286,50 @@ export async function listDispensaryWeeklyActivityTargets() {
           some: { providerId: DISCORD_ACCOUNT_PROVIDER_ID },
         },
       },
-      select: { id: true, name: true },
-      orderBy: { name: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        accounts: {
+          where: { providerId: DISCORD_ACCOUNT_PROVIDER_ID },
+          select: { accountId: true },
+          take: 1,
+        },
+      },
     });
 
-    return { status: 200 as const, data: { users } };
+    const discordUserIds = users
+      .map((user) => user.accounts[0]?.accountId)
+      .filter((id): id is string => Boolean(id));
+    const discordDisplayNames = await getLatestDiscordDisplayNames(prisma, discordUserIds);
+
+    const enriched = users
+      .map((user) => {
+        const discordUserId = user.accounts[0]?.accountId;
+        const discordDisplayName = discordUserId
+          ? discordDisplayNames.get(discordUserId) ?? genericDoctorFallbackName(discordUserId)
+          : genericDoctorFallbackName('unknown');
+        return {
+          id: user.id,
+          name: user.name,
+          discordDisplayName,
+        };
+      })
+      .sort((a, b) =>
+        a.discordDisplayName.localeCompare(b.discordDisplayName, 'fr', { sensitivity: 'base' }),
+      );
+
+    return { status: 200 as const, data: { users: enriched } };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors du chargement des utilisateurs');
   }
 }
 
-export async function createDispensaryWeeklyActivity(input: z.infer<typeof createIntranetSchema>) {
+export async function createDispensaryWeeklyActivity(
+  dispensarySlug: string,
+  input: z.infer<typeof createIntranetSchema>,
+) {
   try {
-    const gate = await requireWeeklyActivityEdit();
+    const gate = await requireWeeklyActivityEdit(dispensarySlug);
     if (!gate.ok) {
       return gate.response;
     }
@@ -284,8 +338,9 @@ export async function createDispensaryWeeklyActivity(input: z.infer<typeof creat
       return { status: 400 as const, error: parsed.error.issues[0]?.message ?? 'Données invalides' };
     }
 
-    const { session } = gate;
-    const role = session.user.role;
+    const { session, tenant } = gate;
+    const { dispensaryId } = tenant;
+    const role = tenant.effectiveRole;
     const editAll = canEditAllWeeklyDispensaryActivity(role);
 
     let discordUserId: string;
@@ -301,7 +356,9 @@ export async function createDispensaryWeeklyActivity(input: z.infer<typeof creat
         };
       }
       discordUserId = ownDiscord;
-      displayName = session.user.name;
+      displayName =
+        parsed.data.displayName?.trim() ||
+        (await resolveDiscordDisplayName(prisma, ownDiscord));
       resolvedUserId = session.user.id;
     } else {
       if (!parsed.data.targetUserId) {
@@ -322,7 +379,9 @@ export async function createDispensaryWeeklyActivity(input: z.infer<typeof creat
         };
       }
       discordUserId = targetDiscord;
-      displayName = (parsed.data.displayName?.trim() || target.name).trim();
+      displayName =
+        parsed.data.displayName?.trim() ||
+        (await resolveDiscordDisplayName(prisma, targetDiscord));
       resolvedUserId = target.id;
     }
 
@@ -338,7 +397,6 @@ export async function createDispensaryWeeklyActivity(input: z.infer<typeof creat
       chestDays: parsed.data.chestDays,
       presenceDays: parsed.data.presenceDays,
       sherifCount: parsed.data.sherifCount,
-      palefrenierCount: parsed.data.palefrenierCount,
       patientsCount: parsed.data.patientsCount,
       infusionsCount: parsed.data.infusionsCount,
       poppyMilkCount: parsed.data.poppyMilkCount,
@@ -347,23 +405,45 @@ export async function createDispensaryWeeklyActivity(input: z.infer<typeof creat
       return { status: 400 as const, error: validated.error.issues[0]?.message ?? 'Données invalides' };
     }
 
-    const created = await createDispensaryWeeklyActivityWithHistory(validated.data, {
+    const settings = await getAppSettings(dispensaryId);
+    const visibility = weeklyActivityFieldVisibilityFromSettings(settings);
+    const createInput = applyVisibilityToCreateInput(validated.data, visibility);
+
+    const existing = await findWeeklyActivityByDoctorAndPeriod(
+      prisma,
+      dispensaryId,
+      discordUserId,
+      parsed.data.periodStart,
+    );
+    if (existing) {
+      return { status: 409 as const, error: WEEKLY_ACTIVITY_DUPLICATE_MESSAGE };
+    }
+
+    const created = await createDispensaryWeeklyActivityWithHistory(createInput, {
       source: 'INTRANET',
       actorUserId: session.user.id,
       actorDiscordUserId: (await getDiscordAccountIdForUser(prisma, session.user.id)) ?? null,
+      dispensaryId,
     });
 
     return { status: 200 as const, data: { id: created.id } };
   } catch (error) {
+    if (error instanceof Error && error.message === WEEKLY_ACTIVITY_DUPLICATE_MESSAGE) {
+      return { status: 409 as const, error: error.message };
+    }
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return { status: 409 as const, error: WEEKLY_ACTIVITY_DUPLICATE_MESSAGE };
+    }
     return actionErrorParser(error, 'Erreur lors de la création');
   }
 }
 
 export async function updateDispensaryWeeklyActivity(
+  dispensarySlug: string,
   input: z.infer<typeof idSchema> & z.infer<typeof dispensaryWeeklyActivityUpdateSchema>,
 ) {
   try {
-    const gate = await requireWeeklyActivityEdit();
+    const gate = await requireWeeklyActivityEdit(dispensarySlug);
     if (!gate.ok) {
       return gate.response;
     }
@@ -380,8 +460,10 @@ export async function updateDispensaryWeeklyActivity(
       return { status: 400 as const, error: parsedBody.error.issues[0]?.message ?? 'Données invalides' };
     }
 
-    const existing = await prisma.dispensaryWeeklyActivity.findUnique({
-      where: { id: parsedId.data.id },
+    const { dispensaryId } = gate.tenant;
+
+    const existing = await prisma.dispensaryWeeklyActivity.findFirst({
+      where: { id: parsedId.data.id, ...tenantWhere(dispensaryId) },
     });
     if (!existing) {
       return { status: 404 as const, error: 'Activité introuvable' };
@@ -390,14 +472,18 @@ export async function updateDispensaryWeeklyActivity(
     const allowed = await canEditWeeklyActivity(
       prisma,
       gate.session.user.id,
-      gate.session.user.role,
+      gate.tenant.effectiveRole,
       existing,
     );
     if (!allowed) {
       return { status: 403 as const, error: 'Permission refusée' };
     }
 
-    await updateDispensaryWeeklyActivityWithHistory(parsedId.data.id, parsedBody.data, {
+    const settings = await getAppSettings(dispensaryId);
+    const visibility = weeklyActivityFieldVisibilityFromSettings(settings);
+    const updateInput = applyVisibilityToUpdateInput(parsedBody.data, visibility);
+
+    await updateDispensaryWeeklyActivityWithHistory(parsedId.data.id, updateInput, {
       source: 'INTRANET',
       actorUserId: gate.session.user.id,
       actorDiscordUserId: (await getDiscordAccountIdForUser(prisma, gate.session.user.id)) ?? null,
@@ -409,9 +495,12 @@ export async function updateDispensaryWeeklyActivity(
   }
 }
 
-export async function deleteDispensaryWeeklyActivity(input: z.infer<typeof idSchema>) {
+export async function deleteDispensaryWeeklyActivity(
+  dispensarySlug: string,
+  input: z.infer<typeof idSchema>,
+) {
   try {
-    const gate = await requireWeeklyActivityEdit();
+    const gate = await requireWeeklyActivityEdit(dispensarySlug);
     if (!gate.ok) {
       return gate.response;
     }
@@ -421,8 +510,10 @@ export async function deleteDispensaryWeeklyActivity(input: z.infer<typeof idSch
       return { status: 400 as const, error: 'ID invalide' };
     }
 
-    const existing = await prisma.dispensaryWeeklyActivity.findUnique({
-      where: { id: parsed.data.id },
+    const { dispensaryId } = gate.tenant;
+
+    const existing = await prisma.dispensaryWeeklyActivity.findFirst({
+      where: { id: parsed.data.id, ...tenantWhere(dispensaryId) },
     });
     if (!existing) {
       return { status: 404 as const, error: 'Activité introuvable' };
@@ -431,7 +522,7 @@ export async function deleteDispensaryWeeklyActivity(input: z.infer<typeof idSch
     const allowed = await canEditWeeklyActivity(
       prisma,
       gate.session.user.id,
-      gate.session.user.role,
+      gate.tenant.effectiveRole,
       existing,
     );
     if (!allowed) {

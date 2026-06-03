@@ -7,6 +7,55 @@ datasource db {
   //   url      = env("DATABASE_URL")
 }
 
+model Dispensary {
+  id        String   @id @default(uuid())
+  slug      String   @unique
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdById String?
+  createdBy   User?    @relation("DispensaryCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  members     DispensaryMember[]
+  settings    AppSettings?
+  categoryItems CategoryItem[]
+  items       Item[]
+  chests      Chest[]
+  companies   Company[]
+  companyGroups CompanyGroup[]
+  individualCustomers IndividualCustomer[]
+  orders      Order[]
+  mailTemplates MailTemplate[]
+  orderMailTemplateAssignments OrderMailTemplateAssignment[]
+  mails       Mail[]
+  bankAccounts BankAccount[]
+  transactionNameSuggestions TransactionNameSuggestion[]
+  transactionDescriptionSuggestions TransactionDescriptionSuggestion[]
+  patientIdentitySuggestions PatientIdentitySuggestion[]
+  privatePracticeWeeks PrivatePracticeWeek[]
+  payrollWeeklyReports PayrollWeeklyReport[]
+  dispensaryWeeklyActivities DispensaryWeeklyActivity[]
+  craftRecipes CraftRecipe[]
+
+  @@index([createdById])
+  @@map("dispensary")
+}
+
+model DispensaryMember {
+  id           String     @id @default(uuid())
+  dispensaryId String
+  userId       String
+  role         String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  dispensary   Dispensary @relation(fields: [dispensaryId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([dispensaryId, userId])
+  @@index([userId])
+  @@map("dispensary_member")
+}
+
 model User {
   id            String    @id
   name          String
@@ -29,6 +78,9 @@ model User {
   payrollWeeklyReports PayrollWeeklyReport[]
   dispensaryWeeklyActivities DispensaryWeeklyActivity[]
   dispensaryWeeklyActivityHistoryAsActor DispensaryWeeklyActivityHistory[] @relation("DispensaryWeeklyActivityHistoryActor")
+  stockItemMovements StockItemMovement[]
+  dispensariesCreated Dispensary[] @relation("DispensaryCreatedBy")
+  dispensaryMemberships DispensaryMember[]
 
   @@unique([email])
   @@map("user")
@@ -36,6 +88,8 @@ model User {
 
 model PayrollWeeklyReport {
   id              String   @id @default(uuid())
+  dispensaryId    String
+  dispensary      Dispensary @relation(fields: [dispensaryId], references: [id], onDelete: Cascade)
   weekStart       DateTime
   weekEnd         DateTime
   reportType      String   @default("Employés")
@@ -46,9 +100,10 @@ model PayrollWeeklyReport {
   createdAt       DateTime                  @default(now())
   updatedAt       DateTime                  @updatedAt
 
-  @@unique([weekStart, reportType])
+  @@unique([dispensaryId, weekStart, reportType])
   @@index([createdById])
   @@index([weekStart])
+  @@index([dispensaryId])
   @@map("payroll_weekly_report")
 }
 
@@ -57,13 +112,11 @@ model UserUiPreferences {
   userId               String   @unique
   user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Stock table colors
   lowStockCraftableBg  String   @default("#fff3cd")
   lowStockNormalBg     String   @default("#f8d7da")
   okStockBg            String?
   unknownStockBg       String?
 
-  // Stock row badge "Fait"
   doneTodayBadgeBg     String?
 
   createdAt            DateTime @default(now())
@@ -123,7 +176,8 @@ model Verification {
 }
 
 model AppSettings {
-  id                           String   @id @default("default")
+  dispensaryId                 String   @id
+  dispensary                   Dispensary @relation(fields: [dispensaryId], references: [id], onDelete: Cascade)
   dispensaryName               String   @default("Saint-Denis")
   featureStockEnabled          Boolean  @default(true)
   featureBankEnabled           Boolean  @default(true)
@@ -133,6 +187,12 @@ model AppSettings {
   featureMailsEnabled          Boolean  @default(true)
   featurePayrollEnabled        Boolean  @default(true)
   featureWeeklyDispensaryActivityEnabled Boolean @default(true)
+  weeklyActivityChestDaysVisible       Boolean @default(true)
+  weeklyActivityPresenceDaysVisible    Boolean @default(true)
+  weeklyActivityPatientsVisible        Boolean @default(true)
+  weeklyActivitySherifsVisible         Boolean @default(true)
+  weeklyActivityInfusionsVisible       Boolean @default(true)
+  weeklyActivityPoppyMilkVisible       Boolean @default(true)
   createdAt                    DateTime @default(now())
   updatedAt                    DateTime @updatedAt
 
@@ -140,20 +200,25 @@ model AppSettings {
 }
 
 model CategoryItem {
-  id        String   @id @default(uuid())
-  name      String
-  color     String   @default("#ffffff")
-  order     Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  items     Item[]
+  id            String     @id @default(uuid())
+  dispensaryId  String
+  dispensary    Dispensary @relation(fields: [dispensaryId], references: [id], onDelete: Cascade)
+  name          String
+  color         String     @default("#ffffff")
+  order         Int        @default(0)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  items         Item[]
   chestStockCheckCategories ChestStockCheckCategory[]
 
+  @@index([dispensaryId])
   @@map("category_item")
 }
 
 model Item {
   id             String            @id @default(uuid())
+  dispensaryId   String
+  dispensary     Dispensary        @relation(fields: [dispensaryId], references: [id], onDelete: Cascade)
   name           String
   description    String?
   minimalQuantity  Int
@@ -170,26 +235,31 @@ model Item {
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
   stockHistory   StockHistory[]
+  stockItemMovements StockItemMovement[]
   craftRecipes   CraftRecipe[]     @relation("CraftedItem")
   usedInRecipes  CraftRecipeItem[] @relation("UsedItem")
   orderItems     OrderItem[]
 
   @@index([categoryId])
   @@index([companyGroupId])
+  @@index([dispensaryId])
   @@map("item")
 }
 
 model Chest {
-  id          String         @id @default(uuid())
-  name        String
-  description String?
-  isEnabled   Boolean        @default(true)
-  order       Int            @default(0)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  id            String         @id @default(uuid())
+  dispensaryId  String
+  dispensary    Dispensary     @relation(fields: [dispensaryId], references: [id], onDelete: Cascade)
+  name          String
+  description   String?
+  isEnabled     Boolean        @default(true)
+  order         Int            @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   stockHistory StockHistory[]
   stockCheckConfig ChestStockCheckConfig?
 
+  @@index([dispensaryId])
   @@map("chest")
 }
 
@@ -232,18 +302,47 @@ model StockHistory {
   @@map("stock_history")
 }
 
+enum StockMovementKind {
+  MANUAL_FIRST_COUNT
+  MANUAL_ADJUST
+  CRAFT_CONSUME
+  CRAFT_PRODUCE
+}
+
+model StockItemMovement {
+  id        String            @id @default(uuid())
+  itemId    String
+  quantity  Int
+  kind      StockMovementKind
+  userId    String?
+  createdAt DateTime          @default(now())
+
+  item Item  @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([itemId, createdAt])
+  @@index([createdAt])
+  @@map("stock_item_movement")
+}
+
 model Company {
   id            String                @id @default(uuid())
+  dispensaryId  String
+  dispensary    Dispensary            @relation(fields: [dispensaryId], references: [id], onDelete: Cascade)
   name          String
   createdAt     DateTime              @default(now())
   updatedAt     DateTime              @updatedAt
   companyGroups CompanyGroupCompany[]
   orders        Order[]
 
+  @@index([dispensaryId])
   @@map("company")
 }
+
 model CraftRecipe {
   id                String            @id @default(uuid())
+  dispensaryId      String
+  dispensary        Dispensary        @relation(fields: [dispensaryId], references: [id], onDelete: Cascade)
   name              String
   description       String?
   craftedItemId     String
@@ -255,8 +354,10 @@ model CraftRecipe {
   ingredients       CraftRecipeItem[]
 
   @@index([craftedItemId])
+  @@index([dispensaryId])
   @@map("craft_recipe")
 }
+
 model CraftRecipeItem {
   id            String      @id @default(uuid())
   craftRecipeId String
@@ -273,25 +374,31 @@ model CraftRecipeItem {
 }
 
 model IndividualCustomer {
-  id        String   @id @default(uuid())
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  orders    Order[]
+  id            String     @id @default(uuid())
+  dispensaryId  String
+  dispensary    Dispensary @relation(fields: [dispensaryId], references: [id], onDelete: Cascade)
+  name          String
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  orders        Order[]
 
+  @@index([dispensaryId])
   @@map("individual_customer")
 }
 
 model CompanyGroup {
-  id          String                @id @default(uuid())
-  name        String
-  description String?
-  createdAt   DateTime              @default(now())
-  updatedAt   DateTime              @updatedAt
-  items       Item[]
-  companies   CompanyGroupCompany[]
-  orders      Order[]
+  id            String                @id @default(uuid())
+  dispensaryId  String
+  dispensary    Dispensary            @relation(fields: [dispensaryId], references: [id], onDelete: Cascade)
+  name          String
+  description   String?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  items         Item[]
+  companies     CompanyGroupCompany[]
+  orders        Order[]
 
+  @@index([dispensaryId])
   @@map("company_group")
 }
 
@@ -326,6 +433,8 @@ enum OrderType {
 
 model Order {
   id                     String               @id @default(uuid())
+  dispensaryId           String
+  dispensary             Dispensary           @relation(fields: [dispensaryId], references: [id], onDelete: Cascade)
   name                   String
   status                 OrderStatus          @default(DRAFT)
   type                   OrderType            @default(INCOMING)
@@ -346,6 +455,7 @@ model Order {
   @@index([individualCustomerId])
   @@index([status])
   @@index([type])
+  @@index([dispensaryId])
   @@map("order")
 }
 
@@ -367,6 +477,8 @@ model OrderItem {
 
 model MailTemplate {
   id               String                          @id @default(uuid())
+  dispensaryId     String
+  dispensary       Dispensary                      @relation(fields: [dispensaryId], references: [id], onDelete: Cascade)
   name             String
   description      String?
   content          String
@@ -378,11 +490,14 @@ model MailTemplate {
   assignments OrderMailTemplateAssignment[]
 
   @@index([userId])
+  @@index([dispensaryId])
   @@map("mail_template")
 }
 
 model OrderMailTemplateAssignment {
   id              String         @id @default(uuid())
+  dispensaryId    String
+  dispensary      Dispensary     @relation(fields: [dispensaryId], references: [id], onDelete: Cascade)
   orderType       OrderType
   orderStatus     OrderStatus
   mailTemplateId  String
@@ -390,14 +505,16 @@ model OrderMailTemplateAssignment {
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
-  @@unique([orderType, orderStatus])
+  @@unique([dispensaryId, orderType, orderStatus])
   @@index([mailTemplateId])
   @@index([orderType, orderStatus])
   @@map("order_mail_template_assignment")
 }
 
 model Mail {
-  id        String   @id @default(uuid())
+  id            String     @id @default(uuid())
+  dispensaryId  String
+  dispensary    Dispensary @relation(fields: [dispensaryId], references: [id], onDelete: Cascade)
   senderId  String
   sender    User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
   name      String
@@ -408,6 +525,7 @@ model Mail {
 
   @@index([senderId])
   @@index([createdAt])
+  @@index([dispensaryId])
   @@map("mail")
 }
 
@@ -417,7 +535,9 @@ enum BankAccountAccessType {
 }
 
 model BankAccount {
-  id        String   @id @default(uuid())
+  id            String     @id @default(uuid())
+  dispensaryId  String
+  dispensary    Dispensary @relation(fields: [dispensaryId], references: [id], onDelete: Cascade)
   name      String
   ownerId   String
   owner     User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
@@ -427,6 +547,7 @@ model BankAccount {
   weeks     BankAccountWeek[]
 
   @@index([ownerId])
+  @@index([dispensaryId])
   @@map("bank_account")
 }
 
@@ -450,9 +571,9 @@ model BankAccountWeek {
   id        String   @id @default(uuid())
   accountId String
   account   BankAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  weekStart DateTime // Lundi de la semaine
-  weekEnd   DateTime // Dimanche de la semaine
-  balance   Decimal  @default(0) @db.Decimal(10, 2) // Solde de fin de semaine
+  weekStart DateTime
+  weekEnd   DateTime
+  balance   Decimal  @default(0) @db.Decimal(10, 2)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   transactions BankTransaction[]
@@ -489,45 +610,54 @@ model BankTransaction {
 }
 
 model TransactionNameSuggestion {
-  id        String   @id @default(uuid())
+  id            String     @id @default(uuid())
+  dispensaryId  String
+  dispensary    Dispensary @relation(fields: [dispensaryId], references: [id], onDelete: Cascade)
   value     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([value])
+  @@unique([dispensaryId, value])
   @@map("transaction_name_suggestion")
 }
 
 model TransactionDescriptionSuggestion {
-  id        String   @id @default(uuid())
+  id            String     @id @default(uuid())
+  dispensaryId  String
+  dispensary    Dispensary @relation(fields: [dispensaryId], references: [id], onDelete: Cascade)
   value     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([value])
+  @@unique([dispensaryId, value])
   @@map("transaction_description_suggestion")
 }
 
 model PatientIdentitySuggestion {
-  id        String   @id @default(uuid())
+  id            String     @id @default(uuid())
+  dispensaryId  String
+  dispensary    Dispensary @relation(fields: [dispensaryId], references: [id], onDelete: Cascade)
   value     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([value])
+  @@unique([dispensaryId, value])
   @@map("patient_identity_suggestion")
 }
 
 model PrivatePracticeWeek {
-  id        String   @id @default(uuid())
-  weekStart DateTime // Lundi de la semaine
-  weekEnd   DateTime // Dimanche de la semaine
+  id            String     @id @default(uuid())
+  dispensaryId  String
+  dispensary    Dispensary @relation(fields: [dispensaryId], references: [id], onDelete: Cascade)
+  weekStart DateTime
+  weekEnd   DateTime
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   patients  PrivatePracticePatient[]
 
-  @@unique([weekStart])
+  @@unique([dispensaryId, weekStart])
   @@index([weekStart])
+  @@index([dispensaryId])
   @@map("private_practice_week")
 }
 
@@ -580,6 +710,8 @@ enum DispensaryWeeklyActivityHistorySource {
 
 model DispensaryWeeklyActivity {
   id                   String   @id @default(uuid())
+  dispensaryId         String
+  dispensary           Dispensary @relation(fields: [dispensaryId], references: [id], onDelete: Cascade)
   periodStart          DateTime
   periodEnd            DateTime
   displayName          String
@@ -589,7 +721,6 @@ model DispensaryWeeklyActivity {
   chestDays            Json
   presenceDays         Json
   sherifCount          Int      @default(0)
-  palefrenierCount     Int      @default(0)
   patientsCount        Int      @default(0)
   infusionsCount       Int      @default(0)
   poppyMilkCount       Int      @default(0)
@@ -597,9 +728,10 @@ model DispensaryWeeklyActivity {
   updatedAt            DateTime @updatedAt
   history              DispensaryWeeklyActivityHistory[]
 
-  @@unique([discordUserId, periodStart, periodEnd])
+  @@unique([dispensaryId, discordUserId, periodStart, periodEnd])
   @@index([discordUserId])
   @@index([userId])
+  @@index([dispensaryId])
   @@map("dispensary_weekly_activity")
 }
 

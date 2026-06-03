@@ -2,37 +2,34 @@
 
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
-import { getAuthSession } from '@/lib/auth';
-import { getAppFeatureActionBlock } from '@/lib/appSettings';
+import { requireTenantServerActionContext } from '@/lib/serverActionAuth';
+import { tenantWhere } from '@/lib/dispensary/tenantWhere';
 
 import {
   createBankAccountAccessSchema,
   deleteBankAccountAccessSchema,
 } from '@/app/_actions/bank/schemas';
-import { checkAccountAccess } from '@/app/_actions/bank/internals';
 
-export async function createBankAccountAccess(data: {
-  accountId: string;
-  userId: string;
-  accessType: 'READ' | 'WRITE';
-}) {
+export async function createBankAccountAccess(
+  dispensarySlug: string,
+  data: {
+    accountId: string;
+    userId: string;
+    accessType: 'READ' | 'WRITE';
+  },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
-    if (bankFeatureBlock) return bankFeatureBlock;
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'bank',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
+    const { session } = ctx;
 
     const validatedData = createBankAccountAccessSchema.parse(data);
 
-    // Only the owner can grant access
-    const account = await prisma.bankAccount.findUnique({
-      where: { id: validatedData.accountId },
+    const account = await prisma.bankAccount.findFirst({
+      where: { id: validatedData.accountId, ...tenantWhere(dispensaryId) },
       select: { ownerId: true },
     });
 
@@ -50,7 +47,6 @@ export async function createBankAccountAccess(data: {
       };
     }
 
-    // Do not allow granting access to oneself
     if (validatedData.userId === session.user.id) {
       return {
         status: 400,
@@ -84,27 +80,25 @@ export async function createBankAccountAccess(data: {
   }
 }
 
-/**
- * Deletes access to a bank account
- */
-export async function deleteBankAccountAccess(data: { id: string }) {
+export async function deleteBankAccountAccess(
+  dispensarySlug: string,
+  data: { id: string },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
-
-    const bankFeatureBlock = await getAppFeatureActionBlock('bank');
-    if (bankFeatureBlock) return bankFeatureBlock;
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'bank',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
+    const { session } = ctx;
 
     const validatedData = deleteBankAccountAccessSchema.parse(data);
 
-    // Only the owner can delete access
-    const access = await prisma.bankAccountAccess.findUnique({
-      where: { id: validatedData.id },
+    const access = await prisma.bankAccountAccess.findFirst({
+      where: {
+        id: validatedData.id,
+        account: tenantWhere(dispensaryId),
+      },
       include: {
         account: {
           select: { ownerId: true },
@@ -138,7 +132,3 @@ export async function deleteBankAccountAccess(data: { id: string }) {
     return actionErrorParser(error, 'Erreur lors de la suppression de l\'accès');
   }
 }
-
-/**
- * Gets or creates a week for an account
- */

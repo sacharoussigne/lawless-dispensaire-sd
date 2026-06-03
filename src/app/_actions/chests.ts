@@ -3,7 +3,8 @@
 import { z } from 'zod/v3';
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
-import { getAuthSession } from '@/lib/auth';
+import { requireTenantServerActionContext } from '@/lib/serverActionAuth';
+import { tenantWhere } from '@/lib/dispensary/tenantWhere';
 
 const createChestSchema = z.object({
   name: z.string().min(1, 'Le nom est requis').max(255, 'Le nom est trop long'),
@@ -30,27 +31,23 @@ const reorderChestsSchema = z.object({
   })),
 });
 
-/**
- * Creates a new chest
- */
-export async function createChest(data: {
-  name: string;
-  description?: string;
-  isEnabled?: boolean;
-}) {
+export async function createChest(
+  dispensarySlug: string,
+  data: {
+    name: string;
+    description?: string;
+    isEnabled?: boolean;
+  },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = createChestSchema.parse(data);
 
-    // Get the maximum current order to place the new chest last
     const maxOrderResult = await prisma.chest.aggregate({
+      where: tenantWhere(dispensaryId),
       _max: {
         order: true,
       },
@@ -60,6 +57,7 @@ export async function createChest(data: {
 
     const chest = await prisma.chest.create({
       data: {
+        dispensaryId,
         name: validatedData.name,
         description: validatedData.description,
         isEnabled: validatedData.isEnabled ?? true,
@@ -76,22 +74,17 @@ export async function createChest(data: {
   }
 }
 
-/**
- * Gets all chests
- * @param onlyEnabled
- */
-export async function getChests(onlyEnabled: boolean = false) {
+export async function getChests(dispensarySlug: string, onlyEnabled: boolean = false) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const chests = await prisma.chest.findMany({
-      where: onlyEnabled ? { isEnabled: true } : undefined,
+      where: {
+        ...tenantWhere(dispensaryId),
+        ...(onlyEnabled && { isEnabled: true }),
+      },
       orderBy: [
         { order: 'asc' },
         { createdAt: 'desc' },
@@ -114,29 +107,26 @@ export async function getChests(onlyEnabled: boolean = false) {
   }
 }
 
-/**
- * Updates an existing chest
- */
-export async function updateChest(data: {
-  id: string;
-  name: string;
-  description?: string;
-  isEnabled?: boolean;
-}) {
+export async function updateChest(
+  dispensarySlug: string,
+  data: {
+    id: string;
+    name: string;
+    description?: string;
+    isEnabled?: boolean;
+  },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = updateChestSchema.parse(data);
 
     const chest = await prisma.chest.update({
       where: {
         id: validatedData.id,
+        ...tenantWhere(dispensaryId),
       },
       data: {
         name: validatedData.name,
@@ -154,22 +144,20 @@ export async function updateChest(data: {
   }
 }
 
-/**
- * Deletes a chest and transfers stocks to another chest
- */
-export async function deleteChest(data: { id: string; targetChestId: string }) {
+export async function deleteChest(
+  dispensarySlug: string,
+  data: { id: string; targetChestId: string },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = deleteChestSchema.parse(data);
 
-    const totalChests = await prisma.chest.count();
+    const totalChests = await prisma.chest.count({
+      where: tenantWhere(dispensaryId),
+    });
     if (totalChests <= 1) {
       return {
         status: 400,
@@ -184,8 +172,11 @@ export async function deleteChest(data: { id: string; targetChestId: string }) {
       };
     }
 
-    const targetChest = await prisma.chest.findUnique({
-      where: { id: validatedData.targetChestId },
+    const targetChest = await prisma.chest.findFirst({
+      where: {
+        id: validatedData.targetChestId,
+        ...tenantWhere(dispensaryId),
+      },
     });
 
     if (!targetChest) {
@@ -195,10 +186,25 @@ export async function deleteChest(data: { id: string; targetChestId: string }) {
       };
     }
 
+    const chestToDelete = await prisma.chest.findFirst({
+      where: {
+        id: validatedData.id,
+        ...tenantWhere(dispensaryId),
+      },
+    });
+
+    if (!chestToDelete) {
+      return {
+        status: 404,
+        error: 'Le coffre à supprimer n\'existe pas.',
+      };
+    }
+
     await prisma.$transaction(async (tx) => {
       await tx.stockHistory.updateMany({
         where: {
           chestId: validatedData.id,
+          chest: tenantWhere(dispensaryId),
         },
         data: {
           chestId: validatedData.targetChestId,
@@ -208,6 +214,7 @@ export async function deleteChest(data: { id: string; targetChestId: string }) {
       await tx.chest.delete({
         where: {
           id: validatedData.id,
+          ...tenantWhere(dispensaryId),
         },
       });
     });
@@ -221,29 +228,24 @@ export async function deleteChest(data: { id: string; targetChestId: string }) {
   }
 }
 
-/**
- * Reorders chests
- */
-export async function reorderChests(data: { items: { id: string; order: number }[] }) {
+export async function reorderChests(
+  dispensarySlug: string,
+  data: { items: { id: string; order: number }[] },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = reorderChestsSchema.parse(data);
 
-    // Update the order of each chest
     await Promise.all(
       validatedData.items.map(({ id, order }) =>
         prisma.chest.update({
-          where: { id },
+          where: { id, ...tenantWhere(dispensaryId) },
           data: { order },
-        })
-      )
+        }),
+      ),
     );
 
     return {

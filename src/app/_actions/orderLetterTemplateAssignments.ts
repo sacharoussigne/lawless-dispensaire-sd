@@ -3,49 +3,45 @@
 import { z } from 'zod/v3';
 import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
-import { getAuthSession } from '@/lib/auth';
+import { requireTenantServerActionContext } from '@/lib/serverActionAuth';
+import { tenantWhere } from '@/lib/dispensary/tenantWhere';
 import type { OrderType, OrderStatus } from '@prisma/client';
 
-// Schéma de validation pour créer une assignation
 const createAssignmentSchema = z.object({
   orderType: z.enum(['INCOMING', 'OUTGOING']),
   orderStatus: z.enum(['DRAFT', 'LETTER_SENT', 'PROCESSING', 'READY', 'COMPLETED', 'CANCELLED']),
   mailTemplateId: z.string().uuid('ID de template invalide'),
 });
 
-// Schéma de validation pour modifier une assignation
 const updateAssignmentSchema = z.object({
   id: z.string().uuid('ID invalide'),
   mailTemplateId: z.string().uuid('ID de template invalide'),
 });
 
-// Schéma pour supprimer une assignation
 const deleteAssignmentSchema = z.object({
   id: z.string().uuid('ID invalide'),
 });
 
-/**
- * Crée une nouvelle assignation de modèle de courrier
- */
-export async function createOrderLetterTemplateAssignment(data: {
-  orderType: OrderType;
-  orderStatus: OrderStatus;
-  mailTemplateId: string;
-}) {
+export async function createOrderLetterTemplateAssignment(
+  dispensarySlug: string,
+  data: {
+    orderType: OrderType;
+    orderStatus: OrderStatus;
+    mailTemplateId: string;
+  },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = createAssignmentSchema.parse(data);
 
-    // Vérifier que le template existe
-    const template = await prisma.mailTemplate.findUnique({
-      where: { id: validatedData.mailTemplateId },
+    const template = await prisma.mailTemplate.findFirst({
+      where: {
+        id: validatedData.mailTemplateId,
+        ...tenantWhere(dispensaryId),
+      },
     });
 
     if (!template) {
@@ -55,10 +51,10 @@ export async function createOrderLetterTemplateAssignment(data: {
       };
     }
 
-    // Vérifier qu'il n'existe pas déjà une assignation pour cette combinaison
     const existing = await prisma.orderMailTemplateAssignment.findUnique({
       where: {
-        orderType_orderStatus: {
+        dispensaryId_orderType_orderStatus: {
+          dispensaryId,
           orderType: validatedData.orderType,
           orderStatus: validatedData.orderStatus,
         },
@@ -74,6 +70,7 @@ export async function createOrderLetterTemplateAssignment(data: {
 
     const assignment = await prisma.orderMailTemplateAssignment.create({
       data: {
+        dispensaryId,
         orderType: validatedData.orderType,
         orderStatus: validatedData.orderStatus,
         mailTemplateId: validatedData.mailTemplateId,
@@ -97,20 +94,14 @@ export async function createOrderLetterTemplateAssignment(data: {
   }
 }
 
-/**
- * Récupère toutes les assignations
- */
-export async function getOrderLetterTemplateAssignments() {
+export async function getOrderLetterTemplateAssignments(dispensarySlug: string) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const assignments = await prisma.orderMailTemplateAssignment.findMany({
+      where: tenantWhere(dispensaryId),
       include: {
         mailTemplate: {
           select: {
@@ -134,25 +125,22 @@ export async function getOrderLetterTemplateAssignments() {
   }
 }
 
-/**
- * Récupère une assignation par type et statut
- */
-export async function getOrderLetterTemplateAssignmentByTypeAndStatus(data: {
-  orderType: OrderType;
-  orderStatus: OrderStatus;
-}) {
+export async function getOrderLetterTemplateAssignmentByTypeAndStatus(
+  dispensarySlug: string,
+  data: {
+    orderType: OrderType;
+    orderStatus: OrderStatus;
+  },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const assignment = await prisma.orderMailTemplateAssignment.findUnique({
       where: {
-        orderType_orderStatus: {
+        dispensaryId_orderType_orderStatus: {
+          dispensaryId,
           orderType: data.orderType,
           orderStatus: data.orderStatus,
         },
@@ -171,27 +159,25 @@ export async function getOrderLetterTemplateAssignmentByTypeAndStatus(data: {
   }
 }
 
-/**
- * Modifie une assignation existante
- */
-export async function updateOrderLetterTemplateAssignment(data: {
-  id: string;
-  mailTemplateId: string;
-}) {
+export async function updateOrderLetterTemplateAssignment(
+  dispensarySlug: string,
+  data: {
+    id: string;
+    mailTemplateId: string;
+  },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = updateAssignmentSchema.parse(data);
 
-    // Vérifier que le template existe
-    const template = await prisma.mailTemplate.findUnique({
-      where: { id: validatedData.mailTemplateId },
+    const template = await prisma.mailTemplate.findFirst({
+      where: {
+        id: validatedData.mailTemplateId,
+        ...tenantWhere(dispensaryId),
+      },
     });
 
     if (!template) {
@@ -201,9 +187,11 @@ export async function updateOrderLetterTemplateAssignment(data: {
       };
     }
 
-    // Vérifier que l'assignation existe
-    const existing = await prisma.orderMailTemplateAssignment.findUnique({
-      where: { id: validatedData.id },
+    const existing = await prisma.orderMailTemplateAssignment.findFirst({
+      where: {
+        id: validatedData.id,
+        ...tenantWhere(dispensaryId),
+      },
     });
 
     if (!existing) {
@@ -216,6 +204,7 @@ export async function updateOrderLetterTemplateAssignment(data: {
     const assignment = await prisma.orderMailTemplateAssignment.update({
       where: {
         id: validatedData.id,
+        ...tenantWhere(dispensaryId),
       },
       data: {
         mailTemplateId: validatedData.mailTemplateId,
@@ -239,24 +228,21 @@ export async function updateOrderLetterTemplateAssignment(data: {
   }
 }
 
-/**
- * Supprime une assignation
- */
-export async function deleteOrderLetterTemplateAssignment(data: { id: string }) {
+export async function deleteOrderLetterTemplateAssignment(
+  dispensarySlug: string,
+  data: { id: string },
+) {
   try {
-    const session = await getAuthSession();
-    if (!session) {
-      return {
-        status: 401,
-        error: 'Non autorisé',
-      };
-    }
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
 
     const validatedData = deleteAssignmentSchema.parse(data);
 
     await prisma.orderMailTemplateAssignment.delete({
       where: {
         id: validatedData.id,
+        ...tenantWhere(dispensaryId),
       },
     });
 
