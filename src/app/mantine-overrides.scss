@@ -5,8 +5,15 @@ body {
   background-color: var(--disp-bg);
 }
 
+html[data-mantine-color-scheme] {
+  font-family: var(--disp-font-ui);
+  --mantine-font-family: var(--disp-font-ui);
+  --mantine-font-family-monospace: var(--disp-font-ui);
+}
+
 html[data-mantine-color-scheme] body {
   background-color: var(--disp-bg);
+  font-family: var(--disp-font-ui);
 }
 
 /* Menus (header Plus, avatar, gestion…) */

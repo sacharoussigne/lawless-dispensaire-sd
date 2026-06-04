@@ -15,8 +15,8 @@
   --disp-table-zebra: #FAF6EF;
   --disp-shadow-card: 0 1px 3px rgba(61, 52, 41, 0.06), 0 2px 8px rgba(61, 52, 41, 0.04);
   --disp-shadow-header: 0 1px 0 rgba(232, 223, 208, 0.8), 0 2px 8px rgba(61, 52, 41, 0.04);
-  --disp-font-display: var(--font-display), Georgia, "Times New Roman", serif;
-  --disp-font-ui: var(--font-ui), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --disp-font-display: var(--font-display), var(--font-ui), "Courier New", Courier, monospace;
+  --disp-font-ui: var(--font-ui), "Courier New", Courier, monospace;
 
   --mantine-datatable-background-color-light: var(--disp-surface);
   --mantine-datatable-border-color-light: var(--disp-surface-border);
@@ -63,13 +63,13 @@ body {
 
 .disp-display-title {
   font-family: var(--disp-font-display);
-  font-weight: 600;
+  font-weight: 400;
   color: var(--disp-ink);
 }
 
 .modal-title {
   font-family: var(--disp-font-display);
-  font-weight: 600;
+  font-weight: 400;
   color: var(--disp-ink);
 
   h2 {

@@ -52,7 +52,7 @@ const theme = createTheme({
   fontFamilyMonospace: dispTokens.fonts.mono,
   headings: {
     fontFamily: dispTokens.fonts.display,
-    fontWeight: '600',
+    fontWeight: '400',
     sizes: {
       h1: { fontSize: '2rem', lineHeight: '1.25' },
       h2: { fontSize: '1.5rem', lineHeight: '1.3' },
@@ -157,7 +157,7 @@ const theme = createTheme({
         },
         title: {
           fontFamily: dispTokens.fonts.display,
-          fontWeight: 600,
+          fontWeight: 400,
           color: c.ink,
         },
         content: {
@@ -425,9 +425,13 @@ export const dispCssVariablesResolver: CSSVariablesResolver = () => ({
     '--mantine-color-text': c.ink,
     '--mantine-color-default-hover': c.tableHeader,
     '--mantine-color-default-border': c.surfaceBorder,
+    '--mantine-font-family': dispTokens.fonts.ui,
+    '--mantine-font-family-monospace': dispTokens.fonts.mono,
   },
   dark: {
     '--mantine-color-dimmed': 'var(--mantine-color-dark-2)',
+    '--mantine-font-family': dispTokens.fonts.ui,
+    '--mantine-font-family-monospace': dispTokens.fonts.mono,
   },
 });
 
