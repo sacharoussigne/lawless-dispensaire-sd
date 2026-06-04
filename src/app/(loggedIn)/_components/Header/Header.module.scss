@@ -95,3 +95,14 @@
     border-radius: 12px !important;
   }
 }
+
+.spaceToggle {
+  flex-shrink: 0;
+}
+
+.spaceToggleLabel {
+  font-size: var(--mantine-font-size-sm);
+  line-height: 1.25;
+  position: relative;
+  top: 1px;
+}
