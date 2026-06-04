@@ -107,6 +107,24 @@ const theme = createTheme({
       styles: {
         root: {
           fontWeight: 600,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        inner: {
+          display: 'flex',
+          alignItems: 'center',
+          lineHeight: 1.25,
+        },
+        label: {
+          lineHeight: 1.25,
+          position: 'relative',
+          top: 1,
+        },
+        section: {
+          display: 'flex',
+          alignItems: 'center',
+          lineHeight: 0,
         },
       },
     },
