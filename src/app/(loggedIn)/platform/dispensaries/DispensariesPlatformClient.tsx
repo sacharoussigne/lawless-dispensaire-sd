@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Button, Card, Group, Stack, Text, TextInput, Title } from '@mantine/core';
+import { Button, Card, Container, Group, Stack, Text, TextInput, Title } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { createDispensary } from '@/app/_actions/dispensaries';
 import { tenantRoutes } from '@/types/routes';
@@ -62,6 +62,7 @@ export function DispensariesPlatformClient({
   };
 
   return (
+    <Container size="xl" py="xl" w="100%">
     <Stack gap="lg">
       <Title order={2}>Dispensaires (plateforme)</Title>
       {error && (
@@ -104,5 +105,6 @@ export function DispensariesPlatformClient({
         ))}
       </Stack>
     </Stack>
+    </Container>
   );
 }

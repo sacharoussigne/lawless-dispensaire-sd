@@ -4,6 +4,7 @@ import { useState } from 'react';
 import {
   Button,
   Card,
+  Container,
   Group,
   MultiSelect,
   Select,
@@ -165,6 +166,7 @@ export function DispensaryMembersClient({
   };
 
   return (
+    <Container size="xl" py="xl" w="100%">
     <Stack gap="lg">
       <Title order={2}>Membres du dispensaire</Title>
       {error && (
@@ -259,5 +261,6 @@ export function DispensaryMembersClient({
         })}
       </Stack>
     </Stack>
+    </Container>
   );
 }
