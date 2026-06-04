@@ -1,7 +1,6 @@
 import Header from '@/app/(loggedIn)/_components/Header/Header';
 import { LoggedInShell } from '@/app/(loggedIn)/_components/LoggedInShell/LoggedInShell';
 import { getAuthSession } from '@/lib/auth';
-import { Container } from '@mantine/core';
 import { PermissionsProvider } from '@/app/_contexts/PermissionsContext';
 import { calculatePermissions } from '@/lib/auth/calculatePermissions';
 import { getAppSettings } from '@/lib/appSettings';
@@ -62,9 +61,9 @@ export default async function DispensaryLayout({
           dispensarySlug={dispensarySlug}
         />
 
-        <Container size={'xl'} className={'flex-1 pb-[72px] sm:pb-0 min-h-0'}>
+        <div className="flex-1 w-full min-w-0 pb-[72px] sm:pb-0 min-h-0">
           {children}
-        </Container>
+        </div>
       </LoggedInShell>
     </PermissionsProvider>
   );
