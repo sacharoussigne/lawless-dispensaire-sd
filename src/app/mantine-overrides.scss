@@ -54,6 +54,14 @@ html[data-mantine-color-scheme] body {
 }
 
 /* mantine-datatable */
+.mantine-datatable {
+  width: 100%;
+}
+
+.mantine-datatable-table {
+  width: 100%;
+}
+
 .mantine-datatable-table thead tr th {
   .mantine-datatable-header-cell-filter-action-icon,
   .mantine-ActionIcon-root {
@@ -84,9 +92,85 @@ html[data-mantine-color-scheme] body {
   }
 }
 
+.mantine-datatable-header-cell-sortable:hover:not(:has(button:hover)) {
+  background: var(--mantine-color-sage-0);
+}
+
+.mantine-datatable-empty-state {
+  color: var(--disp-ink-muted);
+}
+
+.mantine-datatable-empty-state-icon {
+  background: var(--mantine-color-sage-0);
+  color: var(--disp-sage);
+
+  svg {
+    color: var(--disp-sage);
+    stroke: var(--disp-sage);
+  }
+}
+
 /* Soft apothecary pills — inline styles from apothecaryPillStyle take precedence */
 .mantine-Badge-root[data-variant='outline'] {
   font-weight: 600;
+}
+
+/* Accordion (payroll employee cards, etc.) */
+.mantine-Accordion-root[data-variant='contained'] {
+  .mantine-Accordion-item {
+    border-color: var(--disp-surface-border);
+    background-color: var(--disp-table-header);
+  }
+
+  .mantine-Accordion-control {
+    background-color: var(--disp-table-header);
+    color: var(--disp-ink);
+
+    &:hover {
+      background-color: var(--mantine-color-sage-0);
+    }
+
+    &[data-active] {
+      background-color: var(--disp-surface);
+    }
+  }
+
+  .mantine-Accordion-panel {
+    background-color: var(--disp-surface);
+  }
+}
+
+.mantine-Divider-label {
+  color: var(--disp-ink-muted);
+}
+
+/* Mantine Table: replace cool gray-0 stripes / gray-1 hover with apothecary tokens */
+[data-mantine-color-scheme='light'] .mantine-Table-table {
+  --table-striped-color: var(--disp-table-zebra);
+  --table-highlight-on-hover-color: var(--mantine-color-sage-0);
+  --table-hover-color: var(--mantine-color-sage-0);
+  --table-border-color: var(--disp-surface-border);
+}
+
+.mantine-Table-table {
+  background-color: var(--disp-surface);
+
+  thead {
+    background-color: var(--disp-table-header);
+
+    th {
+      color: var(--disp-ink);
+      background-color: var(--disp-table-header);
+    }
+  }
+
+  tbody .mantine-Table-tr:hover:where([data-hover]) {
+    background-color: var(--mantine-color-sage-0);
+  }
+}
+
+.mantine-Table-thead[data-sticky] .mantine-Table-th {
+  background-color: var(--disp-table-header) !important;
 }
 
 .mantine-datatable-pagination-pages-control {

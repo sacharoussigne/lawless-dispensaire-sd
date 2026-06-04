@@ -139,6 +139,7 @@ export function ReorderModal({
       onClose={handleClose}
       title="Réordonner les objets"
       size="md"
+      radius="md"
     >
       <Stack>
         {!selectedCategoryForReorder ? (

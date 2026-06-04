@@ -617,6 +617,7 @@ export default function WeeklyActivityPageClient({
           onSortStatusChange={setSortStatus}
           striped
           highlightOnHover
+          noRecordsText="Aucune activité sur cette période"
           columns={tableColumns}
         />
       </Paper>

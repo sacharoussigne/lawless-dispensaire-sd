@@ -12,23 +12,8 @@ export type ManagementNavItem = {
 export function getManagementNavItems(
   t: ReturnType<typeof tenantRoutes>,
   appSettings: AppSettingsDTO,
-  permissions: Permissions | null,
 ): ManagementNavItem[] {
   return [
-    {
-      id: 'payroll',
-      label: 'Rapports salaires',
-      href: t.employee.payroll,
-      visible:
-        appSettings.featurePayrollEnabled && (permissions?.payrollReports.view ?? false),
-    },
-    {
-      id: 'stockStatistics',
-      label: 'Statistiques de stock',
-      href: t.employee.stockStatistics,
-      visible:
-        appSettings.featureStockEnabled && (permissions?.stockStatistics.view ?? false),
-    },
     {
       id: 'categoryItems',
       label: "Catégories d'objets",

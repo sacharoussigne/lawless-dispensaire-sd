@@ -101,15 +101,17 @@ export function CompanyGroupsTable({
               <Group gap="xs" wrap="nowrap" justify="flex-end">
                 <ActionIcon
                   variant="light"
-                  color="blue"
+                  color="slate"
                   onClick={() => onEdit(companyGroup)}
+                  title="Modifier"
                 >
                   <IconEdit size={16} />
                 </ActionIcon>
                 <ActionIcon
                   variant="light"
-                  color="red"
+                  color="danger"
                   onClick={() => onDelete(companyGroup)}
+                  title="Supprimer"
                 >
                   <IconTrash size={16} />
                 </ActionIcon>

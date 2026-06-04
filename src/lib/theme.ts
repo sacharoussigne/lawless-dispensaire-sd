@@ -1,4 +1,4 @@
-import { createTheme, DEFAULT_THEME } from '@mantine/core';
+import { createTheme, DEFAULT_THEME, type CSSVariablesResolver } from '@mantine/core';
 import {
   clayPalette,
   dangerPalette,
@@ -337,6 +337,97 @@ const theme = createTheme({
         },
       },
     },
+
+    Accordion: {
+      styles: {
+        control: {
+          backgroundColor: c.tableHeader,
+          color: c.ink,
+          '&:hover': {
+            backgroundColor: 'var(--mantine-color-sage-0)',
+          },
+        },
+        item: {
+          borderColor: c.surfaceBorder,
+          backgroundColor: c.tableHeader,
+        },
+        panel: {
+          backgroundColor: c.surface,
+        },
+        chevron: {
+          color: c.inkMuted,
+        },
+      },
+    },
+
+    Divider: {
+      styles: {
+        label: {
+          color: c.inkMuted,
+          fontWeight: 600,
+        },
+      },
+    },
+
+    Tabs: {
+      styles: {
+        list: {
+          borderColor: c.surfaceBorder,
+        },
+        tab: {
+          color: c.inkMuted,
+          '&[data-active]': {
+            color: c.sage,
+            borderColor: c.sage,
+          },
+          '&:hover': {
+            backgroundColor: 'var(--mantine-color-sage-0)',
+            color: c.sage,
+          },
+        },
+      },
+    },
+
+    Table: {
+      vars: () => ({
+        table: {
+          '--table-striped-color': c.tableZebra,
+          '--table-highlight-on-hover-color': 'var(--mantine-color-sage-0)',
+          '--table-border-color': c.surfaceBorder,
+        },
+      }),
+      styles: {
+        table: {
+          backgroundColor: c.surface,
+        },
+        thead: {
+          backgroundColor: c.tableHeader,
+        },
+        th: {
+          color: c.ink,
+          fontWeight: 600,
+          backgroundColor: c.tableHeader,
+        },
+        td: {
+          color: c.ink,
+        },
+      },
+    },
+  },
+});
+
+/** Readable muted text and surfaces on cream backgrounds (light scheme). */
+export const dispCssVariablesResolver: CSSVariablesResolver = () => ({
+  variables: {},
+  light: {
+    '--mantine-color-dimmed': c.inkMuted,
+    '--mantine-color-body': c.background,
+    '--mantine-color-text': c.ink,
+    '--mantine-color-default-hover': c.tableHeader,
+    '--mantine-color-default-border': c.surfaceBorder,
+  },
+  dark: {
+    '--mantine-color-dimmed': 'var(--mantine-color-dark-2)',
   },
 });
 

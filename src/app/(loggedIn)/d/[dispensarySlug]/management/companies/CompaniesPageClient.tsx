@@ -2,7 +2,7 @@
 
 import { usePermissions } from '@/app/_contexts/PermissionsContext';
 import { useEffect, useState } from 'react';
-import { Container, Title, Group, Button } from '@mantine/core';
+import { Container, Button } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
 import { getCompanies } from '@/app/_actions/companies';
 import { handleAction } from '@/lib/action';
@@ -10,6 +10,7 @@ import { notifications } from '@mantine/notifications';
 import { CompanyModal } from './components/CompanyModal';
 import { DeleteCompanyModal } from './components/DeleteCompanyModal';
 import { ActiveFilters } from '@/app/_components/ActiveFilters/ActiveFilters';
+import { PageHeader } from '@/app/_components/PageHeader/PageHeader';
 import { CompaniesTable } from './components/CompaniesTable';
 import type { CompanyWithRelations } from '@/types/companies';
 import { ManagementSectionThemeProvider } from '../ManagementSectionThemeProvider';
@@ -98,12 +99,15 @@ export default function CompaniesPageClient({
   return (
     <ManagementSectionThemeProvider section="companies">
       <Container size="xl" py="xl">
-      <Group justify="space-between" mb="xl">
-        <Title order={1}>Entreprises</Title>
-        <Button leftSection={<IconPlus size={16} />} onClick={openCreateModal}>
-          Créer une entreprise
-        </Button>
-      </Group>
+      <PageHeader
+        title="Entreprises"
+        description="Référentiel des entreprises liées aux groupes et aux objets."
+        actions={
+          <Button leftSection={<IconPlus size={16} />} onClick={openCreateModal}>
+            Créer une entreprise
+          </Button>
+        }
+      />
 
       <ActiveFilters
         filters={[

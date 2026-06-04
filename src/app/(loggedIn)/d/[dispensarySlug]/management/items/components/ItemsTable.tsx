@@ -4,6 +4,7 @@ import { Paper, TextInput, Select, Badge, Group, ActionIcon } from '@mantine/cor
 import { DataTable } from 'mantine-datatable';
 import { IconEdit, IconTrash, IconTools } from '@tabler/icons-react';
 import type { ItemWithRelations, CategoryItem, CompanyGroup } from '@/types/items';
+import { apothecaryBooleanPills } from '@/lib/apothecaryPill';
 
 interface ItemsTableProps {
   items: ItemWithRelations[];
@@ -161,15 +162,15 @@ export function ItemsTable({
             render: (item: ItemWithRelations) =>
               item.isCraftable ? (
                 <Badge
-                  color="green"
-                  variant="light"
-                  style={{ cursor: 'pointer' }}
+                  variant="outline"
+                  radius="sm"
+                  style={{ ...apothecaryBooleanPills.yes, cursor: 'pointer' }}
                   onClick={() => onManageCraftRecipes(item)}
                 >
                   Oui
                 </Badge>
               ) : (
-                <Badge color="gray" variant="light">
+                <Badge variant="outline" radius="sm" style={apothecaryBooleanPills.no}>
                   Non
                 </Badge>
               ),
@@ -193,11 +194,11 @@ export function ItemsTable({
             title: 'Activé',
             render: (item: ItemWithRelations) =>
               item.isEnabled ? (
-                <Badge color="green" variant="light">
+                <Badge variant="outline" radius="sm" style={apothecaryBooleanPills.yes}>
                   Oui
                 </Badge>
               ) : (
-                <Badge color="red" variant="light">
+                <Badge variant="outline" radius="sm" style={apothecaryBooleanPills.noAlert}>
                   Non
                 </Badge>
               ),
@@ -207,11 +208,11 @@ export function ItemsTable({
             title: 'Peut être vendu',
             render: (item: ItemWithRelations) =>
               item.canBeSold ? (
-                <Badge color="blue" variant="light">
+                <Badge variant="outline" radius="sm" style={apothecaryBooleanPills.commerce}>
                   Oui
                 </Badge>
               ) : (
-                <Badge color="gray" variant="light">
+                <Badge variant="outline" radius="sm" style={apothecaryBooleanPills.no}>
                   Non
                 </Badge>
               ),
@@ -251,20 +252,21 @@ export function ItemsTable({
                 {item.isCraftable && (
                   <ActionIcon
                     variant="light"
-                    color="orange"
+                    color="leather"
                     onClick={() => onManageCraftRecipes(item)}
                     title="Gérer les recettes de craft"
                   >
                     <IconTools size={16} />
                   </ActionIcon>
                 )}
-                <ActionIcon variant="light" color="blue" onClick={() => onEdit(item)}>
+                <ActionIcon variant="light" color="slate" onClick={() => onEdit(item)} title="Modifier">
                   <IconEdit size={16} />
                 </ActionIcon>
                 <ActionIcon
                   variant="light"
-                  color="red"
+                  color="danger"
                   onClick={() => onDelete(item)}
+                  title="Supprimer"
                 >
                   <IconTrash size={16} />
                 </ActionIcon>

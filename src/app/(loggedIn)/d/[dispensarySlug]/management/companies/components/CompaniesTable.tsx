@@ -32,7 +32,7 @@ export function CompaniesTable({
 }: CompaniesTableProps) {
 
   return (
-    <Paper shadow="sm" p="md" withBorder>
+    <Paper shadow="sm" p="md" withBorder w="100%">
       <DataTable
         records={companies}
         columns={[
@@ -55,15 +55,17 @@ export function CompaniesTable({
               <Group gap="xs" wrap="nowrap" justify="flex-end">
                 <ActionIcon
                   variant="light"
-                  color="blue"
+                  color="slate"
                   onClick={() => onEdit(company)}
+                  title="Modifier"
                 >
                   <IconEdit size={16} />
                 </ActionIcon>
                 <ActionIcon
                   variant="light"
-                  color="red"
+                  color="danger"
                   onClick={() => onDelete(company)}
+                  title="Supprimer"
                 >
                   <IconTrash size={16} />
                 </ActionIcon>

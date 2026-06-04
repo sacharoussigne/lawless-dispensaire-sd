@@ -83,7 +83,7 @@ export function HeaderNavLinks({
   const isMobile = useMediaQuery('(max-width: 62em)');
 
   if (isManagementSpace && canManage) {
-    const managementItems = getManagementNavItems(t, appSettings, permissions);
+    const managementItems = getManagementNavItems(t, appSettings);
     return (
       <nav className={classes.headerNav} aria-label="Navigation principale">
         <Menu
