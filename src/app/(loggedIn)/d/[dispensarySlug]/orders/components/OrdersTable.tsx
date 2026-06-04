@@ -1,17 +1,11 @@
 'use client';
 
-import { Paper, TextInput, Select, Group, ActionIcon, Badge } from '@mantine/core';
+import { Paper, TextInput, Select, Group, ActionIcon } from '@mantine/core';
+import { OrderStatusBadge } from '@/app/_components/OrderBadges/OrderStatusBadge';
+import { OrderTypeBadge } from '@/app/_components/OrderBadges/OrderTypeBadge';
 import { DataTable } from 'mantine-datatable';
 import { IconEdit, IconTrash, IconEye, IconMail } from '@tabler/icons-react';
-import {
-  getOrderStatusLabel,
-  getOrderStatusColor,
-  OrderStatusEnum,
-} from '@/types/enum/orderStatus';
-import {
-  getOrderTypeLabel,
-  getOrderTypeColor,
-} from '@/types/enum/orderType';
+import { getOrderStatusLabel, OrderStatusEnum } from '@/types/enum/orderStatus';
 import { getOrderClientDisplayName, type OrderWithRelations } from '@/types/orders';
 
 interface OrdersTableProps {
@@ -86,9 +80,7 @@ export function OrdersTable({
             accessor: 'status',
             title: 'Statut',
             render: (order: OrderWithRelations) => (
-              <Badge color={getOrderStatusColor(order.status)}>
-                {getOrderStatusLabel(order.status)}
-              </Badge>
+              <OrderStatusBadge status={order.status} />
             ),
             filter: (
               <Select
@@ -105,9 +97,7 @@ export function OrdersTable({
             accessor: 'type',
             title: 'Type',
             render: (order: OrderWithRelations) => (
-              <Badge color={getOrderTypeColor(order.type || 'INCOMING')}>
-                {getOrderTypeLabel(order.type || 'INCOMING')}
-              </Badge>
+              <OrderTypeBadge type={order.type || 'INCOMING'} />
             ),
           },
           // {
@@ -159,7 +149,7 @@ export function OrdersTable({
                   {onPreviewLetter && hasLetterTemplate && (
                     <ActionIcon
                       variant="light"
-                      color="violet"
+                      color="wine"
                       onClick={() => onPreviewLetter(order)}
                       title="Aperçu du courrier"
                     >
@@ -169,7 +159,7 @@ export function OrdersTable({
                   {permissions?.orders.view && (
                     <ActionIcon
                       variant="light"
-                      color="blue"
+                      color="denim"
                       onClick={() => onView(order)}
                     >
                       <IconEye size={16} />
@@ -178,7 +168,7 @@ export function OrdersTable({
                   {permissions?.orders.update && (
                     <ActionIcon
                       variant="light"
-                      color="gray"
+                      color="slate"
                       onClick={() => onEdit(order)}
                       disabled={isCompleted}
                       title={
@@ -193,7 +183,7 @@ export function OrdersTable({
                   {permissions?.orders.delete && (
                     <ActionIcon
                       variant="light"
-                      color="red"
+                      color="danger"
                       onClick={() => onDelete(order)}
                       disabled={isCompleted}
                       title={

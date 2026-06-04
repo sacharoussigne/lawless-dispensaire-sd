@@ -1,14 +1,8 @@
 'use client';
 
-import { Modal, Stack, Group, Text, Badge, Divider, Table, SimpleGrid } from '@mantine/core';
-import {
-  getOrderStatusLabel,
-  getOrderStatusColor,
-} from '@/types/enum/orderStatus';
-import {
-  getOrderTypeLabel,
-  getOrderTypeColor,
-} from '@/types/enum/orderType';
+import { Modal, Stack, Group, Text, Divider, Table, SimpleGrid } from '@mantine/core';
+import { OrderStatusBadge } from '@/app/_components/OrderBadges/OrderStatusBadge';
+import { OrderTypeBadge } from '@/app/_components/OrderBadges/OrderTypeBadge';
 import { getOrderClientDisplayName, type OrderWithRelations } from '@/types/orders';
 
 interface OrderDetailsModalProps {
@@ -54,17 +48,13 @@ export function OrderDetailsModal({
                 <Text size="xs" c="dimmed">
                   Statut
                 </Text>
-                <Badge color={getOrderStatusColor(viewingOrder.status)}>
-                  {getOrderStatusLabel(viewingOrder.status)}
-                </Badge>
+                <OrderStatusBadge status={viewingOrder.status} />
               </Stack>
               <Stack gap={2}>
                 <Text size="xs" c="dimmed">
                   Type
                 </Text>
-                <Badge color={getOrderTypeColor(viewingOrder.type || 'INCOMING')}>
-                  {getOrderTypeLabel(viewingOrder.type || 'INCOMING')}
-                </Badge>
+                <OrderTypeBadge type={viewingOrder.type || 'INCOMING'} />
               </Stack>
             </SimpleGrid>
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg">

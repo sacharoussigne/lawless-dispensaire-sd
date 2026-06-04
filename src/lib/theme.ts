@@ -1,9 +1,14 @@
 import { createTheme, DEFAULT_THEME } from '@mantine/core';
 import {
+  clayPalette,
   dangerPalette,
+  denimPalette,
   dispTokens,
   leatherPalette,
+  mossPalette,
   sagePalette,
+  slatePalette,
+  winePalette,
 } from '@/lib/design-tokens';
 
 const { colors: c, radius: r, shadows: s } = dispTokens;
@@ -19,6 +24,11 @@ const theme = createTheme({
     sage: [...sagePalette],
     leather: [...leatherPalette],
     danger: [...dangerPalette],
+    slate: [...slatePalette],
+    wine: [...winePalette],
+    clay: [...clayPalette],
+    moss: [...mossPalette],
+    denim: [...denimPalette],
     blue: [
       '#e3f4fd',
       '#cbe8fb',
@@ -97,6 +107,19 @@ const theme = createTheme({
       styles: {
         root: {
           fontWeight: 600,
+        },
+      },
+    },
+
+    Badge: {
+      defaultProps: {
+        variant: 'outline',
+        radius: 'sm',
+      },
+      styles: {
+        root: {
+          fontWeight: 600,
+          fontSize: 'var(--mantine-font-size-xs)',
         },
       },
     },

@@ -73,6 +73,76 @@ export const dangerPalette = [
   '#592f2f',
 ] as const;
 
+/** Warm gray — draft, neutral states */
+export const slatePalette = [
+  '#f4f1eb',
+  '#e8e3da',
+  '#d8d0c4',
+  '#c0b5a6',
+  '#a69a8a',
+  '#8f8375',
+  '#6B5F52',
+  '#5c5249',
+  '#4e4640',
+  '#3d3429',
+] as const;
+
+/** Dusty plum — correspondence, secondary emphasis */
+export const winePalette = [
+  '#f3eaef',
+  '#e6d5df',
+  '#d4b8c8',
+  '#b995ad',
+  '#9f7a92',
+  '#87647c',
+  '#735268',
+  '#624658',
+  '#523b4a',
+  '#43313c',
+] as const;
+
+/** Muted terracotta — in progress, outgoing accents */
+export const clayPalette = [
+  '#f5ebe3',
+  '#e8d9c9',
+  '#d9c0a5',
+  '#c4a07a',
+  '#b08d62',
+  '#9c7a52',
+  '#8a6b48',
+  '#755a3c',
+  '#614b32',
+  '#4f3d28',
+] as const;
+
+/** Deep sage — completed, success */
+export const mossPalette = [
+  '#e9f0eb',
+  '#d5e3d9',
+  '#b6ccb9',
+  '#92b098',
+  '#73957c',
+  '#5f8269',
+  '#4f6f58',
+  '#435c4b',
+  '#384b3f',
+  '#2d3d34',
+] as const;
+
+/** Muted blue-gray — incoming, info */
+export const denimPalette = [
+  '#edf1f4',
+  '#d9e2e9',
+  '#b9c9d6',
+  '#94aabd',
+  '#7893a8',
+  '#637f94',
+  '#526d80',
+  '#465c6d',
+  '#3a4d5b',
+  '#2f404c',
+] as const;
+
 /** CSS custom properties injected on :root via globals.scss */
 export function dispCssVariables(): Record<string, string> {
   const t = dispTokens;

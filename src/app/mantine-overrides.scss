@@ -65,6 +65,11 @@ html[data-mantine-color-scheme] body {
   }
 }
 
+/* Soft apothecary pills — inline styles from apothecaryPillStyle take precedence */
+.mantine-Badge-root[data-variant='outline'] {
+  font-weight: 600;
+}
+
 .mantine-datatable-pagination-pages-control {
   background-color: var(--disp-surface) !important;
   border-color: var(--disp-surface-border) !important;
