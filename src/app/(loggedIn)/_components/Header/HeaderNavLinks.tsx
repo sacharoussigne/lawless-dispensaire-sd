@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import {
   Burger,
-  Button,
   Drawer,
   Group,
   Menu,
@@ -14,7 +13,6 @@ import {
 import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import { IconChevronDown } from '@tabler/icons-react';
 import classes from './Header.module.scss';
-import type { Icon } from '@tabler/icons-react';
 import {
   getEmployeeNavItems,
   type EmployeeNavItem,
@@ -40,7 +38,7 @@ function NavLinkItem({
 }) {
   const Icon = item.icon;
   const content = (
-    <Group gap={6} wrap="nowrap">
+    <Group gap={6} wrap="nowrap" className={classes.linkInner}>
       <Icon size={18} stroke={1.6} />
       {!item.iconOnly && !compact && <span>{item.shortLabel}</span>}
       {!item.iconOnly && compact && <span>{item.shortLabel}</span>}
@@ -152,13 +150,12 @@ export function HeaderNavLinks({
             transitionProps={{ transition: 'pop' }}
           >
             <Menu.Target>
-              <Button
-                variant="subtle"
-                className={classes.link}
-                rightSection={<IconChevronDown size={14} />}
-              >
-                Plus
-              </Button>
+              <UnstyledButton className={classes.link}>
+                <Group gap={4} wrap="nowrap" className={classes.linkInner}>
+                  <span>Plus</span>
+                  <IconChevronDown size={14} stroke={1.6} />
+                </Group>
+              </UnstyledButton>
             </Menu.Target>
             <Menu.Dropdown>
               {more.map((item) => {
@@ -246,13 +243,12 @@ export function HeaderNavLinks({
           transitionProps={{ transition: 'pop' }}
         >
           <Menu.Target>
-            <Button
-              variant="subtle"
-              className={classes.link}
-              rightSection={<IconChevronDown size={14} />}
-            >
-              Plus
-            </Button>
+            <UnstyledButton className={classes.link}>
+              <Group gap={4} wrap="nowrap" className={classes.linkInner}>
+                <span>Plus</span>
+                <IconChevronDown size={14} stroke={1.6} />
+              </Group>
+            </UnstyledButton>
           </Menu.Target>
           <Menu.Dropdown>
             {more.map((item) => {

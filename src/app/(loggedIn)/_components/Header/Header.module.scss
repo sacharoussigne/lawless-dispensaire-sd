@@ -40,17 +40,29 @@
 }
 
 .link {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  height: 100%;
   padding: 0.35rem var(--mantine-spacing-sm);
   text-decoration: none;
   color: var(--disp-ink);
+  font-family: var(--disp-font-ui);
   font-weight: 500;
   font-size: var(--mantine-font-size-sm);
+  line-height: 1.25;
   transition: background-color 0.2s ease, color 0.2s ease;
   border-radius: var(--mantine-radius-md);
   white-space: nowrap;
+
+  span {
+    position: relative;
+    top: 1px;
+    line-height: 1.25;
+  }
+
+  svg {
+    flex-shrink: 0;
+    display: block;
+  }
 
   &:hover:not(.linkActive) {
     background-color: var(--mantine-color-sage-0);
@@ -61,6 +73,14 @@
     font-weight: 600;
     background-color: var(--mantine-color-sage-0);
   }
+}
+
+.linkInner {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 6px;
+  line-height: 1;
 }
 
 .drawerLink {
