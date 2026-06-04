@@ -9,6 +9,25 @@ html[data-mantine-color-scheme] body {
   background-color: var(--disp-bg);
 }
 
+/* Menus (header Plus, avatar, gestion…) */
+.mantine-Menu-dropdown {
+  background-color: var(--disp-surface) !important;
+  border-color: var(--disp-surface-border) !important;
+}
+
+.mantine-Menu-item {
+  color: var(--disp-ink);
+
+  &:hover:not([data-disabled]),
+  &:focus:not([data-disabled]) {
+    color: var(--disp-sage);
+  }
+}
+
+.mantine-Menu-label {
+  color: var(--disp-ink-muted);
+}
+
 /* Select / Combobox dropdowns (often portaled) */
 .mantine-Combobox-dropdown,
 .mantine-Select-dropdown,

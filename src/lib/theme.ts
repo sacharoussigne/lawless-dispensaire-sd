@@ -176,6 +176,16 @@ const theme = createTheme({
           backgroundColor: c.surface,
           borderColor: c.surfaceBorder,
         },
+        item: {
+          color: c.ink,
+          '&[data-hovered]': {
+            backgroundColor: 'var(--mantine-color-sage-0)',
+            color: c.sage,
+          },
+        },
+        label: {
+          color: c.inkMuted,
+        },
       },
     },
 
