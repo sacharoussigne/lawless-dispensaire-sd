@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Cormorant_Garamond, Source_Sans_3 } from 'next/font/google';
+import { Geist_Mono } from 'next/font/google';
 import {
   ColorSchemeScript,
   mantineHtmlProps,
@@ -16,9 +17,16 @@ import 'mantine-datatable/styles.css';
 import theme from '@/lib/theme';
 import '@/lib/dayjs';
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
+const fontDisplay = Cormorant_Garamond({
+  variable: '--font-display',
   subsets: ['latin'],
+  weight: ['500', '600', '700'],
+});
+
+const fontUi = Source_Sans_3({
+  variable: '--font-ui',
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
 });
 
 const geistMono = Geist_Mono({
@@ -44,7 +52,9 @@ export default function RootLayout({
         <link rel="icon" href="/favicon.png" type="image/png" />
         <ColorSchemeScript />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable}`}>
+      <body
+        className={`${fontDisplay.variable} ${fontUi.variable} ${geistMono.variable}`}
+      >
         <MantineProvider theme={theme}>
           <Notifications />
           <ModalsProvider>{children}</ModalsProvider>

@@ -1,4 +1,5 @@
 import Header from '@/app/(loggedIn)/_components/Header/Header';
+import { LoggedInShell } from '@/app/(loggedIn)/_components/LoggedInShell/LoggedInShell';
 import { getAuthSession } from '@/lib/auth';
 import { Container } from '@mantine/core';
 import { PermissionsProvider } from '@/app/_contexts/PermissionsContext';
@@ -54,15 +55,17 @@ export default async function DispensaryLayout({
       dispensaryId={dispensary.id}
       accessibleDispensaries={accessibleDispensaries}
     >
-      <Header
-        session={session as AuthSession | null}
-        impersonatorDisplayName={impersonatorDisplayName}
-        dispensarySlug={dispensarySlug}
-      />
+      <LoggedInShell>
+        <Header
+          session={session as AuthSession | null}
+          impersonatorDisplayName={impersonatorDisplayName}
+          dispensarySlug={dispensarySlug}
+        />
 
-      <Container size={'xl'} className={'flex-1 pb-[72px] sm:pb-0'}>
-        {children}
-      </Container>
+        <Container size={'xl'} className={'flex-1 pb-[72px] sm:pb-0'}>
+          {children}
+        </Container>
+      </LoggedInShell>
     </PermissionsProvider>
   );
 }

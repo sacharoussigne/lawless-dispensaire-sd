@@ -1,0 +1,32 @@
+.root {
+  margin-bottom: var(--mantine-spacing-xl);
+}
+
+.title {
+  font-family: var(--disp-font-display);
+  font-weight: 600;
+  font-size: 2rem;
+  line-height: 1.25;
+  color: var(--disp-ink);
+}
+
+.description {
+  color: var(--disp-ink-muted);
+  margin-top: var(--mantine-spacing-xs);
+  max-width: 42rem;
+}
+
+.divider {
+  margin-top: var(--mantine-spacing-md);
+}
+
+.backLink {
+  color: var(--disp-sage);
+  text-decoration: none;
+  font-size: var(--mantine-font-size-sm);
+  font-weight: 500;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}

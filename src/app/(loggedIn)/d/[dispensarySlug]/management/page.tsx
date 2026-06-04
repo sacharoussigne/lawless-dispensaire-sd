@@ -1,5 +1,5 @@
 import { tenantRoutes } from '@/types/routes';
-import { Button, Card, Container, Group, SimpleGrid, Text, Title } from '@mantine/core';
+import { Container, SimpleGrid } from '@mantine/core';
 import {
   IconBuildingSkyscraper,
   IconCategory2,
@@ -14,6 +14,8 @@ import { hasRole } from '@/lib/auth/permissions';
 import { Role } from '@/types/enum/roles';
 import { dispensarySiteTitle, getAppSettings } from '@/lib/appSettings';
 import { requireDispensaryFromSlug } from '@/lib/dispensary/context';
+import { ModuleCard, type ModuleCardProps } from '@/app/_components/ModuleCard/ModuleCard';
+import { PageHeader } from '@/app/_components/PageHeader/PageHeader';
 
 export default async function ManagementPage({
   params,
@@ -28,14 +30,14 @@ export default async function ManagementPage({
   const showAdminSettings = hasRole(session?.user?.role, Role.ADMIN);
   const siteTitle = dispensarySiteTitle(settings);
 
-  const managementSections = [
+  const managementSections: (ModuleCardProps & { visible: boolean })[] = [
     {
       title: "Catégories d'objets",
       description:
         "Organisez les objets par catégories pour avoir un stock plus clair et structuré.",
       icon: IconCategory2,
       href: t.management.categoryItems,
-      color: 'teal',
+      visible: true,
     },
     {
       title: 'Objets',
@@ -43,7 +45,7 @@ export default async function ManagementPage({
         "Créez et mettez à jour les objets disponibles dans le stock, leurs paramètres et options.",
       icon: IconLayoutGrid,
       href: t.management.items,
-      color: 'grape',
+      visible: true,
     },
     {
       title: 'Coffres',
@@ -51,7 +53,7 @@ export default async function ManagementPage({
         'Configurez les coffres de stockage, leur ordre et leur organisation physique.',
       icon: IconInbox,
       href: t.management.chests,
-      color: 'orange',
+      visible: true,
     },
     {
       title: "Groupes d'entreprises",
@@ -59,15 +61,15 @@ export default async function ManagementPage({
         "Regroupez les entreprises par structure pour simplifier le suivi et les conventions.",
       icon: IconUsersGroup,
       href: t.management.companyGroups,
-      color: 'indigo',
+      visible: true,
     },
     {
-      title: "Entreprises",
+      title: 'Entreprises',
       description:
         "Gérez les entreprises partenaires, leurs coordonnées et informations de contact.",
       icon: IconBuildingSkyscraper,
       href: t.management.companies,
-      color: 'blue',
+      visible: true,
     },
     {
       title: 'Courriers',
@@ -75,96 +77,30 @@ export default async function ManagementPage({
         'Gérez les courriers utilisés pour les entreprises et le suivi administratif.',
       icon: IconClipboardText,
       href: t.management.mails,
-      color: 'violet',
+      visible: settings.featureMailsEnabled,
     },
-  ] as const;
+  ];
 
-  const visibleSections = managementSections.filter(
-    (s) => s.href !== t.management.mails || settings.featureMailsEnabled,
-  );
+  const visibleSections = managementSections.filter((s) => s.visible);
 
   return (
     <Container size="xl" py="xl">
-      <Group justify="space-between" mb="xl">
-        <div>
-          <Title order={1}>Espace gestion</Title>
-          <Text c="dimmed" mt="xs">
-            Retrouvez ici toutes les actions de configuration et d’administration
-            du {siteTitle}.
-          </Text>
-        </div>
-      </Group>
+      <PageHeader
+        title="Espace gestion"
+        description={`Retrouvez ici toutes les actions de configuration et d’administration du ${siteTitle}.`}
+      />
 
-      <SimpleGrid
-        cols={{ base: 1, sm: 2, lg: 3 }}
-        spacing="lg"
-      >
-        {visibleSections.map((section) => {
-          const Icon = section.icon;
-          return (
-            <Card
-              key={section.title}
-              withBorder
-              shadow="sm"
-              radius="md"
-              padding="lg"
-            >
-              <Group mb="md" align="flex-start">
-                <div className="rounded-full p-2" style={{ backgroundColor: 'rgba(0,0,0,0.02)' }}>
-                  <Icon size={24} stroke={1.8} />
-                </div>
-                <div>
-                  <Text fw={600}>{section.title}</Text>
-                  <Text size="sm" c="dimmed" mt={4}>
-                    {section.description}
-                  </Text>
-                </div>
-              </Group>
-
-              <Group justify="flex-end" mt="md">
-                <Button
-                  component="a"
-                  href={section.href}
-                  variant="light"
-                  color={section.color}
-                >
-                  Accéder
-                </Button>
-              </Group>
-            </Card>
-          );
-        })}
+      <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="lg">
+        {visibleSections.map(({ visible: _visible, ...section }) => (
+          <ModuleCard key={section.title} {...section} />
+        ))}
         {showAdminSettings && (
-          <Card
-            key="admin-app-settings"
-            withBorder
-            shadow="sm"
-            radius="md"
-            padding="lg"
-          >
-            <Group mb="md" align="flex-start">
-              <div className="rounded-full p-2" style={{ backgroundColor: 'rgba(0,0,0,0.02)' }}>
-                <IconSettings size={24} stroke={1.8} />
-              </div>
-              <div>
-                <Text fw={600}>Paramètres application</Text>
-                <Text size="sm" c="dimmed" mt={4}>
-                  Nom du site, activation des modules employés (stock, banque, etc.).
-                </Text>
-              </div>
-            </Group>
-
-            <Group justify="flex-end" mt="md">
-              <Button
-                component="a"
-                href={t.admin.settings}
-                variant="light"
-                color="gray"
-              >
-                Accéder
-              </Button>
-            </Group>
-          </Card>
+          <ModuleCard
+            title="Paramètres application"
+            description="Nom du site, activation des modules employés (stock, banque, etc.)."
+            icon={IconSettings}
+            href={t.admin.settings}
+          />
         )}
       </SimpleGrid>
     </Container>
