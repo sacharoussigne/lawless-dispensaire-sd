@@ -33,3 +33,50 @@ html[data-mantine-color-scheme] body {
     background-color: var(--mantine-color-sage-0);
   }
 }
+
+/* mantine-datatable */
+.mantine-datatable-table thead tr th {
+  .mantine-datatable-header-cell-filter-action-icon,
+  .mantine-ActionIcon-root {
+    --ai-bg: var(--disp-table-header);
+    --ai-hover: var(--mantine-color-sage-0);
+    --ai-color: var(--disp-ink-muted);
+    --ai-hover-color: var(--disp-sage);
+    background-color: var(--disp-table-header) !important;
+    color: var(--disp-ink-muted) !important;
+    border: none;
+
+    &:hover {
+      background-color: var(--mantine-color-sage-0) !important;
+      color: var(--disp-sage) !important;
+    }
+  }
+
+  .mantine-datatable-header-cell-filter-action-icon[data-active] {
+    --ai-bg: var(--mantine-color-sage-0);
+    --ai-color: var(--disp-sage);
+    background-color: var(--mantine-color-sage-0) !important;
+    color: var(--disp-sage) !important;
+  }
+
+  .mantine-datatable-header-cell-sortable-unsorted-icon,
+  .mantine-datatable-header-cell-sortable-icon {
+    color: var(--disp-ink-muted);
+  }
+}
+
+.mantine-datatable-pagination-pages-control {
+  background-color: var(--disp-surface) !important;
+  border-color: var(--disp-surface-border) !important;
+  color: var(--disp-ink) !important;
+
+  &:hover:not([data-active]):not(:disabled) {
+    background-color: var(--mantine-color-sage-0) !important;
+  }
+
+  &[data-active] {
+    background-color: var(--mantine-color-sage-filled) !important;
+    color: #fff !important;
+    border-color: transparent !important;
+  }
+}

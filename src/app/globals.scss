@@ -17,6 +17,13 @@
   --disp-shadow-header: 0 1px 0 rgba(232, 223, 208, 0.8), 0 2px 8px rgba(61, 52, 41, 0.04);
   --disp-font-display: var(--font-display), Georgia, "Times New Roman", serif;
   --disp-font-ui: var(--font-ui), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  --mantine-datatable-background-color-light: var(--disp-surface);
+  --mantine-datatable-border-color-light: var(--disp-surface-border);
+  --mantine-datatable-row-border-color-light: var(--disp-surface-border);
+  --mantine-datatable-striped-color-light: var(--disp-table-zebra);
+  --mantine-datatable-highlight-on-hover-color-light: var(--mantine-color-sage-0);
+  --mantine-datatable-color-light: var(--disp-ink);
 }
 
 html {
@@ -145,7 +152,7 @@ body {
   }
 }
 
-.mantine-DataTable-table {
+.mantine-datatable-table {
   thead tr th {
     background-color: var(--disp-table-header) !important;
     color: var(--disp-ink) !important;
