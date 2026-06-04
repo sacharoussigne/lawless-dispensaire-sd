@@ -47,17 +47,52 @@ html[data-mantine-color-scheme] body {
 
 .mantine-Combobox-option,
 .mantine-Select-option {
+  display: flex;
+  align-items: center;
+  line-height: 1.25;
   color: var(--disp-ink);
+
+  span {
+    line-height: 1.25;
+    position: relative;
+    top: 1px;
+  }
 
   &[data-combobox-selected],
   &[data-selected] {
-    background-color: var(--mantine-color-sage-0);
+    background-color: var(--mantine-color-sage-0) !important;
     color: var(--disp-sage);
   }
 
-  &[data-combobox-active] {
-    background-color: var(--mantine-color-sage-0);
+  &[data-combobox-active]:not([data-combobox-selected]):not([data-selected]) {
+    background-color: var(--mantine-color-sage-0) !important;
   }
+
+  @media (hover: hover) {
+    &:hover:where(:not([data-combobox-selected], [data-combobox-disabled], [data-selected])) {
+      background-color: var(--mantine-color-sage-0) !important;
+      color: var(--disp-ink);
+    }
+  }
+
+  @media (hover: none) {
+    &:active:where(:not([data-combobox-selected], [data-combobox-disabled], [data-selected])) {
+      background-color: var(--mantine-color-sage-0) !important;
+    }
+  }
+}
+
+.mantine-Select-input,
+.mantine-Autocomplete-input,
+.mantine-MultiSelect-input {
+  line-height: 1.25;
+}
+
+.mantine-Select-section,
+.mantine-Autocomplete-section,
+.mantine-MultiSelect-section {
+  display: flex;
+  align-items: center;
 }
 
 /* mantine-datatable */

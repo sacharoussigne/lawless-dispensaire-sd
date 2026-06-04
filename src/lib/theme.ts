@@ -13,6 +13,46 @@ import {
 
 const { colors: c, radius: r, shadows: s } = dispTokens;
 
+const selectLikeInput = {
+  backgroundColor: c.surface,
+  borderColor: c.surfaceBorder,
+  color: c.ink,
+  lineHeight: 1.25,
+};
+
+const selectLikeSection = {
+  display: 'flex',
+  alignItems: 'center',
+  lineHeight: 0,
+};
+
+const comboboxDropdown = {
+  backgroundColor: c.surface,
+  borderColor: c.surfaceBorder,
+};
+
+const comboboxOption = {
+  display: 'flex',
+  alignItems: 'center',
+  lineHeight: 1.25,
+  color: c.ink,
+  '& span': {
+    lineHeight: 1.25,
+    position: 'relative',
+    top: 1,
+  },
+  '&:hover:not([data-combobox-selected]):not([data-combobox-disabled])': {
+    backgroundColor: 'var(--mantine-color-sage-0)',
+  },
+  '&[data-combobox-selected]': {
+    backgroundColor: 'var(--mantine-color-sage-0)',
+    color: c.sage,
+  },
+  '&[data-combobox-active]': {
+    backgroundColor: 'var(--mantine-color-sage-0)',
+  },
+};
+
 const theme = createTheme({
   ...DEFAULT_THEME,
 
@@ -238,45 +278,21 @@ const theme = createTheme({
     },
 
     Select: {
+      defaultProps: {
+        withAlignedLabels: true,
+      },
       styles: {
-        input: {
-          backgroundColor: c.surface,
-          borderColor: c.surfaceBorder,
-          color: c.ink,
-        },
-        dropdown: {
-          backgroundColor: c.surface,
-          borderColor: c.surfaceBorder,
-        },
-        option: {
-          color: c.ink,
-          '&[data-combobox-selected]': {
-            backgroundColor: 'var(--mantine-color-sage-0)',
-            color: c.sage,
-          },
-          '&[data-combobox-active]': {
-            backgroundColor: 'var(--mantine-color-sage-0)',
-          },
-        },
+        input: selectLikeInput,
+        section: selectLikeSection,
+        dropdown: comboboxDropdown,
+        option: comboboxOption,
       },
     },
 
     Combobox: {
       styles: {
-        dropdown: {
-          backgroundColor: c.surface,
-          borderColor: c.surfaceBorder,
-        },
-        option: {
-          color: c.ink,
-          '&[data-combobox-selected]': {
-            backgroundColor: 'var(--mantine-color-sage-0)',
-            color: c.sage,
-          },
-          '&[data-combobox-active]': {
-            backgroundColor: 'var(--mantine-color-sage-0)',
-          },
-        },
+        dropdown: comboboxDropdown,
+        option: comboboxOption,
       },
     },
 
@@ -291,48 +307,25 @@ const theme = createTheme({
 
     Autocomplete: {
       styles: {
-        input: {
-          backgroundColor: c.surface,
-          borderColor: c.surfaceBorder,
-          color: c.ink,
-        },
-        dropdown: {
-          backgroundColor: c.surface,
-          borderColor: c.surfaceBorder,
-        },
-        option: {
-          color: c.ink,
-          '&[data-combobox-selected]': {
-            backgroundColor: 'var(--mantine-color-sage-0)',
-            color: c.sage,
-          },
-          '&[data-combobox-active]': {
-            backgroundColor: 'var(--mantine-color-sage-0)',
-          },
-        },
+        input: selectLikeInput,
+        section: selectLikeSection,
+        dropdown: comboboxDropdown,
+        option: comboboxOption,
       },
     },
 
     MultiSelect: {
+      defaultProps: {
+        withAlignedLabels: true,
+      },
       styles: {
-        input: {
-          backgroundColor: c.surface,
-          borderColor: c.surfaceBorder,
+        input: selectLikeInput,
+        inputField: {
+          lineHeight: 1.25,
         },
-        dropdown: {
-          backgroundColor: c.surface,
-          borderColor: c.surfaceBorder,
-        },
-        option: {
-          color: c.ink,
-          '&[data-combobox-selected]': {
-            backgroundColor: 'var(--mantine-color-sage-0)',
-            color: c.sage,
-          },
-          '&[data-combobox-active]': {
-            backgroundColor: 'var(--mantine-color-sage-0)',
-          },
-        },
+        section: selectLikeSection,
+        dropdown: comboboxDropdown,
+        option: comboboxOption,
       },
     },
 
