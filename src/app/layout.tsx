@@ -13,6 +13,7 @@ import './globals.scss';
 import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
 import 'mantine-datatable/styles.css';
+import './mantine-overrides.scss';
 
 import theme from '@/lib/theme';
 import '@/lib/dayjs';
@@ -53,11 +54,13 @@ export default function RootLayout({
         <ColorSchemeScript />
       </head>
       <body
-        className={`${fontDisplay.variable} ${fontUi.variable} ${geistMono.variable}`}
+        className={`${fontDisplay.variable} ${fontUi.variable} ${geistMono.variable} min-h-dvh flex flex-col`}
       >
         <MantineProvider theme={theme}>
-          <Notifications />
-          <ModalsProvider>{children}</ModalsProvider>
+          <div className="flex min-h-dvh flex-1 flex-col">
+            <Notifications />
+            <ModalsProvider>{children}</ModalsProvider>
+          </div>
         </MantineProvider>
       </body>
     </html>

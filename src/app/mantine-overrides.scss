@@ -1,0 +1,35 @@
+/* Loaded after Mantine styles so apothecary background wins */
+html,
+body {
+  min-height: 100dvh;
+  background-color: var(--disp-bg);
+}
+
+html[data-mantine-color-scheme] body {
+  background-color: var(--disp-bg);
+}
+
+/* Select / Combobox dropdowns (often portaled) */
+.mantine-Combobox-dropdown,
+.mantine-Select-dropdown,
+.mantine-Popover-dropdown,
+.mantine-Autocomplete-dropdown,
+.mantine-MultiSelect-dropdown {
+  background-color: var(--disp-surface) !important;
+  border-color: var(--disp-surface-border) !important;
+}
+
+.mantine-Combobox-option,
+.mantine-Select-option {
+  color: var(--disp-ink);
+
+  &[data-combobox-selected],
+  &[data-selected] {
+    background-color: var(--mantine-color-sage-0);
+    color: var(--disp-sage);
+  }
+
+  &[data-combobox-active] {
+    background-color: var(--mantine-color-sage-0);
+  }
+}

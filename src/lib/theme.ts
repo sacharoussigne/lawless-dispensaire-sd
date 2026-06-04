@@ -11,6 +11,10 @@ const { colors: c, radius: r, shadows: s } = dispTokens;
 const theme = createTheme({
   ...DEFAULT_THEME,
 
+  /** Used for dropdowns, popovers, etc. — not pure #fff */
+  white: c.surface,
+  black: c.ink,
+
   colors: {
     sage: [...sagePalette],
     leather: [...leatherPalette],
@@ -187,6 +191,116 @@ const theme = createTheme({
         input: {
           backgroundColor: c.surface,
           borderColor: c.surfaceBorder,
+          color: c.ink,
+        },
+        dropdown: {
+          backgroundColor: c.surface,
+          borderColor: c.surfaceBorder,
+        },
+        option: {
+          color: c.ink,
+          '&[data-combobox-selected]': {
+            backgroundColor: 'var(--mantine-color-sage-0)',
+            color: c.sage,
+          },
+          '&[data-combobox-active]': {
+            backgroundColor: 'var(--mantine-color-sage-0)',
+          },
+        },
+      },
+    },
+
+    Combobox: {
+      styles: {
+        dropdown: {
+          backgroundColor: c.surface,
+          borderColor: c.surfaceBorder,
+        },
+        option: {
+          color: c.ink,
+          '&[data-combobox-selected]': {
+            backgroundColor: 'var(--mantine-color-sage-0)',
+            color: c.sage,
+          },
+          '&[data-combobox-active]': {
+            backgroundColor: 'var(--mantine-color-sage-0)',
+          },
+        },
+      },
+    },
+
+    Popover: {
+      styles: {
+        dropdown: {
+          backgroundColor: c.surface,
+          borderColor: c.surfaceBorder,
+        },
+      },
+    },
+
+    Autocomplete: {
+      styles: {
+        input: {
+          backgroundColor: c.surface,
+          borderColor: c.surfaceBorder,
+          color: c.ink,
+        },
+        dropdown: {
+          backgroundColor: c.surface,
+          borderColor: c.surfaceBorder,
+        },
+        option: {
+          color: c.ink,
+          '&[data-combobox-selected]': {
+            backgroundColor: 'var(--mantine-color-sage-0)',
+            color: c.sage,
+          },
+          '&[data-combobox-active]': {
+            backgroundColor: 'var(--mantine-color-sage-0)',
+          },
+        },
+      },
+    },
+
+    MultiSelect: {
+      styles: {
+        input: {
+          backgroundColor: c.surface,
+          borderColor: c.surfaceBorder,
+        },
+        dropdown: {
+          backgroundColor: c.surface,
+          borderColor: c.surfaceBorder,
+        },
+        option: {
+          color: c.ink,
+          '&[data-combobox-selected]': {
+            backgroundColor: 'var(--mantine-color-sage-0)',
+            color: c.sage,
+          },
+          '&[data-combobox-active]': {
+            backgroundColor: 'var(--mantine-color-sage-0)',
+          },
+        },
+      },
+    },
+
+    Textarea: {
+      styles: {
+        input: {
+          backgroundColor: c.surface,
+          borderColor: c.surfaceBorder,
+          color: c.ink,
+        },
+      },
+    },
+
+    NumberInput: {
+      styles: {
+        input: {
+          backgroundColor: c.surface,
+          borderColor: c.surfaceBorder,
+          color: c.ink,
         },
       },
     },

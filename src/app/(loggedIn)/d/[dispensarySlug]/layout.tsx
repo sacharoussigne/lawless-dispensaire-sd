@@ -62,7 +62,7 @@ export default async function DispensaryLayout({
           dispensarySlug={dispensarySlug}
         />
 
-        <Container size={'xl'} className={'flex-1 pb-[72px] sm:pb-0'}>
+        <Container size={'xl'} className={'flex-1 pb-[72px] sm:pb-0 min-h-0'}>
           {children}
         </Container>
       </LoggedInShell>
