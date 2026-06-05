@@ -1,26 +1,17 @@
 'use client';
 
 import { Box, Group, Progress, Stack, Text, Tooltip } from '@mantine/core';
-import type { StockStatsDisplayMode } from '@/lib/stock/movements';
+import {
+  getStockStatsBarColor,
+  getStockStatsValueColor,
+  type StockStatsDisplayMode,
+} from '@/lib/stock/movements';
 
 export type StockStatsChartRow = {
   itemId: string;
   itemName: string;
   value: number;
 };
-
-function barColor(mode: StockStatsDisplayMode): string {
-  if (mode === 'consumed') return 'red';
-  if (mode === 'added') return 'green';
-  return 'blue';
-}
-
-function valueTextColor(mode: StockStatsDisplayMode, value: number): string | undefined {
-  if (mode !== 'net') return undefined;
-  if (value < 0) return 'var(--mantine-color-red-6)';
-  if (value > 0) return 'var(--mantine-color-green-6)';
-  return undefined;
-}
 
 export function StockStatsTopChart({
   rows,
@@ -30,7 +21,7 @@ export function StockStatsTopChart({
   displayMode: StockStatsDisplayMode;
 }) {
   const maxMagnitude = Math.max(...rows.map((r) => Math.abs(r.value)), 1);
-  const color = barColor(displayMode);
+  const color = getStockStatsBarColor(displayMode);
 
   return (
     <Stack gap="sm">
@@ -48,7 +39,10 @@ export function StockStatsTopChart({
                 size="sm"
                 fw={600}
                 ta="right"
-                style={{ flexShrink: 0, color: valueTextColor(displayMode, row.value) }}
+                style={{
+                  flexShrink: 0,
+                  color: getStockStatsValueColor(displayMode, row.value),
+                }}
               >
                 {row.value.toLocaleString('fr-FR')}
               </Text>
@@ -59,6 +53,9 @@ export function StockStatsTopChart({
               size="lg"
               radius="sm"
               aria-label={`${row.itemName}: ${row.value}`}
+              styles={{
+                root: { backgroundColor: 'var(--disp-table-header)' },
+              }}
             />
           </Box>
         );

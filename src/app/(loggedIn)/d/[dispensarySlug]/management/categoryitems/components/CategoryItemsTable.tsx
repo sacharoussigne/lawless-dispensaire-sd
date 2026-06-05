@@ -31,7 +31,7 @@ export function CategoryItemsTable({
   onDelete,
 }: CategoryItemsTableProps) {
   return (
-    <Paper shadow="sm" p="md" withBorder>
+    <Paper shadow="sm" p="md" withBorder w="100%">
       <DataTable
         records={items}
         columns={[
@@ -58,7 +58,7 @@ export function CategoryItemsTable({
                     height: 20,
                     borderRadius: 4,
                     backgroundColor: categoryItem.color,
-                    border: '1px solid #dee2e6',
+                    border: '1px solid var(--disp-surface-border)',
                   }}
                 />
                 <span style={{ fontSize: '14px' }}>{categoryItem.color}</span>
@@ -77,15 +77,17 @@ export function CategoryItemsTable({
               <Group gap="xs" wrap="nowrap" justify="flex-end">
                 <ActionIcon
                   variant="light"
-                  color="blue"
+                  color="slate"
                   onClick={() => onEdit(categoryItem)}
+                  title="Modifier"
                 >
                   <IconEdit size={16} />
                 </ActionIcon>
                 <ActionIcon
                   variant="light"
-                  color="red"
+                  color="danger"
                   onClick={() => onDelete(categoryItem)}
+                  title="Supprimer"
                 >
                   <IconTrash size={16} />
                 </ActionIcon>

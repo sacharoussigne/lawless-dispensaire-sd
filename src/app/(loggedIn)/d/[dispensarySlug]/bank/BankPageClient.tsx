@@ -2,15 +2,8 @@
 
 import { usePermissions, useTenantRoutes } from '@/app/_contexts/PermissionsContext';
 import { useEffect, useState } from 'react';
-import {
-  Container,
-  Title,
-  Group,
-  Button,
-  Paper,
-  Stack,
-  Text,
-} from '@mantine/core';
+import { Container, Group, Button, Paper, Stack, Text } from '@mantine/core';
+import { PageHeader } from '@/app/_components/PageHeader/PageHeader';
 import { IconPlus, IconBuildingBank } from '@tabler/icons-react';
 import { getBankAccounts } from '@/app/_actions/bankAccounts';
 import { handleAction } from '@/lib/action';
@@ -94,15 +87,18 @@ export default function BankPageClient({
 
   return (
     <Container size="xl" py="xl">
-      <Group justify="space-between" mb="xl">
-        <Title order={1}>Comptes bancaires</Title>
-        <Button
-          leftSection={<IconPlus size={16} />}
-          onClick={() => setCreateModalOpened(true)}
-        >
-          Créer un compte
-        </Button>
-      </Group>
+      <PageHeader
+        title="Comptes bancaires"
+        description="Suivi des comptes et transactions hebdomadaires du dispensaire."
+        actions={
+          <Button
+            leftSection={<IconPlus size={16} />}
+            onClick={() => setCreateModalOpened(true)}
+          >
+            Créer un compte
+          </Button>
+        }
+      />
 
       <Paper shadow="sm" withBorder>
         {accounts.length === 0 && !loading ? (

@@ -31,14 +31,16 @@ export function ActiveFilters({ filters }: ActiveFiltersProps) {
           <Badge
             key={index}
             variant="light"
+            color="sage"
             size="lg"
             rightSection={
               <ActionIcon
                 size="xs"
-                color="blue"
+                color="slate"
                 radius="xl"
-                variant="transparent"
+                variant="subtle"
                 onClick={filter.onRemove}
+                aria-label={`Retirer le filtre ${filter.label}`}
               >
                 <IconX size={12} />
               </ActionIcon>

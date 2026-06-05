@@ -1,6 +1,6 @@
 import Header from '@/app/(loggedIn)/_components/Header/Header';
+import { LoggedInShell } from '@/app/(loggedIn)/_components/LoggedInShell/LoggedInShell';
 import { getAuthSession } from '@/lib/auth';
-import { Container } from '@mantine/core';
 import type { AuthSession } from '@/types/session';
 import { getImpersonatorDisplayName } from '@/lib/auth/impersonationDisplay';
 import { PermissionsProvider } from '@/app/_contexts/PermissionsContext';
@@ -19,13 +19,15 @@ export default async function PlatformLayout({ children }: { children: React.Rea
       initialAppSettings={APP_SETTINGS_DEFAULTS}
       accessibleDispensaries={accessibleDispensaries}
     >
-      <Header
-        session={session as AuthSession | null}
-        impersonatorDisplayName={impersonatorDisplayName}
-      />
-      <Container size="xl" className="flex-1 pb-[72px] sm:pb-0">
-        {children}
-      </Container>
+      <LoggedInShell>
+        <Header
+          session={session as AuthSession | null}
+          impersonatorDisplayName={impersonatorDisplayName}
+        />
+        <div className="flex-1 w-full min-w-0 pb-[72px] sm:pb-0">
+          {children}
+        </div>
+      </LoggedInShell>
     </PermissionsProvider>
   );
 }

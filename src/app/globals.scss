@@ -1,23 +1,99 @@
 @import "tailwindcss";
 @import '@mantine/dates/styles.css';
 
+:root {
+  --disp-bg: #F7F3EB;
+  --disp-surface: #FFFCF6;
+  --disp-surface-border: #E8DFD0;
+  --disp-ink: #3D3429;
+  --disp-ink-muted: #6B5F52;
+  --disp-sage: #4A6B5A;
+  --disp-leather: #8B5E3C;
+  --disp-gold: #B8860B;
+  --disp-danger: #9B4D4D;
+  --disp-table-header: #F0EBE3;
+  --disp-table-zebra: #FAF6EF;
+  --disp-shadow-card: 0 1px 3px rgba(61, 52, 41, 0.06), 0 2px 8px rgba(61, 52, 41, 0.04);
+  --disp-shadow-header: 0 1px 0 rgba(232, 223, 208, 0.8), 0 2px 8px rgba(61, 52, 41, 0.04);
+  --disp-font-display: var(--font-display), var(--font-ui), "Courier New", Courier, monospace;
+  --disp-font-ui: var(--font-ui), "Courier New", Courier, monospace;
+
+  --mantine-datatable-background-color-light: var(--disp-surface);
+  --mantine-datatable-border-color-light: var(--disp-surface-border);
+  --mantine-datatable-row-border-color-light: var(--disp-surface-border);
+  --mantine-datatable-striped-color-light: var(--disp-table-zebra);
+  --mantine-datatable-highlight-on-hover-color-light: var(--mantine-color-sage-0);
+  --mantine-datatable-color-light: var(--disp-ink);
+
+  --menu-item-hover: var(--mantine-color-sage-0);
+
+  /* Fallback before MantineProvider injects scheme variables */
+  --mantine-color-dimmed: var(--disp-ink-muted);
+  --mantine-color-default-hover: var(--disp-table-header);
+}
+
+html {
+  background-color: var(--disp-bg);
+}
+
+body {
+  background-color: var(--disp-bg);
+  color: var(--disp-ink);
+  font-family: var(--disp-font-ui);
+  min-height: 100dvh;
+}
+
+.disp-paper-bg {
+  background-color: var(--disp-bg);
+  background-image:
+    radial-gradient(ellipse at 20% 0%, rgba(74, 107, 90, 0.04) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 100%, rgba(139, 94, 60, 0.03) 0%, transparent 50%);
+  min-height: 100dvh;
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.disp-section-divider {
+  border: none;
+  border-top: 1px dashed var(--disp-surface-border);
+  margin: 0;
+}
+
+.disp-display-title {
+  font-family: var(--disp-font-display);
+  font-weight: 400;
+  color: var(--disp-ink);
+}
+
+.disp-inline-meta {
+  line-height: 1.25;
+  position: relative;
+  top: 1px;
+}
+
 .modal-title {
+  font-family: var(--disp-font-display);
+  font-weight: 400;
+  color: var(--disp-ink);
+
   h2 {
+    font-family: inherit;
     font-size: 1.5rem;
     margin-bottom: 1rem;
   }
 }
 
-.mantine-DatePickerInput-day:where([data-selected]), .mantine-DateInput-day:where([data-selected])  {
+.mantine-DatePickerInput-day:where([data-selected]),
+.mantine-DateInput-day:where([data-selected]) {
   background-color: var(--mantine-primary-color-filled-hover) !important;
   color: #fff !important;
 }
 
-// Fix rounded corners for tables inside Paper components
 .mantine-Paper-root {
   overflow: hidden;
 
-  // Native Mantine Table
   .mantine-Table-root {
     border-collapse: separate;
     border-spacing: 0;
@@ -25,6 +101,12 @@
 
   .mantine-Table-thead {
     .mantine-Table-tr:first-child {
+      .mantine-Table-th {
+        background-color: var(--disp-table-header);
+        color: var(--disp-ink);
+        font-weight: 600;
+      }
+
       .mantine-Table-th:first-child {
         border-top-left-radius: var(--mantine-radius-md);
       }
@@ -35,6 +117,10 @@
   }
 
   .mantine-Table-tbody {
+    .mantine-Table-tr:nth-child(even) {
+      background-color: var(--disp-table-zebra);
+    }
+
     .mantine-Table-tr:last-child {
       .mantine-Table-td:first-child {
         border-bottom-left-radius: var(--mantine-radius-md);
@@ -45,19 +131,27 @@
     }
   }
 
-  // DataTable (mantine-datatable)
   table {
     border-collapse: separate;
     border-spacing: 0;
   }
 
   thead tr:first-child {
+    th {
+      background-color: var(--disp-table-header);
+      color: var(--disp-ink);
+    }
+
     th:first-child {
       border-top-left-radius: var(--mantine-radius-md);
     }
     th:last-child {
       border-top-right-radius: var(--mantine-radius-md);
     }
+  }
+
+  tbody tr:nth-child(even) {
+    background-color: var(--disp-table-zebra);
   }
 
   tbody tr:last-child {
@@ -67,5 +161,16 @@
     td:last-child {
       border-bottom-right-radius: var(--mantine-radius-md);
     }
+  }
+}
+
+.mantine-datatable-table {
+  thead tr th {
+    background-color: var(--disp-table-header) !important;
+    color: var(--disp-ink) !important;
+  }
+
+  tbody tr:nth-child(even) td {
+    background-color: var(--disp-table-zebra);
   }
 }

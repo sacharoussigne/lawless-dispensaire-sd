@@ -1,6 +1,6 @@
 'use client';
 
-import { Paper, TextInput } from '@mantine/core';
+import { Paper, TextInput, Text } from '@mantine/core';
 import { DataTable } from 'mantine-datatable';
 import { IconEdit, IconTrash, IconFlask } from '@tabler/icons-react';
 import { Group, ActionIcon } from '@mantine/core';
@@ -34,7 +34,7 @@ export function MailTemplatesTable({
   onTest,
 }: MailTemplatesTableProps) {
   return (
-    <Paper shadow="sm" p="md" withBorder>
+    <Paper shadow="sm" p="md" withBorder w="100%">
       <DataTable
         records={mailTemplates}
         columns={[
@@ -55,7 +55,11 @@ export function MailTemplatesTable({
             title: 'Description',
             render: (mailTemplate: MailTemplate) => {
               if (!mailTemplate.description) {
-                return <span style={{ color: 'var(--mantine-color-dimmed)' }}>—</span>;
+                return (
+                  <Text c="dimmed" span>
+                    —
+                  </Text>
+                );
               }
               const preview = mailTemplate.description.length > 100
                 ? mailTemplate.description.substring(0, 100) + '...'
@@ -72,7 +76,7 @@ export function MailTemplatesTable({
                 {onTest && (
                   <ActionIcon
                     variant="light"
-                    color="green"
+                    color="moss"
                     onClick={() => onTest(mailTemplate)}
                     title="Tester le template"
                   >
@@ -81,7 +85,7 @@ export function MailTemplatesTable({
                 )}
                 <ActionIcon
                   variant="light"
-                  color="blue"
+                  color="slate"
                   onClick={() => onEdit(mailTemplate)}
                   title="Modifier"
                 >
@@ -89,7 +93,7 @@ export function MailTemplatesTable({
                 </ActionIcon>
                 <ActionIcon
                   variant="light"
-                  color="red"
+                  color="danger"
                   onClick={() => onDelete(mailTemplate)}
                   title="Supprimer"
                 >

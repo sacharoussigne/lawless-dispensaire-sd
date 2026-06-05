@@ -1,8 +1,6 @@
 'use client';
 
-import { MantineProvider } from '@mantine/core';
-import type { MantineThemeOverride } from '@mantine/core';
-import baseTheme from '@/lib/theme';
+import type { ReactNode } from 'react';
 
 type ManagementSection =
   | 'categoryItems'
@@ -12,33 +10,14 @@ type ManagementSection =
   | 'companies'
   | 'mails';
 
-const sectionPrimaryColor: Record<ManagementSection, MantineThemeOverride['primaryColor']> = {
-  categoryItems: 'teal',
-  items: 'grape',
-  chests: 'orange',
-  companyGroups: 'indigo',
-  companies: 'blue',
-  mails: 'violet',
-};
-
+/**
+ * Kept for API stability; all management sections use the global sage theme.
+ */
 export function ManagementSectionThemeProvider({
-  section,
   children,
 }: {
-  section: ManagementSection;
-  children: React.ReactNode;
+  section?: ManagementSection;
+  children: ReactNode;
 }) {
-  const primaryColor = sectionPrimaryColor[section] ?? baseTheme.primaryColor;
-
-  return (
-    <MantineProvider
-      theme={{
-        ...baseTheme,
-        primaryColor,
-      }}
-    >
-      {children}
-    </MantineProvider>
-  );
+  return <>{children}</>;
 }
-

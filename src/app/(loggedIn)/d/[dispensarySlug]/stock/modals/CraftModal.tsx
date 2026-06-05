@@ -680,7 +680,12 @@ export default function CraftModal({
         )}
 
         {validation.reason && (
-          <Alert icon={<IconAlertCircle size={16} />} title="Attention" color="orange">
+          <Alert
+            icon={<IconAlertCircle size={16} />}
+            title="Attention"
+            color="amber"
+            variant="light"
+          >
             {validation.reason}
           </Alert>
         )}

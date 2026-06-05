@@ -1,29 +1,26 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
-import {
-  ColorSchemeScript,
-  mantineHtmlProps,
-  MantineProvider,
-} from '@mantine/core';
-import { Notifications } from '@mantine/notifications';
-import { ModalsProvider } from '@mantine/modals';
+import { Courier_Prime, Special_Elite } from 'next/font/google';
+import { ColorSchemeScript, mantineHtmlProps } from '@mantine/core';
 
 import './globals.scss';
 import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
 import 'mantine-datatable/styles.css';
+import './mantine-overrides.scss';
 
-import theme from '@/lib/theme';
 import '@/lib/dayjs';
+import { MantineAppProvider } from './MantineAppProvider';
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
+const fontUi = Courier_Prime({
+  variable: '--font-ui',
   subsets: ['latin'],
+  weight: ['400', '700'],
 });
 
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
+const fontDisplay = Special_Elite({
+  variable: '--font-display',
   subsets: ['latin'],
+  weight: '400',
 });
 
 export const metadata: Metadata = {
@@ -39,16 +36,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr" {...mantineHtmlProps}>
+    <html
+      lang="fr"
+      className={`${fontDisplay.variable} ${fontUi.variable} ${fontUi.className}`}
+      {...mantineHtmlProps}
+    >
       <head>
         <link rel="icon" href="/favicon.png" type="image/png" />
         <ColorSchemeScript />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        <MantineProvider theme={theme}>
-          <Notifications />
-          <ModalsProvider>{children}</ModalsProvider>
-        </MantineProvider>
+      <body className="min-h-dvh flex flex-col">
+        <MantineAppProvider>
+          <div className="flex min-h-dvh flex-1 flex-col">{children}</div>
+        </MantineAppProvider>
       </body>
     </html>
   );

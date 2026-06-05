@@ -2,7 +2,8 @@
 
 import { usePermissions } from '@/app/_contexts/PermissionsContext';
 import { useEffect, useState } from 'react';
-import { Container, Title, Group, Button } from '@mantine/core';
+import { Container, Group, Button } from '@mantine/core';
+import { PageHeader } from '@/app/_components/PageHeader/PageHeader';
 import { IconPlus } from '@tabler/icons-react';
 import { getItems } from '@/app/_actions/items';
 import { handleAction } from '@/lib/action';
@@ -137,21 +138,24 @@ export default function ItemsPageClient({
   return (
     <ManagementSectionThemeProvider section="items">
       <Container size="xl" py="xl">
-      <Group justify="space-between" mb="xl">
-        <Title order={1}>Objets</Title>
-        <Group>
-          <Button
-            variant="light"
-            onClick={() => setReorderModalOpened(true)}
-            disabled={items.length === 0}
-          >
-            Réordonner
-          </Button>
-          <Button leftSection={<IconPlus size={16} />} onClick={openCreateModal}>
-            Créer un objet
-          </Button>
-        </Group>
-      </Group>
+      <PageHeader
+        title="Objets"
+        description="Catalogue des objets du dispensaire, catégories et paramètres de stock."
+        actions={
+          <Group>
+            <Button
+              variant="light"
+              onClick={() => setReorderModalOpened(true)}
+              disabled={items.length === 0}
+            >
+              Réordonner
+            </Button>
+            <Button leftSection={<IconPlus size={16} />} onClick={openCreateModal}>
+              Créer un objet
+            </Button>
+          </Group>
+        }
+      />
 
       <ActiveFilters
         filters={[

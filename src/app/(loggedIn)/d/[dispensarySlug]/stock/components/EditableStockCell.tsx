@@ -94,7 +94,7 @@ export const EditableStockCell = ({
         <Group gap={2} wrap="nowrap">
           {hasStockToday && (
             <Tooltip label="Mise à jour du stock existant">
-              <ActionIcon size="sm" variant="subtle" color="blue" tabIndex={-1}>
+              <ActionIcon size="sm" variant="subtle" tabIndex={-1}>
                 <IconEdit size={14} />
               </ActionIcon>
             </Tooltip>
@@ -113,7 +113,6 @@ export const EditableStockCell = ({
                   <ActionIcon
                     size="sm"
                     variant="subtle"
-                    color="blue"
                     tabIndex={-1}
                     onClick={() => {
                       const isOpening = !weightPopoverOpened;
@@ -167,7 +166,6 @@ export const EditableStockCell = ({
                           <ActionIcon
                             size="xs"
                             variant="subtle"
-                            color="blue"
                             onClick={() => {
                               const trimmed = weightInputValue.trim();
                               if (!trimmed) return;

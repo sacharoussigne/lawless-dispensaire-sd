@@ -19,10 +19,11 @@ import { AuthSession } from '@/types/session';
 import { routes, tenantRoutes } from '@/types/routes';
 import Link from 'next/link';
 import Image from 'next/image';
-import { IconArrowBackUp, IconLogout, IconSearch, IconSettings } from '@tabler/icons-react';
+import { IconArrowBackUp, IconLogout, IconSettings } from '@tabler/icons-react';
+import { HeaderNavLinks } from './HeaderNavLinks';
 import { usePermissions } from '@/app/_contexts/PermissionsContext';
 import { dispensarySiteTitle } from '@/lib/appSettingsShared';
-import { hasRole, checkRolePermission } from '@/lib/auth/permissions';
+import { hasRole } from '@/lib/auth/permissions';
 import { Role } from '@/types/enum/roles';
 import { isPlatformAdmin } from '@/lib/dispensary/platformAdmin';
 import { DEFAULT_DISPENSARY_SLUG } from '@/lib/dispensary/constants';
@@ -169,134 +170,26 @@ export default function Header({
 
           {session && t ? (
             <>
-              <nav className={classes.headerNav} aria-label="Navigation principale">
-                {isAdminOrManagementSpace && permissions?.application.management ? (
-                  <Menu
-                    width={260}
-                    position="bottom-start"
-                    transitionProps={{ transition: 'pop-top-left' }}
-                    withinPortal
-                  >
-                    <Menu.Target>
-                      <Button variant="subtle" className={classes.link}>
-                        Actions de gestion
-                      </Button>
-                    </Menu.Target>
-                    <Menu.Dropdown>
-                      <Menu.Label>Gestion</Menu.Label>
-                      {appSettings.featurePayrollEnabled && permissions?.payrollReports.view && (
-                        <Link href={t.employee.payroll}>
-                          <Menu.Item>Rapports salaires</Menu.Item>
-                        </Link>
-                      )}
-                      {appSettings.featureStockEnabled && permissions?.stockStatistics.view && (
-                        <Link href={t.employee.stockStatistics}>
-                          <Menu.Item>Statistiques de stock</Menu.Item>
-                        </Link>
-                      )}
-                      <Link href={t.management.categoryItems}>
-                        <Menu.Item>Catégories d&apos;objets</Menu.Item>
-                      </Link>
-                      <Link href={t.management.items}>
-                        <Menu.Item>Objets</Menu.Item>
-                      </Link>
-                      <Link href={t.management.chests}>
-                        <Menu.Item>Coffres</Menu.Item>
-                      </Link>
-                      <Link href={t.management.companyGroups}>
-                        <Menu.Item>Groupes d&apos;entreprises</Menu.Item>
-                      </Link>
-                      <Link href={t.management.companies}>
-                        <Menu.Item>Entreprises</Menu.Item>
-                      </Link>
-                      {appSettings.featureMailsEnabled && (
-                        <Link href={t.management.mails}>
-                          <Menu.Item>Courriers</Menu.Item>
-                        </Link>
-                      )}
-                    </Menu.Dropdown>
-                  </Menu>
-                ) : (
-                  <>
-                    {appSettings.featureBankEnabled &&
-                      checkRolePermission(userRole, 'bank', 'access') && (
-                        <Link
-                          href={t.bank.index}
-                          className={`${classes.link} ${isRouteActive(t.bank.index) ? classes.linkActive : ''}`}
-                        >
-                          Banque
-                        </Link>
-                      )}
-                    {appSettings.featurePrivatePracticeEnabled &&
-                      checkRolePermission(userRole, 'private_practice', 'access') && (
-                        <Link
-                          href={t.privatePractice.index}
-                          className={`${classes.link} ${isRouteActive(t.privatePractice.index) ? classes.linkActive : ''}`}
-                        >
-                          Cabinet privé
-                        </Link>
-                      )}
-                    {appSettings.featureWeeklyDispensaryActivityEnabled &&
-                      permissions?.weeklyDispensaryActivity.view && (
-                        <Link
-                          href={t.weeklyActivity.index}
-                          className={`${classes.link} ${isRouteActive(t.weeklyActivity.index) ? classes.linkActive : ''}`}
-                        >
-                          Activité hebdo
-                        </Link>
-                      )}
-                    {appSettings.featureOrdersEnabled &&
-                      checkRolePermission(userRole, 'orders', 'view') && (
-                        <Link
-                          href={t.orders.index}
-                          className={`${classes.link} ${isRouteActive(t.orders.index) ? classes.linkActive : ''}`}
-                        >
-                          Commandes
-                        </Link>
-                      )}
-                    {appSettings.featureStockEnabled &&
-                      checkRolePermission(userRole, 'stock', 'view') && (
-                        <Link
-                          href={t.stock.index}
-                          className={`${classes.link} ${isRouteActive(t.stock.index) ? classes.linkActive : ''}`}
-                        >
-                          Stocks
-                        </Link>
-                      )}
-                    {appSettings.featurePayrollEnabled && permissions?.payrollReports.view && (
-                      <Link
-                        href={t.employee.payroll}
-                        className={`${classes.link} ${isRouteActive(t.employee.payroll) ? classes.linkActive : ''}`}
-                      >
-                        Salaires
-                      </Link>
-                    )}
-                    {appSettings.featureStockEnabled && permissions?.stockStatistics.view && (
-                      <Link
-                        href={t.employee.stockStatistics}
-                        className={`${classes.link} ${isRouteActive(t.employee.stockStatistics) ? classes.linkActive : ''}`}
-                      >
-                        Stats stock
-                      </Link>
-                    )}
-                  </>
-                )}
-                {(!isAdminOrManagementSpace || !permissions?.application.management) &&
-                  appSettings.featureSearchEnabled &&
-                  checkRolePermission(userRole, 'search', 'access') && (
-                    <Link
-                      href={t.searchItems.index}
-                      className={`${classes.link} ${isRouteActive(t.searchItems.index) ? classes.linkActive : ''}`}
-                      aria-label="Recherche"
-                    >
-                      <IconSearch size={20} />
-                    </Link>
-                  )}
-              </nav>
+              <div className={classes.headerNavSlot}>
+                <HeaderNavLinks
+                t={t}
+                appSettings={appSettings}
+                permissions={permissions}
+                userRole={userRole}
+                isManagementSpace={isAdminOrManagementSpace}
+                canManage={permissions?.application.management === true}
+                isRouteActive={isRouteActive}
+                />
+              </div>
 
               <Group gap="sm" wrap="nowrap" className={classes.headerSide}>
                 {canSwitchSpaces && (
                   <SegmentedControl
+                    size="md"
+                    classNames={{
+                      root: classes.spaceToggle,
+                      label: classes.spaceToggleLabel,
+                    }}
                     value={isAdminOrManagementSpace ? 'management' : 'employee'}
                     onChange={handleSpaceChange}
                     data={[
