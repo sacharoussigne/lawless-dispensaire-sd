@@ -67,6 +67,12 @@ body {
   color: var(--disp-ink);
 }
 
+.disp-inline-meta {
+  line-height: 1.25;
+  position: relative;
+  top: 1px;
+}
+
 .modal-title {
   font-family: var(--disp-font-display);
   font-weight: 400;

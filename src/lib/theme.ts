@@ -178,6 +178,19 @@ const theme = createTheme({
         root: {
           fontWeight: 600,
           fontSize: 'var(--mantine-font-size-xs)',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        label: {
+          lineHeight: 1.25,
+          position: 'relative',
+          top: 1,
+        },
+        section: {
+          display: 'flex',
+          alignItems: 'center',
+          lineHeight: 0,
         },
       },
     },

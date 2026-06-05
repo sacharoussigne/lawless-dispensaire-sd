@@ -153,8 +153,20 @@ html[data-mantine-color-scheme] body {
 }
 
 /* Soft apothecary pills — inline styles from apothecaryPillStyle take precedence */
+.mantine-Badge-root {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .mantine-Badge-root[data-variant='outline'] {
   font-weight: 600;
+}
+
+.mantine-Badge-label {
+  line-height: 1.25;
+  position: relative;
+  top: 1px;
 }
 
 /* Accordion (payroll employee cards, etc.) */
