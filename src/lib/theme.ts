@@ -433,9 +433,11 @@ const theme = createTheme({
           color: c.ink,
           fontWeight: 600,
           backgroundColor: c.tableHeader,
+          lineHeight: 1.25,
         },
         td: {
           color: c.ink,
+          lineHeight: 1.25,
         },
       },
     },
