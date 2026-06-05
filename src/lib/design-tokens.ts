@@ -28,9 +28,9 @@ export const dispTokens = {
     elevated: '0 4px 16px rgba(61, 52, 41, 0.08)',
   },
   fonts: {
-    display: 'var(--font-display), Georgia, "Times New Roman", serif',
-    ui: 'var(--font-ui), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-    mono: 'var(--font-geist-mono), Monaco, Courier, monospace',
+    display: 'var(--font-display), var(--font-ui), "Courier New", Courier, monospace',
+    ui: 'var(--font-ui), "Courier New", Courier, monospace',
+    mono: 'var(--font-ui), "Courier New", Courier, monospace',
   },
 } as const;
 

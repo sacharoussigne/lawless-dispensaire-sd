@@ -5,8 +5,15 @@ body {
   background-color: var(--disp-bg);
 }
 
+html[data-mantine-color-scheme] {
+  font-family: var(--disp-font-ui);
+  --mantine-font-family: var(--disp-font-ui);
+  --mantine-font-family-monospace: var(--disp-font-ui);
+}
+
 html[data-mantine-color-scheme] body {
   background-color: var(--disp-bg);
+  font-family: var(--disp-font-ui);
 }
 
 /* Menus (header Plus, avatar, gestion…) */
@@ -40,17 +47,54 @@ html[data-mantine-color-scheme] body {
 
 .mantine-Combobox-option,
 .mantine-Select-option {
+  display: flex;
+  align-items: center;
+  line-height: 1.25;
+  margin-bottom: 0.375rem;
+  border-radius: var(--mantine-radius-sm);
   color: var(--disp-ink);
+
+  span {
+    line-height: 1.25;
+    position: relative;
+    top: 1px;
+  }
 
   &[data-combobox-selected],
   &[data-selected] {
-    background-color: var(--mantine-color-sage-0);
+    background-color: var(--mantine-color-sage-0) !important;
     color: var(--disp-sage);
   }
 
-  &[data-combobox-active] {
-    background-color: var(--mantine-color-sage-0);
+  &[data-combobox-active]:not([data-combobox-selected]):not([data-selected]) {
+    background-color: var(--mantine-color-sage-0) !important;
   }
+
+  @media (hover: hover) {
+    &:hover:where(:not([data-combobox-selected], [data-combobox-disabled], [data-selected])) {
+      background-color: var(--mantine-color-sage-0) !important;
+      color: var(--disp-ink);
+    }
+  }
+
+  @media (hover: none) {
+    &:active:where(:not([data-combobox-selected], [data-combobox-disabled], [data-selected])) {
+      background-color: var(--mantine-color-sage-0) !important;
+    }
+  }
+}
+
+.mantine-Select-input,
+.mantine-Autocomplete-input,
+.mantine-MultiSelect-input {
+  line-height: 1.25;
+}
+
+.mantine-Select-section,
+.mantine-Autocomplete-section,
+.mantine-MultiSelect-section {
+  display: flex;
+  align-items: center;
 }
 
 /* mantine-datatable */
@@ -60,6 +104,44 @@ html[data-mantine-color-scheme] body {
 
 .mantine-datatable-table {
   width: 100%;
+
+  .mantine-Table-th,
+  .mantine-Table-td {
+    line-height: 1.25;
+  }
+
+  thead .mantine-Table-th {
+    padding-top: calc(var(--table-vertical-spacing, var(--mantine-spacing-xs)) + 2px);
+    padding-bottom: calc(var(--table-vertical-spacing, var(--mantine-spacing-xs)) - 2px);
+  }
+
+  tbody .mantine-Table-td {
+    padding-top: calc(var(--table-vertical-spacing, var(--mantine-spacing-xs)) + 2px);
+    padding-bottom: calc(var(--table-vertical-spacing, var(--mantine-spacing-xs)) - 2px);
+    vertical-align: middle;
+  }
+
+  .mantine-datatable-header-cell-sortable-group {
+    align-items: center;
+  }
+
+  .mantine-datatable-header-cell-sortable-text,
+  .mantine-datatable-column-group-header-cell {
+    line-height: 1.25;
+    position: relative;
+    top: 1px;
+  }
+
+  tbody .mantine-Table-td .mantine-Text-root,
+  tbody .mantine-Table-td .mantine-Badge-root {
+    line-height: 1.25;
+    position: relative;
+    top: 1px;
+  }
+
+  tbody .mantine-Table-td .mantine-Group-root {
+    align-items: center;
+  }
 }
 
 .mantine-datatable-table thead tr th {
@@ -111,8 +193,20 @@ html[data-mantine-color-scheme] body {
 }
 
 /* Soft apothecary pills — inline styles from apothecaryPillStyle take precedence */
+.mantine-Badge-root {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .mantine-Badge-root[data-variant='outline'] {
   font-weight: 600;
+}
+
+.mantine-Badge-label {
+  line-height: 1.25;
+  position: relative;
+  top: 1px;
 }
 
 /* Accordion (payroll employee cards, etc.) */

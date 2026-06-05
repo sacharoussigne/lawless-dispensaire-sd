@@ -185,6 +185,11 @@ export default function Header({
               <Group gap="sm" wrap="nowrap" className={classes.headerSide}>
                 {canSwitchSpaces && (
                   <SegmentedControl
+                    size="md"
+                    classNames={{
+                      root: classes.spaceToggle,
+                      label: classes.spaceToggleLabel,
+                    }}
                     value={isAdminOrManagementSpace ? 'management' : 'employee'}
                     onChange={handleSpaceChange}
                     data={[

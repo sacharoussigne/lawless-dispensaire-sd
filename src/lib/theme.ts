@@ -13,6 +13,48 @@ import {
 
 const { colors: c, radius: r, shadows: s } = dispTokens;
 
+const selectLikeInput = {
+  backgroundColor: c.surface,
+  borderColor: c.surfaceBorder,
+  color: c.ink,
+  lineHeight: 1.25,
+};
+
+const selectLikeSection = {
+  display: 'flex',
+  alignItems: 'center',
+  lineHeight: 0,
+};
+
+const comboboxDropdown = {
+  backgroundColor: c.surface,
+  borderColor: c.surfaceBorder,
+};
+
+const comboboxOption = {
+  display: 'flex',
+  alignItems: 'center',
+  lineHeight: 1.25,
+  borderRadius: 'var(--mantine-radius-sm)',
+  marginBottom: '0.2rem',
+  color: c.ink,
+  '& span': {
+    lineHeight: 1.25,
+    position: 'relative',
+    top: 1,
+  },
+  '&:hover:not([data-combobox-selected]):not([data-combobox-disabled])': {
+    backgroundColor: 'var(--mantine-color-sage-0)',
+  },
+  '&[data-combobox-selected]': {
+    backgroundColor: 'var(--mantine-color-sage-0)',
+    color: c.sage,
+  },
+  '&[data-combobox-active]': {
+    backgroundColor: 'var(--mantine-color-sage-0)',
+  },
+};
+
 const theme = createTheme({
   ...DEFAULT_THEME,
 
@@ -52,7 +94,7 @@ const theme = createTheme({
   fontFamilyMonospace: dispTokens.fonts.mono,
   headings: {
     fontFamily: dispTokens.fonts.display,
-    fontWeight: '600',
+    fontWeight: '400',
     sizes: {
       h1: { fontSize: '2rem', lineHeight: '1.25' },
       h2: { fontSize: '1.5rem', lineHeight: '1.3' },
@@ -107,6 +149,24 @@ const theme = createTheme({
       styles: {
         root: {
           fontWeight: 600,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        inner: {
+          display: 'flex',
+          alignItems: 'center',
+          lineHeight: 1.25,
+        },
+        label: {
+          lineHeight: 1.25,
+          position: 'relative',
+          top: 1,
+        },
+        section: {
+          display: 'flex',
+          alignItems: 'center',
+          lineHeight: 0,
         },
       },
     },
@@ -120,6 +180,19 @@ const theme = createTheme({
         root: {
           fontWeight: 600,
           fontSize: 'var(--mantine-font-size-xs)',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        label: {
+          lineHeight: 1.25,
+          position: 'relative',
+          top: 1,
+        },
+        section: {
+          display: 'flex',
+          alignItems: 'center',
+          lineHeight: 0,
         },
       },
     },
@@ -157,7 +230,7 @@ const theme = createTheme({
         },
         title: {
           fontFamily: dispTokens.fonts.display,
-          fontWeight: 600,
+          fontWeight: 400,
           color: c.ink,
         },
         content: {
@@ -220,45 +293,21 @@ const theme = createTheme({
     },
 
     Select: {
+      defaultProps: {
+        withAlignedLabels: true,
+      },
       styles: {
-        input: {
-          backgroundColor: c.surface,
-          borderColor: c.surfaceBorder,
-          color: c.ink,
-        },
-        dropdown: {
-          backgroundColor: c.surface,
-          borderColor: c.surfaceBorder,
-        },
-        option: {
-          color: c.ink,
-          '&[data-combobox-selected]': {
-            backgroundColor: 'var(--mantine-color-sage-0)',
-            color: c.sage,
-          },
-          '&[data-combobox-active]': {
-            backgroundColor: 'var(--mantine-color-sage-0)',
-          },
-        },
+        input: selectLikeInput,
+        section: selectLikeSection,
+        dropdown: comboboxDropdown,
+        option: comboboxOption,
       },
     },
 
     Combobox: {
       styles: {
-        dropdown: {
-          backgroundColor: c.surface,
-          borderColor: c.surfaceBorder,
-        },
-        option: {
-          color: c.ink,
-          '&[data-combobox-selected]': {
-            backgroundColor: 'var(--mantine-color-sage-0)',
-            color: c.sage,
-          },
-          '&[data-combobox-active]': {
-            backgroundColor: 'var(--mantine-color-sage-0)',
-          },
-        },
+        dropdown: comboboxDropdown,
+        option: comboboxOption,
       },
     },
 
@@ -273,48 +322,25 @@ const theme = createTheme({
 
     Autocomplete: {
       styles: {
-        input: {
-          backgroundColor: c.surface,
-          borderColor: c.surfaceBorder,
-          color: c.ink,
-        },
-        dropdown: {
-          backgroundColor: c.surface,
-          borderColor: c.surfaceBorder,
-        },
-        option: {
-          color: c.ink,
-          '&[data-combobox-selected]': {
-            backgroundColor: 'var(--mantine-color-sage-0)',
-            color: c.sage,
-          },
-          '&[data-combobox-active]': {
-            backgroundColor: 'var(--mantine-color-sage-0)',
-          },
-        },
+        input: selectLikeInput,
+        section: selectLikeSection,
+        dropdown: comboboxDropdown,
+        option: comboboxOption,
       },
     },
 
     MultiSelect: {
+      defaultProps: {
+        withAlignedLabels: true,
+      },
       styles: {
-        input: {
-          backgroundColor: c.surface,
-          borderColor: c.surfaceBorder,
+        input: selectLikeInput,
+        inputField: {
+          lineHeight: 1.25,
         },
-        dropdown: {
-          backgroundColor: c.surface,
-          borderColor: c.surfaceBorder,
-        },
-        option: {
-          color: c.ink,
-          '&[data-combobox-selected]': {
-            backgroundColor: 'var(--mantine-color-sage-0)',
-            color: c.sage,
-          },
-          '&[data-combobox-active]': {
-            backgroundColor: 'var(--mantine-color-sage-0)',
-          },
-        },
+        section: selectLikeSection,
+        dropdown: comboboxDropdown,
+        option: comboboxOption,
       },
     },
 
@@ -407,9 +433,11 @@ const theme = createTheme({
           color: c.ink,
           fontWeight: 600,
           backgroundColor: c.tableHeader,
+          lineHeight: 1.25,
         },
         td: {
           color: c.ink,
+          lineHeight: 1.25,
         },
       },
     },
@@ -425,9 +453,13 @@ export const dispCssVariablesResolver: CSSVariablesResolver = () => ({
     '--mantine-color-text': c.ink,
     '--mantine-color-default-hover': c.tableHeader,
     '--mantine-color-default-border': c.surfaceBorder,
+    '--mantine-font-family': dispTokens.fonts.ui,
+    '--mantine-font-family-monospace': dispTokens.fonts.mono,
   },
   dark: {
     '--mantine-color-dimmed': 'var(--mantine-color-dark-2)',
+    '--mantine-font-family': dispTokens.fonts.ui,
+    '--mantine-font-family-monospace': dispTokens.fonts.mono,
   },
 });
 

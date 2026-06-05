@@ -1,4 +1,7 @@
 .card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   transition:
     box-shadow 0.2s ease,
     border-color 0.2s ease,
@@ -9,6 +12,16 @@
     border-color: var(--mantine-color-sage-2);
     transform: translateY(-1px);
   }
+}
+
+.body {
+  flex: 1;
+  min-width: 0;
+}
+
+.footer {
+  margin-top: auto;
+  padding-top: var(--mantine-spacing-md);
 }
 
 .iconMedallion {
@@ -25,7 +38,7 @@
 
 .title {
   font-family: var(--disp-font-display);
-  font-weight: 600;
+  font-weight: 400;
   font-size: 1.125rem;
   color: var(--disp-ink);
   line-height: 1.3;

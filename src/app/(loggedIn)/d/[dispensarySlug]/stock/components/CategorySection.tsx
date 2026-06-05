@@ -56,12 +56,12 @@ export const CategorySection = memo(function CategorySection({
           >
             {categoryData.category.name}
           </Badge>
-          <Text c="dimmed" size="sm">
+          <Text c="dimmed" size="sm" className="disp-inline-meta">
             {categoryData.items.length} objet(s)
           </Text>
         </Group>
         {categoryTotalWeight > 0 && (
-          <Text size="sm" fw={600} c={categoryData.category.color}>
+          <Text size="sm" fw={600} c={categoryData.category.color} className="disp-inline-meta">
             {categoryTotalWeight.toFixed(2)} kg
           </Text>
         )}
