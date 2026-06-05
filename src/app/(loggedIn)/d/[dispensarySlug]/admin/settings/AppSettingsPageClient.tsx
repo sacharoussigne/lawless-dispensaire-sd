@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   Button,
   Card,
+  Container,
   Group,
   Paper,
   SimpleGrid,
@@ -118,6 +119,7 @@ export default function AppSettingsPageClient({
   };
 
   return (
+    <Container size="xl" py="xl" w="100%">
     <Stack gap="lg">
       <Title order={2}>Paramètres application</Title>
 
@@ -296,5 +298,6 @@ export default function AppSettingsPageClient({
         Enregistrer
       </Button>
     </Stack>
+    </Container>
   );
 }

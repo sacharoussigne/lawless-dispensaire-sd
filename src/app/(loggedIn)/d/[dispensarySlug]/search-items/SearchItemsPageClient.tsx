@@ -18,6 +18,7 @@ import { getItemsWithDetailedStock } from '@/app/_actions/stock';
 import { handleAction } from '@/lib/action';
 import { notifications } from '@mantine/notifications';
 import type { ChestWithStockHistory } from '@/types/chests';
+import { apothecaryBooleanPills } from '@/lib/apothecaryPill';
 
 interface Item {
   id: string;
@@ -157,12 +158,12 @@ export default function SearchItemsPageClient({
                               </Badge>
                             )}
                             {item.isCraftable && (
-                              <Badge color="blue" variant="light">
+                              <Badge variant="outline" radius="sm" style={apothecaryBooleanPills.yes}>
                                 Craftable
                               </Badge>
                             )}
                             {item.canBeSold && (
-                              <Badge color="green" variant="light">
+                              <Badge variant="outline" radius="sm" style={apothecaryBooleanPills.commerce}>
                                 Peut être vendu
                               </Badge>
                             )}

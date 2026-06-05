@@ -96,7 +96,7 @@ export function MailsTable({
               <Group gap="xs" wrap="nowrap" justify="flex-end">
                 <ActionIcon
                   variant="light"
-                  color="gray"
+                  color="denim"
                   onClick={() => onView(mail)}
                   title="Voir"
                 >
@@ -104,7 +104,7 @@ export function MailsTable({
                 </ActionIcon>
                 <ActionIcon
                   variant="light"
-                  color="blue"
+                  color="slate"
                   onClick={() => onEdit(mail)}
                   title="Modifier"
                 >
@@ -112,7 +112,7 @@ export function MailsTable({
                 </ActionIcon>
                 <ActionIcon
                   variant="light"
-                  color="red"
+                  color="danger"
                   onClick={() => onDelete(mail)}
                   title="Supprimer"
                 >

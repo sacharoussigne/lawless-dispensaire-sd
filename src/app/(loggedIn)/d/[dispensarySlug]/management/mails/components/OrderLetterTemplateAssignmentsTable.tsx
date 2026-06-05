@@ -1,11 +1,11 @@
 'use client';
 
 import { DataTable } from 'mantine-datatable';
-import { Paper, ActionIcon, Group, Badge } from '@mantine/core';
+import { Paper, ActionIcon, Group } from '@mantine/core';
 import { IconEdit, IconTrash } from '@tabler/icons-react';
 import type { OrderMailTemplateAssignment } from '@prisma/client';
-import { getOrderTypeLabel } from '@/types/enum/orderType';
-import { getOrderStatusLabel } from '@/types/enum/orderStatus';
+import { OrderTypeBadge } from '@/app/_components/OrderBadges/OrderTypeBadge';
+import { OrderStatusBadge } from '@/app/_components/OrderBadges/OrderStatusBadge';
 
 interface OrderMailTemplateAssignmentWithTemplate extends OrderMailTemplateAssignment {
   mailTemplate: {
@@ -28,7 +28,7 @@ export function OrderLetterTemplateAssignmentsTable({
   onDelete,
 }: OrderLetterTemplateAssignmentsTableProps) {
   return (
-    <Paper shadow="sm" p="md" withBorder>
+    <Paper shadow="sm" p="md" withBorder w="100%">
       <DataTable
         records={assignments}
         columns={[
@@ -36,18 +36,14 @@ export function OrderLetterTemplateAssignmentsTable({
             accessor: 'orderType',
             title: 'Type de commande',
             render: (assignment: OrderMailTemplateAssignmentWithTemplate) => (
-              <Badge color="blue" variant="light">
-                {getOrderTypeLabel(assignment.orderType)}
-              </Badge>
+              <OrderTypeBadge type={assignment.orderType} />
             ),
           },
           {
             accessor: 'orderStatus',
             title: 'Statut de commande',
             render: (assignment: OrderMailTemplateAssignmentWithTemplate) => (
-              <Badge color="grape" variant="light">
-                {getOrderStatusLabel(assignment.orderStatus)}
-              </Badge>
+              <OrderStatusBadge status={assignment.orderStatus} />
             ),
           },
           {
@@ -61,15 +57,17 @@ export function OrderLetterTemplateAssignmentsTable({
               <Group gap="xs" wrap="nowrap" justify="flex-end">
                 <ActionIcon
                   variant="light"
-                  color="blue"
+                  color="slate"
                   onClick={() => onEdit(assignment)}
+                  title="Modifier"
                 >
                   <IconEdit size={16} />
                 </ActionIcon>
                 <ActionIcon
                   variant="light"
-                  color="red"
+                  color="danger"
                   onClick={() => onDelete(assignment)}
+                  title="Supprimer"
                 >
                   <IconTrash size={16} />
                 </ActionIcon>
@@ -79,6 +77,8 @@ export function OrderLetterTemplateAssignmentsTable({
         ]}
         fetching={loading}
         noRecordsText="Aucune assignation"
+        striped
+        highlightOnHover
         minHeight={200}
       />
     </Paper>

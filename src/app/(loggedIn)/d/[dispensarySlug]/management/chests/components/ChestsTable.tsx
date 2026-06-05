@@ -1,9 +1,10 @@
 'use client';
 
-import { Paper, TextInput, Group, ActionIcon, Badge, Tooltip } from '@mantine/core';
+import { Paper, TextInput, Group, ActionIcon, Badge, Tooltip, Text } from '@mantine/core';
 import { DataTable } from 'mantine-datatable';
 import { IconEdit, IconTrash, IconChecklist } from '@tabler/icons-react';
 import type { ChestWithStockHistory } from '@/types/chests';
+import { apothecaryBooleanPills } from '@/lib/apothecaryPill';
 
 interface ChestsTableProps {
   items: ChestWithStockHistory[];
@@ -55,20 +56,28 @@ export function ChestsTable({
           {
             accessor: 'description',
             title: 'Description',
-            render: (chest: ChestWithStockHistory) => (
-              <span style={{ fontSize: '14px' }}>
-                {chest.description || <span style={{ color: '#999' }}>Aucune description</span>}
-              </span>
-            ),
+            render: (chest: ChestWithStockHistory) =>
+              chest.description ? (
+                <Text size="sm">{chest.description}</Text>
+              ) : (
+                <Text size="sm" c="dimmed">
+                  Aucune description
+                </Text>
+              ),
           },
           {
             accessor: 'isEnabled',
             title: 'État',
-            render: (chest: ChestWithStockHistory) => (
-              <Badge color={chest.isEnabled ? 'green' : 'red'} variant="light">
-                {chest.isEnabled ? 'Activé' : 'Désactivé'}
-              </Badge>
-            ),
+            render: (chest: ChestWithStockHistory) =>
+              chest.isEnabled ? (
+                <Badge variant="outline" radius="sm" style={apothecaryBooleanPills.yes}>
+                  Activé
+                </Badge>
+              ) : (
+                <Badge variant="outline" radius="sm" style={apothecaryBooleanPills.noAlert}>
+                  Désactivé
+                </Badge>
+              ),
           },
           {
             accessor: 'stockHistory.length',
@@ -83,22 +92,19 @@ export function ChestsTable({
                 <Tooltip label="Vérifications de stock">
                   <ActionIcon
                     variant="light"
-                    color="grape"
+                    color="moss"
                     onClick={() => onConfigureStockChecks(chest)}
+                    title="Vérifications de stock"
                   >
                     <IconChecklist size={16} />
                   </ActionIcon>
                 </Tooltip>
-                <ActionIcon
-                  variant="light"
-                  color="blue"
-                  onClick={() => onEdit(chest)}
-                >
+                <ActionIcon variant="light" color="slate" onClick={() => onEdit(chest)} title="Modifier">
                   <IconEdit size={16} />
                 </ActionIcon>
                 <ActionIcon
                   variant="light"
-                  color="red"
+                  color="danger"
                   onClick={() => onDelete(chest)}
                   disabled={isLastChest}
                   title={isLastChest ? 'Impossible de supprimer le dernier coffre' : 'Supprimer'}

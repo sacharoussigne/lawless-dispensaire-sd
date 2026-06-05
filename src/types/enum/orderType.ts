@@ -1,4 +1,7 @@
+import type { CSSProperties } from 'react';
 import type { OrderType } from '@prisma/client';
+import { apothecaryPillStyle, type ApothecaryPalette } from '@/lib/apothecaryPill';
+import { denimPalette, leatherPalette } from '@/lib/design-tokens';
 
 export enum OrderTypeEnum {
   INCOMING = 'INCOMING',
@@ -16,13 +19,20 @@ export function getOrderTypeLabel(type: OrderType): string {
   return labels[type];
 }
 
-/**
- * Transforme un type de commande en couleur Mantine
- */
+const orderTypePillPalettes: Record<OrderType, ApothecaryPalette> = {
+  INCOMING: denimPalette,
+  OUTGOING: leatherPalette,
+};
+
+/** @deprecated Prefer OrderTypeBadge or getOrderTypePillStyle */
 export function getOrderTypeColor(type: OrderType): string {
   const colors: Record<OrderType, string> = {
-    INCOMING: 'blue',
-    OUTGOING: 'orange',
+    INCOMING: 'denim',
+    OUTGOING: 'leather',
   };
   return colors[type];
+}
+
+export function getOrderTypePillStyle(type: OrderType): CSSProperties {
+  return apothecaryPillStyle(orderTypePillPalettes[type]);
 }

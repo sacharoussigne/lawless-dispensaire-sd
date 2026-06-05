@@ -3,7 +3,6 @@
 import { usePermissions } from '@/app/_contexts/PermissionsContext';
 import { useEffect } from 'react';
 import {
-  Modal,
   Stack,
   TextInput,
   Textarea,
@@ -13,7 +12,6 @@ import {
   Button,
   Group,
   Text,
-  Divider,
   SimpleGrid,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
@@ -23,6 +21,8 @@ import { handleAction } from '@/lib/action';
 import { handleApiZodError } from '@/lib/services/zod';
 import { ParsedZodError } from '@/lib/errors/ParsedZodError';
 import type { ItemWithRelations, CategoryItem, CompanyGroup } from '@/types/items';
+import { AppModal, AppModalFooter } from '@/app/_components/AppModal/AppModal';
+import { FormSection } from '@/app/_components/AppModal/FormSection';
 
 interface ItemModalProps {
   opened: boolean;
@@ -69,14 +69,12 @@ export function ItemModal({
     },
   });
 
-  // Reset companyGroupId when item becomes craftable
   useEffect(() => {
     if (form.values.isCraftable && form.values.companyGroupId) {
       form.setFieldValue('companyGroupId', '');
     }
   }, [form.values.isCraftable]);
 
-  // Initialiser le formulaire quand l'item change
   useEffect(() => {
     if (editingItem) {
       form.setValues({
@@ -96,10 +94,13 @@ export function ItemModal({
     }
   }, [editingItem, opened]);
 
+  const handleClose = () => {
+    onClose();
+    form.reset();
+  };
+
   const handleSubmit = async (values: typeof form.values) => {
     try {
-      let result;
-      // If the item is craftable, do not associate a company group
       const companyGroupId = values.isCraftable
         ? undefined
         : values.companyGroupId || undefined;
@@ -107,34 +108,32 @@ export function ItemModal({
       const priceToSave =
         values.price !== null && values.price !== undefined ? values.price : null;
 
-      if (editingItem) {
-        result = await updateItem(dispensarySlug!, {
-          id: editingItem.id,
-          name: values.name,
-          description: values.description || undefined,
-          minimalQuantity: values.minimalQuantity,
-          isCraftable: values.isCraftable,
-          isEnabled: values.isEnabled,
-          canBeSold: values.canBeSold,
-          price: priceToSave,
-          weight: values.weight,
-          categoryId: values.categoryId,
-          companyGroupId,
-        });
-      } else {
-        result = await createItem(dispensarySlug!, {
-          name: values.name,
-          description: values.description || undefined,
-          minimalQuantity: values.minimalQuantity,
-          isCraftable: values.isCraftable,
-          isEnabled: values.isEnabled,
-          canBeSold: values.canBeSold,
-          price: priceToSave,
-          weight: values.weight,
-          categoryId: values.categoryId,
-          companyGroupId,
-        });
-      }
+      const result = editingItem
+        ? await updateItem(dispensarySlug!, {
+            id: editingItem.id,
+            name: values.name,
+            description: values.description || undefined,
+            minimalQuantity: values.minimalQuantity,
+            isCraftable: values.isCraftable,
+            isEnabled: values.isEnabled,
+            canBeSold: values.canBeSold,
+            price: priceToSave,
+            weight: values.weight,
+            categoryId: values.categoryId,
+            companyGroupId,
+          })
+        : await createItem(dispensarySlug!, {
+            name: values.name,
+            description: values.description || undefined,
+            minimalQuantity: values.minimalQuantity,
+            isCraftable: values.isCraftable,
+            isEnabled: values.isEnabled,
+            canBeSold: values.canBeSold,
+            price: priceToSave,
+            weight: values.weight,
+            categoryId: values.categoryId,
+            companyGroupId,
+          });
 
       handleAction(result);
       notifications.show({
@@ -144,17 +143,17 @@ export function ItemModal({
           : 'Objet créé avec succès',
         color: 'green',
       });
-      onClose();
-      form.reset();
+      handleClose();
       onSuccess();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
       if (error instanceof ParsedZodError) {
         handleApiZodError(error.error, form);
       } else {
         notifications.show({
           title: 'Erreur',
-          message: error.message || 'Erreur lors de la sauvegarde',
+          message:
+            error instanceof Error ? error.message : 'Erreur lors de la sauvegarde',
           color: 'red',
         });
       }
@@ -183,22 +182,25 @@ export function ItemModal({
     }));
 
   return (
-    <Modal
+    <AppModal
       opened={opened}
-      onClose={() => {
-        onClose();
-        form.reset();
-      }}
+      onClose={handleClose}
       title={editingItem ? "Modifier l'objet" : 'Créer un objet'}
       size="lg"
+      footer={
+        <AppModalFooter>
+          <Button variant="subtle" onClick={handleClose}>
+            Annuler
+          </Button>
+          <Button type="submit" form="item-modal-form">
+            {editingItem ? 'Modifier' : 'Créer'}
+          </Button>
+        </AppModalFooter>
+      }
     >
-      <form onSubmit={form.onSubmit(handleSubmit)}>
+      <form id="item-modal-form" onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
-          {/* Section: informations générales */}
-          <Stack gap="sm">
-            <Text fw={600} size="xs" c="dimmed" tt="uppercase">
-              Informations générales
-            </Text>
+          <FormSection title="Informations générales">
             <TextInput
               label="Nom"
               placeholder="Nom de l'objet"
@@ -213,13 +215,9 @@ export function ItemModal({
               minRows={3}
               {...form.getInputProps('description')}
             />
-          </Stack>
+          </FormSection>
 
-          {/* Section: stock et catégorisation */}
-          <Stack gap="sm" mt="xs">
-            <Text fw={600} size="xs" c="dimmed" tt="uppercase">
-              Stock et catégorisation
-            </Text>
+          <FormSection title="Stock et catégorisation">
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
               <NumberInput
                 label="Quantité minimale"
@@ -269,12 +267,9 @@ export function ItemModal({
                 {...form.getInputProps('companyGroupId')}
               />
             )}
-          </Stack>
+          </FormSection>
 
-          <Stack gap="sm" mt="xs">
-            <Text fw={600} size="xs" c="dimmed" tt="uppercase">
-              Vente et tarification
-            </Text>
+          <FormSection title="Vente et tarification">
             <NumberInput
               label="Prix de référence"
               placeholder="0,00"
@@ -293,24 +288,9 @@ export function ItemModal({
               description="Inclut cet objet dans les commandes sortantes (vente)"
               {...form.getInputProps('canBeSold', { type: 'checkbox' })}
             />
-          </Stack>
-          <Group justify="flex-end" mt="md">
-            <Button
-              variant="subtle"
-              onClick={() => {
-                onClose();
-                form.reset();
-              }}
-          >
-              Annuler
-            </Button>
-            <Button type="submit">
-              {editingItem ? 'Modifier' : 'Créer'}
-            </Button>
-          </Group>
+          </FormSection>
         </Stack>
       </form>
-    </Modal>
+    </AppModal>
   );
 }
-

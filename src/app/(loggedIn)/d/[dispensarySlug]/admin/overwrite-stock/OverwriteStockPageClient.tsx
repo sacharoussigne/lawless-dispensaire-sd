@@ -152,7 +152,7 @@ export default function OverwriteStockPageClient({
         <Alert
           icon={<IconAlertCircle size={16} />}
           title="Attention"
-          color="orange"
+          color="amber"
         >
           Cette action va supprimer tous les stocks existants pour la date sélectionnée et le coffre sélectionné (hors « Tous les coffres »), puis les remplacer par les nouvelles valeurs.
           Cette opération est irréversible.

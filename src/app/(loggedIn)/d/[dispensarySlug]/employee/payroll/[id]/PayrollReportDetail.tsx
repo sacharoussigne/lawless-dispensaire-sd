@@ -104,11 +104,12 @@ function CopyableCell({
           <Tooltip label={copied ? 'Copié' : 'Copier'} withArrow openDelay={100}>
             <ActionIcon
               variant="subtle"
+              color="slate"
               size="sm"
               onClick={copy}
               aria-label="Copier"
               style={{
-                opacity: copyFaded ? 0.2 : 1,
+                opacity: copyFaded ? 0.5 : 1,
                 transition: 'opacity 120ms ease',
               }}
             >
@@ -425,7 +426,7 @@ export default function PayrollReportDetail({
               Totaux
             </Title>
             <Stack gap="xl">
-              <Paper p="md" radius="md" withBorder style={{ background: 'var(--mantine-color-default-hover)' }}>
+              <Paper p="md" radius="md" withBorder style={{ background: 'var(--disp-table-header)' }}>
                 <UnstyledButton
                   type="button"
                   onClick={() => setPricingSectionOpen((o) => !o)}
@@ -438,7 +439,7 @@ export default function PayrollReportDetail({
                       <IconCoin
                         size={22}
                         stroke={1.5}
-                        style={{ flexShrink: 0, color: 'var(--mantine-color-dimmed)', marginTop: 2 }}
+                        style={{ flexShrink: 0, color: 'var(--disp-ink-muted)', marginTop: 2 }}
                       />
                       <div>
                         <Text fw={600} size="sm">
@@ -455,7 +456,7 @@ export default function PayrollReportDetail({
                       stroke={1.5}
                       style={{
                         flexShrink: 0,
-                        color: 'var(--mantine-color-dimmed)',
+                        color: 'var(--disp-ink-muted)',
                         transform: pricingSectionOpen ? 'rotate(180deg)' : 'none',
                         transition: 'transform 200ms ease',
                         marginTop: 2,
@@ -568,7 +569,7 @@ export default function PayrollReportDetail({
                   <IconCalculator
                     size={22}
                     stroke={1.5}
-                    style={{ flexShrink: 0, color: 'var(--mantine-color-dimmed)', marginTop: 2 }}
+                    style={{ flexShrink: 0, color: 'var(--disp-ink-muted)', marginTop: 2 }}
                   />
                   <div>
                     <Text fw={600} size="sm">

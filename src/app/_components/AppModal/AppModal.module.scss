@@ -1,0 +1,25 @@
+.footer {
+  border-top: 1px solid var(--disp-surface-border);
+  margin-top: var(--mantine-spacing-md);
+  padding-top: var(--mantine-spacing-md);
+}
+
+.section {
+  margin-top: var(--mantine-spacing-xs);
+}
+
+.sectionLabel {
+  font-size: var(--mantine-font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--disp-ink-muted);
+  padding-bottom: var(--mantine-spacing-xs);
+  border-bottom: 1px dashed var(--disp-surface-border);
+}
+
+.description {
+  color: var(--disp-ink-muted);
+  font-size: var(--mantine-font-size-sm);
+  margin-top: var(--mantine-spacing-xs);
+}

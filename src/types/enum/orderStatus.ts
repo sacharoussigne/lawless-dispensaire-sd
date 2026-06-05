@@ -1,4 +1,17 @@
+import type { CSSProperties } from 'react';
 import type { OrderStatus } from '@prisma/client';
+import {
+  apothecaryPillStyle,
+  type ApothecaryPalette,
+} from '@/lib/apothecaryPill';
+import {
+  clayPalette,
+  dangerPalette,
+  mossPalette,
+  sagePalette,
+  slatePalette,
+  winePalette,
+} from '@/lib/design-tokens';
 
 export enum OrderStatusEnum {
     DRAFT = 'DRAFT',
@@ -24,18 +37,29 @@ export function getOrderStatusLabel(status: OrderStatus): string {
   return labels[status];
 }
 
-/**
- * Transforme un statut de commande en couleur Mantine
- */
+const orderStatusPillPalettes: Record<OrderStatus, ApothecaryPalette> = {
+  DRAFT: slatePalette,
+  LETTER_SENT: winePalette,
+  PROCESSING: clayPalette,
+  READY: sagePalette,
+  COMPLETED: mossPalette,
+  CANCELLED: dangerPalette,
+};
+
+/** @deprecated Prefer OrderStatusBadge or getOrderStatusPillStyle */
 export function getOrderStatusColor(status: OrderStatus): string {
   const colors: Record<OrderStatus, string> = {
-    DRAFT: 'gray',
-    LETTER_SENT: 'grape',
-    PROCESSING: 'orange',
-    READY: 'green',
-    COMPLETED: 'teal',
-    CANCELLED: 'red',
+    DRAFT: 'slate',
+    LETTER_SENT: 'wine',
+    PROCESSING: 'clay',
+    READY: 'sage',
+    COMPLETED: 'moss',
+    CANCELLED: 'danger',
   };
   return colors[status];
+}
+
+export function getOrderStatusPillStyle(status: OrderStatus): CSSProperties {
+  return apothecaryPillStyle(orderStatusPillPalettes[status]);
 }
 

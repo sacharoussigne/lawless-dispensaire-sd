@@ -1,11 +1,12 @@
 'use client';
 
 import { usePermissions } from '@/app/_contexts/PermissionsContext';
-import { Modal, Stack, Button, Group, Text } from '@mantine/core';
+import { Button, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { deleteItem } from '@/app/_actions/items';
 import { handleAction } from '@/lib/action';
 import type { ItemWithRelations } from '@/types/items';
+import { AppModal, AppModalFooter } from '@/app/_components/AppModal/AppModal';
 
 interface DeleteItemModalProps {
   opened: boolean;
@@ -21,6 +22,7 @@ export function DeleteItemModal({
   onSuccess,
 }: DeleteItemModalProps) {
   const { dispensarySlug } = usePermissions();
+
   const handleDelete = async () => {
     if (!itemToDelete) return;
 
@@ -34,37 +36,37 @@ export function DeleteItemModal({
       });
       onClose();
       onSuccess();
-    } catch (error: any) {
+    } catch (error: unknown) {
       notifications.show({
         title: 'Erreur',
-        message: error.message || 'Erreur lors de la suppression',
+        message:
+          error instanceof Error ? error.message : 'Erreur lors de la suppression',
         color: 'red',
       });
     }
   };
 
   return (
-    <Modal
+    <AppModal
       opened={opened}
       onClose={onClose}
       title="Confirmer la suppression"
       size="md"
-    >
-      <Stack>
-        <Text>
-          Êtes-vous sûr de vouloir supprimer l'objet{' '}
-          <strong>{itemToDelete?.name}</strong> ?
-        </Text>
-        <Group justify="flex-end" mt="md">
+      footer={
+        <AppModalFooter>
           <Button variant="subtle" onClick={onClose}>
             Annuler
           </Button>
-          <Button color="red" onClick={handleDelete}>
+          <Button color="danger" onClick={handleDelete}>
             Supprimer
           </Button>
-        </Group>
-      </Stack>
-    </Modal>
+        </AppModalFooter>
+      }
+    >
+      <Text>
+        Êtes-vous sûr de vouloir supprimer l&apos;objet{' '}
+        <strong>{itemToDelete?.name}</strong> ?
+      </Text>
+    </AppModal>
   );
 }
-
