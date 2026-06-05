@@ -1,6 +1,7 @@
 import { createTheme, DEFAULT_THEME, type CSSVariablesResolver } from '@mantine/core';
 import { apothecaryPillStyle } from '@/lib/apothecaryPill';
 import {
+  amberPalette,
   clayPalette,
   dangerPalette,
   denimPalette,
@@ -70,6 +71,7 @@ const theme = createTheme({
     slate: [...slatePalette],
     wine: [...winePalette],
     clay: [...clayPalette],
+    amber: [...amberPalette],
     moss: [...mossPalette],
     denim: [...denimPalette],
     blue: [
@@ -271,6 +273,7 @@ const theme = createTheme({
         },
         body: {
           backgroundColor: c.surface,
+          paddingTop: 'var(--mantine-spacing-md)',
         },
       },
     },

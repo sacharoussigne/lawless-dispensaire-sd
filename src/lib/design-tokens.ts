@@ -101,6 +101,20 @@ export const winePalette = [
   '#43313c',
 ] as const;
 
+/** Pale warm orange — soft warnings */
+export const amberPalette = [
+  '#faf4eb',
+  '#f5e8d4',
+  '#edd4b0',
+  '#e0b87a',
+  '#d4a256',
+  '#c4903f',
+  '#b07d35',
+  '#94682c',
+  '#7a5524',
+  '#61441d',
+] as const;
+
 /** Muted terracotta — in progress, outgoing accents */
 export const clayPalette = [
   '#f5ebe3',
