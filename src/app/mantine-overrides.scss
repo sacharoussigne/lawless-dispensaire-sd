@@ -192,6 +192,22 @@ html[data-mantine-color-scheme] body {
   }
 }
 
+.mantine-Tabs-root[data-variant='default'],
+.mantine-Tabs-root[data-variant='pills'] {
+  --tab-hover-color: var(--mantine-color-sage-0);
+  --tab-border-color: var(--disp-surface-border);
+}
+
+.mantine-Tabs-tab {
+  &[data-active] {
+    background-color: var(--disp-surface);
+  }
+
+  &:hover:not([data-disabled]):not(:disabled) {
+    color: var(--disp-sage);
+  }
+}
+
 /* Soft apothecary pills — inline styles from apothecaryPillStyle take precedence */
 .mantine-Badge-root {
   display: inline-flex;

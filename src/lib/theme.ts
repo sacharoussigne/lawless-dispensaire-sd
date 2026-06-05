@@ -438,6 +438,15 @@ const theme = createTheme({
     },
 
     Tabs: {
+      defaultProps: {
+        color: 'sage',
+      },
+      vars: () => ({
+        root: {
+          '--tab-hover-color': 'var(--mantine-color-sage-0)',
+          '--tab-border-color': c.surfaceBorder,
+        },
+      }),
       styles: {
         list: {
           borderColor: c.surfaceBorder,
@@ -447,9 +456,9 @@ const theme = createTheme({
           '&[data-active]': {
             color: c.sage,
             borderColor: c.sage,
+            backgroundColor: c.surface,
           },
-          '&:hover': {
-            backgroundColor: 'var(--mantine-color-sage-0)',
+          '&:hover:not([data-disabled]):not(:disabled)': {
             color: c.sage,
           },
         },
