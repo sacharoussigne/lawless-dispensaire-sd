@@ -4,6 +4,7 @@ import { memo } from 'react';
 import { Badge, Group, Table, Text, Tooltip } from '@mantine/core';
 import { IconClipboardCheck } from '@tabler/icons-react';
 import type { ItemWithRelations } from '@/types/stock';
+import { apothecaryBooleanPills } from '@/lib/apothecaryPill';
 import { EditableStockCell } from './EditableStockCell';
 import type { EvalResult } from '@/lib/stock/expression';
 import type { StockUiPreferences } from '@/types/stockUiPreferences';
@@ -74,10 +75,10 @@ export const StockRow = memo(function StockRow({
                 </Badge>
               ) : (
                 <Badge
-                  color="green"
-                  variant="light"
+                  variant="outline"
                   size="sm"
                   leftSection={<IconClipboardCheck size={12} />}
+                  style={apothecaryBooleanPills.yes}
                 >
                   Fait
                 </Badge>
