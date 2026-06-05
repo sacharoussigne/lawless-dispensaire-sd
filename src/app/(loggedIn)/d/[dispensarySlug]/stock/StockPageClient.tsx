@@ -290,6 +290,8 @@ export default function StockPageClient({ initialItems, initialChests, stockUiPr
         selectedChestId={selectedChestId}
         isEditing={isEditing}
         totalWeightToday={totalWeightToday}
+        itemsWithStockToday={itemsWithStockToday}
+        totalItems={totalItems}
         onChangeChestId={setSelectedChestId}
       />
 
