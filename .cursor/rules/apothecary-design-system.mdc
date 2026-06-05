@@ -1,0 +1,87 @@
+---
+description: Direction artistique Apothecary — tokens, Mantine, composants UI
+alwaysApply: true
+---
+
+# Apothecary Design System
+
+Panel RP « dispensaire de Saint-Denis » : papier crème, encre brune, accents sauge/cuir. Pas de gris froid Mantine par défaut.
+
+## Sources de vérité
+
+Avant tout changement UI, consulter :
+- `src/lib/design-tokens.ts` — tokens + palettes
+- `src/lib/theme.ts` — thème Mantine (`primaryColor: 'sage'`)
+- `src/app/globals.scss` + `src/app/mantine-overrides.scss` — variables `--disp-*`
+
+Ne jamais hardcoder de hex dans les composants. Utiliser `dispTokens`, `var(--disp-*)`, ou palettes Mantine custom.
+
+Typo : `Special Elite` (titres, `--disp-font-display`) + `Courier Prime` (UI, `--disp-font-ui`).
+
+## Palettes Mantine (remplacements)
+
+| Interdit (neuf) | Utiliser |
+|---|---|
+| `blue`, `cyan`, `teal` | `denim`, `sage` |
+| `red`, `pink` | `danger` |
+| `green` | `moss`, `sage` |
+| `gray` | `slate` |
+| `orange`, `yellow` | `amber`, `clay` |
+| `violet`, `grape` | `wine` |
+
+Primaire : **`sage`**. Secondaire / sortants : **`leather`**.
+
+## Composants Mantine
+
+- **Button** : `color="sage"` (défaut) ; destructif → `color="danger"` ; annuler → `variant="subtle"` + `color="slate"`
+- **Badge statut** : `variant="outline"` + `style={apothecaryPillStyle(palette)}` — jamais `variant="light"` + `color="blue/red/green"`
+- **ActionIcon** : `variant="light"` + sémantique (`slate` edit, `danger` delete, `leather` craft, `moss` enable)
+- **Alert** : `color="danger"` / `amber` / `slate` — pas `red` / `orange` / `gray`
+- **Notifications** : `moss` (succès), `danger` (erreur) quand on touche le fichier
+- **Texte atténué** : `c="dimmed"` — pas `color="gray"`
+
+Badge statut (pattern canonique) :
+
+```tsx
+<Badge variant="outline" radius="sm" style={getOrderStatusPillStyle(status)}>
+  {getOrderStatusLabel(status)}
+</Badge>
+```
+
+Préférer `OrderStatusBadge`, `OrderTypeBadge`, ou `apothecaryBooleanPills` depuis `src/lib/apothecaryPill.ts`.
+
+## Layout et structure
+
+- Shell : `disp-paper-bg` via `LoggedInShell`
+- Page : `PageHeader` + `Container` + contenu
+- Hub modules : `ModuleCard` (cf. `management/page.tsx`)
+- Modales : `AppModal` + `AppModalFooter` + `FormSection` — pas de `<Modal>` brut
+- Séparateur : `<hr className="disp-section-divider" />`
+- Titres : `disp-display-title` ou `--disp-font-display`
+
+## Tables et drag-and-drop
+
+- `mantine-datatable` — styles dans `globals.scss` / `mantine-overrides.scss` ; ne pas réintroduire gris Mantine
+- Lignes triables : `sortableRowStyles(isDragging)` + `sortableRowGripStyle`
+- Stats stock : `getStockStatsBarColor` / `getStockStatsValueColor` (`src/lib/stock/movements.ts`)
+
+## SCSS modules
+
+- `var(--disp-*)` et `var(--mantine-color-sage-*)` — pas de hex en dur
+- Titres : `font-family: var(--disp-font-display); font-weight: 400;`
+- Hover : `var(--mantine-color-sage-0)` sur fond crème
+
+## Dette legacy
+
+Fichiers bank/payroll/TransferModal etc. utilisent encore `red`/`blue`/`gray`. Migrer vers palettes apothecary **uniquement quand on modifie le fichier** — pas de refactor massif non demandé.
+
+- `getOrderStatusColor` / `getOrderTypeColor` → `@deprecated`, utiliser pill styles ou badges dédiés
+- `ManagementSectionThemeProvider` est un no-op — ne pas recréer de thèmes par section
+
+## Checklist avant livraison UI
+
+- [ ] Aucune couleur Mantine default (`red`, `blue`, `green`, `gray`…)
+- [ ] Tokens / `--disp-*` plutôt que hex inline
+- [ ] Composants partagés réutilisés (`PageHeader`, `AppModal`, badges)
+- [ ] Badges statut en `outline` + `apothecaryPillStyle`
+- [ ] Titres display, corps Courier Prime
