@@ -1,4 +1,5 @@
 import { createTheme, DEFAULT_THEME, type CSSVariablesResolver } from '@mantine/core';
+import { apothecaryPillStyle } from '@/lib/apothecaryPill';
 import {
   clayPalette,
   dangerPalette,
@@ -145,6 +146,7 @@ const theme = createTheme({
     Button: {
       defaultProps: {
         radius: 'md',
+        color: 'sage',
       },
       styles: {
         root: {
@@ -152,6 +154,11 @@ const theme = createTheme({
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
+          '&:disabled:not([data-loading]), &[data-disabled]:not([data-loading])': {
+            backgroundColor: c.tableHeader,
+            color: c.inkMuted,
+            borderColor: 'transparent',
+          },
         },
         inner: {
           display: 'flex',
@@ -193,6 +200,31 @@ const theme = createTheme({
           display: 'flex',
           alignItems: 'center',
           lineHeight: 0,
+        },
+      },
+    },
+
+    Pill: {
+      styles: {
+        root: {
+          ...apothecaryPillStyle(sagePalette),
+          fontWeight: 600,
+          display: 'inline-flex',
+          alignItems: 'center',
+        },
+        label: {
+          lineHeight: 1,
+          display: 'flex',
+          alignItems: 'center',
+          position: 'relative',
+          top: 2,
+        },
+        remove: {
+          display: 'flex',
+          alignItems: 'center',
+          alignSelf: 'center',
+          position: 'relative',
+          top: 1,
         },
       },
     },
@@ -341,6 +373,7 @@ const theme = createTheme({
         section: selectLikeSection,
         dropdown: comboboxDropdown,
         option: comboboxOption,
+        pill: apothecaryPillStyle(sagePalette),
       },
     },
 
@@ -453,6 +486,9 @@ export const dispCssVariablesResolver: CSSVariablesResolver = () => ({
     '--mantine-color-text': c.ink,
     '--mantine-color-default-hover': c.tableHeader,
     '--mantine-color-default-border': c.surfaceBorder,
+    '--mantine-color-disabled': c.tableHeader,
+    '--mantine-color-disabled-color': c.inkMuted,
+    '--mantine-color-disabled-border': c.surfaceBorder,
     '--mantine-font-family': dispTokens.fonts.ui,
     '--mantine-font-family-monospace': dispTokens.fonts.mono,
   },

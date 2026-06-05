@@ -81,7 +81,12 @@ export function DispensariesPlatformClient({
             value={slug}
             onChange={(e) => setSlug(e.currentTarget.value)}
           />
-          <Button loading={loading} onClick={handleCreate} disabled={!name.trim()}>
+          <Button
+            color="sage"
+            loading={loading}
+            onClick={handleCreate}
+            disabled={!name.trim()}
+          >
             Créer
           </Button>
         </Stack>
