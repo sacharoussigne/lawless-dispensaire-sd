@@ -1,4 +1,5 @@
 import { StockMovementKind } from '@prisma/client';
+import { dispTokens } from '@/lib/design-tokens';
 
 export type ManualStockMovementInput = {
   itemId: string;
@@ -95,4 +96,27 @@ export function getDisplayModeLabel(mode: StockStatsDisplayMode): string {
     case 'net':
       return 'Stat réelle';
   }
+}
+
+/** Mantine theme keys — muted apothecary palettes instead of default red/green/blue */
+export function getStockStatsBarColor(mode: StockStatsDisplayMode): string {
+  switch (mode) {
+    case 'consumed':
+      return 'danger';
+    case 'added':
+      return 'moss';
+    case 'net':
+      return 'denim';
+  }
+}
+
+/** Brand danger/sage hex — readable and distinct from ink on cream backgrounds */
+export function getStockStatsValueColor(
+  mode: StockStatsDisplayMode,
+  value: number,
+): string | undefined {
+  if (mode !== 'net') return undefined;
+  if (value < 0) return dispTokens.colors.danger;
+  if (value > 0) return dispTokens.colors.sage;
+  return dispTokens.colors.inkMuted;
 }

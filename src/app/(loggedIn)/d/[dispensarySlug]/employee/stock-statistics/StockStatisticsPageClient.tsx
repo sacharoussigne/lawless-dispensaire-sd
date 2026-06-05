@@ -24,6 +24,7 @@ import { getMondayOfCurrentWeek, getTodayStart } from '@/lib/date';
 import {
   getDisplayModeLabel,
   getDisplayValue,
+  getStockStatsValueColor,
   type StockStatsDisplayMode,
   type StockStatsItemRowWithDisplay,
 } from '@/lib/stock/movements';
@@ -37,13 +38,6 @@ function normalizeString(str: string): string {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '');
-}
-
-function valueColor(mode: StockStatsDisplayMode, value: number): string | undefined {
-  if (mode !== 'net') return undefined;
-  if (value < 0) return 'red';
-  if (value > 0) return 'green';
-  return 'dimmed';
 }
 
 export default function StockStatisticsPageClient() {
@@ -265,7 +259,11 @@ export default function StockStatisticsPageClient() {
             <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
               Total — {modeLabel}
             </Text>
-            <Text size="xl" fw={700} c={valueColor(displayMode, modeTotal)}>
+            <Text
+              size="xl"
+              fw={700}
+              style={{ color: getStockStatsValueColor(displayMode, modeTotal) }}
+            >
               {modeTotal.toLocaleString('fr-FR')}
             </Text>
           </Paper>
@@ -319,7 +317,10 @@ export default function StockStatisticsPageClient() {
                 sortable: true,
                 textAlign: 'right',
                 render: (row) => (
-                  <Text fw={600} c={valueColor(displayMode, row.displayValue)}>
+                  <Text
+                    fw={600}
+                    style={{ color: getStockStatsValueColor(displayMode, row.displayValue) }}
+                  >
                     {row.displayValue.toLocaleString('fr-FR')}
                   </Text>
                 ),
@@ -348,7 +349,9 @@ export default function StockStatisticsPageClient() {
                       sortable: true,
                       textAlign: 'right' as const,
                       render: (row: StockStatsItemRowWithDisplay) => (
-                        <Text c={valueColor('net', row.net)}>{row.net.toLocaleString('fr-FR')}</Text>
+                        <Text style={{ color: getStockStatsValueColor('net', row.net) }}>
+                          {row.net.toLocaleString('fr-FR')}
+                        </Text>
                       ),
                     },
                   ]
