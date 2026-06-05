@@ -249,7 +249,8 @@ export default function TransferModal({
         <Alert
           icon={<IconAlertCircle size={16} />}
           title="Information"
-          color="blue"
+          color="denim"
+          variant="light"
         >
           Transférez des items d'un coffre source vers un coffre destination. Le stock sera automatiquement mis à jour dans les deux coffres.
         </Alert>

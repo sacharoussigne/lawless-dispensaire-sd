@@ -180,6 +180,12 @@ const theme = createTheme({
       },
     },
 
+    ActionIcon: {
+      defaultProps: {
+        color: 'sage',
+      },
+    },
+
     Badge: {
       defaultProps: {
         variant: 'outline',
