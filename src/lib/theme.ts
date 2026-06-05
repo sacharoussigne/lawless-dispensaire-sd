@@ -35,6 +35,8 @@ const comboboxOption = {
   display: 'flex',
   alignItems: 'center',
   lineHeight: 1.25,
+  borderRadius: 'var(--mantine-radius-sm)',
+  marginBottom: '0.2rem',
   color: c.ink,
   '& span': {
     lineHeight: 1.25,
