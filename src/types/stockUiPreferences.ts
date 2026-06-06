@@ -7,10 +7,9 @@ export type StockUiPreferences = {
 };
 
 export const STOCK_UI_DEFAULTS: StockUiPreferences = {
-  lowStockCraftableBg: '#fff3cd',
-  lowStockNormalBg: '#f8d7da',
+  lowStockCraftableBg: '#faf2d7',
+  lowStockNormalBg: '#f5e4e5',
   okStockBg: null,
   unknownStockBg: null,
   doneTodayBadgeBg: null,
 };
-
