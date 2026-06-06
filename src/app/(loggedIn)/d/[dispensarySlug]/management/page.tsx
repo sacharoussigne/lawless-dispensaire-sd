@@ -1,13 +1,13 @@
 import { tenantRoutes } from '@/types/routes';
 import { Container, SimpleGrid } from '@mantine/core';
 import {
-  IconBuildingSkyscraper,
-  IconCategory2,
-  IconClipboardText,
-  IconInbox,
-  IconLayoutGrid,
+  IconArchive,
+  IconBottle,
+  IconBuildingStore,
   IconSettings,
-  IconUsersGroup,
+  IconTags,
+  IconClipboardText,
+  IconUsers,
 } from '@tabler/icons-react';
 import { getAuthSession } from '@/lib/auth';
 import { hasRole } from '@/lib/auth/permissions';
@@ -35,7 +35,7 @@ export default async function ManagementPage({
       title: "Catégories d'objets",
       description:
         "Organisez les objets par catégories pour avoir un stock plus clair et structuré.",
-      icon: IconCategory2,
+      icon: IconTags,
       href: t.management.categoryItems,
       visible: true,
     },
@@ -43,7 +43,7 @@ export default async function ManagementPage({
       title: 'Objets',
       description:
         "Créez et mettez à jour les objets disponibles dans le stock, leurs paramètres et options.",
-      icon: IconLayoutGrid,
+      icon: IconBottle,
       href: t.management.items,
       visible: true,
     },
@@ -51,7 +51,7 @@ export default async function ManagementPage({
       title: 'Coffres',
       description:
         'Configurez les coffres de stockage, leur ordre et leur organisation physique.',
-      icon: IconInbox,
+      icon: IconArchive,
       href: t.management.chests,
       visible: true,
     },
@@ -59,7 +59,7 @@ export default async function ManagementPage({
       title: "Groupes d'entreprises",
       description:
         "Regroupez les entreprises par structure pour simplifier le suivi et les conventions.",
-      icon: IconUsersGroup,
+      icon: IconUsers,
       href: t.management.companyGroups,
       visible: true,
     },
@@ -67,7 +67,7 @@ export default async function ManagementPage({
       title: 'Entreprises',
       description:
         "Gérez les entreprises partenaires, leurs coordonnées et informations de contact.",
-      icon: IconBuildingSkyscraper,
+      icon: IconBuildingStore,
       href: t.management.companies,
       visible: true,
     },

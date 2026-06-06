@@ -16,7 +16,7 @@ export function ModuleCard({ title, description, href, icon: IconComponent }: Mo
       <div className={classes.body}>
         <Group align="flex-start" wrap="nowrap">
           <div className={classes.iconMedallion}>
-            <IconComponent size={24} stroke={1.6} />
+            <IconComponent size={24} stroke={2} />
           </div>
           <div>
             <Text className={classes.title}>{title}</Text>
