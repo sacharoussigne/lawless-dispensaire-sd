@@ -1,14 +1,14 @@
 import { tenantRoutes } from '@/types/routes';
 import { Container, SimpleGrid } from '@mantine/core';
 import {
-  IconBox,
-  IconClipboardList,
-  IconBuildingBank,
-  IconUserHeart,
+  IconAbacus,
+  IconArchive,
+  IconCalendarWeek,
+  IconCashRegister,
   IconMail,
+  IconNotebook,
   IconReportMoney,
-  IconHeartbeat,
-  IconChartBar,
+  IconStethoscope,
 } from '@tabler/icons-react';
 import { getAuthSession } from '@/lib/auth';
 import { calculatePermissions } from '@/lib/auth/calculatePermissions';
@@ -38,21 +38,21 @@ export default async function EmployeePage({
       title: 'Stock',
       description:
         'Consultez et gérez le stock des objets disponibles dans les différents coffres.',
-      icon: IconBox,
+      icon: IconArchive,
       href: t.stock.index,
       hasAccess: appSettings.featureStockEnabled && (permissions?.stock.view ?? false),
     },
     {
       title: 'Commandes',
       description: 'Gérez les commandes passées aux entreprises et suivez leur statut.',
-      icon: IconClipboardList,
+      icon: IconNotebook,
       href: t.orders.index,
       hasAccess: appSettings.featureOrdersEnabled && (permissions?.orders.view ?? false),
     },
     {
       title: 'Banque',
       description: 'Suivez les comptes bancaires et les transactions hebdomadaires.',
-      icon: IconBuildingBank,
+      icon: IconCashRegister,
       href: t.bank.index,
       hasAccess:
         appSettings.featureBankEnabled && checkRolePermission(effectiveRole, 'bank', 'access'),
@@ -60,7 +60,7 @@ export default async function EmployeePage({
     {
       title: 'Cabinet privé',
       description: 'Gérez les consultations et patients du cabinet privé.',
-      icon: IconUserHeart,
+      icon: IconStethoscope,
       href: t.privatePractice.index,
       hasAccess:
         appSettings.featurePrivatePracticeEnabled &&
@@ -83,7 +83,7 @@ export default async function EmployeePage({
     {
       title: 'Activité hebdo',
       description: 'Suivez l’activité hebdomadaire du dispensaire.',
-      icon: IconHeartbeat,
+      icon: IconCalendarWeek,
       href: t.weeklyActivity.index,
       hasAccess:
         appSettings.featureWeeklyDispensaryActivityEnabled &&
@@ -92,7 +92,7 @@ export default async function EmployeePage({
     {
       title: 'Stats stock',
       description: 'Visualisez les statistiques de stock.',
-      icon: IconChartBar,
+      icon: IconAbacus,
       href: t.employee.stockStatistics,
       hasAccess: appSettings.featureStockEnabled && (permissions?.stockStatistics.view ?? false),
     },

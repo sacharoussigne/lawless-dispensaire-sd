@@ -1,14 +1,14 @@
 import type { Icon } from '@tabler/icons-react';
 import {
-  IconBox,
-  IconBuildingBank,
-  IconChartBar,
-  IconClipboardList,
-  IconHeartbeat,
+  IconAbacus,
+  IconArchive,
+  IconCalendarWeek,
+  IconCashRegister,
   IconMail,
+  IconNotebook,
   IconReportMoney,
   IconSearch,
-  IconUserHeart,
+  IconStethoscope,
 } from '@tabler/icons-react';
 import type { AppSettingsDTO } from '@/lib/appSettingsShared';
 import { checkRolePermission } from '@/lib/auth/permissions';
@@ -106,7 +106,7 @@ function buildAllItems(ctx: EmployeeNavContext): EmployeeNavItem[] {
       label: 'Stocks',
       shortLabel: 'Stock',
       href: t.stock.index,
-      icon: IconBox,
+      icon: IconArchive,
       navOrder: 1,
     },
     {
@@ -114,7 +114,7 @@ function buildAllItems(ctx: EmployeeNavContext): EmployeeNavItem[] {
       label: 'Commandes',
       shortLabel: 'Commandes',
       href: t.orders.index,
-      icon: IconClipboardList,
+      icon: IconNotebook,
       navOrder: 2,
     },
     {
@@ -122,7 +122,7 @@ function buildAllItems(ctx: EmployeeNavContext): EmployeeNavItem[] {
       label: 'Banque',
       shortLabel: 'Banque',
       href: t.bank.index,
-      icon: IconBuildingBank,
+      icon: IconCashRegister,
       navOrder: 3,
     },
     {
@@ -130,7 +130,7 @@ function buildAllItems(ctx: EmployeeNavContext): EmployeeNavItem[] {
       label: 'Cabinet privé',
       shortLabel: 'Cabinet',
       href: t.privatePractice.index,
-      icon: IconUserHeart,
+      icon: IconStethoscope,
       navOrder: 4,
     },
     {
@@ -138,7 +138,7 @@ function buildAllItems(ctx: EmployeeNavContext): EmployeeNavItem[] {
       label: 'Activité hebdo',
       shortLabel: 'Activité',
       href: t.weeklyActivity.index,
-      icon: IconHeartbeat,
+      icon: IconCalendarWeek,
       navOrder: 10,
     },
     {
@@ -154,7 +154,7 @@ function buildAllItems(ctx: EmployeeNavContext): EmployeeNavItem[] {
       label: 'Stats stock',
       shortLabel: 'Stats',
       href: t.employee.stockStatistics,
-      icon: IconChartBar,
+      icon: IconAbacus,
       navOrder: 12,
     },
     {
