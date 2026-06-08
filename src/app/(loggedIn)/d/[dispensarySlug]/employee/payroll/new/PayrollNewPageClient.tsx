@@ -255,6 +255,8 @@ export default function PayrollNewPageClient() {
               required
               clearable={false}
               popoverProps={{ withinPortal: true }}
+              autoComplete="off"
+              data-dashlane-ignore="true"
             />
             <Text size="xs" c="dimmed" mt="sm">
               La plage « semaine du … au … » du rapport est dérivée automatiquement (lundi–dimanche, heure
@@ -294,6 +296,8 @@ export default function PayrollNewPageClient() {
                   size="md"
                   clearable={false}
                   popoverProps={{ withinPortal: true }}
+                  autoComplete="off"
+                  data-dashlane-ignore="true"
                 />
                 {knownWaWeeks.length > 0 && (
                   <Text size="xs" c="dimmed" mt="xs">

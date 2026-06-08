@@ -1,6 +1,8 @@
 'use client';
 
 import { Badge, Button, Paper, Select, Stack, Table, Text } from '@mantine/core';
+import { apothecaryBooleanPills, apothecaryPillStyle } from '@/lib/apothecaryPill';
+import { denimPalette, amberPalette, dangerPalette } from '@/lib/design-tokens';
 
 type StockInfo = { stock: number | null; isToday: boolean };
 
@@ -86,7 +88,10 @@ export function CraftIngredientsTable(props: {
                   </Table.Td>
                   <Table.Td>
                     {row.stockInfo.stock !== null ? (
-                      <Badge color={row.stockInfo.isToday ? 'blue' : 'orange'} variant="light">
+                      <Badge
+                        variant="outline"
+                        style={apothecaryPillStyle(row.stockInfo.isToday ? denimPalette : amberPalette)}
+                      >
                         {row.stockInfo.stock} {row.stockInfo.isToday ? '' : '(hier)'}
                       </Badge>
                     ) : (
@@ -103,16 +108,20 @@ export function CraftIngredientsTable(props: {
                   <Table.Td>
                     {row.stockInfo.stock !== null ? (
                       row.hasEnough ? (
-                        <Badge color="green" size="sm">
+                        <Badge variant="outline" style={apothecaryBooleanPills.yes} size="sm">
                           ✓
                         </Badge>
                       ) : (
-                        <Badge color={row.stockInfo.isToday ? 'red' : 'orange'} size="sm">
+                        <Badge
+                          variant="outline"
+                          style={apothecaryPillStyle(row.stockInfo.isToday ? dangerPalette : amberPalette)}
+                          size="sm"
+                        >
                           ✗
                         </Badge>
                       )
                     ) : (
-                      <Badge color="red" size="sm">
+                      <Badge variant="outline" style={apothecaryBooleanPills.noAlert} size="sm">
                         ✗
                       </Badge>
                     )}
