@@ -2,7 +2,7 @@
 
 import { usePermissions, useTenantRoutes } from '@/app/_contexts/PermissionsContext';
 import { useMemo, useState } from 'react';
-import { ActionIcon, Group, Paper, Text, TextInput, Tooltip } from '@mantine/core';
+import { ActionIcon, Group, Paper, Select, Text, TextInput, Tooltip } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import { DataTable, type DataTableSortStatus } from 'mantine-datatable';
@@ -14,6 +14,10 @@ import { IconEye, IconTrash } from '@tabler/icons-react';
 import { deletePayrollReport } from '@/app/_actions/payrollReports';
 import { ActiveFilters } from '@/app/_components/ActiveFilters/ActiveFilters';
 import { handleAction } from '@/lib/action';
+import {
+  PAYROLL_REPORT_TYPE_EMPLOYES,
+  PAYROLL_REPORT_TYPE_PREPARATEURS_CAISSE,
+} from '@/lib/payroll/constants';
 
 
 const PAGE_SIZE = 20;
@@ -39,6 +43,14 @@ function compareReportRows(
     cmp = a.reportType.localeCompare(b.reportType, 'fr', { sensitivity: 'base' });
   } else if (columnAccessor === 'createdBy.name') {
     cmp = a.createdBy.name.localeCompare(b.createdBy.name, 'fr', { sensitivity: 'base' });
+  } else if (columnAccessor === 'patientsSoignes') {
+    const valA = a.reportType === PAYROLL_REPORT_TYPE_PREPARATEURS_CAISSE ? -1 : (a.resultJson?.global_stats?.total_patients_soignes ?? 0);
+    const valB = b.reportType === PAYROLL_REPORT_TYPE_PREPARATEURS_CAISSE ? -1 : (b.resultJson?.global_stats?.total_patients_soignes ?? 0);
+    cmp = valA - valB;
+  } else if (columnAccessor === 'sherifsSoignes') {
+    const valA = a.reportType === PAYROLL_REPORT_TYPE_PREPARATEURS_CAISSE ? -1 : (a.resultJson?.global_stats?.total_sherifs ?? 0);
+    const valB = b.reportType === PAYROLL_REPORT_TYPE_PREPARATEURS_CAISSE ? -1 : (b.resultJson?.global_stats?.total_sherifs ?? 0);
+    cmp = valA - valB;
   } else {
     return 0;
   }
@@ -52,6 +64,7 @@ export interface PayrollReportListItem {
   reportType: string;
   createdAt: string;
   createdBy: { name: string; id: string };
+  resultJson?: any;
 }
 
 export default function PayrollReportsList({
@@ -65,6 +78,7 @@ export default function PayrollReportsList({
   const { dispensarySlug } = usePermissions();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedType, setSelectedType] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [sortStatus, setSortStatus] = useState<DataTableSortStatus<PayrollReportListItem>>({
     columnAccessor: 'weekStart',
@@ -72,19 +86,22 @@ export default function PayrollReportsList({
   });
 
   const filteredReports = useMemo(() => {
+    let result = reports;
+    if (selectedType) {
+      result = result.filter((r) => r.reportType === selectedType);
+    }
     const q = searchQuery.trim();
-    if (!q) return reports;
+    if (!q) return result;
     const nq = normalizeString(q);
-    return reports.filter((r) => {
+    return result.filter((r) => {
       const weekLabel = `${format(new Date(r.weekStart), 'd MMM yyyy', { locale: fr })} ${format(new Date(r.weekEnd), 'd MMM yyyy', { locale: fr })}`;
       return (
-        normalizeString(r.reportType).includes(nq) ||
         normalizeString(r.createdBy.name).includes(nq) ||
         normalizeString(weekLabel).includes(nq) ||
         r.weekStart.slice(0, 10).includes(q)
       );
     });
-  }, [reports, searchQuery]);
+  }, [reports, searchQuery, selectedType]);
 
   const sortedReports = useMemo(() => {
     return [...filteredReports].sort((a, b) =>
@@ -132,6 +149,11 @@ export default function PayrollReportsList({
             value: searchQuery,
             onRemove: () => setSearchQuery(''),
           },
+          {
+            label: 'Type',
+            value: selectedType ?? '',
+            onRemove: () => setSelectedType(null),
+          },
         ]}
       />
       <Paper shadow="sm" p="md" withBorder>
@@ -148,17 +170,23 @@ export default function PayrollReportsList({
               title: 'Type',
               sortable: true,
               filter: (
-                <TextInput
-                  placeholder="Type, auteur, semaine…"
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.currentTarget.value);
+                <Select
+                  placeholder="Tous les types"
+                  data={[
+                    { value: PAYROLL_REPORT_TYPE_EMPLOYES, label: PAYROLL_REPORT_TYPE_EMPLOYES },
+                    { value: PAYROLL_REPORT_TYPE_PREPARATEURS_CAISSE, label: PAYROLL_REPORT_TYPE_PREPARATEURS_CAISSE },
+                  ]}
+                  value={selectedType}
+                  onChange={(v) => {
+                    setSelectedType(v);
                     setPage(1);
                   }}
-                  style={{ minWidth: 200 }}
+                  clearable
+                  size="xs"
+                  style={{ minWidth: 180 }}
                 />
               ),
-              filtering: searchQuery.trim() !== '',
+              filtering: selectedType !== null,
               render: (r) => r.reportType,
             },
             {
@@ -171,6 +199,26 @@ export default function PayrollReportsList({
                   {format(new Date(r.weekEnd), 'd MMM yyyy', { locale: fr })}
                 </Text>
               ),
+            },
+            {
+              accessor: 'patientsSoignes',
+              title: 'Patients soignés',
+              sortable: true,
+              render: (r) => {
+                if (r.reportType === PAYROLL_REPORT_TYPE_PREPARATEURS_CAISSE) return '';
+                const result = r.resultJson;
+                return result?.global_stats?.total_patients_soignes ?? 0;
+              },
+            },
+            {
+              accessor: 'sherifsSoignes',
+              title: 'Shérifs soignés',
+              sortable: true,
+              render: (r) => {
+                if (r.reportType === PAYROLL_REPORT_TYPE_PREPARATEURS_CAISSE) return '';
+                const result = r.resultJson;
+                return result?.global_stats?.total_sherifs ?? 0;
+              },
             },
             {
               accessor: 'createdBy.name',

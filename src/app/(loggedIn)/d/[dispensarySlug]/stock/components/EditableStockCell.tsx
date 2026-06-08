@@ -135,6 +135,7 @@ export const EditableStockCell = ({
                     Poids unitaire: {item.weight} kg
                   </Text>
                   <TextInput
+                    autoFocus
                     value={weightInputValue}
                     onChange={(e) => {
                       const v = String(e.currentTarget.value);

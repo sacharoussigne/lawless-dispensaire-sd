@@ -34,6 +34,7 @@ export default async function PayrollReportsPage({ params }: { params: Promise<{
       reportType: true,
       createdAt: true,
       createdBy: { select: { name: true, id: true } },
+      resultJson: true,
     },
   });
 
@@ -44,6 +45,7 @@ export default async function PayrollReportsPage({ params }: { params: Promise<{
     reportType: r.reportType,
     createdAt: r.createdAt.toISOString(),
     createdBy: r.createdBy,
+    resultJson: r.resultJson,
   }));
 
   return (
