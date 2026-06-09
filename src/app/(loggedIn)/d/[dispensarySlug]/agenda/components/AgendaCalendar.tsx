@@ -42,17 +42,35 @@ export function AgendaCalendar({
   const [view, setView] = useState<View>('month');
   const [date, setDate] = useState(new Date());
 
+  const isTimeView = view === 'week' || view === 'day' || view === 'work_week';
+
   const calendarEvents = useMemo<CalendarEvent[]>(
     () =>
-      events.map((e) => ({
-        id: e.id,
-        title: e.title,
-        start: new Date(e.startAt),
-        end: new Date(e.endAt),
-        allDay: e.allDay,
-        resource: e,
-      })),
-    [events],
+      events.map((e) => {
+        const start = new Date(e.startAt);
+        const end = new Date(e.endAt);
+
+        if (isTimeView && e.allDay) {
+          return {
+            id: e.id,
+            title: e.title,
+            start: dayjs(start).startOf('day').toDate(),
+            end: dayjs(end).endOf('day').toDate(),
+            allDay: false,
+            resource: e,
+          };
+        }
+
+        return {
+          id: e.id,
+          title: e.title,
+          start,
+          end,
+          allDay: e.allDay,
+          resource: e,
+        };
+      }),
+    [events, isTimeView],
   );
 
   const loadRange = useCallback(
@@ -99,6 +117,9 @@ export function AgendaCalendar({
         min={agendaCalendarTimeBounds.min}
         max={agendaCalendarTimeBounds.max}
         scrollToTime={agendaCalendarTimeBounds.scrollToTime}
+        dayLayoutAlgorithm="no-overlap"
+        showMultiDayTimes
+        allDayMaxRows={0}
         events={calendarEvents}
         view={view}
         onView={setView}
@@ -122,6 +143,7 @@ export function AgendaCalendar({
           time: 'Heure',
           event: 'Événement',
           noEventsInRange: 'Aucun événement sur cette période.',
+          showMore: (total) => `+${total} de plus`,
         }}
         eventPropGetter={eventPropGetter}
         onSelectEvent={(event) => onSelectEvent(event.resource)}

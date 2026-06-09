@@ -67,6 +67,19 @@
     background: var(--disp-paper-muted, var(--mantine-color-slate-0));
   }
 
+  :global(.rbc-time-view .rbc-allday-cell) {
+    display: none;
+  }
+
+  :global(.rbc-time-view .rbc-event) {
+    border: none;
+    border-radius: 3px;
+    padding: 2px 4px;
+    font-size: 0.75rem;
+    line-height: 1.25;
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.15);
+  }
+
   :global(.rbc-event) {
     border: none;
     border-radius: 2px;
