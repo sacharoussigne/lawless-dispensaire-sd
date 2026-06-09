@@ -14,10 +14,12 @@ import {
   Popover,
   Stack,
   Text,
+  Tooltip,
   UnstyledButton,
 } from '@mantine/core';
 import { IconCalendarEvent } from '@tabler/icons-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import classes from './Header.module.scss';
 
@@ -120,6 +122,7 @@ export function HeaderUpcomingEvents({
   dispensarySlug: string;
   agendaHref: string;
 }) {
+  const router = useRouter();
   const [opened, setOpened] = useState(false);
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState<AgendaEventDTO[]>([]);
@@ -160,9 +163,37 @@ export function HeaderUpcomingEvents({
   );
 
   const eventCount = today.length + tomorrow.length;
+  const hasEvents = eventCount > 0;
 
-  if (!loading && eventCount === 0) {
-    return null;
+  const handleIndicatorClick = () => {
+    if (loading) return;
+    if (!hasEvents) {
+      router.push(agendaHref);
+      return;
+    }
+    setOpened((value) => !value);
+  };
+
+  const calendarButton = (
+    <ActionIcon
+      variant="light"
+      color="sage"
+      size="lg"
+      aria-label={hasEvents ? "Événements aujourd'hui et demain" : 'Agenda'}
+      onClick={handleIndicatorClick}
+    >
+      <IconCalendarEvent size={20} stroke={1.5} />
+    </ActionIcon>
+  );
+
+  if (!hasEvents) {
+    return (
+      <Tooltip label="Agenda" position="bottom">
+        <Indicator inline processing={loading} disabled color="sage" size={18}>
+          {calendarButton}
+        </Indicator>
+      </Tooltip>
+    );
   }
 
   return (
@@ -177,20 +208,12 @@ export function HeaderUpcomingEvents({
         <Indicator
           inline
           processing={loading}
-          disabled={loading || eventCount === 0}
+          disabled={loading}
           color="sage"
           label={eventCount > 9 ? '9+' : eventCount}
           size={18}
         >
-          <ActionIcon
-            variant="light"
-            color="sage"
-            size="lg"
-            aria-label="Événements aujourd'hui et demain"
-            onClick={() => setOpened((value) => !value)}
-          >
-            <IconCalendarEvent size={20} stroke={1.5} />
-          </ActionIcon>
+          {calendarButton}
         </Indicator>
       </Popover.Target>
       <Popover.Dropdown>

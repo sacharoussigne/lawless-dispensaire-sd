@@ -2,7 +2,6 @@ import type { Icon } from '@tabler/icons-react';
 import {
   IconAbacus,
   IconArchive,
-  IconCalendarEvent,
   IconCalendarWeek,
   IconCashRegister,
   IconMail,
@@ -25,8 +24,7 @@ export type EmployeeNavId =
   | 'payroll'
   | 'stockStatistics'
   | 'mails'
-  | 'search'
-  | 'agenda';
+  | 'search';
 
 export type EmployeeNavItem = {
   id: EmployeeNavId;
@@ -44,7 +42,6 @@ export type EmployeeNavContext = {
   appSettings: AppSettingsDTO;
   permissions: Permissions | null;
   userRole: string | null;
-  agendaModuleAccess: boolean;
 };
 
 const PRIMARY_SLOT_COUNT = 4;
@@ -96,8 +93,6 @@ function isItemVisible(item: EmployeeNavItem, ctx: EmployeeNavContext): boolean 
         appSettings.featureSearchEnabled &&
         checkRolePermission(userRole, 'search', 'access')
       );
-    case 'agenda':
-      return appSettings.featureAgendaEnabled && ctx.agendaModuleAccess;
     default:
       return false;
   }
@@ -137,14 +132,6 @@ function buildAllItems(ctx: EmployeeNavContext): EmployeeNavItem[] {
       href: t.privatePractice.index,
       icon: IconStethoscope,
       navOrder: 4,
-    },
-    {
-      id: 'agenda',
-      label: 'Agenda',
-      shortLabel: 'Agenda',
-      href: t.agenda.index,
-      icon: IconCalendarEvent,
-      navOrder: 9,
     },
     {
       id: 'weeklyActivity',

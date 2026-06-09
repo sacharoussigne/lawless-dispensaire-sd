@@ -178,7 +178,6 @@ export default function Header({
                 appSettings={appSettings}
                 permissions={permissions}
                 userRole={userRole}
-                agendaModuleAccess={agendaModuleAccess}
                 isManagementSpace={isAdminOrManagementSpace}
                 canManage={permissions?.application.management === true}
                 isRouteActive={isRouteActive}
