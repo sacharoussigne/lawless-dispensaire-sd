@@ -9,6 +9,7 @@ import { IconPlus } from '@tabler/icons-react';
 import Link from 'next/link';
 import dayjs from '@/lib/dayjs';
 import { buildDefaultTimedSlotForDay } from '@/lib/agenda/dates';
+import { notifyUpcomingEventsRefresh } from '@/lib/agenda/upcomingEventsRefresh';
 import { PageHeader } from '@/app/_components/PageHeader/PageHeader';
 import {
   canWriteAgenda,
@@ -96,6 +97,7 @@ export function AgendaPageClient({
 
   const refreshCalendar = useCallback(() => {
     void fetchEvents();
+    notifyUpcomingEventsRefresh();
   }, [fetchEvents]);
 
   const handleSelectEvent = async (event: AgendaEventDTO) => {

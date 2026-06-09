@@ -2,6 +2,7 @@
 
 import { listAgendaEvents } from '@/app/_actions/agenda/events';
 import { buildAgendaDayViewHref } from '@/lib/agenda/calendarNavigation';
+import { subscribeUpcomingEventsRefresh } from '@/lib/agenda/upcomingEventsRefresh';
 import { formatAgendaTimeInput } from '@/lib/agenda/dates';
 import type { Dayjs } from 'dayjs';
 import dayjs from '@/lib/dayjs';
@@ -143,6 +144,12 @@ export function HeaderUpcomingEvents({
 
   useEffect(() => {
     void loadEvents();
+  }, [loadEvents]);
+
+  useEffect(() => {
+    return subscribeUpcomingEventsRefresh(() => {
+      void loadEvents();
+    });
   }, [loadEvents]);
 
   useEffect(() => {
