@@ -5,7 +5,11 @@ export class ParsedZodError extends ErrorWithStatus {
         field: string | number;
         message: string;
     }[]) {
-        super("ParsedZodError", 422);
+        const message = error
+            .map((entry) => entry.message)
+            .filter(Boolean)
+            .join(' · ') || 'Données invalides';
+        super(message, 422);
     }
 
     toFormError() {

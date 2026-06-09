@@ -1,0 +1,1 @@
+export const AGENDA_PANEL_HEIGHT_PX = 620;

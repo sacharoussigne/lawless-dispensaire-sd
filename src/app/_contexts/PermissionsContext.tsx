@@ -14,6 +14,7 @@ const PermissionsContext = createContext<PermissionsContextType>({
   dispensarySlug: null,
   dispensaryId: null,
   accessibleDispensaries: [],
+  agendaModuleAccess: false,
 });
 
 interface PermissionsProviderProps {
@@ -24,6 +25,7 @@ interface PermissionsProviderProps {
   dispensarySlug?: string | null;
   dispensaryId?: string | null;
   accessibleDispensaries?: AccessibleDispensary[];
+  agendaModuleAccess?: boolean;
 }
 
 export function PermissionsProvider({
@@ -34,6 +36,7 @@ export function PermissionsProvider({
   dispensarySlug = null,
   dispensaryId = null,
   accessibleDispensaries = [],
+  agendaModuleAccess = false,
 }: PermissionsProviderProps) {
   return (
     <PermissionsContext.Provider
@@ -45,6 +48,7 @@ export function PermissionsProvider({
         dispensarySlug,
         dispensaryId,
         accessibleDispensaries,
+        agendaModuleAccess,
       }}
     >
       {children}

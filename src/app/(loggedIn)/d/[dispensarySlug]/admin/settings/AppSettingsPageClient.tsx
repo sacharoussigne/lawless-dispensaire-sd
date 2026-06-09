@@ -52,6 +52,9 @@ export default function AppSettingsPageClient({
   );
   const [featureWeeklyDispensaryActivityEnabled, setFeatureWeeklyDispensaryActivityEnabled] =
     useState(initial.featureWeeklyDispensaryActivityEnabled);
+  const [featureAgendaEnabled, setFeatureAgendaEnabled] = useState(
+    initial.featureAgendaEnabled,
+  );
   const [weeklyActivityChestDaysVisible, setWeeklyActivityChestDaysVisible] = useState(
     initial.weeklyActivityChestDaysVisible ?? true,
   );
@@ -85,6 +88,7 @@ export default function AppSettingsPageClient({
       featureMailsEnabled,
       featurePayrollEnabled,
       featureWeeklyDispensaryActivityEnabled,
+      featureAgendaEnabled,
       weeklyActivityChestDaysVisible,
       weeklyActivityPresenceDaysVisible,
       weeklyActivityPatientsVisible,
@@ -222,6 +226,13 @@ export default function AppSettingsPageClient({
                 onChange={(e) =>
                   setFeatureWeeklyDispensaryActivityEnabled(e.currentTarget.checked)
                 }
+              />
+            </Paper>
+            <Paper withBorder p="md" radius="md" bg="var(--mantine-color-body)">
+              <Switch
+                label="Agenda & to-do"
+                checked={featureAgendaEnabled}
+                onChange={(e) => setFeatureAgendaEnabled(e.currentTarget.checked)}
               />
             </Paper>
           </SimpleGrid>
