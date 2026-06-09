@@ -6,7 +6,8 @@ export type AppFeatureKey =
   | 'search'
   | 'mails'
   | 'payroll'
-  | 'weeklyDispensaryActivity';
+  | 'weeklyDispensaryActivity'
+  | 'agenda';
 
 export type AppSettingsDTO = {
   dispensaryName: string;
@@ -18,6 +19,7 @@ export type AppSettingsDTO = {
   featureMailsEnabled: boolean;
   featurePayrollEnabled: boolean;
   featureWeeklyDispensaryActivityEnabled: boolean;
+  featureAgendaEnabled: boolean;
   weeklyActivityChestDaysVisible: boolean;
   weeklyActivityPresenceDaysVisible: boolean;
   weeklyActivityPatientsVisible: boolean;
@@ -36,6 +38,7 @@ export const APP_SETTINGS_DEFAULTS: AppSettingsDTO = {
   featureMailsEnabled: true,
   featurePayrollEnabled: true,
   featureWeeklyDispensaryActivityEnabled: true,
+  featureAgendaEnabled: true,
   weeklyActivityChestDaysVisible: true,
   weeklyActivityPresenceDaysVisible: true,
   weeklyActivityPatientsVisible: true,
@@ -72,6 +75,8 @@ export function isAppFeatureEnabled(
       return settings.featurePayrollEnabled;
     case 'weeklyDispensaryActivity':
       return settings.featureWeeklyDispensaryActivityEnabled;
+    case 'agenda':
+      return settings.featureAgendaEnabled;
     default: {
       const _exhaustive: never = feature;
       return _exhaustive;

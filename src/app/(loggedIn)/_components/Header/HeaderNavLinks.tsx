@@ -71,6 +71,7 @@ export function HeaderNavLinks({
   appSettings,
   permissions,
   userRole,
+  agendaModuleAccess,
   isManagementSpace,
   canManage,
   isRouteActive,
@@ -79,6 +80,7 @@ export function HeaderNavLinks({
   appSettings: AppSettingsDTO;
   permissions: Permissions | null;
   userRole: string | null;
+  agendaModuleAccess: boolean;
   isManagementSpace: boolean;
   canManage: boolean;
   isRouteActive: (route: string) => boolean;
@@ -180,6 +182,7 @@ export function HeaderNavLinks({
     appSettings,
     permissions,
     userRole,
+    agendaModuleAccess,
   });
 
   const renderItem = (item: HeaderNavLinkItem) => (

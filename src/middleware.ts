@@ -79,7 +79,9 @@ export async function middleware(req: NextRequest) {
       pathname === t.admin.overwriteStock ||
       pathname.startsWith(`${t.admin.overwriteStock}/`) ||
       pathname === t.admin.members ||
-      pathname.startsWith(`${t.admin.members}/`)
+      pathname.startsWith(`${t.admin.members}/`) ||
+      pathname === t.admin.agendas ||
+      pathname.startsWith(`${t.admin.agendas}/`)
     ) {
       middlewares.push(hasAdminRoleMiddleware);
       if (pathname === t.admin.settings || pathname.startsWith(`${t.admin.settings}/`)) {
@@ -124,6 +126,10 @@ export async function middleware(req: NextRequest) {
       middlewares.push(hasWeeklyDispensaryActivityMiddleware);
       middlewares.push((request: NextRequest, s: AppMiddlewareSession) =>
         assertAppFeatureEnabledMiddleware(request, s, 'weeklyDispensaryActivity'),
+      );
+    } else if (pathname.startsWith(t.agenda.index)) {
+      middlewares.push((request: NextRequest, s: AppMiddlewareSession) =>
+        assertAppFeatureEnabledMiddleware(request, s, 'agenda'),
       );
     } else if (
       pathname === t.employee.payroll ||

@@ -3,6 +3,7 @@ import { Container, SimpleGrid } from '@mantine/core';
 import {
   IconAbacus,
   IconArchive,
+  IconCalendarEvent,
   IconCalendarWeek,
   IconCashRegister,
   IconMail,
@@ -16,6 +17,10 @@ import { checkRolePermission } from '@/lib/auth/permissions';
 import { dispensarySiteTitle, getAppSettings } from '@/lib/appSettings';
 import type { AuthSession } from '@/types/session';
 import { getEffectiveRoleForDispensary, requireDispensaryFromSlug } from '@/lib/dispensary/context';
+import { userHasAnyAgendaAccess } from '@/lib/agenda/access';
+import { isPlatformAdmin } from '@/lib/dispensary/platformAdmin';
+import { hasRole } from '@/lib/auth/permissions';
+import { Role } from '@/types/enum/roles';
 import { ModuleCard, type ModuleCardProps } from '@/app/_components/ModuleCard/ModuleCard';
 import { PageHeader } from '@/app/_components/PageHeader/PageHeader';
 
@@ -32,6 +37,17 @@ export default async function EmployeePage({
   const appSettings = await getAppSettings(dispensary.id);
   const t = tenantRoutes(dispensarySlug);
   const siteTitle = dispensarySiteTitle(appSettings);
+  const userId = session?.user?.id;
+  const agendaModuleAccess = userId
+    ? await userHasAnyAgendaAccess(
+        dispensary.id,
+        userId,
+        session.user.role,
+        effectiveRole,
+      ) ||
+      isPlatformAdmin(session.user.role) ||
+      hasRole(effectiveRole, Role.ADMIN)
+    : false;
 
   const employeeSections: (ModuleCardProps & { hasAccess: boolean })[] = [
     {
@@ -79,6 +95,13 @@ export default async function EmployeePage({
       icon: IconReportMoney,
       href: t.employee.payroll,
       hasAccess: appSettings.featurePayrollEnabled && (permissions?.payrollReports.view ?? false),
+    },
+    {
+      title: 'Agenda',
+      description: 'Calendrier partagé et listes de tâches de l\'organisation.',
+      icon: IconCalendarEvent,
+      href: t.agenda.index,
+      hasAccess: appSettings.featureAgendaEnabled && agendaModuleAccess,
     },
     {
       title: 'Activité hebdo',

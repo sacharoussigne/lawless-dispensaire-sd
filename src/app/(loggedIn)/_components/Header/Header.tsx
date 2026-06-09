@@ -48,6 +48,7 @@ export default function Header({
     appSettings,
     dispensarySlug: ctxSlug,
     accessibleDispensaries,
+    agendaModuleAccess,
   } = usePermissions();
 
   const dispensarySlug = dispensarySlugProp ?? ctxSlug;
@@ -176,6 +177,7 @@ export default function Header({
                 appSettings={appSettings}
                 permissions={permissions}
                 userRole={userRole}
+                agendaModuleAccess={agendaModuleAccess}
                 isManagementSpace={isAdminOrManagementSpace}
                 canManage={permissions?.application.management === true}
                 isRouteActive={isRouteActive}
@@ -237,6 +239,11 @@ export default function Header({
                         <Link href={t.admin.members}>
                           <Menu.Item>Membres</Menu.Item>
                         </Link>
+                        {appSettings.featureAgendaEnabled && (
+                          <Link href={t.admin.agendas}>
+                            <Menu.Item>Agendas</Menu.Item>
+                          </Link>
+                        )}
                         {appSettings.featureStockEnabled && (
                           <Link href={t.admin.overwriteStock}>
                             <Menu.Item>Écraser les stocks</Menu.Item>

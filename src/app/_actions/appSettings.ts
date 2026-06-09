@@ -38,6 +38,7 @@ const updateSchema = z.object({
   featureMailsEnabled: z.boolean(),
   featurePayrollEnabled: z.boolean(),
   featureWeeklyDispensaryActivityEnabled: z.boolean(),
+  featureAgendaEnabled: z.boolean(),
   weeklyActivityChestDaysVisible: z.boolean(),
   weeklyActivityPresenceDaysVisible: z.boolean(),
   weeklyActivityPatientsVisible: z.boolean(),
@@ -134,6 +135,7 @@ export async function updateAppSettings(
           featurePayrollEnabled: parsed.data.featurePayrollEnabled,
           featureWeeklyDispensaryActivityEnabled:
             parsed.data.featureWeeklyDispensaryActivityEnabled,
+          featureAgendaEnabled: parsed.data.featureAgendaEnabled,
           weeklyActivityChestDaysVisible: parsed.data.weeklyActivityChestDaysVisible,
           weeklyActivityPresenceDaysVisible: parsed.data.weeklyActivityPresenceDaysVisible,
           weeklyActivityPatientsVisible: parsed.data.weeklyActivityPatientsVisible,
@@ -152,6 +154,7 @@ export async function updateAppSettings(
           featurePayrollEnabled: parsed.data.featurePayrollEnabled,
           featureWeeklyDispensaryActivityEnabled:
             parsed.data.featureWeeklyDispensaryActivityEnabled,
+          featureAgendaEnabled: parsed.data.featureAgendaEnabled,
           weeklyActivityChestDaysVisible: parsed.data.weeklyActivityChestDaysVisible,
           weeklyActivityPresenceDaysVisible: parsed.data.weeklyActivityPresenceDaysVisible,
           weeklyActivityPatientsVisible: parsed.data.weeklyActivityPatientsVisible,
@@ -180,6 +183,7 @@ export async function updateAppSettings(
       featureMailsEnabled: row.featureMailsEnabled,
       featurePayrollEnabled: row.featurePayrollEnabled,
       featureWeeklyDispensaryActivityEnabled: row.featureWeeklyDispensaryActivityEnabled,
+      featureAgendaEnabled: row.featureAgendaEnabled,
       weeklyActivityChestDaysVisible: row.weeklyActivityChestDaysVisible ?? true,
       weeklyActivityPresenceDaysVisible: row.weeklyActivityPresenceDaysVisible ?? true,
       weeklyActivityPatientsVisible: row.weeklyActivityPatientsVisible ?? true,

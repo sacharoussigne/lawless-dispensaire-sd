@@ -1,0 +1,122 @@
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: var(--mantine-spacing-md);
+  align-items: start;
+
+  @media (max-width: 62em) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.calendarPanel {
+  min-width: 0;
+}
+
+.todoPanel {
+  min-width: 0;
+  border: 1px solid var(--disp-border);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--disp-surface);
+  padding: var(--mantine-spacing-md);
+  max-height: calc(100vh - 12rem);
+  overflow-y: auto;
+
+  @media (max-width: 62em) {
+    max-height: none;
+  }
+}
+
+.calendarWrapper {
+  :global(.rbc-calendar) {
+    font-family: var(--disp-font-ui);
+    color: var(--disp-ink);
+  }
+
+  :global(.rbc-toolbar) {
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  :global(.rbc-toolbar button) {
+    font-family: var(--disp-font-ui);
+    color: var(--disp-ink);
+    border-color: var(--disp-border);
+  }
+
+  :global(.rbc-toolbar button:hover),
+  :global(.rbc-toolbar button:active),
+  :global(.rbc-toolbar button.rbc-active) {
+    background: var(--mantine-color-sage-0);
+    border-color: var(--mantine-color-sage-4);
+    color: var(--disp-ink);
+  }
+
+  :global(.rbc-header) {
+    padding: 0.5rem;
+    font-family: var(--disp-font-display);
+    font-weight: 400;
+    border-color: var(--disp-border);
+  }
+
+  :global(.rbc-today) {
+    background: var(--mantine-color-sage-0);
+  }
+
+  :global(.rbc-off-range-bg) {
+    background: var(--disp-paper-muted, var(--mantine-color-slate-0));
+  }
+
+  :global(.rbc-event) {
+    border: none;
+    border-radius: 2px;
+    padding: 2px 4px;
+    font-size: 0.8rem;
+  }
+
+  :global(.rbc-event.agenda-event-default) {
+    background: var(--mantine-color-sage-6);
+  }
+
+  :global(.rbc-event.agenda-event-participant) {
+    background: var(--mantine-color-leather-6);
+    box-shadow: inset 0 0 0 1px var(--mantine-color-leather-8);
+  }
+
+  :global(.rbc-month-view),
+  :global(.rbc-time-view),
+  :global(.rbc-agenda-view) {
+    border-color: var(--disp-border);
+  }
+
+  :global(.rbc-day-bg + .rbc-day-bg),
+  :global(.rbc-month-row + .rbc-month-row) {
+    border-color: var(--disp-border);
+  }
+}
+
+.todoCategory {
+  border: 1px solid var(--disp-border);
+  border-radius: var(--mantine-radius-sm);
+  padding: var(--mantine-spacing-sm);
+  background: var(--disp-paper-muted, var(--mantine-color-slate-0));
+}
+
+.todoTaskRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--mantine-spacing-xs);
+  padding: 0.25rem 0;
+}
+
+.todoTaskCompleted {
+  text-decoration: line-through;
+  color: var(--mantine-color-dimmed);
+}
+
+.grip {
+  cursor: grab;
+  color: var(--mantine-color-slate-5);
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
