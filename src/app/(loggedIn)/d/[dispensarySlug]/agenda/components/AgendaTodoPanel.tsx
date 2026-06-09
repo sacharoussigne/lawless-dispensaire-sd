@@ -321,6 +321,43 @@ export function AgendaTodoPanel({
   const taskDragSnapshotRef = useRef<TodoCategories | null>(null);
   const dragCategoriesRef = useRef<TodoCategories | null>(null);
   const lastDragOverKeyRef = useRef<string | null>(null);
+  const todoPanelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!activeDrag) return;
+
+    const panel = todoPanelRef.current;
+    if (!panel) return;
+
+    const handleWheel = (event: WheelEvent) => {
+      const rect = panel.getBoundingClientRect();
+      const { clientX, clientY } = event;
+      if (
+        clientX < rect.left ||
+        clientX > rect.right ||
+        clientY < rect.top ||
+        clientY > rect.bottom
+      ) {
+        return;
+      }
+
+      const maxScroll = panel.scrollHeight - panel.clientHeight;
+      if (maxScroll <= 0) return;
+
+      const nextScroll = Math.min(
+        maxScroll,
+        Math.max(0, panel.scrollTop + event.deltaY),
+      );
+      if (nextScroll === panel.scrollTop) return;
+
+      panel.scrollTop = nextScroll;
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    document.addEventListener('wheel', handleWheel, { passive: false, capture: true });
+    return () => document.removeEventListener('wheel', handleWheel, { capture: true });
+  }, [activeDrag]);
 
   const handleDragStart = (event: DragStartEvent) => {
     if (!selectedList) return;
@@ -759,7 +796,7 @@ export function AgendaTodoPanel({
   }
 
   return (
-    <div className={classes.todoPanel}>
+    <div ref={todoPanelRef} className={classes.todoPanel}>
       <Group justify="space-between" mb="md" align="flex-start">
         <Title order={4} className="disp-display-title">To-Do</Title>
         <Button

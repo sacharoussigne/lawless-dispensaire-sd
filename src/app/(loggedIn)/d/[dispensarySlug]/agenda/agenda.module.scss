@@ -34,6 +34,7 @@
   padding: var(--mantine-spacing-md);
   max-height: var(--agenda-panel-height, 620px);
   overflow-y: auto;
+  overscroll-behavior: contain;
 
   @media (max-width: 62em) {
     max-height: none;
