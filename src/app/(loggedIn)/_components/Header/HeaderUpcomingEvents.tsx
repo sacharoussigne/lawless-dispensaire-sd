@@ -130,33 +130,57 @@ export function HeaderUpcomingEvents({
 
   const bounds = useMemo(() => getTodayTomorrowBounds(), []);
 
-  const loadEvents = useCallback(async () => {
-    const result = await listAgendaEvents(dispensarySlug, {
+  const queryRange = useMemo(
+    () => ({
       rangeStart: bounds.rangeStart,
       rangeEnd: bounds.rangeEnd,
-    });
+    }),
+    [bounds.rangeEnd, bounds.rangeStart],
+  );
 
+  const fetchUpcomingEvents = useCallback(async () => {
+    const result = await listAgendaEvents(dispensarySlug, queryRange);
     if (result.status === 200 && 'data' in result) {
-      setEvents(result.data);
+      return result.data;
     }
-    setLoading(false);
-  }, [bounds.rangeEnd, bounds.rangeStart, dispensarySlug]);
+    return null;
+  }, [dispensarySlug, queryRange]);
 
   useEffect(() => {
-    void loadEvents();
-  }, [loadEvents]);
+    let cancelled = false;
+
+    void (async () => {
+      const data = await fetchUpcomingEvents();
+      if (cancelled) return;
+      if (data) setEvents(data);
+      setLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchUpcomingEvents]);
 
   useEffect(() => {
     return subscribeUpcomingEventsRefresh(() => {
-      void loadEvents();
+      void fetchUpcomingEvents().then((data) => {
+        if (data) setEvents(data);
+        setLoading(false);
+      });
     });
-  }, [loadEvents]);
+  }, [fetchUpcomingEvents]);
 
-  useEffect(() => {
-    if (opened) {
-      void loadEvents();
-    }
-  }, [opened, loadEvents]);
+  const handlePopoverChange = useCallback(
+    (value: boolean) => {
+      setOpened(value);
+      if (!value) return;
+
+      void fetchUpcomingEvents().then((data) => {
+        if (data) setEvents(data);
+      });
+    },
+    [fetchUpcomingEvents],
+  );
 
   const { today, tomorrow } = useMemo(
     () =>
@@ -178,7 +202,7 @@ export function HeaderUpcomingEvents({
       router.push(agendaHref);
       return;
     }
-    setOpened((value) => !value);
+    handlePopoverChange(!opened);
   };
 
   const calendarButton = (
@@ -206,7 +230,7 @@ export function HeaderUpcomingEvents({
   return (
     <Popover
       opened={opened}
-      onChange={setOpened}
+      onChange={handlePopoverChange}
       position="bottom-end"
       width={320}
       withinPortal

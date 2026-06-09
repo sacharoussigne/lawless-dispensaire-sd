@@ -41,17 +41,33 @@ export function AgendaPageClient({
   initialTodoLists,
   isAdmin,
 }: AgendaPageClientProps) {
+  const searchParams = useSearchParams();
+  const agendaIdFromUrl = searchParams.get('agendaId');
+
   const [agendas] = useState(initialAgendas);
-  const [selectedAgendaId, setSelectedAgendaId] = useState<string | null>(
-    initialAgendas[0]?.id ?? null,
-  );
+  const [manualAgendaId, setManualAgendaId] = useState<string | null>(null);
+  const [lastUrlAgendaId, setLastUrlAgendaId] = useState(agendaIdFromUrl);
   const [events, setEvents] = useState(initialEvents);
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEventDTO | null>(null);
   const [slotStart, setSlotStart] = useState<Date | null>(null);
   const [slotEnd, setSlotEnd] = useState<Date | null>(null);
-  const searchParams = useSearchParams();
-  const agendaIdFromUrl = searchParams.get('agendaId');
+
+  const participantOnly = agendas.length === 0 && events.length > 0;
+
+  const urlAgendaId = useMemo(() => {
+    if (participantOnly || !agendaIdFromUrl) return null;
+    if (!agendas.some((agenda) => agenda.id === agendaIdFromUrl)) return null;
+    return agendaIdFromUrl;
+  }, [agendaIdFromUrl, agendas, participantOnly]);
+
+  if (agendaIdFromUrl !== lastUrlAgendaId) {
+    setLastUrlAgendaId(agendaIdFromUrl);
+    setManualAgendaId(null);
+  }
+
+  const selectedAgendaId =
+    manualAgendaId ?? urlAgendaId ?? agendas[0]?.id ?? null;
 
   const selectedAgenda = useMemo(
     () => agendas.find((a) => a.id === selectedAgendaId) ?? agendas[0] ?? null,
@@ -60,8 +76,6 @@ export function AgendaPageClient({
 
   const canWrite = canWriteAgenda(selectedAgenda?.accessLevel ?? null);
   const t = tenantRoutes(dispensarySlug);
-
-  const participantOnly = agendas.length === 0 && events.length > 0;
 
   const fetchEvents = useCallback(
     async (agendaId: string | null = selectedAgendaId) => {
@@ -79,17 +93,31 @@ export function AgendaPageClient({
   );
 
   useEffect(() => {
-    if (participantOnly || !agendaIdFromUrl) return;
-    if (!agendas.some((agenda) => agenda.id === agendaIdFromUrl)) return;
-    if (selectedAgendaId === agendaIdFromUrl) return;
+    if (!urlAgendaId) return;
 
-    setSelectedAgendaId(agendaIdFromUrl);
-    void fetchEvents(agendaIdFromUrl);
-  }, [agendaIdFromUrl, agendas, participantOnly, selectedAgendaId, fetchEvents]);
+    let cancelled = false;
+
+    void (async () => {
+      const rangeStart = dayjs().startOf('month').subtract(1, 'week').toDate();
+      const rangeEnd = dayjs().endOf('month').add(1, 'week').toDate();
+      const result = await listAgendaEvents(dispensarySlug, {
+        agendaId: urlAgendaId,
+        rangeStart: rangeStart.toISOString(),
+        rangeEnd: rangeEnd.toISOString(),
+      });
+      if (cancelled) return;
+      const data = handleAction(result);
+      if (data) setEvents(data);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dispensarySlug, urlAgendaId]);
 
   const handleAgendaChange = useCallback(
     (agendaId: string) => {
-      setSelectedAgendaId(agendaId);
+      setManualAgendaId(agendaId);
       void fetchEvents(agendaId);
     },
     [fetchEvents],
