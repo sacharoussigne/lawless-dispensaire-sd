@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { listAgendaEvents } from '@/app/_actions/agenda/events';
 import { handleAction } from '@/lib/action';
 import { Button, Container, Group, Stack, Text } from '@mantine/core';
@@ -41,6 +41,8 @@ export function AgendaPageClient({
   initialTodoLists,
   isAdmin,
 }: AgendaPageClientProps) {
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const agendaIdFromUrl = searchParams.get('agendaId');
 
@@ -119,8 +121,15 @@ export function AgendaPageClient({
     (agendaId: string) => {
       setManualAgendaId(agendaId);
       void fetchEvents(agendaId);
+
+      const params = new URLSearchParams(searchParams.toString());
+      if (params.get('agendaId') && params.get('agendaId') !== agendaId) {
+        params.delete('agendaId');
+        const qs = params.toString();
+        router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+      }
     },
-    [fetchEvents],
+    [fetchEvents, pathname, router, searchParams],
   );
 
   const refreshCalendar = useCallback(() => {
@@ -220,7 +229,6 @@ export function AgendaPageClient({
       >
         {showCalendar && (
           <AgendaCalendar
-            key={participantOnly ? 'participant' : selectedAgendaId ?? 'agenda'}
             dispensarySlug={dispensarySlug}
             agendaId={selectedAgendaId}
             events={events}
@@ -236,7 +244,9 @@ export function AgendaPageClient({
             dispensarySlug={dispensarySlug}
             agendaId={selectedAgendaId}
             accessLevel={selectedAgenda?.accessLevel ?? null}
-            initialLists={initialTodoLists}
+            initialLists={
+              selectedAgendaId === initialAgendas[0]?.id ? initialTodoLists : []
+            }
           />
         )}
       </div>

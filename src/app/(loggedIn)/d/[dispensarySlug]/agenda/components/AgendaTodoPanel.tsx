@@ -67,25 +67,41 @@ export function AgendaTodoPanel({
   const [selectedListId, setSelectedListId] = useState<string | null>(
     initialLists[0]?.id ?? null,
   );
+  const [syncedAgendaId, setSyncedAgendaId] = useState(agendaId);
   const [archivesOpen, setArchivesOpen] = useState(false);
   const [archiveLists, setArchiveLists] = useState<AgendaTodoListDTO[]>([]);
   const canWrite = canWriteAgenda(accessLevel);
 
+  if (agendaId !== syncedAgendaId) {
+    setSyncedAgendaId(agendaId);
+    if (!agendaId) {
+      setLists([]);
+      setSelectedListId(null);
+    }
+  }
+
   const selectedList = lists.find((l) => l.id === selectedListId) ?? lists[0] ?? null;
+
+  const applyLists = useCallback((data: AgendaTodoListDTO[]) => {
+    setLists(data);
+    setSelectedListId((current) =>
+      current && data.some((list) => list.id === current)
+        ? current
+        : (data[0]?.id ?? null),
+    );
+  }, []);
+
+  const fetchTodoLists = useCallback(async () => {
+    if (!agendaId) return null;
+    const result = await listAgendaTodoLists(dispensarySlug, agendaId);
+    return handleAction(result) ?? null;
+  }, [agendaId, dispensarySlug]);
 
   const reload = useCallback(async () => {
     if (!agendaId) return;
     try {
-      const result = await listAgendaTodoLists(dispensarySlug, agendaId);
-      const data = handleAction(result);
-      if (data) {
-        setLists(data);
-        setSelectedListId((current) =>
-          current && data.some((list) => list.id === current)
-            ? current
-            : (data[0]?.id ?? null),
-        );
-      }
+      const data = await fetchTodoLists();
+      if (data) applyLists(data);
     } catch (error: unknown) {
       notifications.show({
         title: 'Erreur',
@@ -93,18 +109,31 @@ export function AgendaTodoPanel({
         color: 'danger',
       });
     }
-  }, [agendaId, dispensarySlug]);
+  }, [agendaId, applyLists, fetchTodoLists]);
 
   useEffect(() => {
-    setLists(initialLists);
-    setSelectedListId(initialLists[0]?.id ?? null);
-  }, [initialLists]);
+    if (!agendaId) return;
 
-  useEffect(() => {
-    if (agendaId) {
-      void reload();
-    }
-  }, [agendaId, reload]);
+    let cancelled = false;
+
+    void fetchTodoLists()
+      .then((data) => {
+        if (cancelled || !data) return;
+        applyLists(data);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        notifications.show({
+          title: 'Erreur',
+          message: error instanceof Error ? error.message : 'Chargement impossible',
+          color: 'danger',
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [agendaId, applyLists, fetchTodoLists]);
 
   const sensors = useSensors(
     usePressHoldPointerSensor(),
