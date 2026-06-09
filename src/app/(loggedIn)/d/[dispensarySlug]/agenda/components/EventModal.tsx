@@ -120,7 +120,10 @@ export function EventModal({
         setUserOptions((prev) => {
           const map = new Map(prev.map((o) => [o.value, o]));
           for (const u of data) {
-            map.set(u.id, { value: u.id, label: u.name });
+            map.set(u.id, {
+              value: u.id,
+              label: u.email ? `${u.name} (${u.email})` : u.name,
+            });
           }
           return Array.from(map.values());
         });
