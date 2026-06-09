@@ -132,6 +132,15 @@ export function EventModal({
   const handleSave = async () => {
     if (!startDate || !endDate) return;
 
+    if (!title.trim()) {
+      notifications.show({
+        title: 'Erreur',
+        message: 'Le titre est requis',
+        color: 'danger',
+      });
+      return;
+    }
+
     const startDateStr = formatAgendaDateInput(startDate);
     const endDateStr = formatAgendaDateInput(endDate);
 
