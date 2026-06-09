@@ -3,7 +3,11 @@
 import { useState, type ReactNode } from 'react';
 import {
   ActionIcon,
+  Button,
+  Group,
+  Popover,
   Stack,
+  Text,
 } from '@mantine/core';
 import {
   DndContext,
@@ -43,6 +47,7 @@ function SortableCategoryShell({
   onRename: (id: string, name: string) => void | Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: category.id, disabled: !canWrite || editing });
@@ -71,16 +76,54 @@ function SortableCategoryShell({
           onEditingChange={setEditing}
         />
         {canWrite && (
-          <ActionIcon
-            variant="subtle"
-            color="danger"
-            size="sm"
-            onClick={onDelete}
-            onPointerDown={stopDragPointer}
-            aria-label="Supprimer la catégorie"
+          <Popover
+            position="left"
+            withArrow
+            shadow="md"
+            opened={deleteConfirmOpen}
+            onChange={setDeleteConfirmOpen}
           >
-            <IconTrash size={14} />
-          </ActionIcon>
+            <Popover.Target>
+              <ActionIcon
+                variant="subtle"
+                color="danger"
+                size="sm"
+                onClick={() => setDeleteConfirmOpen(true)}
+                onPointerDown={stopDragPointer}
+                aria-label="Supprimer la catégorie"
+              >
+                <IconTrash size={14} />
+              </ActionIcon>
+            </Popover.Target>
+            <Popover.Dropdown>
+              <Stack gap="xs" className={classes.todoDeleteConfirm}>
+                <Text size="sm" fw={500}>Supprimer la catégorie ?</Text>
+                <Text size="xs" c="dimmed">
+                  « {category.name} » et toutes ses tâches seront supprimées.
+                </Text>
+                <Group gap="xs" justify="flex-end" mt={4}>
+                  <Button
+                    size="xs"
+                    variant="subtle"
+                    color="slate"
+                    onClick={() => setDeleteConfirmOpen(false)}
+                  >
+                    Annuler
+                  </Button>
+                  <Button
+                    size="xs"
+                    color="danger"
+                    onClick={() => {
+                      setDeleteConfirmOpen(false);
+                      onDelete();
+                    }}
+                  >
+                    Supprimer
+                  </Button>
+                </Group>
+              </Stack>
+            </Popover.Dropdown>
+          </Popover>
         )}
       </div>
       {children}
