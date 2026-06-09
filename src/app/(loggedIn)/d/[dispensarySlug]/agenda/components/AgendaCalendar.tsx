@@ -23,7 +23,8 @@ type CalendarEvent = {
 interface AgendaCalendarProps {
   dispensarySlug: string;
   agendaId: string | null;
-  initialEvents: AgendaEventDTO[];
+  events: AgendaEventDTO[];
+  onEventsChange: (events: AgendaEventDTO[]) => void;
   canWrite: boolean;
   onSelectEvent: (event: AgendaEventDTO) => void;
   onSelectSlot: (start: Date, end: Date) => void;
@@ -32,12 +33,12 @@ interface AgendaCalendarProps {
 export function AgendaCalendar({
   dispensarySlug,
   agendaId,
-  initialEvents,
+  events,
+  onEventsChange,
   canWrite,
   onSelectEvent,
   onSelectSlot,
 }: AgendaCalendarProps) {
-  const [events, setEvents] = useState<AgendaEventDTO[]>(initialEvents);
   const [view, setView] = useState<View>('month');
   const [date, setDate] = useState(new Date());
 
@@ -62,9 +63,9 @@ export function AgendaCalendar({
         rangeEnd: rangeEnd.toISOString(),
       });
       const data = handleAction(result);
-      if (data) setEvents(data);
+      if (data) onEventsChange(data);
     },
-    [dispensarySlug, agendaId],
+    [dispensarySlug, agendaId, onEventsChange],
   );
 
   const handleRangeChange = useCallback(

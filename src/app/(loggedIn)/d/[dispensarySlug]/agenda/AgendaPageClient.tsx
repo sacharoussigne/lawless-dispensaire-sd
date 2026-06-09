@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
+import { listAgendaEvents } from '@/app/_actions/agenda/events';
+import { handleAction } from '@/lib/action';
 import { Button, Container, Group, Stack, Text } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
 import Link from 'next/link';
@@ -38,7 +40,7 @@ export function AgendaPageClient({
   const [selectedAgendaId, setSelectedAgendaId] = useState<string | null>(
     initialAgendas[0]?.id ?? null,
   );
-  const [calendarKey, setCalendarKey] = useState(0);
+  const [events, setEvents] = useState(initialEvents);
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEventDTO | null>(null);
   const [slotStart, setSlotStart] = useState<Date | null>(null);
@@ -52,9 +54,34 @@ export function AgendaPageClient({
   const canWrite = canWriteAgenda(selectedAgenda?.accessLevel ?? null);
   const t = tenantRoutes(dispensarySlug);
 
+  const participantOnly = agendas.length === 0 && events.length > 0;
+
+  const fetchEvents = useCallback(
+    async (agendaId: string | null = selectedAgendaId) => {
+      const rangeStart = dayjs().startOf('month').subtract(1, 'week').toDate();
+      const rangeEnd = dayjs().endOf('month').add(1, 'week').toDate();
+      const result = await listAgendaEvents(dispensarySlug, {
+        agendaId: agendaId ?? undefined,
+        rangeStart: rangeStart.toISOString(),
+        rangeEnd: rangeEnd.toISOString(),
+      });
+      const data = handleAction(result);
+      if (data) setEvents(data);
+    },
+    [dispensarySlug, selectedAgendaId],
+  );
+
+  const handleAgendaChange = useCallback(
+    (agendaId: string) => {
+      setSelectedAgendaId(agendaId);
+      void fetchEvents(agendaId);
+    },
+    [fetchEvents],
+  );
+
   const refreshCalendar = useCallback(() => {
-    setCalendarKey((k) => k + 1);
-  }, []);
+    void fetchEvents();
+  }, [fetchEvents]);
 
   const handleSelectEvent = async (event: AgendaEventDTO) => {
     setSelectedEvent(event);
@@ -78,8 +105,6 @@ export function AgendaPageClient({
     setSlotEnd(dayjs().add(1, 'hour').toDate());
     setEventModalOpen(true);
   };
-
-  const participantOnly = agendas.length === 0 && initialEvents.length > 0;
 
   if (agendas.length === 0 && !participantOnly) {
     return (
@@ -115,7 +140,7 @@ export function AgendaPageClient({
               <AgendaSelector
                 agendas={agendas}
                 value={selectedAgendaId}
-                onChange={setSelectedAgendaId}
+                onChange={handleAgendaChange}
               />
               {canWrite && selectedAgendaId && (
                 <Button
@@ -134,14 +159,11 @@ export function AgendaPageClient({
       <div className={participantOnly ? undefined : classes.layout}>
         {showCalendar && (
           <AgendaCalendar
-            key={
-              participantOnly
-                ? `participant-${calendarKey}`
-                : `${selectedAgendaId}-${calendarKey}`
-            }
+            key={participantOnly ? 'participant' : selectedAgendaId ?? 'agenda'}
             dispensarySlug={dispensarySlug}
             agendaId={selectedAgendaId}
-            initialEvents={initialEvents}
+            events={events}
+            onEventsChange={setEvents}
             canWrite={canWrite && !participantOnly}
             onSelectEvent={handleSelectEvent}
             onSelectSlot={handleSelectSlot}
