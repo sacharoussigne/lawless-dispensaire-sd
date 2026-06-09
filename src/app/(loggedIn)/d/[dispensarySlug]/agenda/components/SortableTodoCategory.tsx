@@ -36,12 +36,14 @@ import classes from '../agenda.module.scss';
 function SortableCategoryShell({
   category,
   canWrite,
+  canDrag,
   children,
   onDelete,
   onRename,
 }: {
   category: AgendaTodoCategoryDTO;
   canWrite: boolean;
+  canDrag: boolean;
   children: ReactNode;
   onDelete: () => void;
   onRename: (id: string, name: string) => void | Promise<void>;
@@ -50,7 +52,7 @@ function SortableCategoryShell({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: category.id, disabled: !canWrite || editing });
+    useSortable({ id: category.id, disabled: !canDrag || editing });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -62,10 +64,10 @@ function SortableCategoryShell({
     <div ref={setNodeRef} style={style} className={classes.todoCategory}>
       <div
         className={`${classes.todoCategoryHeader} ${
-          canWrite && !editing ? classes.todoCategoryHeaderDraggable : ''
+          canDrag && !editing ? classes.todoCategoryHeaderDraggable : ''
         }`}
         data-dragging={isDragging || undefined}
-        {...(canWrite && !editing ? { ...attributes, ...listeners } : {})}
+        {...(canDrag && !editing ? { ...attributes, ...listeners } : {})}
       >
         <InlineEditableText
           value={category.name}
@@ -134,6 +136,7 @@ function SortableCategoryShell({
 interface SortableTodoCategoryProps {
   category: AgendaTodoCategoryDTO;
   canWrite: boolean;
+  dragEnabled?: boolean;
   onReorderTasks: (categoryId: string, taskIds: string[]) => void;
   onToggleTask: (id: string, completed: boolean) => void;
   onRenameTask: (id: string, title: string) => void | Promise<void>;
@@ -146,6 +149,7 @@ interface SortableTodoCategoryProps {
 export function SortableTodoCategory({
   category,
   canWrite,
+  dragEnabled = true,
   onReorderTasks,
   onToggleTask,
   onRenameTask,
@@ -159,7 +163,10 @@ export function SortableTodoCategory({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
+  const canDrag = canWrite && dragEnabled;
+
   const handleTaskDragEnd = (event: DragEndEvent) => {
+    if (!canDrag) return;
     const { active, over } = event;
     if (!over || active.id === over.id) return;
     const oldIndex = category.tasks.findIndex((t) => t.id === active.id);
@@ -176,29 +183,46 @@ export function SortableTodoCategory({
     <SortableCategoryShell
       category={category}
       canWrite={canWrite}
+      canDrag={canDrag}
       onDelete={() => onDeleteCategory(category.id)}
       onRename={onRenameCategory}
     >
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleTaskDragEnd}>
-        <SortableContext
-          items={category.tasks.map((t) => t.id)}
-          strategy={verticalListSortingStrategy}
-        >
-          <Stack gap={2}>
-            {category.tasks.map((task) => (
-              <SortableTodoTask
-                key={task.id}
-                task={task}
-                canWrite={canWrite}
-                onToggle={onToggleTask}
-                onRename={onRenameTask}
-                onDelete={onDeleteTask}
-              />
-            ))}
-          </Stack>
-        </SortableContext>
-      </DndContext>
-      {canWrite && (
+      {canDrag ? (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleTaskDragEnd}>
+          <SortableContext
+            items={category.tasks.map((t) => t.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <Stack gap={2}>
+              {category.tasks.map((task) => (
+                <SortableTodoTask
+                  key={task.id}
+                  task={task}
+                  canWrite={canWrite}
+                  onToggle={onToggleTask}
+                  onRename={onRenameTask}
+                  onDelete={onDeleteTask}
+                />
+              ))}
+            </Stack>
+          </SortableContext>
+        </DndContext>
+      ) : (
+        <Stack gap={2}>
+          {category.tasks.map((task) => (
+            <SortableTodoTask
+              key={task.id}
+              task={task}
+              canWrite={canWrite}
+              dragEnabled={false}
+              onToggle={onToggleTask}
+              onRename={onRenameTask}
+              onDelete={onDeleteTask}
+            />
+          ))}
+        </Stack>
+      )}
+      {canWrite && dragEnabled && (
         <InlineNoteInput
           placeholder="Nouvelle tâche…"
           onSubmit={(title) => onAddTask(category.id, title)}

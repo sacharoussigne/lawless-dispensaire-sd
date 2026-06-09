@@ -1,12 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Button,
   Group,
   Stack,
   Text,
+  TextInput,
   Title,
+  UnstyledButton,
 } from '@mantine/core';
 import {
   DndContext,
@@ -22,7 +24,7 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { IconArchive } from '@tabler/icons-react';
+import { IconArchive, IconSearch, IconX } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import {
   createAgendaTodoCategory,
@@ -70,6 +72,9 @@ export function AgendaTodoPanel({
   const [syncedAgendaId, setSyncedAgendaId] = useState(agendaId);
   const [archivesOpen, setArchivesOpen] = useState(false);
   const [archiveLists, setArchiveLists] = useState<AgendaTodoListDTO[]>([]);
+  const [categoryFilterIds, setCategoryFilterIds] = useState<Set<string>>(new Set());
+  const [taskSearch, setTaskSearch] = useState('');
+  const [lastFilterListId, setLastFilterListId] = useState(selectedListId);
   const canWrite = canWriteAgenda(accessLevel);
 
   if (agendaId !== syncedAgendaId) {
@@ -81,6 +86,68 @@ export function AgendaTodoPanel({
   }
 
   const selectedList = lists.find((l) => l.id === selectedListId) ?? lists[0] ?? null;
+
+  if (selectedListId !== lastFilterListId) {
+    setLastFilterListId(selectedListId);
+    setCategoryFilterIds(new Set());
+    setTaskSearch('');
+  }
+
+  const allCategoryIds = useMemo(
+    () => selectedList?.categories.map((category) => category.id) ?? [],
+    [selectedList],
+  );
+
+  const isCategoryFilterActive =
+    categoryFilterIds.size > 0 && categoryFilterIds.size < allCategoryIds.length;
+
+  const isTaskSearchActive = taskSearch.trim().length > 0;
+  const isFiltering = isCategoryFilterActive || isTaskSearchActive;
+
+  const visibleCategories = useMemo(() => {
+    if (!selectedList) return [];
+
+    let categories = selectedList.categories;
+    if (isCategoryFilterActive) {
+      categories = categories.filter((category) => categoryFilterIds.has(category.id));
+    }
+
+    const query = taskSearch.trim().toLowerCase();
+    if (!query) return categories;
+
+    return categories
+      .map((category) => ({
+        ...category,
+        tasks: category.tasks.filter(
+          (task) =>
+            task.title.toLowerCase().includes(query) ||
+            (task.description?.toLowerCase().includes(query) ?? false),
+        ),
+      }))
+      .filter((category) => category.tasks.length > 0);
+  }, [selectedList, categoryFilterIds, taskSearch, isCategoryFilterActive]);
+
+  const toggleCategoryFilter = (categoryId: string) => {
+    if (!selectedList) return;
+
+    setCategoryFilterIds((prev) => {
+      const base =
+        prev.size === 0 ? new Set(allCategoryIds) : new Set(prev);
+      if (base.has(categoryId)) {
+        base.delete(categoryId);
+      } else {
+        base.add(categoryId);
+      }
+      if (base.size === 0 || base.size === allCategoryIds.length) {
+        return new Set();
+      }
+      return base;
+    });
+  };
+
+  const showAllCategories = () => {
+    setCategoryFilterIds(new Set());
+  };
 
   const applyLists = useCallback((data: AgendaTodoListDTO[]) => {
     setLists(data);
@@ -438,23 +505,73 @@ export function AgendaTodoPanel({
           <Text size="sm" c="dimmed">Aucune liste de tâches.</Text>
         )}
 
+        {selectedList && selectedList.categories.length > 0 && (
+          <Stack gap="xs">
+            <TextInput
+              placeholder="Rechercher une tâche…"
+              value={taskSearch}
+              onChange={(event) => setTaskSearch(event.currentTarget.value)}
+              leftSection={<IconSearch size={16} stroke={1.5} />}
+              rightSection={
+                taskSearch ? (
+                  <UnstyledButton
+                    aria-label="Effacer la recherche"
+                    onClick={() => setTaskSearch('')}
+                    className={classes.todoSearchClear}
+                  >
+                    <IconX size={14} stroke={1.5} />
+                  </UnstyledButton>
+                ) : null
+              }
+              size="sm"
+            />
+
+            {selectedList.categories.length > 1 && (
+              <div className={classes.todoCategoryFilters} role="group" aria-label="Filtrer par catégorie">
+                <UnstyledButton
+                  type="button"
+                  className={`${classes.todoCategoryFilterChip} ${
+                    !isCategoryFilterActive ? classes.todoCategoryFilterChipActive : ''
+                  }`}
+                  onClick={showAllCategories}
+                >
+                  Toutes
+                </UnstyledButton>
+                {selectedList.categories.map((category) => {
+                  const isActive =
+                    !isCategoryFilterActive || categoryFilterIds.has(category.id);
+                  return (
+                    <UnstyledButton
+                      key={category.id}
+                      type="button"
+                      className={`${classes.todoCategoryFilterChip} ${
+                        isActive ? classes.todoCategoryFilterChipActive : ''
+                      }`}
+                      onClick={() => toggleCategoryFilter(category.id)}
+                    >
+                      {category.name}
+                    </UnstyledButton>
+                  );
+                })}
+              </div>
+            )}
+          </Stack>
+        )}
+
         {selectedList && (
           <>
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={(e) => void handleCategoryDragEnd(e)}
-            >
+            {isFiltering ? (
               <SortableContext
-                items={selectedList.categories.map((c) => c.id)}
+                items={visibleCategories.map((category) => category.id)}
                 strategy={verticalListSortingStrategy}
               >
                 <Stack gap={0}>
-                  {selectedList.categories.map((category) => (
+                  {visibleCategories.map((category) => (
                     <SortableTodoCategory
                       key={category.id}
                       category={category}
                       canWrite={canWrite}
+                      dragEnabled={false}
                       onReorderTasks={handleReorderTasks}
                       onToggleTask={handleToggleTask}
                       onRenameTask={handleRenameTask}
@@ -466,9 +583,44 @@ export function AgendaTodoPanel({
                   ))}
                 </Stack>
               </SortableContext>
-            </DndContext>
+            ) : (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={(e) => void handleCategoryDragEnd(e)}
+              >
+                <SortableContext
+                  items={selectedList.categories.map((c) => c.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <Stack gap={0}>
+                    {selectedList.categories.map((category) => (
+                      <SortableTodoCategory
+                        key={category.id}
+                        category={category}
+                        canWrite={canWrite}
+                        dragEnabled
+                        onReorderTasks={handleReorderTasks}
+                        onToggleTask={handleToggleTask}
+                        onRenameTask={handleRenameTask}
+                        onDeleteTask={handleDeleteTask}
+                        onDeleteCategory={handleDeleteCategory}
+                        onRenameCategory={handleRenameCategory}
+                        onAddTask={handleAddTask}
+                      />
+                    ))}
+                  </Stack>
+                </SortableContext>
+              </DndContext>
+            )}
 
-            {canWrite && (
+            {isFiltering && visibleCategories.length === 0 && (
+              <Text size="sm" c="dimmed" py="sm">
+                Aucune tâche ne correspond à votre recherche.
+              </Text>
+            )}
+
+            {canWrite && !isFiltering && (
               <InlineNoteInput
                 placeholder="Nouvelle catégorie…"
                 onSubmit={handleCreateCategory}

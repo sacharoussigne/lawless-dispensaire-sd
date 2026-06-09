@@ -13,6 +13,7 @@ import classes from '../agenda.module.scss';
 interface SortableTodoTaskProps {
   task: AgendaTodoTaskDTO;
   canWrite: boolean;
+  dragEnabled?: boolean;
   onToggle: (id: string, completed: boolean) => void;
   onRename: (id: string, title: string) => void | Promise<void>;
   onDelete: (id: string) => void;
@@ -21,14 +22,16 @@ interface SortableTodoTaskProps {
 export function SortableTodoTask({
   task,
   canWrite,
+  dragEnabled = true,
   onToggle,
   onRename,
   onDelete,
 }: SortableTodoTaskProps) {
   const [editing, setEditing] = useState(false);
+  const canDrag = canWrite && dragEnabled;
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: task.id, disabled: !canWrite || editing });
+    useSortable({ id: task.id, disabled: !canDrag || editing });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -40,9 +43,9 @@ export function SortableTodoTask({
     <div
       ref={setNodeRef}
       style={style}
-      className={`${classes.todoTaskRow} ${canWrite && !editing ? classes.todoTaskRowDraggable : ''}`}
+      className={`${classes.todoTaskRow} ${canDrag && !editing ? classes.todoTaskRowDraggable : ''}`}
       data-dragging={isDragging || undefined}
-      {...(canWrite && !editing ? { ...attributes, ...listeners } : {})}
+      {...(canDrag && !editing ? { ...attributes, ...listeners } : {})}
     >
       <Checkbox
         checked={task.completed}

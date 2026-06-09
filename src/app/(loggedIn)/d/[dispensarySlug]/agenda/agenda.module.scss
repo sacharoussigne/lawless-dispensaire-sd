@@ -172,6 +172,49 @@
   }
 }
 
+.todoSearchClear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--mantine-color-dimmed);
+  padding: 0.15rem;
+  border-radius: var(--mantine-radius-xs);
+
+  &:hover {
+    color: var(--disp-ink);
+    background: var(--mantine-color-sage-0);
+  }
+}
+
+.todoCategoryFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.todoCategoryFilterChip {
+  font-family: var(--disp-font-ui);
+  font-size: 0.75rem;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: var(--mantine-radius-sm);
+  background: transparent;
+  color: var(--mantine-color-dimmed);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+
+  &:hover {
+    color: var(--disp-ink);
+    background: var(--mantine-color-sage-0);
+  }
+}
+
+.todoCategoryFilterChipActive {
+  color: var(--disp-ink);
+  border-color: var(--disp-border);
+  background: var(--mantine-color-sage-0);
+}
+
 .todoListTabsRow {
   min-width: 0;
 }
