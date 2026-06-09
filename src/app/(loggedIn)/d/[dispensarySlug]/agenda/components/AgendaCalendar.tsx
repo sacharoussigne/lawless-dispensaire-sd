@@ -1,16 +1,15 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import { Calendar, dayjsLocalizer, type View } from 'react-big-calendar';
+import { Calendar, type View } from 'react-big-calendar';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import dayjs from '@/lib/dayjs';
 import type { AgendaEventDTO } from '@/types/agenda';
 import { listAgendaEvents } from '@/app/_actions/agenda/events';
 import { handleAction } from '@/lib/action';
 import { AGENDA_PANEL_HEIGHT_PX } from '../constants';
+import { agendaCalendarLocalizer, agendaCalendarTimeBounds } from '../calendarLocalizer';
 import classes from '../agenda.module.scss';
-
-const localizer = dayjsLocalizer(dayjs);
 
 type CalendarEvent = {
   id: string;
@@ -96,7 +95,10 @@ export function AgendaCalendar({
   return (
     <div className={`${classes.calendarWrapper} ${classes.calendarPanel}`}>
       <Calendar
-        localizer={localizer}
+        localizer={agendaCalendarLocalizer}
+        min={agendaCalendarTimeBounds.min}
+        max={agendaCalendarTimeBounds.max}
+        scrollToTime={agendaCalendarTimeBounds.scrollToTime}
         events={calendarEvents}
         view={view}
         onView={setView}
