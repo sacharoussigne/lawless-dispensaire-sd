@@ -1,14 +1,10 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useState } from 'react';
 import {
   ActionIcon,
-  Button,
   Group,
   Stack,
-  Text,
-  TextInput,
 } from '@mantine/core';
 import {
   DndContext,
@@ -30,6 +26,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { IconGripVertical, IconTrash } from '@tabler/icons-react';
 import type { AgendaTodoCategoryDTO } from '@/types/agenda';
 import { SortableTodoTask } from './SortableTodoTask';
+import { InlineNoteInput } from './InlineNoteInput';
 import classes from '../agenda.module.scss';
 
 function SortableCategoryShell({
@@ -54,17 +51,23 @@ function SortableCategoryShell({
 
   return (
     <div ref={setNodeRef} style={style} className={classes.todoCategory}>
-      <Group justify="space-between" mb="xs" wrap="nowrap">
-        <Group gap="xs" wrap="nowrap">
+      <Group justify="space-between" mb={6} wrap="nowrap" align="center">
+        <Group gap="xs" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
           {canWrite && (
             <span className={classes.grip} {...attributes} {...listeners}>
-              <IconGripVertical size={16} />
+              <IconGripVertical size={15} />
             </span>
           )}
-          <Text fw={500} size="sm">{category.name}</Text>
+          <span className={classes.todoCategoryTitle}>{category.name}</span>
         </Group>
         {canWrite && (
-          <ActionIcon variant="subtle" color="danger" size="sm" onClick={onDelete}>
+          <ActionIcon
+            variant="subtle"
+            color="danger"
+            size="sm"
+            onClick={onDelete}
+            aria-label="Supprimer la catégorie"
+          >
             <IconTrash size={14} />
           </ActionIcon>
         )}
@@ -93,7 +96,6 @@ export function SortableTodoCategory({
   onDeleteCategory,
   onAddTask,
 }: SortableTodoCategoryProps) {
-  const [newTaskTitle, setNewTaskTitle] = useState('');
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -123,7 +125,7 @@ export function SortableTodoCategory({
           items={category.tasks.map((t) => t.id)}
           strategy={verticalListSortingStrategy}
         >
-          <Stack gap={4}>
+          <Stack gap={2}>
             {category.tasks.map((task) => (
               <SortableTodoTask
                 key={task.id}
@@ -137,33 +139,10 @@ export function SortableTodoCategory({
         </SortableContext>
       </DndContext>
       {canWrite && (
-        <Group mt="xs">
-          <TextInput
-            size="xs"
-            placeholder="Nouvelle tâche…"
-            value={newTaskTitle}
-            onChange={(e) => setNewTaskTitle(e.currentTarget.value)}
-            style={{ flex: 1 }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && newTaskTitle.trim()) {
-                onAddTask(category.id, newTaskTitle.trim());
-                setNewTaskTitle('');
-              }
-            }}
-          />
-          <Button
-            size="xs"
-            color="sage"
-            variant="light"
-            onClick={() => {
-              if (!newTaskTitle.trim()) return;
-              onAddTask(category.id, newTaskTitle.trim());
-              setNewTaskTitle('');
-            }}
-          >
-            +
-          </Button>
-        </Group>
+        <InlineNoteInput
+          placeholder="Nouvelle tâche…"
+          onSubmit={(title) => onAddTask(category.id, title)}
+        />
       )}
     </SortableCategoryShell>
   );

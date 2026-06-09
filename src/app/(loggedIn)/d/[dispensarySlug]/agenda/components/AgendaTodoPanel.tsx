@@ -4,10 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   Button,
   Group,
-  Select,
   Stack,
   Text,
-  TextInput,
   Title,
 } from '@mantine/core';
 import {
@@ -25,7 +23,7 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { IconArchive, IconPlus } from '@tabler/icons-react';
+import { IconArchive } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import {
   createAgendaTodoCategory,
@@ -43,6 +41,7 @@ import { canWriteAgenda, type AgendaTodoListDTO } from '@/types/agenda';
 import type { AgendaAccessLevel } from '@prisma/client';
 import { SortableTodoCategory } from './SortableTodoCategory';
 import { AgendaTodoArchivesDrawer } from './AgendaTodoArchivesDrawer';
+import { InlineNoteInput } from './InlineNoteInput';
 import classes from '../agenda.module.scss';
 
 interface AgendaTodoPanelProps {
@@ -64,8 +63,6 @@ export function AgendaTodoPanel({
   );
   const [archivesOpen, setArchivesOpen] = useState(false);
   const [archiveLists, setArchiveLists] = useState<AgendaTodoListDTO[]>([]);
-  const [newListName, setNewListName] = useState('');
-  const [newCategoryName, setNewCategoryName] = useState('');
   const canWrite = canWriteAgenda(accessLevel);
 
   const selectedList = lists.find((l) => l.id === selectedListId) ?? lists[0] ?? null;
@@ -85,7 +82,7 @@ export function AgendaTodoPanel({
       notifications.show({
         title: 'Erreur',
         message: error instanceof Error ? error.message : 'Chargement impossible',
-        color: 'red',
+        color: 'danger',
       });
     }
   }, [agendaId, dispensarySlug, selectedListId]);
@@ -170,7 +167,7 @@ export function AgendaTodoPanel({
       notifications.show({
         title: 'Erreur',
         message: error instanceof Error ? error.message : 'Mise à jour impossible',
-        color: 'red',
+        color: 'danger',
       });
     }
   };
@@ -186,7 +183,7 @@ export function AgendaTodoPanel({
       notifications.show({
         title: 'Erreur',
         message: error instanceof Error ? error.message : 'Suppression impossible',
-        color: 'red',
+        color: 'danger',
       });
     }
   };
@@ -206,44 +203,45 @@ export function AgendaTodoPanel({
       notifications.show({
         title: 'Erreur',
         message: error instanceof Error ? error.message : 'Chargement impossible',
-        color: 'red',
+        color: 'danger',
       });
     }
   };
 
-  const handleCreateList = async () => {
-    if (!agendaId || !newListName.trim()) return;
+  const handleCreateList = async (name: string) => {
+    if (!agendaId) return;
     try {
       const result = await createAgendaTodoList(dispensarySlug, {
         agendaId,
-        name: newListName.trim(),
+        name,
       });
-      handleAction(result);
-      setNewListName('');
+      const data = handleAction(result);
+      if (data) {
+        setSelectedListId(data.id);
+      }
       await reload();
     } catch (error: unknown) {
       notifications.show({
         title: 'Erreur',
         message: error instanceof Error ? error.message : 'Création impossible',
-        color: 'red',
+        color: 'danger',
       });
     }
   };
 
-  const handleCreateCategory = async () => {
-    if (!selectedList || !newCategoryName.trim()) return;
+  const handleCreateCategory = async (name: string) => {
+    if (!selectedList) return;
     try {
       await createAgendaTodoCategory(dispensarySlug, {
         listId: selectedList.id,
-        name: newCategoryName.trim(),
+        name,
       });
-      setNewCategoryName('');
       await reload();
     } catch (error: unknown) {
       notifications.show({
         title: 'Erreur',
         message: error instanceof Error ? error.message : 'Création impossible',
-        color: 'red',
+        color: 'danger',
       });
     }
   };
@@ -256,7 +254,7 @@ export function AgendaTodoPanel({
       notifications.show({
         title: 'Erreur',
         message: error instanceof Error ? error.message : 'Ajout impossible',
-        color: 'red',
+        color: 'danger',
       });
     }
   };
@@ -269,7 +267,7 @@ export function AgendaTodoPanel({
       notifications.show({
         title: 'Erreur',
         message: error instanceof Error ? error.message : 'Suppression impossible',
-        color: 'red',
+        color: 'danger',
       });
     }
   };
@@ -299,58 +297,41 @@ export function AgendaTodoPanel({
 
       <Stack gap="md">
         {lists.length > 1 && (
-          <Select
-            label="Liste"
-            data={lists.map((l) => ({ value: l.id, label: l.name }))}
-            value={selectedList?.id ?? null}
-            onChange={(v) => setSelectedListId(v)}
+          <div className={classes.todoListTabs}>
+            {lists.map((list) => (
+              <button
+                key={list.id}
+                type="button"
+                className={`${classes.todoListTab} ${
+                  selectedList?.id === list.id ? classes.todoListTabActive : ''
+                }`}
+                onClick={() => setSelectedListId(list.id)}
+              >
+                {list.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {lists.length === 1 && selectedList && (
+          <Text size="sm" fw={500} className="disp-display-title">
+            {selectedList.name}
+          </Text>
+        )}
+
+        {lists.length === 0 && canWrite && (
+          <InlineNoteInput
+            placeholder="Nommer une nouvelle liste…"
+            onSubmit={handleCreateList}
           />
         )}
 
-        {lists.length === 0 && (
+        {lists.length === 0 && !canWrite && (
           <Text size="sm" c="dimmed">Aucune liste de tâches.</Text>
-        )}
-
-        {canWrite && (
-          <Group>
-            <TextInput
-              placeholder="Nouvelle liste…"
-              value={newListName}
-              onChange={(e) => setNewListName(e.currentTarget.value)}
-              style={{ flex: 1 }}
-            />
-            <Button
-              color="sage"
-              variant="light"
-              leftSection={<IconPlus size={14} />}
-              onClick={() => void handleCreateList()}
-            >
-              Liste
-            </Button>
-          </Group>
         )}
 
         {selectedList && (
           <>
-            {canWrite && (
-              <Group>
-                <TextInput
-                  placeholder="Nouvelle catégorie…"
-                  value={newCategoryName}
-                  onChange={(e) => setNewCategoryName(e.currentTarget.value)}
-                  style={{ flex: 1 }}
-                />
-                <Button
-                  size="sm"
-                  color="sage"
-                  variant="light"
-                  onClick={() => void handleCreateCategory()}
-                >
-                  Catégorie
-                </Button>
-              </Group>
-            )}
-
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
@@ -360,7 +341,7 @@ export function AgendaTodoPanel({
                 items={selectedList.categories.map((c) => c.id)}
                 strategy={verticalListSortingStrategy}
               >
-                <Stack gap="sm">
+                <Stack gap={0}>
                   {selectedList.categories.map((category) => (
                     <SortableTodoCategory
                       key={category.id}
@@ -376,6 +357,20 @@ export function AgendaTodoPanel({
                 </Stack>
               </SortableContext>
             </DndContext>
+
+            {canWrite && (
+              <InlineNoteInput
+                placeholder="Nouvelle catégorie…"
+                onSubmit={handleCreateCategory}
+              />
+            )}
+
+            {canWrite && lists.length > 0 && (
+              <InlineNoteInput
+                placeholder="Ajouter une autre liste…"
+                onSubmit={handleCreateList}
+              />
+            )}
           </>
         )}
       </Stack>
