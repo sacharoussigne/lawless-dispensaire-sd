@@ -3,14 +3,12 @@
 import type { ReactNode } from 'react';
 import {
   ActionIcon,
-  Group,
   Stack,
 } from '@mantine/core';
 import {
   DndContext,
   closestCenter,
   KeyboardSensor,
-  PointerSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -23,10 +21,11 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { IconGripVertical, IconTrash } from '@tabler/icons-react';
+import { IconTrash } from '@tabler/icons-react';
 import type { AgendaTodoCategoryDTO } from '@/types/agenda';
 import { SortableTodoTask } from './SortableTodoTask';
 import { InlineNoteInput } from './InlineNoteInput';
+import { stopDragPointer, usePressHoldPointerSensor } from './agendaDnd';
 import classes from '../agenda.module.scss';
 
 function SortableCategoryShell({
@@ -51,27 +50,27 @@ function SortableCategoryShell({
 
   return (
     <div ref={setNodeRef} style={style} className={classes.todoCategory}>
-      <Group justify="space-between" mb={6} wrap="nowrap" align="center">
-        <Group gap="xs" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
-          {canWrite && (
-            <span className={classes.grip} {...attributes} {...listeners}>
-              <IconGripVertical size={15} />
-            </span>
-          )}
-          <span className={classes.todoCategoryTitle}>{category.name}</span>
-        </Group>
+      <div
+        className={`${classes.todoCategoryHeader} ${
+          canWrite ? classes.todoCategoryHeaderDraggable : ''
+        }`}
+        data-dragging={isDragging || undefined}
+        {...(canWrite ? { ...attributes, ...listeners } : {})}
+      >
+        <span className={classes.todoCategoryTitle}>{category.name}</span>
         {canWrite && (
           <ActionIcon
             variant="subtle"
             color="danger"
             size="sm"
             onClick={onDelete}
+            onPointerDown={stopDragPointer}
             aria-label="Supprimer la catégorie"
           >
             <IconTrash size={14} />
           </ActionIcon>
         )}
-      </Group>
+      </div>
       {children}
     </div>
   );
@@ -97,7 +96,7 @@ export function SortableTodoCategory({
   onAddTask,
 }: SortableTodoCategoryProps) {
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    usePressHoldPointerSensor(),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 

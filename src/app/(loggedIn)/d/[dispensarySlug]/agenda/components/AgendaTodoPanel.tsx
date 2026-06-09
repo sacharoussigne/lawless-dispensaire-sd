@@ -12,7 +12,6 @@ import {
   DndContext,
   closestCenter,
   KeyboardSensor,
-  PointerSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -42,6 +41,7 @@ import type { AgendaAccessLevel } from '@prisma/client';
 import { SortableTodoCategory } from './SortableTodoCategory';
 import { AgendaTodoArchivesDrawer } from './AgendaTodoArchivesDrawer';
 import { InlineNoteInput } from './InlineNoteInput';
+import { usePressHoldPointerSensor } from './agendaDnd';
 import classes from '../agenda.module.scss';
 
 interface AgendaTodoPanelProps {
@@ -99,7 +99,7 @@ export function AgendaTodoPanel({
   }, [agendaId, reload]);
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    usePressHoldPointerSensor(),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
