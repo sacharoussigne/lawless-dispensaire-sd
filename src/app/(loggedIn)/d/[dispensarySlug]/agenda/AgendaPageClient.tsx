@@ -79,16 +79,14 @@ export function AgendaPageClient({
     setEventModalOpen(true);
   };
 
-  if (agendas.length === 0) {
+  const participantOnly = agendas.length === 0 && initialEvents.length > 0;
+
+  if (agendas.length === 0 && !participantOnly) {
     return (
       <Container size="xl" py="xl">
         <PageHeader title="Agenda" description="Planification et listes de tâches." />
         <Stack align="center" py="xl" gap="md">
-          <Text c="dimmed">
-            {isAdmin
-              ? 'Aucun agenda n\'a encore été créé pour ce dispensaire.'
-              : 'Vous n\'avez accès à aucun agenda.'}
-          </Text>
+          <Text c="dimmed">Vous n&apos;avez accès à aucun agenda.</Text>
           {isAdmin && (
             <Button component={Link} href={t.admin.agendas} color="sage">
               Gérer les agendas
@@ -99,62 +97,77 @@ export function AgendaPageClient({
     );
   }
 
+  const showCalendar = Boolean(selectedAgendaId) || participantOnly;
+  const eventModalAgendaId = selectedAgendaId ?? selectedEvent?.agendaId ?? '';
+
   return (
     <Container size="xl" py="xl">
       <PageHeader
         title="Agenda"
-        description={selectedAgenda?.description ?? 'Calendrier partagé et listes de tâches.'}
+        description={
+          participantOnly
+            ? 'Événements auxquels vous participez.'
+            : (selectedAgenda?.description ?? 'Calendrier partagé et listes de tâches.')
+        }
         actions={
-          <Group>
-            <AgendaSelector
-              agendas={agendas}
-              value={selectedAgendaId}
-              onChange={setSelectedAgendaId}
-            />
-            {canWrite && selectedAgendaId && (
-              <Button
-                color="sage"
-                leftSection={<IconPlus size={16} />}
-                onClick={handleCreateEvent}
-              >
-                Événement
-              </Button>
-            )}
-          </Group>
+          !participantOnly ? (
+            <Group>
+              <AgendaSelector
+                agendas={agendas}
+                value={selectedAgendaId}
+                onChange={setSelectedAgendaId}
+              />
+              {canWrite && selectedAgendaId && (
+                <Button
+                  color="sage"
+                  leftSection={<IconPlus size={16} />}
+                  onClick={handleCreateEvent}
+                >
+                  Événement
+                </Button>
+              )}
+            </Group>
+          ) : undefined
         }
       />
 
-      <div className={classes.layout}>
-        {selectedAgendaId && (
+      <div className={participantOnly ? undefined : classes.layout}>
+        {showCalendar && (
           <AgendaCalendar
-            key={`${selectedAgendaId}-${calendarKey}`}
+            key={
+              participantOnly
+                ? `participant-${calendarKey}`
+                : `${selectedAgendaId}-${calendarKey}`
+            }
             dispensarySlug={dispensarySlug}
             agendaId={selectedAgendaId}
             initialEvents={initialEvents}
-            canWrite={canWrite}
+            canWrite={canWrite && !participantOnly}
             onSelectEvent={handleSelectEvent}
             onSelectSlot={handleSelectSlot}
           />
         )}
 
-        <AgendaTodoPanel
-          dispensarySlug={dispensarySlug}
-          agendaId={selectedAgendaId}
-          accessLevel={selectedAgenda?.accessLevel ?? null}
-          initialLists={initialTodoLists}
-        />
+        {!participantOnly && (
+          <AgendaTodoPanel
+            dispensarySlug={dispensarySlug}
+            agendaId={selectedAgendaId}
+            accessLevel={selectedAgenda?.accessLevel ?? null}
+            initialLists={initialTodoLists}
+          />
+        )}
       </div>
 
-      {selectedAgendaId && (
+      {eventModalAgendaId && (
         <EventModal
           opened={eventModalOpen}
           onClose={() => setEventModalOpen(false)}
           dispensarySlug={dispensarySlug}
-          agendaId={selectedAgendaId}
+          agendaId={eventModalAgendaId}
           event={selectedEvent}
           slotStart={slotStart}
           slotEnd={slotEnd}
-          canWrite={canWrite}
+          canWrite={canWrite && !participantOnly}
           onSuccess={refreshCalendar}
         />
       )}

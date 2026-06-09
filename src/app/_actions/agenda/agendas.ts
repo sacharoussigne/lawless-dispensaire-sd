@@ -113,7 +113,7 @@ export async function checkAgendaModuleAccess(dispensarySlug: string) {
       ctx.tenant.effectiveRole,
     );
 
-    return { status: 200, data: { hasAccess: hasAccess || isAdmin, isAdmin } };
+    return { status: 200, data: { hasAccess, isAdmin } };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la vérification d\'accès');
   }
@@ -121,7 +121,7 @@ export async function checkAgendaModuleAccess(dispensarySlug: string) {
 
 export async function createAgenda(
   dispensarySlug: string,
-  data: { name: string; description?: string | null },
+  data: { name: string; description?: string | null; ownerUserId: string },
 ) {
   try {
     const auth = await requireDispensaryAdminContext(dispensarySlug);
@@ -130,6 +130,23 @@ export async function createAgenda(
     }
 
     const validated = createAgendaSchema.parse(data);
+
+    const ownerMember = await prisma.dispensaryMember.findUnique({
+      where: {
+        dispensaryId_userId: {
+          dispensaryId: auth.ctx.dispensaryId,
+          userId: validated.ownerUserId,
+        },
+      },
+      select: { userId: true },
+    });
+
+    if (!ownerMember) {
+      return {
+        status: 400,
+        error: 'Le propriétaire doit être membre du dispensaire',
+      };
+    }
 
     const agenda = await prisma.$transaction(async (tx) => {
       const created = await tx.agenda.create({
@@ -143,7 +160,7 @@ export async function createAgenda(
       await tx.agendaMember.create({
         data: {
           agendaId: created.id,
-          userId: auth.ctx.userId,
+          userId: validated.ownerUserId,
           accessLevel: 'OWNER',
         },
       });

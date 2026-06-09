@@ -46,7 +46,8 @@ function mapFromDb(row: {
     featureMailsEnabled: row.featureMailsEnabled,
     featurePayrollEnabled: row.featurePayrollEnabled,
     featureWeeklyDispensaryActivityEnabled: row.featureWeeklyDispensaryActivityEnabled,
-    featureAgendaEnabled: row.featureAgendaEnabled,
+    featureAgendaEnabled:
+      row.featureAgendaEnabled ?? APP_SETTINGS_DEFAULTS.featureAgendaEnabled,
     weeklyActivityChestDaysVisible:
       row.weeklyActivityChestDaysVisible ?? APP_SETTINGS_DEFAULTS.weeklyActivityChestDaysVisible,
     weeklyActivityPresenceDaysVisible:

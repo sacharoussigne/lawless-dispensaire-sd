@@ -15,9 +15,6 @@ import {
 } from '@/lib/dispensary/context';
 import { notFound, redirect } from 'next/navigation';
 import { userHasAnyAgendaAccess } from '@/lib/agenda/access';
-import { isPlatformAdmin } from '@/lib/dispensary/platformAdmin';
-import { hasRole } from '@/lib/auth/permissions';
-import { Role } from '@/types/enum/roles';
 
 export default async function DispensaryLayout({
   children,
@@ -55,9 +52,7 @@ export default async function DispensaryLayout({
         userId,
         session.user.role,
         effectiveRole,
-      ) ||
-      isPlatformAdmin(session.user.role) ||
-      hasRole(effectiveRole, Role.ADMIN)
+      )
     : false;
 
   return (

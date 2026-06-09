@@ -37,21 +37,19 @@ export async function resolveAgendaAccess(
     return { ok: false, status: 404, error: 'Agenda introuvable' };
   }
 
-  const isAdmin = isDispensaryAdminRole(platformRole, effectiveRole);
-
   const membership = await prisma.agendaMember.findUnique({
     where: { agendaId_userId: { agendaId, userId } },
     select: { accessLevel: true },
   });
 
-  if (!membership && !isAdmin) {
+  if (!membership) {
     return { ok: false, status: 403, error: 'Accès non autorisé à cet agenda' };
   }
 
   return {
     ok: true,
-    accessLevel: membership?.accessLevel ?? null,
-    isDispensaryAdmin: isAdmin,
+    accessLevel: membership.accessLevel,
+    isDispensaryAdmin: isDispensaryAdminRole(platformRole, effectiveRole),
   };
 }
 
@@ -71,10 +69,7 @@ export async function requireAgendaRead(
   );
   if (!access.ok) return access;
 
-  if (
-    !canReadAgenda(access.accessLevel) &&
-    !access.isDispensaryAdmin
-  ) {
+  if (!canReadAgenda(access.accessLevel)) {
     return { ok: false, status: 403, error: 'Accès lecture requis' };
   }
 
@@ -149,17 +144,9 @@ export async function canManageAgendaMembers(
 export async function listAccessibleAgendaIds(
   dispensaryId: string,
   userId: string,
-  platformRole: string | null | undefined,
-  effectiveRole: string | null | undefined,
+  _platformRole?: string | null | undefined,
+  _effectiveRole?: string | null | undefined,
 ): Promise<string[]> {
-  if (isDispensaryAdminRole(platformRole, effectiveRole)) {
-    const agendas = await prisma.agenda.findMany({
-      where: tenantWhere(dispensaryId),
-      select: { id: true },
-    });
-    return agendas.map((a) => a.id);
-  }
-
   const memberships = await prisma.agendaMember.findMany({
     where: {
       userId,
@@ -174,19 +161,26 @@ export async function listAccessibleAgendaIds(
 export async function userHasAnyAgendaAccess(
   dispensaryId: string,
   userId: string,
-  platformRole: string | null | undefined,
-  effectiveRole: string | null | undefined,
+  _platformRole?: string | null | undefined,
+  _effectiveRole?: string | null | undefined,
 ): Promise<boolean> {
-  if (isDispensaryAdminRole(platformRole, effectiveRole)) {
-    return true;
-  }
-
-  const count = await prisma.agendaMember.count({
+  const membershipCount = await prisma.agendaMember.count({
     where: {
       userId,
       agenda: tenantWhere(dispensaryId),
     },
   });
 
-  return count > 0;
+  if (membershipCount > 0) {
+    return true;
+  }
+
+  const participantCount = await prisma.agendaEventParticipant.count({
+    where: {
+      userId,
+      event: { agenda: tenantWhere(dispensaryId) },
+    },
+  });
+
+  return participantCount > 0;
 }

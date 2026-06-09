@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
 import { tenantWhere } from '@/lib/dispensary/tenantWhere';
 import { canManageAgendaMembers } from '@/lib/agenda/access';
+import { requireDispensaryAdminContext } from '@/lib/dispensary/serverActionContext';
 import {
   upsertAgendaMemberSchema,
   removeAgendaMemberSchema,
@@ -139,31 +140,46 @@ export async function removeAgendaMember(
   }
 }
 
+export type AgendaUserSearchResult = {
+  id: string;
+  name: string;
+  image: string | null;
+};
+
 export async function searchDispensaryUsersForAgenda(
   dispensarySlug: string,
   query: string,
+  options?: { adminContext?: boolean },
 ) {
   try {
-    const ctx = await getAgendaSessionContext(dispensarySlug);
-    if (!ctx.ok) return ctx.response;
-
     const q = query.trim();
     if (q.length < 2) {
-      return { status: 200, data: [] };
+      return { status: 200, data: [] as AgendaUserSearchResult[] };
+    }
+
+    let dispensaryId: string;
+
+    if (options?.adminContext) {
+      const auth = await requireDispensaryAdminContext(dispensarySlug);
+      if (!auth.ok) {
+        return { status: auth.status, error: auth.error };
+      }
+      dispensaryId = auth.ctx.dispensaryId;
+    } else {
+      const ctx = await getAgendaSessionContext(dispensarySlug);
+      if (!ctx.ok) return ctx.response;
+      dispensaryId = ctx.tenant.dispensaryId;
     }
 
     const members = await prisma.dispensaryMember.findMany({
       where: {
-        ...tenantWhere(ctx.tenant.dispensaryId),
+        ...tenantWhere(dispensaryId),
         user: {
-          OR: [
-            { name: { contains: q, mode: 'insensitive' } },
-            { email: { contains: q, mode: 'insensitive' } },
-          ],
+          name: { contains: q, mode: 'insensitive' },
         },
       },
       include: {
-        user: { select: { id: true, name: true, email: true, image: true } },
+        user: { select: { id: true, name: true, image: true } },
       },
       take: 20,
       orderBy: { user: { name: 'asc' } },

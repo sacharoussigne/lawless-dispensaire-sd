@@ -5,10 +5,13 @@ export const agendaAccessLevelSchema = z.enum(['OWNER', 'WRITE', 'READ']);
 export const createAgendaSchema = z.object({
   name: z.string().trim().min(1, 'Le nom est requis').max(120),
   description: z.string().trim().max(2000).optional().nullable(),
+  ownerUserId: z.string().min(1, 'Le propriétaire est requis'),
 });
 
-export const updateAgendaSchema = createAgendaSchema.extend({
+export const updateAgendaSchema = z.object({
   id: z.string().uuid(),
+  name: z.string().trim().min(1, 'Le nom est requis').max(120),
+  description: z.string().trim().max(2000).optional().nullable(),
 });
 
 export const deleteAgendaSchema = z.object({

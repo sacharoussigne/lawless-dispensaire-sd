@@ -46,7 +46,7 @@ export function AgendaMembersModal({
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<
-    { id: string; name: string; email: string }[]
+    { id: string; name: string }[]
   >([]);
   const [accessLevel, setAccessLevel] = useState<AgendaAccessLevel>('READ');
 
@@ -87,6 +87,7 @@ export function AgendaMembersModal({
         const result = await searchDispensaryUsersForAgenda(
           dispensarySlug,
           searchQuery,
+          { adminContext: true },
         );
         const data = handleAction(result);
         if (data) {
@@ -175,7 +176,7 @@ export function AgendaMembersModal({
         <Group align="flex-end" grow>
           <TextInput
             label="Rechercher un utilisateur"
-            placeholder="Nom ou email…"
+            placeholder="Pseudo…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.currentTarget.value)}
           />
@@ -194,9 +195,7 @@ export function AgendaMembersModal({
           <Stack gap="xs">
             {searchResults.map((user) => (
               <Group key={user.id} justify="space-between">
-                <Text size="sm">
-                  {user.name} <Text span c="dimmed" size="xs">({user.email})</Text>
-                </Text>
+                <Text size="sm">{user.name}</Text>
                 <Button
                   size="xs"
                   color="sage"

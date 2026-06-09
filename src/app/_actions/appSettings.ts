@@ -183,7 +183,7 @@ export async function updateAppSettings(
       featureMailsEnabled: row.featureMailsEnabled,
       featurePayrollEnabled: row.featurePayrollEnabled,
       featureWeeklyDispensaryActivityEnabled: row.featureWeeklyDispensaryActivityEnabled,
-      featureAgendaEnabled: row.featureAgendaEnabled,
+      featureAgendaEnabled: row.featureAgendaEnabled ?? true,
       weeklyActivityChestDaysVisible: row.weeklyActivityChestDaysVisible ?? true,
       weeklyActivityPresenceDaysVisible: row.weeklyActivityPresenceDaysVisible ?? true,
       weeklyActivityPatientsVisible: row.weeklyActivityPatientsVisible ?? true,

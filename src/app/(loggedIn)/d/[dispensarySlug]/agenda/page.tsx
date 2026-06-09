@@ -41,13 +41,11 @@ export default async function AgendaPage({
   const rangeEnd = dayjs().endOf('month').add(1, 'week').toDate();
 
   const [eventsResult, todosResult] = await Promise.all([
-    firstAgendaId
-      ? listAgendaEvents(dispensarySlug, {
-          agendaId: firstAgendaId,
-          rangeStart: rangeStart.toISOString(),
-          rangeEnd: rangeEnd.toISOString(),
-        })
-      : Promise.resolve({ status: 200 as const, data: [] }),
+    listAgendaEvents(dispensarySlug, {
+      agendaId: firstAgendaId,
+      rangeStart: rangeStart.toISOString(),
+      rangeEnd: rangeEnd.toISOString(),
+    }),
     firstAgendaId
       ? listAgendaTodoLists(dispensarySlug, firstAgendaId)
       : Promise.resolve({ status: 200 as const, data: [] }),

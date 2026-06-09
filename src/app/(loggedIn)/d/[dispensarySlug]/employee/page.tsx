@@ -18,9 +18,6 @@ import { dispensarySiteTitle, getAppSettings } from '@/lib/appSettings';
 import type { AuthSession } from '@/types/session';
 import { getEffectiveRoleForDispensary, requireDispensaryFromSlug } from '@/lib/dispensary/context';
 import { userHasAnyAgendaAccess } from '@/lib/agenda/access';
-import { isPlatformAdmin } from '@/lib/dispensary/platformAdmin';
-import { hasRole } from '@/lib/auth/permissions';
-import { Role } from '@/types/enum/roles';
 import { ModuleCard, type ModuleCardProps } from '@/app/_components/ModuleCard/ModuleCard';
 import { PageHeader } from '@/app/_components/PageHeader/PageHeader';
 
@@ -44,9 +41,7 @@ export default async function EmployeePage({
         userId,
         session.user.role,
         effectiveRole,
-      ) ||
-      isPlatformAdmin(session.user.role) ||
-      hasRole(effectiveRole, Role.ADMIN)
+      )
     : false;
 
   const employeeSections: (ModuleCardProps & { hasAccess: boolean })[] = [
