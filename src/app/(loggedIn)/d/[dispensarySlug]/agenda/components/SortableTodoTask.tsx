@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Checkbox, Text, ActionIcon } from '@mantine/core';
+import { useState } from 'react';
+import { Checkbox, ActionIcon } from '@mantine/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { IconTrash } from '@tabler/icons-react';
 import type { AgendaTodoTaskDTO } from '@/types/agenda';
 import { stopDragPointer } from './agendaDnd';
+import { InlineEditableText } from './InlineEditableText';
 import classes from '../agenda.module.scss';
 
 interface SortableTodoTaskProps {
@@ -25,41 +26,9 @@ export function SortableTodoTask({
   onDelete,
 }: SortableTodoTaskProps) {
   const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState(task.title);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const skipBlurCommit = useRef(false);
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: task.id, disabled: !canWrite || editing });
-
-  useEffect(() => {
-    if (!editing) return;
-    requestAnimationFrame(() => {
-      inputRef.current?.focus();
-      inputRef.current?.select();
-    });
-  }, [editing]);
-
-  const commit = useCallback(async () => {
-    const trimmed = value.trim();
-    setEditing(false);
-    if (!trimmed || trimmed === task.title) {
-      setValue(task.title);
-      return;
-    }
-    await onRename(task.id, trimmed);
-  }, [value, task.id, task.title, onRename]);
-
-  const cancel = () => {
-    setEditing(false);
-    setValue(task.title);
-  };
-
-  const startEditing = () => {
-    if (!canWrite) return;
-    setValue(task.title);
-    setEditing(true);
-  };
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -81,49 +50,16 @@ export function SortableTodoTask({
         disabled={!canWrite}
         onPointerDown={stopDragPointer}
       />
-      {editing ? (
-        <input
-          ref={inputRef}
-          type="text"
-          className={classes.todoTaskEditInput}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onPointerDown={stopDragPointer}
-          onBlur={() => {
-            if (skipBlurCommit.current) {
-              skipBlurCommit.current = false;
-              return;
-            }
-            void commit();
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              skipBlurCommit.current = true;
-              void commit();
-            }
-            if (e.key === 'Escape') {
-              e.preventDefault();
-              skipBlurCommit.current = true;
-              cancel();
-            }
-          }}
-        />
-      ) : (
-        <Text
-          size="sm"
-          style={{ flex: 1 }}
-          className={`${classes.todoTaskTitle} ${
-            task.completed ? classes.todoTaskCompleted : ''
-          }`}
-          onDoubleClick={(e) => {
-            e.stopPropagation();
-            startEditing();
-          }}
-        >
-          {task.title}
-        </Text>
-      )}
+      <InlineEditableText
+        value={task.title}
+        canEdit={canWrite}
+        onSave={(title) => onRename(task.id, title)}
+        textClassName={`${classes.todoTaskTitle} ${
+          task.completed ? classes.todoTaskCompleted : ''
+        }`}
+        inputClassName={classes.todoTaskEditInput}
+        onEditingChange={setEditing}
+      />
       {canWrite && task.completed && !editing && (
         <ActionIcon
           variant="subtle"

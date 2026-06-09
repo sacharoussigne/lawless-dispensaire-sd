@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   ActionIcon,
   Stack,
@@ -25,6 +25,7 @@ import { IconTrash } from '@tabler/icons-react';
 import type { AgendaTodoCategoryDTO } from '@/types/agenda';
 import { SortableTodoTask } from './SortableTodoTask';
 import { InlineNoteInput } from './InlineNoteInput';
+import { InlineEditableText } from './InlineEditableText';
 import { stopDragPointer, usePressHoldPointerSensor } from './agendaDnd';
 import classes from '../agenda.module.scss';
 
@@ -33,14 +34,18 @@ function SortableCategoryShell({
   canWrite,
   children,
   onDelete,
+  onRename,
 }: {
   category: AgendaTodoCategoryDTO;
   canWrite: boolean;
   children: ReactNode;
   onDelete: () => void;
+  onRename: (id: string, name: string) => void | Promise<void>;
 }) {
+  const [editing, setEditing] = useState(false);
+
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: category.id, disabled: !canWrite });
+    useSortable({ id: category.id, disabled: !canWrite || editing });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -52,12 +57,19 @@ function SortableCategoryShell({
     <div ref={setNodeRef} style={style} className={classes.todoCategory}>
       <div
         className={`${classes.todoCategoryHeader} ${
-          canWrite ? classes.todoCategoryHeaderDraggable : ''
+          canWrite && !editing ? classes.todoCategoryHeaderDraggable : ''
         }`}
         data-dragging={isDragging || undefined}
-        {...(canWrite ? { ...attributes, ...listeners } : {})}
+        {...(canWrite && !editing ? { ...attributes, ...listeners } : {})}
       >
-        <span className={classes.todoCategoryTitle}>{category.name}</span>
+        <InlineEditableText
+          value={category.name}
+          canEdit={canWrite}
+          onSave={(name) => onRename(category.id, name)}
+          textClassName={classes.todoCategoryTitle}
+          inputClassName={classes.todoCategoryEditInput}
+          onEditingChange={setEditing}
+        />
         {canWrite && (
           <ActionIcon
             variant="subtle"
@@ -84,6 +96,7 @@ interface SortableTodoCategoryProps {
   onRenameTask: (id: string, title: string) => void | Promise<void>;
   onDeleteTask: (id: string) => void;
   onDeleteCategory: (id: string) => void;
+  onRenameCategory: (id: string, name: string) => void | Promise<void>;
   onAddTask: (categoryId: string, title: string) => void;
 }
 
@@ -95,6 +108,7 @@ export function SortableTodoCategory({
   onRenameTask,
   onDeleteTask,
   onDeleteCategory,
+  onRenameCategory,
   onAddTask,
 }: SortableTodoCategoryProps) {
   const sensors = useSensors(
@@ -120,6 +134,7 @@ export function SortableTodoCategory({
       category={category}
       canWrite={canWrite}
       onDelete={() => onDeleteCategory(category.id)}
+      onRename={onRenameCategory}
     >
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleTaskDragEnd}>
         <SortableContext

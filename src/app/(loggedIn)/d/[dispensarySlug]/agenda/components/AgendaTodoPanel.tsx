@@ -33,6 +33,8 @@ import {
   listAgendaTodoLists,
   reorderAgendaTodoCategories,
   reorderAgendaTodoTasks,
+  updateAgendaTodoCategory,
+  updateAgendaTodoList,
   updateAgendaTodoTask,
 } from '@/app/_actions/agenda/todoLists';
 import { handleAction } from '@/lib/action';
@@ -41,6 +43,8 @@ import type { AgendaAccessLevel } from '@prisma/client';
 import { SortableTodoCategory } from './SortableTodoCategory';
 import { AgendaTodoArchivesDrawer } from './AgendaTodoArchivesDrawer';
 import { InlineNoteInput } from './InlineNoteInput';
+import { InlineEditableText } from './InlineEditableText';
+import { EditableTodoListTab } from './EditableTodoListTab';
 import { usePressHoldPointerSensor } from './agendaDnd';
 import classes from '../agenda.module.scss';
 
@@ -185,6 +189,32 @@ export function AgendaTodoPanel({
     }
   };
 
+  const handleRenameList = async (id: string, name: string) => {
+    try {
+      await updateAgendaTodoList(dispensarySlug, { id, name });
+      await reload();
+    } catch (error: unknown) {
+      notifications.show({
+        title: 'Erreur',
+        message: error instanceof Error ? error.message : 'Renommage impossible',
+        color: 'danger',
+      });
+    }
+  };
+
+  const handleRenameCategory = async (id: string, name: string) => {
+    try {
+      await updateAgendaTodoCategory(dispensarySlug, { id, name });
+      await reload();
+    } catch (error: unknown) {
+      notifications.show({
+        title: 'Erreur',
+        message: error instanceof Error ? error.message : 'Renommage impossible',
+        color: 'danger',
+      });
+    }
+  };
+
   const handleDeleteTask = async (id: string) => {
     try {
       await deleteAgendaTodoTask(dispensarySlug, id);
@@ -310,26 +340,29 @@ export function AgendaTodoPanel({
 
       <Stack gap="md">
         {lists.length > 1 && (
-          <div className={classes.todoListTabs}>
+          <div className={classes.todoListTabs} role="tablist">
             {lists.map((list) => (
-              <button
+              <EditableTodoListTab
                 key={list.id}
-                type="button"
-                className={`${classes.todoListTab} ${
-                  selectedList?.id === list.id ? classes.todoListTabActive : ''
-                }`}
-                onClick={() => setSelectedListId(list.id)}
-              >
-                {list.name}
-              </button>
+                listId={list.id}
+                name={list.name}
+                active={selectedList?.id === list.id}
+                canWrite={canWrite}
+                onSelect={setSelectedListId}
+                onRename={handleRenameList}
+              />
             ))}
           </div>
         )}
 
         {lists.length === 1 && selectedList && (
-          <Text size="sm" fw={500} className="disp-display-title">
-            {selectedList.name}
-          </Text>
+          <InlineEditableText
+            value={selectedList.name}
+            canEdit={canWrite}
+            onSave={(name) => handleRenameList(selectedList.id, name)}
+            textClassName={`disp-display-title ${classes.todoListTitle}`}
+            inputClassName={classes.todoListEditInput}
+          />
         )}
 
         {lists.length === 0 && canWrite && (
@@ -365,6 +398,7 @@ export function AgendaTodoPanel({
                       onRenameTask={handleRenameTask}
                       onDeleteTask={handleDeleteTask}
                       onDeleteCategory={handleDeleteCategory}
+                      onRenameCategory={handleRenameCategory}
                       onAddTask={handleAddTask}
                     />
                   ))}

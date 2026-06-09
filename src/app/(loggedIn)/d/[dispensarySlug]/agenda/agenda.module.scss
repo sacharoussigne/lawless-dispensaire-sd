@@ -123,6 +123,59 @@
   background: var(--mantine-color-sage-0);
 }
 
+.todoListTabEditing {
+  cursor: default;
+  padding: 0.1rem 0.35rem;
+}
+
+.todoListTabLabel {
+  display: block;
+  line-height: 1.3;
+}
+
+.todoListTabEditInput {
+  width: 100%;
+  min-width: 4rem;
+  background: var(--mantine-color-sage-0);
+  border: none;
+  border-bottom: 1px dashed var(--mantine-color-sage-4);
+  border-radius: var(--mantine-radius-xs) var(--mantine-radius-xs) 0 0;
+  padding: 0.1rem 0.2rem;
+  font-family: var(--disp-font-ui);
+  font-size: 0.8rem;
+  color: var(--disp-ink);
+  outline: none;
+
+  &:focus {
+    border-bottom-color: var(--mantine-color-sage-6);
+  }
+}
+
+.todoListTitle {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.todoListEditInput {
+  display: block;
+  width: 100%;
+  background: var(--mantine-color-sage-0);
+  border: none;
+  border-bottom: 1px dashed var(--mantine-color-sage-4);
+  border-radius: var(--mantine-radius-xs) var(--mantine-radius-xs) 0 0;
+  padding: 0.2rem 0.25rem;
+  font-family: var(--disp-font-display);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--disp-ink);
+  outline: none;
+
+  &:focus {
+    border-bottom-color: var(--mantine-color-sage-6);
+  }
+}
+
 .todoCategory {
   padding: var(--mantine-spacing-sm) 0;
   border: none;
@@ -142,6 +195,24 @@
   color: var(--disp-ink);
   flex: 1;
   min-width: 0;
+}
+
+.todoCategoryEditInput {
+  flex: 1;
+  min-width: 0;
+  background: var(--mantine-color-sage-0);
+  border: none;
+  border-bottom: 1px dashed var(--mantine-color-sage-4);
+  border-radius: var(--mantine-radius-xs) var(--mantine-radius-xs) 0 0;
+  padding: 0.1rem 0.25rem;
+  font-family: var(--disp-font-display);
+  font-size: 0.95rem;
+  color: var(--disp-ink);
+  outline: none;
+
+  &:focus {
+    border-bottom-color: var(--mantine-color-sage-6);
+  }
 }
 
 .inlineNotePlaceholder {
@@ -249,6 +320,26 @@
 .todoTaskTitle {
   flex: 1;
   min-width: 0;
+  font-size: var(--mantine-font-size-sm);
+  line-height: var(--mantine-line-height-sm);
+}
+
+.inlineEditableInput {
+  flex: 1;
+  min-width: 0;
+  background: var(--mantine-color-sage-0);
+  border: none;
+  border-bottom: 1px dashed var(--mantine-color-sage-4);
+  border-radius: var(--mantine-radius-xs) var(--mantine-radius-xs) 0 0;
+  padding: 0.1rem 0.25rem;
+  font-family: var(--disp-font-ui);
+  font-size: var(--mantine-font-size-sm);
+  color: var(--disp-ink);
+  outline: none;
+
+  &:focus {
+    border-bottom-color: var(--mantine-color-sage-6);
+  }
 }
 
 .todoTaskEditInput {
