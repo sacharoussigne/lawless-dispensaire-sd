@@ -11,6 +11,7 @@ import {
 } from '@/app/_actions/agenda/schemas';
 import {
   getAgendaSessionContext,
+  searchEligibleDispensaryUsersForAgenda,
   validateDispensaryUserIds,
 } from '@/app/_actions/agenda/internals';
 
@@ -143,6 +144,7 @@ export async function removeAgendaMember(
 export type AgendaUserSearchResult = {
   id: string;
   name: string;
+  email: string;
   image: string | null;
 };
 
@@ -152,11 +154,6 @@ export async function searchDispensaryUsersForAgenda(
   options?: { adminContext?: boolean },
 ) {
   try {
-    const q = query.trim();
-    if (q.length < 2) {
-      return { status: 200, data: [] as AgendaUserSearchResult[] };
-    }
-
     let dispensaryId: string;
 
     if (options?.adminContext) {
@@ -171,23 +168,11 @@ export async function searchDispensaryUsersForAgenda(
       dispensaryId = ctx.tenant.dispensaryId;
     }
 
-    const members = await prisma.dispensaryMember.findMany({
-      where: {
-        ...tenantWhere(dispensaryId),
-        user: {
-          name: { contains: q, mode: 'insensitive' },
-        },
-      },
-      include: {
-        user: { select: { id: true, name: true, image: true } },
-      },
-      take: 20,
-      orderBy: { user: { name: 'asc' } },
-    });
+    const data = await searchEligibleDispensaryUsersForAgenda(dispensaryId, query);
 
     return {
       status: 200,
-      data: members.map((m) => m.user),
+      data,
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la recherche');
