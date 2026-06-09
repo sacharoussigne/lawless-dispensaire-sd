@@ -12,7 +12,8 @@ import {
   TextInput,
   Textarea,
 } from '@mantine/core';
-import { DateInput } from '@mantine/dates';
+import { DateInput, DatesProvider } from '@mantine/dates';
+import 'dayjs/locale/fr';
 import { IconCalendarEvent, IconTrash } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { AppModal, AppModalFooter } from '@/app/_components/AppModal/AppModal';
@@ -312,6 +313,7 @@ export function EventModal({
         )
       }
     >
+      <DatesProvider settings={{ locale: 'fr', firstDayOfWeek: 1 }}>
       <Stack gap="md">
         <TextInput
           label="Titre"
@@ -337,6 +339,7 @@ export function EventModal({
           <DateInput
             label="Début"
             value={startDate}
+            valueFormat="DD/MM/YYYY"
             onChange={(value) => setStartDate(value ? new Date(value) : null)}
             readOnly={readOnly}
           />
@@ -354,6 +357,7 @@ export function EventModal({
           <DateInput
             label="Fin"
             value={endDate}
+            valueFormat="DD/MM/YYYY"
             onChange={(value) => setEndDate(value ? new Date(value) : null)}
             readOnly={readOnly}
           />
@@ -433,6 +437,7 @@ export function EventModal({
           </Stack>
         )}
       </Stack>
+      </DatesProvider>
     </AppModal>
   );
 }
