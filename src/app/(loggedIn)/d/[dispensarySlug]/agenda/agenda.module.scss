@@ -313,6 +313,43 @@
   }
 }
 
+.todoCategoryDropZone {
+  min-height: 0.5rem;
+  border-radius: var(--mantine-radius-xs);
+  transition: background-color 0.15s ease;
+}
+
+.todoCategoryDropZoneOver {
+  background-color: var(--mantine-color-sage-0);
+  outline: 1px dashed var(--mantine-color-sage-4);
+  outline-offset: 2px;
+}
+
+.todoTaskDragOverlay {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--mantine-spacing-xs);
+  padding: 0.35rem 0.5rem;
+  min-width: 12rem;
+  max-width: 20rem;
+  background: var(--disp-surface);
+  border: 1px solid var(--mantine-color-sage-4);
+  border-radius: var(--mantine-radius-sm);
+  box-shadow: var(--disp-shadow-header);
+  cursor: grabbing;
+  pointer-events: none;
+}
+
+.todoCategoryDragOverlay {
+  padding: 0.35rem 0.65rem;
+  background: var(--disp-surface);
+  border: 1px solid var(--disp-border);
+  border-radius: var(--mantine-radius-sm);
+  box-shadow: var(--disp-shadow-header);
+  cursor: grabbing;
+  pointer-events: none;
+}
+
 .todoCategoryTitle {
   font-family: var(--disp-font-display);
   font-weight: 400;

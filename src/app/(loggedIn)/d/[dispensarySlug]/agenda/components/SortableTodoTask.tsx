@@ -12,6 +12,7 @@ import classes from '../agenda.module.scss';
 
 interface SortableTodoTaskProps {
   task: AgendaTodoTaskDTO;
+  categoryId: string;
   canWrite: boolean;
   dragEnabled?: boolean;
   onToggle: (id: string, completed: boolean) => void;
@@ -21,6 +22,7 @@ interface SortableTodoTaskProps {
 
 export function SortableTodoTask({
   task,
+  categoryId,
   canWrite,
   dragEnabled = true,
   onToggle,
@@ -31,12 +33,16 @@ export function SortableTodoTask({
   const canDrag = canWrite && dragEnabled;
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: task.id, disabled: !canDrag || editing });
+    useSortable({
+      id: task.id,
+      disabled: !canDrag || editing,
+      data: { type: 'task', categoryId },
+    });
 
   const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.55 : 1,
+    transform: isDragging ? undefined : CSS.Transform.toString(transform),
+    transition: isDragging ? undefined : transition,
+    opacity: isDragging ? 0 : 1,
   };
 
   return (

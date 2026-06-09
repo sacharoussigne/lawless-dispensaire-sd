@@ -94,6 +94,7 @@ export const updateTodoTaskSchema = z.object({
   title: z.string().trim().min(1).max(300).optional(),
   description: z.string().trim().max(2000).optional().nullable(),
   completed: z.boolean().optional(),
+  categoryId: z.string().uuid().optional(),
 });
 
 export const deleteTodoTaskSchema = z.object({
@@ -105,6 +106,24 @@ export const reorderSchema = z.object({
     id: z.string().uuid(),
     order: z.number().int(),
   })),
+});
+
+export const moveTodoTaskSchema = z.object({
+  taskId: z.string().uuid(),
+  sourceCategoryId: z.string().uuid(),
+  targetCategoryId: z.string().uuid(),
+  sourceOrders: z.array(
+    z.object({
+      id: z.string().uuid(),
+      order: z.number().int(),
+    }),
+  ),
+  targetOrders: z.array(
+    z.object({
+      id: z.string().uuid(),
+      order: z.number().int(),
+    }),
+  ),
 });
 
 export const createEventTodoTaskSchema = z.object({

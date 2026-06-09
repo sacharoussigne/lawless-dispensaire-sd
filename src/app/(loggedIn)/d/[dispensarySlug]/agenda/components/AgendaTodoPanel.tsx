@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Button,
+  Checkbox,
   Group,
   Stack,
   Text,
@@ -12,11 +13,14 @@ import {
 } from '@mantine/core';
 import {
   DndContext,
+  DragOverlay,
   closestCenter,
   KeyboardSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -34,14 +38,14 @@ import {
   deleteAgendaTodoList,
   deleteAgendaTodoTask,
   listAgendaTodoLists,
+  moveAgendaTodoTask,
   reorderAgendaTodoCategories,
-  reorderAgendaTodoTasks,
   updateAgendaTodoCategory,
   updateAgendaTodoList,
   updateAgendaTodoTask,
 } from '@/app/_actions/agenda/todoLists';
 import { handleAction } from '@/lib/action';
-import { canWriteAgenda, type AgendaTodoListDTO } from '@/types/agenda';
+import { canWriteAgenda, type AgendaTodoListDTO, type AgendaTodoTaskDTO } from '@/types/agenda';
 import type { AgendaAccessLevel } from '@prisma/client';
 import { SortableTodoCategory } from './SortableTodoCategory';
 import { AgendaTodoArchivesDrawer } from './AgendaTodoArchivesDrawer';
@@ -50,6 +54,105 @@ import { InlineEditableText } from './InlineEditableText';
 import { EditableTodoListTab } from './EditableTodoListTab';
 import { DeleteTodoListButton } from './DeleteTodoListButton';
 import { usePressHoldPointerSensor } from './agendaDnd';
+
+type TodoCategories = AgendaTodoListDTO['categories'];
+
+function findTaskLocation(categories: TodoCategories, taskId: string) {
+  for (const category of categories) {
+    const index = category.tasks.findIndex((task) => task.id === taskId);
+    if (index >= 0) {
+      return { categoryId: category.id, index, task: category.tasks[index] };
+    }
+  }
+  return null;
+}
+
+function insertTaskAtVisibleIndex(
+  categories: TodoCategories,
+  draggingTaskId: string,
+  targetCategoryId: string,
+  visibleInsertIndex: number,
+): TodoCategories {
+  let task: AgendaTodoTaskDTO | undefined;
+
+  const withoutTask = categories.map((category) => ({
+    ...category,
+    tasks: category.tasks.filter((item) => {
+      if (item.id === draggingTaskId) {
+        task = item;
+        return false;
+      }
+      return true;
+    }),
+  }));
+
+  if (!task) return categories;
+
+  return withoutTask.map((category) => {
+    if (category.id !== targetCategoryId) return category;
+    const tasks = [...category.tasks];
+    tasks.splice(visibleInsertIndex, 0, { ...task!, categoryId: targetCategoryId });
+    return { ...category, tasks };
+  });
+}
+
+function categoriesTaskKey(categories: TodoCategories) {
+  return categories.map((c) => `${c.id}:${c.tasks.map((t) => t.id).join(',')}`).join('|');
+}
+
+function applyTaskOverPlacement(
+  categories: TodoCategories,
+  draggingTaskId: string,
+  startCategoryId: string,
+  overType: string | undefined,
+  overCategoryId: string,
+  overTaskId: string | number | undefined,
+): TodoCategories | null {
+  if (overType !== 'task' && overType !== 'category-drop') return null;
+
+  const current = findTaskLocation(categories, draggingTaskId);
+  if (!current) return null;
+
+  if (current.categoryId === startCategoryId && overCategoryId === startCategoryId) {
+    return null;
+  }
+
+  const targetCategory = categories.find((category) => category.id === overCategoryId);
+  if (!targetCategory) return null;
+
+  const visibleTasks = targetCategory.tasks.filter((task) => task.id !== draggingTaskId);
+  const visibleInsertIndex =
+    overType === 'category-drop'
+      ? visibleTasks.length
+      : visibleTasks.findIndex((task) => task.id === overTaskId);
+
+  if (overType === 'task' && visibleInsertIndex < 0) return null;
+
+  const nextCategories = insertTaskAtVisibleIndex(
+    categories,
+    draggingTaskId,
+    overCategoryId,
+    visibleInsertIndex,
+  );
+
+  if (categoriesTaskKey(categories) === categoriesTaskKey(nextCategories)) {
+    return null;
+  }
+
+  return nextCategories;
+}
+
+function reorderTaskInCategory(
+  categories: TodoCategories,
+  categoryId: string,
+  fromIndex: number,
+  toIndex: number,
+): TodoCategories {
+  return categories.map((category) => {
+    if (category.id !== categoryId) return category;
+    return { ...category, tasks: arrayMove(category.tasks, fromIndex, toIndex) };
+  });
+}
 import classes from '../agenda.module.scss';
 
 interface AgendaTodoPanelProps {
@@ -207,59 +310,278 @@ export function AgendaTodoPanel({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  const handleCategoryDragEnd = async (event: DragEndEvent) => {
-    if (!selectedList || !canWrite) return;
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const oldIndex = selectedList.categories.findIndex((c) => c.id === active.id);
-    const newIndex = selectedList.categories.findIndex((c) => c.id === over.id);
-    if (oldIndex < 0 || newIndex < 0) return;
+  const [activeDrag, setActiveDrag] = useState<
+    | { type: 'task'; task: AgendaTodoTaskDTO }
+    | { type: 'category'; name: string }
+    | null
+  >(null);
 
-    const reordered = arrayMove(selectedList.categories, oldIndex, newIndex);
-    setLists((prev) =>
-      prev.map((l) =>
-        l.id === selectedList.id ? { ...l, categories: reordered } : l,
-      ),
-    );
+  const taskDragCrossedRef = useRef(false);
+  const taskDragStartRef = useRef<{ categoryId: string; index: number } | null>(null);
+  const taskDragSnapshotRef = useRef<TodoCategories | null>(null);
+  const dragCategoriesRef = useRef<TodoCategories | null>(null);
+  const lastDragOverKeyRef = useRef<string | null>(null);
 
-    try {
-      await reorderAgendaTodoCategories(dispensarySlug, {
-        items: reordered.map((c, index) => ({ id: c.id, order: index })),
-      });
-    } catch {
-      void reload();
+  const handleDragStart = (event: DragStartEvent) => {
+    if (!selectedList) return;
+
+    const dragType = event.active.data.current?.type as string | undefined;
+    if (dragType === 'task') {
+      for (const category of selectedList.categories) {
+        const taskIndex = category.tasks.findIndex((item) => item.id === event.active.id);
+        if (taskIndex >= 0) {
+          taskDragCrossedRef.current = false;
+          lastDragOverKeyRef.current = null;
+          taskDragStartRef.current = { categoryId: category.id, index: taskIndex };
+          taskDragSnapshotRef.current = selectedList.categories.map((item) => ({
+            ...item,
+            tasks: [...item.tasks],
+          }));
+          dragCategoriesRef.current = taskDragSnapshotRef.current;
+          setActiveDrag({ type: 'task', task: category.tasks[taskIndex] });
+          return;
+        }
+      }
+      return;
+    }
+
+    if (dragType === 'category') {
+      const category = selectedList.categories.find((item) => item.id === event.active.id);
+      if (category) {
+        setActiveDrag({ type: 'category', name: category.name });
+      }
     }
   };
 
-  const handleReorderTasks = async (categoryId: string, taskIds: string[]) => {
-    if (!selectedList || !canWrite) return;
-    const category = selectedList.categories.find((c) => c.id === categoryId);
-    if (!category) return;
+  const clearActiveDrag = () => {
+    setActiveDrag(null);
+  };
 
-    const taskMap = new Map(category.tasks.map((t) => [t.id, t]));
-    const reordered = taskIds
-      .map((id) => taskMap.get(id))
-      .filter((t): t is NonNullable<typeof t> => !!t);
-
+  const applyCategoryUpdates = (
+    listId: string,
+    categories: AgendaTodoListDTO['categories'],
+  ) => {
     setLists((prev) =>
-      prev.map((l) =>
-        l.id === selectedList.id
-          ? {
-              ...l,
-              categories: l.categories.map((c) =>
-                c.id === categoryId ? { ...c, tasks: reordered } : c,
-              ),
-            }
-          : l,
-      ),
+      prev.map((list) => (list.id === listId ? { ...list, categories } : list)),
+    );
+  };
+
+  const handleDragOver = (event: DragOverEvent) => {
+    if (!selectedListId || !canWrite) return;
+
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    if (active.data.current?.type !== 'task') return;
+
+    const taskId = String(active.id);
+    const startCategoryId = taskDragStartRef.current?.categoryId;
+    if (!startCategoryId) return;
+
+    const overType = over.data.current?.type as string | undefined;
+    const overCategoryId = over.data.current?.categoryId as string | undefined;
+    if (!overCategoryId) return;
+    if (overType !== 'task' && overType !== 'category-drop') return;
+
+    const previewCategories = dragCategoriesRef.current ?? taskDragSnapshotRef.current;
+    if (!previewCategories) return;
+
+    const nextCategories = applyTaskOverPlacement(
+      previewCategories,
+      taskId,
+      startCategoryId,
+      overType,
+      overCategoryId,
+      overType === 'task' ? over.id : undefined,
     );
 
+    if (!nextCategories) return;
+
+    const nextKey = categoriesTaskKey(nextCategories);
+    if (lastDragOverKeyRef.current === nextKey) return;
+
+    lastDragOverKeyRef.current = nextKey;
+
+    const clonedCategories = nextCategories.map((category) => ({
+      ...category,
+      tasks: [...category.tasks],
+    }));
+
+    taskDragCrossedRef.current = true;
+    dragCategoriesRef.current = clonedCategories;
+
+    setLists((prev) =>
+      prev.map((item) =>
+        item.id === selectedListId ? { ...item, categories: clonedCategories } : item,
+      ),
+    );
+  };
+
+  const resetTaskDragState = () => {
+    taskDragCrossedRef.current = false;
+    taskDragStartRef.current = null;
+    taskDragSnapshotRef.current = null;
+    dragCategoriesRef.current = null;
+    lastDragOverKeyRef.current = null;
+  };
+
+  const persistTaskDragChanges = async (
+    nextCategories: TodoCategories,
+    taskId: string,
+    startCategoryId: string,
+  ) => {
+    const currentLocation = findTaskLocation(nextCategories, taskId);
+    if (!currentLocation) {
+      throw new Error('Tâche introuvable');
+    }
+
+    const sourceFinal = nextCategories.find((category) => category.id === startCategoryId);
+    const targetFinal = nextCategories.find(
+      (category) => category.id === currentLocation.categoryId,
+    );
+    if (!sourceFinal || !targetFinal) {
+      throw new Error('Catégorie introuvable');
+    }
+
+    handleAction(
+      await moveAgendaTodoTask(dispensarySlug, {
+        taskId,
+        sourceCategoryId: startCategoryId,
+        targetCategoryId: currentLocation.categoryId,
+        sourceOrders: sourceFinal.tasks.map((task, order) => ({ id: task.id, order })),
+        targetOrders: targetFinal.tasks.map((task, order) => ({ id: task.id, order })),
+      }),
+    );
+  };
+
+  const resolveTaskDropCategories = (
+    event: DragEndEvent,
+    dragStart: { categoryId: string; index: number },
+    crossedDuringDrag: boolean,
+    previewCategories: TodoCategories | null,
+    baseCategories: TodoCategories,
+  ): TodoCategories | null => {
+    const { active, over } = event;
+    const taskId = String(active.id);
+    const startCategoryId = dragStart.categoryId;
+
+    if (crossedDuringDrag && previewCategories) {
+      return previewCategories;
+    }
+
+    if (!over || active.id === over.id) {
+      return null;
+    }
+
+    const overType = over.data.current?.type as string | undefined;
+    const overCategoryId = over.data.current?.categoryId as string | undefined;
+    if (!overCategoryId) return null;
+
+    if (startCategoryId === overCategoryId) {
+      const targetIndex = baseCategories
+        .find((category) => category.id === overCategoryId)
+        ?.tasks.findIndex((task) => task.id === over.id);
+      if (targetIndex === undefined || targetIndex < 0) return null;
+      if (dragStart.index === targetIndex) return null;
+
+      return reorderTaskInCategory(
+        baseCategories,
+        startCategoryId,
+        dragStart.index,
+        targetIndex,
+      );
+    }
+
+    return applyTaskOverPlacement(
+      baseCategories,
+      taskId,
+      startCategoryId,
+      overType,
+      overCategoryId,
+      overType === 'task' ? over.id : undefined,
+    );
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const crossedDuringDrag = taskDragCrossedRef.current;
+    const dragStart = taskDragStartRef.current;
+    const dragSnapshot = taskDragSnapshotRef.current;
+    const previewCategories = dragCategoriesRef.current;
+    clearActiveDrag();
+
+    if (!selectedList || !canWrite) {
+      resetTaskDragState();
+      return;
+    }
+
+    const { active, over } = event;
+    const activeType = active.data.current?.type as string | undefined;
+
+    const restoreTaskDragSnapshot = () => {
+      if (crossedDuringDrag && dragSnapshot) {
+        applyCategoryUpdates(selectedList.id, dragSnapshot);
+      }
+    };
+
     try {
-      await reorderAgendaTodoTasks(dispensarySlug, {
-        items: reordered.map((t, index) => ({ id: t.id, order: index })),
-      });
-    } catch {
+      if (activeType === 'category') {
+        if (!over || active.id === over.id) return;
+        const overType = over.data.current?.type as string | undefined;
+        if (overType !== 'category') return;
+
+        const oldIndex = selectedList.categories.findIndex((c) => c.id === active.id);
+        const newIndex = selectedList.categories.findIndex((c) => c.id === over.id);
+        if (oldIndex < 0 || newIndex < 0) return;
+
+        const reordered = arrayMove(selectedList.categories, oldIndex, newIndex);
+        applyCategoryUpdates(selectedList.id, reordered);
+
+        handleAction(
+          await reorderAgendaTodoCategories(dispensarySlug, {
+            items: reordered.map((category, index) => ({ id: category.id, order: index })),
+          }),
+        );
+        return;
+      }
+
+      if (activeType !== 'task' || !dragStart) {
+        restoreTaskDragSnapshot();
+        return;
+      }
+
+      const taskId = String(active.id);
+      const nextCategories = resolveTaskDropCategories(
+        event,
+        dragStart,
+        crossedDuringDrag,
+        previewCategories,
+        selectedList.categories,
+      );
+
+      if (!nextCategories) {
+        restoreTaskDragSnapshot();
+        return;
+      }
+
+      if (dragSnapshot && categoriesTaskKey(dragSnapshot) === categoriesTaskKey(nextCategories)) {
+        return;
+      }
+
+      applyCategoryUpdates(selectedList.id, nextCategories);
+
+      await persistTaskDragChanges(nextCategories, taskId, dragStart.categoryId);
+    } catch (error: unknown) {
+      restoreTaskDragSnapshot();
       void reload();
+      notifications.show({
+        title: 'Erreur',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Impossible d’enregistrer le déplacement',
+        color: 'danger',
+      });
+    } finally {
+      resetTaskDragState();
     }
   };
 
@@ -572,7 +894,6 @@ export function AgendaTodoPanel({
                       category={category}
                       canWrite={canWrite}
                       dragEnabled={false}
-                      onReorderTasks={handleReorderTasks}
                       onToggleTask={handleToggleTask}
                       onRenameTask={handleRenameTask}
                       onDeleteTask={handleDeleteTask}
@@ -587,7 +908,16 @@ export function AgendaTodoPanel({
               <DndContext
                 sensors={sensors}
                 collisionDetection={closestCenter}
-                onDragEnd={(e) => void handleCategoryDragEnd(e)}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
+                onDragCancel={() => {
+                  if (taskDragCrossedRef.current && taskDragSnapshotRef.current && selectedList) {
+                    applyCategoryUpdates(selectedList.id, taskDragSnapshotRef.current);
+                  }
+                  resetTaskDragState();
+                  clearActiveDrag();
+                }}
+                onDragEnd={(e) => void handleDragEnd(e)}
               >
                 <SortableContext
                   items={selectedList.categories.map((c) => c.id)}
@@ -600,7 +930,6 @@ export function AgendaTodoPanel({
                         category={category}
                         canWrite={canWrite}
                         dragEnabled
-                        onReorderTasks={handleReorderTasks}
                         onToggleTask={handleToggleTask}
                         onRenameTask={handleRenameTask}
                         onDeleteTask={handleDeleteTask}
@@ -611,6 +940,28 @@ export function AgendaTodoPanel({
                     ))}
                   </Stack>
                 </SortableContext>
+                <DragOverlay dropAnimation={null}>
+                  {activeDrag?.type === 'task' ? (
+                    <div className={classes.todoTaskDragOverlay}>
+                      <Checkbox checked={activeDrag.task.completed} readOnly size="sm" />
+                      <Text
+                        size="sm"
+                        lineClamp={1}
+                        className={
+                          activeDrag.task.completed ? classes.todoTaskCompleted : undefined
+                        }
+                      >
+                        {activeDrag.task.title}
+                      </Text>
+                    </div>
+                  ) : activeDrag?.type === 'category' ? (
+                    <div className={classes.todoCategoryDragOverlay}>
+                      <Text size="sm" fw={500} className="disp-display-title">
+                        {activeDrag.name}
+                      </Text>
+                    </div>
+                  ) : null}
+                </DragOverlay>
               </DndContext>
             )}
 
