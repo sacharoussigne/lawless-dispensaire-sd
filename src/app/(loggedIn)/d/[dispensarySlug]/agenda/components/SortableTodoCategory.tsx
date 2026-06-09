@@ -81,6 +81,7 @@ interface SortableTodoCategoryProps {
   canWrite: boolean;
   onReorderTasks: (categoryId: string, taskIds: string[]) => void;
   onToggleTask: (id: string, completed: boolean) => void;
+  onRenameTask: (id: string, title: string) => void | Promise<void>;
   onDeleteTask: (id: string) => void;
   onDeleteCategory: (id: string) => void;
   onAddTask: (categoryId: string, title: string) => void;
@@ -91,6 +92,7 @@ export function SortableTodoCategory({
   canWrite,
   onReorderTasks,
   onToggleTask,
+  onRenameTask,
   onDeleteTask,
   onDeleteCategory,
   onAddTask,
@@ -131,6 +133,7 @@ export function SortableTodoCategory({
                 task={task}
                 canWrite={canWrite}
                 onToggle={onToggleTask}
+                onRename={onRenameTask}
                 onDelete={onDeleteTask}
               />
             ))}

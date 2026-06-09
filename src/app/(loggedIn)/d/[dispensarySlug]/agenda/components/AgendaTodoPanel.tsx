@@ -172,6 +172,19 @@ export function AgendaTodoPanel({
     }
   };
 
+  const handleRenameTask = async (id: string, title: string) => {
+    try {
+      await updateAgendaTodoTask(dispensarySlug, { id, title });
+      await reload();
+    } catch (error: unknown) {
+      notifications.show({
+        title: 'Erreur',
+        message: error instanceof Error ? error.message : 'Renommage impossible',
+        color: 'danger',
+      });
+    }
+  };
+
   const handleDeleteTask = async (id: string) => {
     try {
       await deleteAgendaTodoTask(dispensarySlug, id);
@@ -349,6 +362,7 @@ export function AgendaTodoPanel({
                       canWrite={canWrite}
                       onReorderTasks={handleReorderTasks}
                       onToggleTask={handleToggleTask}
+                      onRenameTask={handleRenameTask}
                       onDeleteTask={handleDeleteTask}
                       onDeleteCategory={handleDeleteCategory}
                       onAddTask={handleAddTask}

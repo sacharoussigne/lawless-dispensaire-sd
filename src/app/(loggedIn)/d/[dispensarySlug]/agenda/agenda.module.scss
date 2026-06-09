@@ -246,6 +246,30 @@
   }
 }
 
+.todoTaskTitle {
+  flex: 1;
+  min-width: 0;
+}
+
+.todoTaskEditInput {
+  flex: 1;
+  min-width: 0;
+  background: var(--mantine-color-sage-0);
+  border: none;
+  border-bottom: 1px dashed var(--mantine-color-sage-4);
+  border-radius: var(--mantine-radius-xs) var(--mantine-radius-xs) 0 0;
+  padding: 0.1rem 0.25rem;
+  font-family: var(--disp-font-ui);
+  font-size: var(--mantine-font-size-sm);
+  line-height: var(--mantine-line-height-sm);
+  color: var(--disp-ink);
+  outline: none;
+
+  &:focus {
+    border-bottom-color: var(--mantine-color-sage-6);
+  }
+}
+
 .todoTaskCompleted {
   text-decoration: line-through;
   color: var(--mantine-color-dimmed);
