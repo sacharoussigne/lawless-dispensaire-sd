@@ -1,6 +1,6 @@
 .layout {
   display: grid;
-  grid-template-columns: 1fr 360px;
+  grid-template-columns: 1fr var(--agenda-todo-column-width, 360px);
   gap: var(--mantine-spacing-md);
   align-items: start;
 
@@ -16,6 +16,29 @@
       grid-row: 2;
     }
   }
+}
+
+.layoutCalendarOnly {
+  @media (min-width: 62.01em) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.layoutTodoOnly {
+  @media (min-width: 62.01em) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.agendaContainerExpanded {
+  max-width: var(--agenda-container-max-width, 1680px);
+}
+
+.agendaLayoutControls {
+  padding: 2px;
+  border: 1px solid var(--disp-border);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--disp-surface);
 }
 
 .calendarPanel {

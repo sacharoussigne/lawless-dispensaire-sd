@@ -21,9 +21,17 @@ import { tenantRoutes } from '@/types/routes';
 import { AgendaSelector } from './components/AgendaSelector';
 import type { View } from 'react-big-calendar';
 import { AgendaCalendar } from './components/AgendaCalendar';
+import { AgendaLayoutControls } from './components/AgendaLayoutControls';
 import { AgendaTodoPanel } from './components/AgendaTodoPanel';
 import { EventModal } from './components/EventModal';
-import { AGENDA_PANEL_HEIGHT_PX } from './constants';
+import { useAgendaLayoutPreference } from './hooks/useAgendaLayoutPreference';
+import {
+  AGENDA_CONTAINER_MAX_WIDTH_EXPANDED_PX,
+  AGENDA_PANEL_HEIGHT_EXPANDED_PX,
+  AGENDA_PANEL_HEIGHT_PX,
+  AGENDA_TODO_COLUMN_WIDTH_EXPANDED_PX,
+  AGENDA_TODO_COLUMN_WIDTH_PX,
+} from './constants';
 import classes from './agenda.module.scss';
 
 interface AgendaPageClientProps {
@@ -78,6 +86,24 @@ export function AgendaPageClient({
 
   const canWrite = canWriteAgenda(selectedAgenda?.accessLevel ?? null);
   const t = tenantRoutes(dispensarySlug);
+  const { layout, setWidthMode, toggleCalendar, toggleTodo } =
+    useAgendaLayoutPreference(dispensarySlug);
+
+  const isExpanded = layout.widthMode === 'expanded';
+  const panelHeightPx = isExpanded ? AGENDA_PANEL_HEIGHT_EXPANDED_PX : AGENDA_PANEL_HEIGHT_PX;
+  const todoColumnWidthPx = isExpanded
+    ? AGENDA_TODO_COLUMN_WIDTH_EXPANDED_PX
+    : AGENDA_TODO_COLUMN_WIDTH_PX;
+
+  const layoutStyle = useMemo(
+    () =>
+      ({
+        '--agenda-panel-height': `${panelHeightPx}px`,
+        '--agenda-todo-column-width': `${todoColumnWidthPx}px`,
+        '--agenda-container-max-width': `${AGENDA_CONTAINER_MAX_WIDTH_EXPANDED_PX}px`,
+      }) as CSSProperties,
+    [panelHeightPx, todoColumnWidthPx],
+  );
 
   const fetchEvents = useCallback(
     async (agendaId: string | null = selectedAgendaId) => {
@@ -185,11 +211,27 @@ export function AgendaPageClient({
     );
   }
 
-  const showCalendar = Boolean(selectedAgendaId) || participantOnly;
+  const showCalendarPanel = Boolean(selectedAgendaId) || participantOnly;
+  const showTodoPanel = !participantOnly;
+  const renderCalendar = showCalendarPanel && (participantOnly || layout.showCalendar);
+  const renderTodo = showTodoPanel && layout.showTodo;
   const eventModalAgendaId = selectedAgendaId ?? selectedEvent?.agendaId ?? '';
 
+  const layoutClassName = [
+    classes.layout,
+    !renderCalendar && renderTodo ? classes.layoutTodoOnly : '',
+    renderCalendar && !renderTodo ? classes.layoutCalendarOnly : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
-    <Container size="xl" py="xl">
+    <Container
+      size={isExpanded ? undefined : 'xl'}
+      fluid={isExpanded}
+      className={isExpanded ? classes.agendaContainerExpanded : undefined}
+      py="xl"
+    >
       <PageHeader
         title="Agenda"
         description={
@@ -198,36 +240,42 @@ export function AgendaPageClient({
             : (selectedAgenda?.description ?? 'Calendrier partagé et listes de tâches.')
         }
         actions={
-          !participantOnly ? (
-            <Group>
-              <AgendaSelector
-                agendas={agendas}
-                value={selectedAgendaId}
-                onChange={handleAgendaChange}
-              />
-              {canWrite && selectedAgendaId && (
-                <Button
-                  color="sage"
-                  leftSection={<IconPlus size={16} />}
-                  onClick={handleCreateEvent}
-                >
-                  Événement
-                </Button>
-              )}
-            </Group>
-          ) : undefined
+          <Group gap="sm">
+            <AgendaLayoutControls
+              layout={layout}
+              canToggleCalendar={!participantOnly}
+              canToggleTodo={showTodoPanel}
+              onWidthModeChange={setWidthMode}
+              onToggleCalendar={toggleCalendar}
+              onToggleTodo={toggleTodo}
+            />
+            {!participantOnly && (
+              <>
+                <AgendaSelector
+                  agendas={agendas}
+                  value={selectedAgendaId}
+                  onChange={handleAgendaChange}
+                />
+                {canWrite && selectedAgendaId && (
+                  <Button
+                    color="sage"
+                    leftSection={<IconPlus size={16} />}
+                    onClick={handleCreateEvent}
+                  >
+                    Événement
+                  </Button>
+                )}
+              </>
+            )}
+          </Group>
         }
       />
 
       <div
-        className={participantOnly ? undefined : classes.layout}
-        style={
-          participantOnly
-            ? undefined
-            : ({ '--agenda-panel-height': `${AGENDA_PANEL_HEIGHT_PX}px` } as CSSProperties)
-        }
+        className={participantOnly ? undefined : layoutClassName}
+        style={layoutStyle}
       >
-        {showCalendar && (
+        {renderCalendar && (
           <AgendaCalendar
             dispensarySlug={dispensarySlug}
             agendaId={selectedAgendaId}
@@ -239,7 +287,7 @@ export function AgendaPageClient({
           />
         )}
 
-        {!participantOnly && (
+        {renderTodo && (
           <AgendaTodoPanel
             dispensarySlug={dispensarySlug}
             agendaId={selectedAgendaId}
