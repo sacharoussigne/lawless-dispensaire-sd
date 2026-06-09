@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useMemo, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { listAgendaEvents } from '@/app/_actions/agenda/events';
 import { handleAction } from '@/lib/action';
 import { Button, Container, Group, Stack, Text } from '@mantine/core';
@@ -48,6 +49,8 @@ export function AgendaPageClient({
   const [selectedEvent, setSelectedEvent] = useState<AgendaEventDTO | null>(null);
   const [slotStart, setSlotStart] = useState<Date | null>(null);
   const [slotEnd, setSlotEnd] = useState<Date | null>(null);
+  const searchParams = useSearchParams();
+  const agendaIdFromUrl = searchParams.get('agendaId');
 
   const selectedAgenda = useMemo(
     () => agendas.find((a) => a.id === selectedAgendaId) ?? agendas[0] ?? null,
@@ -73,6 +76,15 @@ export function AgendaPageClient({
     },
     [dispensarySlug, selectedAgendaId],
   );
+
+  useEffect(() => {
+    if (participantOnly || !agendaIdFromUrl) return;
+    if (!agendas.some((agenda) => agenda.id === agendaIdFromUrl)) return;
+    if (selectedAgendaId === agendaIdFromUrl) return;
+
+    setSelectedAgendaId(agendaIdFromUrl);
+    void fetchEvents(agendaIdFromUrl);
+  }, [agendaIdFromUrl, agendas, participantOnly, selectedAgendaId, fetchEvents]);
 
   const handleAgendaChange = useCallback(
     (agendaId: string) => {

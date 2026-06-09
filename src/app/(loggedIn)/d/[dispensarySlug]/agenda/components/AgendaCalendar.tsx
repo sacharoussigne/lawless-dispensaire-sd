@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Calendar, type View } from 'react-big-calendar';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import dayjs from '@/lib/dayjs';
@@ -8,6 +9,11 @@ import type { AgendaEventDTO } from '@/types/agenda';
 import { listAgendaEvents } from '@/app/_actions/agenda/events';
 import { handleAction } from '@/lib/action';
 import { AGENDA_PANEL_HEIGHT_PX } from '../constants';
+import {
+  isAgendaCalendarView,
+  parseAgendaCalendarDateParam,
+} from '@/lib/agenda/calendarNavigation';
+import { formatAgendaDateInput } from '@/lib/agenda/dates';
 import { agendaCalendarLocalizer, agendaCalendarTimeBounds } from '../calendarLocalizer';
 import classes from '../agenda.module.scss';
 
@@ -39,8 +45,72 @@ export function AgendaCalendar({
   onSelectEvent,
   onSelectSlot,
 }: AgendaCalendarProps) {
-  const [view, setView] = useState<View>('month');
-  const [date, setDate] = useState(new Date());
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const searchParamsKey = searchParams.toString();
+
+  const viewParam = searchParams.get('view');
+  const urlView = isAgendaCalendarView(viewParam) ? viewParam : null;
+  const urlDate = parseAgendaCalendarDateParam(searchParams.get('date'));
+
+  const [view, setView] = useState<View>(urlView ?? 'month');
+  const [date, setDate] = useState(urlDate ?? new Date());
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParamsKey);
+    const nextView = params.get('view');
+    const nextDate = params.get('date');
+
+    if (isAgendaCalendarView(nextView)) {
+      setView(nextView);
+    }
+    const parsedDate = parseAgendaCalendarDateParam(nextDate);
+    if (parsedDate) {
+      setDate(parsedDate);
+    }
+  }, [searchParamsKey]);
+
+  const replaceSearchParams = useCallback(
+    (mutate: (params: URLSearchParams) => void) => {
+      const params = new URLSearchParams(searchParams.toString());
+      mutate(params);
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
+
+  const handleViewChange = useCallback(
+    (nextView: View) => {
+      setView(nextView);
+      replaceSearchParams((params) => {
+        if (nextView === 'month') {
+          params.delete('view');
+          params.delete('date');
+          return;
+        }
+        params.set('view', nextView);
+        if (nextView === 'day' || nextView === 'week' || nextView === 'work_week') {
+          params.set('date', formatAgendaDateInput(date));
+        }
+      });
+    },
+    [date, replaceSearchParams],
+  );
+
+  const handleNavigate = useCallback(
+    (nextDate: Date) => {
+      setDate(nextDate);
+      replaceSearchParams((params) => {
+        const currentView = params.get('view');
+        if (isAgendaCalendarView(currentView) && currentView !== 'month') {
+          params.set('date', formatAgendaDateInput(nextDate));
+        }
+      });
+    },
+    [replaceSearchParams],
+  );
 
   const isTimeView = view === 'week' || view === 'day' || view === 'work_week';
 
@@ -122,9 +192,9 @@ export function AgendaCalendar({
         allDayMaxRows={0}
         events={calendarEvents}
         view={view}
-        onView={setView}
+        onView={handleViewChange}
         date={date}
-        onNavigate={setDate}
+        onNavigate={handleNavigate}
         onRangeChange={handleRangeChange}
         startAccessor="start"
         endAccessor="end"

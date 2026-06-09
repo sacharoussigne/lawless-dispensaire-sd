@@ -21,6 +21,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { IconArrowBackUp, IconLogout, IconSettings } from '@tabler/icons-react';
 import { HeaderNavLinks } from './HeaderNavLinks';
+import { HeaderUpcomingEvents } from './HeaderUpcomingEvents';
 import { usePermissions } from '@/app/_contexts/PermissionsContext';
 import { dispensarySiteTitle } from '@/lib/appSettingsShared';
 import { hasRole } from '@/lib/auth/permissions';
@@ -198,6 +199,12 @@ export default function Header({
                       { label: 'Employé', value: 'employee' },
                       { label: 'Gestion', value: 'management' },
                     ]}
+                  />
+                )}
+                {appSettings.featureAgendaEnabled && agendaModuleAccess && (
+                  <HeaderUpcomingEvents
+                    dispensarySlug={dispensarySlug!}
+                    agendaHref={t.agenda.index}
                   />
                 )}
                 <Menu

@@ -5,6 +5,7 @@ import {
 } from '@/app/_actions/agenda/agendas';
 import { listAgendaEvents } from '@/app/_actions/agenda/events';
 import { listAgendaTodoLists } from '@/app/_actions/agenda/todoLists';
+import { SuspenseLoader } from '@/app/_components/SuspenseLoader/SuspenseLoader';
 import { AgendaPageClient } from './AgendaPageClient';
 import { redirect } from 'next/navigation';
 import { tenantRoutes } from '@/types/routes';
@@ -52,20 +53,22 @@ export default async function AgendaPage({
   ]);
 
   return (
-    <AgendaPageClient
-      dispensarySlug={dispensarySlug}
-      agendas={agendas}
-      initialEvents={
-        eventsResult.status === 200 && 'data' in eventsResult
-          ? eventsResult.data ?? []
-          : []
-      }
-      initialTodoLists={
-        todosResult.status === 200 && 'data' in todosResult
-          ? todosResult.data ?? []
-          : []
-      }
-      isAdmin={isAdmin}
-    />
+    <SuspenseLoader>
+      <AgendaPageClient
+        dispensarySlug={dispensarySlug}
+        agendas={agendas}
+        initialEvents={
+          eventsResult.status === 200 && 'data' in eventsResult
+            ? eventsResult.data ?? []
+            : []
+        }
+        initialTodoLists={
+          todosResult.status === 200 && 'data' in todosResult
+            ? todosResult.data ?? []
+            : []
+        }
+        isAdmin={isAdmin}
+      />
+    </SuspenseLoader>
   );
 }
