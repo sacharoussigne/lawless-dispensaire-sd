@@ -29,6 +29,7 @@ import {
   createAgendaTodoList,
   createAgendaTodoTask,
   deleteAgendaTodoCategory,
+  deleteAgendaTodoList,
   deleteAgendaTodoTask,
   listAgendaTodoLists,
   reorderAgendaTodoCategories,
@@ -45,6 +46,7 @@ import { AgendaTodoArchivesDrawer } from './AgendaTodoArchivesDrawer';
 import { InlineNoteInput } from './InlineNoteInput';
 import { InlineEditableText } from './InlineEditableText';
 import { EditableTodoListTab } from './EditableTodoListTab';
+import { DeleteTodoListButton } from './DeleteTodoListButton';
 import { usePressHoldPointerSensor } from './agendaDnd';
 import classes from '../agenda.module.scss';
 
@@ -78,9 +80,11 @@ export function AgendaTodoPanel({
       const data = handleAction(result);
       if (data) {
         setLists(data);
-        if (!selectedListId && data[0]) {
-          setSelectedListId(data[0].id);
-        }
+        setSelectedListId((current) =>
+          current && data.some((list) => list.id === current)
+            ? current
+            : (data[0]?.id ?? null),
+        );
       }
     } catch (error: unknown) {
       notifications.show({
@@ -89,7 +93,7 @@ export function AgendaTodoPanel({
         color: 'danger',
       });
     }
-  }, [agendaId, dispensarySlug, selectedListId]);
+  }, [agendaId, dispensarySlug]);
 
   useEffect(() => {
     setLists(initialLists);
@@ -315,6 +319,19 @@ export function AgendaTodoPanel({
     }
   };
 
+  const handleDeleteList = async (id: string) => {
+    try {
+      await deleteAgendaTodoList(dispensarySlug, id);
+      await reload();
+    } catch (error: unknown) {
+      notifications.show({
+        title: 'Erreur',
+        message: error instanceof Error ? error.message : 'Suppression impossible',
+        color: 'danger',
+      });
+    }
+  };
+
   if (!agendaId) {
     return (
       <div className={classes.todoPanel}>
@@ -340,29 +357,45 @@ export function AgendaTodoPanel({
 
       <Stack gap="md">
         {lists.length > 1 && (
-          <div className={classes.todoListTabs} role="tablist">
-            {lists.map((list) => (
-              <EditableTodoListTab
-                key={list.id}
-                listId={list.id}
-                name={list.name}
-                active={selectedList?.id === list.id}
-                canWrite={canWrite}
-                onSelect={setSelectedListId}
-                onRename={handleRenameList}
+          <Group gap="xs" align="center" wrap="nowrap" className={classes.todoListTabsRow}>
+            <div className={classes.todoListTabs} role="tablist">
+              {lists.map((list) => (
+                <EditableTodoListTab
+                  key={list.id}
+                  listId={list.id}
+                  name={list.name}
+                  active={selectedList?.id === list.id}
+                  canWrite={canWrite}
+                  onSelect={setSelectedListId}
+                  onRename={handleRenameList}
+                />
+              ))}
+            </div>
+            {canWrite && selectedList && (
+              <DeleteTodoListButton
+                listName={selectedList.name}
+                onConfirm={() => void handleDeleteList(selectedList.id)}
               />
-            ))}
-          </div>
+            )}
+          </Group>
         )}
 
         {lists.length === 1 && selectedList && (
-          <InlineEditableText
-            value={selectedList.name}
-            canEdit={canWrite}
-            onSave={(name) => handleRenameList(selectedList.id, name)}
-            textClassName={`disp-display-title ${classes.todoListTitle}`}
-            inputClassName={classes.todoListEditInput}
-          />
+          <Group justify="space-between" align="center" wrap="nowrap" gap="xs">
+            <InlineEditableText
+              value={selectedList.name}
+              canEdit={canWrite}
+              onSave={(name) => handleRenameList(selectedList.id, name)}
+              textClassName={`disp-display-title ${classes.todoListTitle}`}
+              inputClassName={classes.todoListEditInput}
+            />
+            {canWrite && (
+              <DeleteTodoListButton
+                listName={selectedList.name}
+                onConfirm={() => void handleDeleteList(selectedList.id)}
+              />
+            )}
+          </Group>
         )}
 
         {lists.length === 0 && canWrite && (

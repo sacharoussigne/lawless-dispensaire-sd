@@ -95,10 +95,16 @@
   }
 }
 
+.todoListTabsRow {
+  min-width: 0;
+}
+
 .todoListTabs {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
+  flex: 1;
+  min-width: 0;
 }
 
 .todoListTab {
