@@ -21,6 +21,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { IconArrowBackUp, IconLogout, IconSettings } from '@tabler/icons-react';
 import { HeaderNavLinks } from './HeaderNavLinks';
+import { HeaderUpcomingEvents } from './HeaderUpcomingEvents';
 import { usePermissions } from '@/app/_contexts/PermissionsContext';
 import { dispensarySiteTitle } from '@/lib/appSettingsShared';
 import { hasRole } from '@/lib/auth/permissions';
@@ -48,6 +49,7 @@ export default function Header({
     appSettings,
     dispensarySlug: ctxSlug,
     accessibleDispensaries,
+    agendaModuleAccess,
   } = usePermissions();
 
   const dispensarySlug = dispensarySlugProp ?? ctxSlug;
@@ -198,6 +200,12 @@ export default function Header({
                     ]}
                   />
                 )}
+                {appSettings.featureAgendaEnabled && agendaModuleAccess && (
+                  <HeaderUpcomingEvents
+                    dispensarySlug={dispensarySlug!}
+                    agendaHref={t.agenda.index}
+                  />
+                )}
                 <Menu
                   width={260}
                   position="bottom-end"
@@ -237,6 +245,11 @@ export default function Header({
                         <Link href={t.admin.members}>
                           <Menu.Item>Membres</Menu.Item>
                         </Link>
+                        {appSettings.featureAgendaEnabled && (
+                          <Link href={t.admin.agendas}>
+                            <Menu.Item>Agendas</Menu.Item>
+                          </Link>
+                        )}
                         {appSettings.featureStockEnabled && (
                           <Link href={t.admin.overwriteStock}>
                             <Menu.Item>Écraser les stocks</Menu.Item>

@@ -36,6 +36,7 @@ model Dispensary {
   payrollWeeklyReports PayrollWeeklyReport[]
   dispensaryWeeklyActivities DispensaryWeeklyActivity[]
   craftRecipes CraftRecipe[]
+  agendas Agenda[]
 
   @@index([createdById])
   @@map("dispensary")
@@ -81,6 +82,9 @@ model User {
   stockItemMovements StockItemMovement[]
   dispensariesCreated Dispensary[] @relation("DispensaryCreatedBy")
   dispensaryMemberships DispensaryMember[]
+  agendaMemberships AgendaMember[]
+  agendaEventsCreated AgendaEvent[] @relation("AgendaEventCreatedBy")
+  agendaEventParticipations AgendaEventParticipant[]
 
   @@unique([email])
   @@map("user")
@@ -187,6 +191,7 @@ model AppSettings {
   featureMailsEnabled          Boolean  @default(true)
   featurePayrollEnabled        Boolean  @default(true)
   featureWeeklyDispensaryActivityEnabled Boolean @default(true)
+  featureAgendaEnabled                 Boolean @default(true)
   weeklyActivityChestDaysVisible       Boolean @default(true)
   weeklyActivityPresenceDaysVisible    Boolean @default(true)
   weeklyActivityPatientsVisible        Boolean @default(true)
@@ -751,4 +756,134 @@ model DispensaryWeeklyActivityHistory {
   @@index([activityId])
   @@index([actorUserId])
   @@map("dispensary_weekly_activity_history")
+}
+
+enum AgendaAccessLevel {
+  OWNER
+  WRITE
+  READ
+}
+
+model Agenda {
+  id           String   @id @default(uuid())
+  dispensaryId String
+  dispensary   Dispensary @relation(fields: [dispensaryId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  members      AgendaMember[]
+  events       AgendaEvent[]
+  todoLists    AgendaTodoList[]
+
+  @@index([dispensaryId])
+  @@map("agenda")
+}
+
+model AgendaMember {
+  id          String            @id @default(uuid())
+  agendaId    String
+  agenda      Agenda            @relation(fields: [agendaId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessLevel AgendaAccessLevel
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@unique([agendaId, userId])
+  @@index([userId])
+  @@map("agenda_member")
+}
+
+model AgendaEvent {
+  id          String   @id @default(uuid())
+  agendaId    String
+  agenda      Agenda   @relation(fields: [agendaId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  startAt     DateTime
+  endAt       DateTime
+  allDay      Boolean  @default(false)
+  createdById String?
+  createdBy   User?    @relation("AgendaEventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  participants AgendaEventParticipant[]
+  todoTasks   AgendaEventTodoTask[]
+
+  @@index([agendaId, startAt])
+  @@map("agenda_event")
+}
+
+model AgendaEventParticipant {
+  id      String      @id @default(uuid())
+  eventId String
+  event   AgendaEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId  String
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+
+  @@unique([eventId, userId])
+  @@index([userId])
+  @@map("agenda_event_participant")
+}
+
+model AgendaTodoList {
+  id        String   @id @default(uuid())
+  agendaId  String
+  agenda    Agenda   @relation(fields: [agendaId], references: [id], onDelete: Cascade)
+  name      String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  categories AgendaTodoCategory[]
+
+  @@index([agendaId])
+  @@map("agenda_todo_list")
+}
+
+model AgendaTodoCategory {
+  id        String   @id @default(uuid())
+  listId    String
+  list      AgendaTodoList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  name      String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tasks     AgendaTodoTask[]
+
+  @@index([listId])
+  @@map("agenda_todo_category")
+}
+
+model AgendaTodoTask {
+  id          String   @id @default(uuid())
+  categoryId  String
+  category    AgendaTodoCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  completed   Boolean  @default(false)
+  completedAt DateTime?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([categoryId])
+  @@map("agenda_todo_task")
+}
+
+model AgendaEventTodoTask {
+  id          String   @id @default(uuid())
+  eventId     String
+  event       AgendaEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  completed   Boolean  @default(false)
+  completedAt DateTime?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([eventId])
+  @@map("agenda_event_todo_task")
 }

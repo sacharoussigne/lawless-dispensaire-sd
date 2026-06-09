@@ -126,3 +126,17 @@
   position: relative;
   top: 1px;
 }
+
+.upcomingEventRow {
+  display: block;
+  width: 100%;
+  padding: var(--mantine-spacing-xs) var(--mantine-spacing-sm);
+  border-radius: var(--mantine-radius-md);
+  text-decoration: none;
+  color: inherit;
+  transition: background-color 0.15s ease;
+
+  &:hover {
+    background-color: var(--mantine-color-sage-0);
+  }
+}

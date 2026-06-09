@@ -27,6 +27,7 @@ export function tenantRoutes(slug: string) {
     bank: { index: `${base}/bank` },
     privatePractice: { index: `${base}/private-practice` },
     weeklyActivity: { index: `${base}/weekly-activity` },
+    agenda: { index: `${base}/agenda` },
     management: {
       index: `${base}/management`,
       companies: `${base}/management/companies`,
@@ -44,6 +45,7 @@ export function tenantRoutes(slug: string) {
       payroll: `${base}/admin/payroll`,
       payrollNew: `${base}/admin/payroll/new`,
       payrollDetail: (id: string) => `${base}/admin/payroll/${id}`,
+      agendas: `${base}/admin/agendas`,
     },
   };
 }

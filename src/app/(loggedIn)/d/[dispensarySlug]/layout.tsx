@@ -14,6 +14,7 @@ import {
   resolveDispensaryAccessDeniedRedirect,
 } from '@/lib/dispensary/context';
 import { notFound, redirect } from 'next/navigation';
+import { userHasAnyAgendaAccess } from '@/lib/agenda/access';
 
 export default async function DispensaryLayout({
   children,
@@ -44,6 +45,15 @@ export default async function DispensaryLayout({
   const permissions = calculatePermissions(effectiveRole);
   const appSettings = await getAppSettings(dispensary.id);
   const accessibleDispensaries = await listAccessibleDispensaries(session as AuthSession | null);
+  const userId = session?.user?.id;
+  const agendaModuleAccess = userId
+    ? await userHasAnyAgendaAccess(
+        dispensary.id,
+        userId,
+        session.user.role,
+        effectiveRole,
+      )
+    : false;
 
   return (
     <PermissionsProvider
@@ -53,6 +63,7 @@ export default async function DispensaryLayout({
       dispensarySlug={dispensarySlug}
       dispensaryId={dispensary.id}
       accessibleDispensaries={accessibleDispensaries}
+      agendaModuleAccess={agendaModuleAccess}
     >
       <LoggedInShell>
         <Header
