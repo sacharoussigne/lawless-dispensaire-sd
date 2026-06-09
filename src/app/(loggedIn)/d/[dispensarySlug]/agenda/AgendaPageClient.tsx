@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type CSSProperties } from 'react';
 import { listAgendaEvents } from '@/app/_actions/agenda/events';
 import { handleAction } from '@/lib/action';
 import { Button, Container, Group, Stack, Text } from '@mantine/core';
@@ -19,6 +19,7 @@ import { AgendaSelector } from './components/AgendaSelector';
 import { AgendaCalendar } from './components/AgendaCalendar';
 import { AgendaTodoPanel } from './components/AgendaTodoPanel';
 import { EventModal } from './components/EventModal';
+import { AGENDA_PANEL_HEIGHT_PX } from './constants';
 import classes from './agenda.module.scss';
 
 interface AgendaPageClientProps {
@@ -156,7 +157,14 @@ export function AgendaPageClient({
         }
       />
 
-      <div className={participantOnly ? undefined : classes.layout}>
+      <div
+        className={participantOnly ? undefined : classes.layout}
+        style={
+          participantOnly
+            ? undefined
+            : ({ '--agenda-panel-height': `${AGENDA_PANEL_HEIGHT_PX}px` } as CSSProperties)
+        }
+      >
         {showCalendar && (
           <AgendaCalendar
             key={participantOnly ? 'participant' : selectedAgendaId ?? 'agenda'}

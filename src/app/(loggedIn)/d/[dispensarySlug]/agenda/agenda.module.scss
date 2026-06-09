@@ -19,7 +19,7 @@
   border-radius: var(--mantine-radius-sm);
   background: var(--disp-surface);
   padding: var(--mantine-spacing-md);
-  max-height: calc(100vh - 12rem);
+  max-height: var(--agenda-panel-height, 620px);
   overflow-y: auto;
 
   @media (max-width: 62em) {
