@@ -5,6 +5,7 @@ import { actionErrorParser } from '@/lib/action';
 import { tenantWhere } from '@/lib/dispensary/tenantWhere';
 import { listAccessibleAgendaIds } from '@/lib/agenda/access';
 import {
+  assertAgendaEventRangeValid,
   parseAgendaDateInput,
   parseAgendaEndDateInput,
 } from '@/lib/agenda/dates';
@@ -239,8 +240,13 @@ export async function createAgendaEvent(
       validated.allDay,
     );
 
-    if (endAt < startAt) {
-      return { status: 400, error: 'La date de fin doit être après le début' };
+    try {
+      assertAgendaEventRangeValid(startAt, endAt, validated.allDay);
+    } catch (error: unknown) {
+      return {
+        status: 400,
+        error: error instanceof Error ? error.message : 'Plage horaire invalide',
+      };
     }
 
     const event = await prisma.agendaEvent.create({
@@ -327,8 +333,13 @@ export async function updateAgendaEvent(
       validated.allDay,
     );
 
-    if (endAt < startAt) {
-      return { status: 400, error: 'La date de fin doit être après le début' };
+    try {
+      assertAgendaEventRangeValid(startAt, endAt, validated.allDay);
+    } catch (error: unknown) {
+      return {
+        status: 400,
+        error: error instanceof Error ? error.message : 'Plage horaire invalide',
+      };
     }
 
     const event = await prisma.$transaction(async (tx) => {

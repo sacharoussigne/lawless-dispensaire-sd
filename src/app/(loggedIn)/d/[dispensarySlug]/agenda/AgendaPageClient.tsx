@@ -7,6 +7,7 @@ import { Button, Container, Group, Stack, Text } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
 import Link from 'next/link';
 import dayjs from '@/lib/dayjs';
+import { buildDefaultTimedSlotForDay } from '@/lib/agenda/dates';
 import { PageHeader } from '@/app/_components/PageHeader/PageHeader';
 import {
   canWriteAgenda,
@@ -16,6 +17,7 @@ import {
 } from '@/types/agenda';
 import { tenantRoutes } from '@/types/routes';
 import { AgendaSelector } from './components/AgendaSelector';
+import type { View } from 'react-big-calendar';
 import { AgendaCalendar } from './components/AgendaCalendar';
 import { AgendaTodoPanel } from './components/AgendaTodoPanel';
 import { EventModal } from './components/EventModal';
@@ -91,19 +93,28 @@ export function AgendaPageClient({
     setEventModalOpen(true);
   };
 
-  const handleSelectSlot = (start: Date, end: Date) => {
+  const handleSelectSlot = (start: Date, end: Date, calendarView: View) => {
     if (!selectedAgendaId) return;
     setSelectedEvent(null);
-    setSlotStart(start);
-    setSlotEnd(end);
+
+    if (calendarView === 'month') {
+      const slot = buildDefaultTimedSlotForDay(start);
+      setSlotStart(slot.start);
+      setSlotEnd(slot.end);
+    } else {
+      setSlotStart(start);
+      setSlotEnd(end);
+    }
+
     setEventModalOpen(true);
   };
 
   const handleCreateEvent = () => {
     if (!selectedAgendaId) return;
     setSelectedEvent(null);
-    setSlotStart(new Date());
-    setSlotEnd(dayjs().add(1, 'hour').toDate());
+    const slot = buildDefaultTimedSlotForDay(new Date());
+    setSlotStart(slot.start);
+    setSlotEnd(slot.end);
     setEventModalOpen(true);
   };
 

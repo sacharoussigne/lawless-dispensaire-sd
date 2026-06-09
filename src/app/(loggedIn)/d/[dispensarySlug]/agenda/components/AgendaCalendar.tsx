@@ -27,7 +27,7 @@ interface AgendaCalendarProps {
   onEventsChange: (events: AgendaEventDTO[]) => void;
   canWrite: boolean;
   onSelectEvent: (event: AgendaEventDTO) => void;
-  onSelectSlot: (start: Date, end: Date) => void;
+  onSelectSlot: (start: Date, end: Date, view: View) => void;
 }
 
 export function AgendaCalendar({
@@ -150,7 +150,7 @@ export function AgendaCalendar({
         selectable={canWrite}
         onSelectSlot={
           canWrite
-            ? ({ start, end }) => onSelectSlot(start, end)
+            ? ({ start, end }) => onSelectSlot(start, end, view)
             : undefined
         }
       />

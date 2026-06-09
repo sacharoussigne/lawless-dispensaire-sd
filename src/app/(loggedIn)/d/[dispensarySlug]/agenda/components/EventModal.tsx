@@ -29,8 +29,11 @@ import {
 import { searchDispensaryUsersForAgenda } from '@/app/_actions/agenda/members';
 import { handleAction } from '@/lib/action';
 import {
+  assertAgendaEventRangeValid,
   formatAgendaDateInput,
   formatAgendaTimeInput,
+  parseAgendaDateInput,
+  parseAgendaEndDateInput,
 } from '@/lib/agenda/dates';
 import type { AgendaEventDTO } from '@/types/agenda';
 import dayjs from '@/lib/dayjs';
@@ -128,15 +131,32 @@ export function EventModal({
 
   const handleSave = async () => {
     if (!startDate || !endDate) return;
+
+    const startDateStr = formatAgendaDateInput(startDate);
+    const endDateStr = formatAgendaDateInput(endDate);
+
+    try {
+      const startAt = parseAgendaDateInput(startDateStr, allDay ? undefined : startTime, allDay);
+      const endAt = parseAgendaEndDateInput(endDateStr, allDay ? undefined : endTime, allDay);
+      assertAgendaEventRangeValid(startAt, endAt, allDay);
+    } catch (error: unknown) {
+      notifications.show({
+        title: 'Erreur',
+        message: error instanceof Error ? error.message : 'Plage horaire invalide',
+        color: 'danger',
+      });
+      return;
+    }
+
     setSubmitting(true);
     try {
       const payload = {
         agendaId,
         title: title.trim(),
         description: description.trim() || null,
-        startDate: formatAgendaDateInput(startDate),
+        startDate: startDateStr,
         startTime: allDay ? undefined : startTime,
-        endDate: formatAgendaDateInput(endDate),
+        endDate: endDateStr,
         endTime: allDay ? undefined : endTime,
         allDay,
         participantUserIds: participantIds,
@@ -150,7 +170,7 @@ export function EventModal({
       notifications.show({
         title: 'Succès',
         message: event ? 'Événement mis à jour' : 'Événement créé',
-        color: 'green',
+        color: 'moss',
       });
       onSuccess();
       onClose();
@@ -158,7 +178,7 @@ export function EventModal({
       notifications.show({
         title: 'Erreur',
         message: error instanceof Error ? error.message : 'Enregistrement impossible',
-        color: 'red',
+        color: 'danger',
       });
     } finally {
       setSubmitting(false);
@@ -177,7 +197,7 @@ export function EventModal({
       notifications.show({
         title: 'Erreur',
         message: error instanceof Error ? error.message : 'Suppression impossible',
-        color: 'red',
+        color: 'danger',
       });
     } finally {
       setSubmitting(false);
@@ -200,7 +220,7 @@ export function EventModal({
       notifications.show({
         title: 'Erreur',
         message: error instanceof Error ? error.message : 'Ajout impossible',
-        color: 'red',
+        color: 'danger',
       });
     }
   };
@@ -221,7 +241,7 @@ export function EventModal({
       notifications.show({
         title: 'Erreur',
         message: error instanceof Error ? error.message : 'Mise à jour impossible',
-        color: 'red',
+        color: 'danger',
       });
     }
   };
@@ -235,7 +255,7 @@ export function EventModal({
       notifications.show({
         title: 'Erreur',
         message: error instanceof Error ? error.message : 'Suppression impossible',
-        color: 'red',
+        color: 'danger',
       });
     }
   };
