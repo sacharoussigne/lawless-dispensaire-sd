@@ -14,6 +14,7 @@ import {
   createTodoTaskSchema,
   updateTodoTaskSchema,
   deleteTodoTaskSchema,
+  moveTodoTaskSchema,
   reorderSchema,
 } from '@/app/_actions/agenda/schemas';
 import {
@@ -24,8 +25,10 @@ import {
   resolveAgendaIdFromTodoCategoryId,
   resolveAgendaIdFromTodoTaskId,
 } from '@/app/_actions/agenda/internals';
-
-const COMPLETED_PREVIEW_LIMIT = 10;
+import {
+  compareTodoTasksByCompletedAtDesc,
+  isTodoTaskArchived,
+} from '@/lib/agenda/todoArchive';
 
 const listInclude = {
   categories: {
@@ -72,24 +75,39 @@ function mapTodoList(list: {
   };
 }
 
-function filterTasksForMainView(list: AgendaTodoListDTO): AgendaTodoListDTO {
+function filterTasksForMainView(
+  list: AgendaTodoListDTO,
+  nowMs: number = Date.now(),
+): AgendaTodoListDTO {
   return {
     ...list,
     categories: list.categories.map((category) => {
       const active = category.tasks.filter((t) => !t.completed);
-      const completed = category.tasks
-        .filter((t) => t.completed)
-        .sort((a, b) => {
-          const aTime = a.completedAt?.getTime() ?? 0;
-          const bTime = b.completedAt?.getTime() ?? 0;
-          return bTime - aTime;
-        })
-        .slice(0, COMPLETED_PREVIEW_LIMIT);
+      const recentlyCompleted = category.tasks
+        .filter((t) => t.completed && !isTodoTaskArchived(t, nowMs))
+        .sort(compareTodoTasksByCompletedAtDesc);
       return {
         ...category,
-        tasks: [...active, ...completed],
+        tasks: [...active, ...recentlyCompleted],
       };
     }),
+  };
+}
+
+function filterTasksForArchives(
+  list: AgendaTodoListDTO,
+  nowMs: number = Date.now(),
+): AgendaTodoListDTO {
+  return {
+    ...list,
+    categories: list.categories
+      .map((category) => ({
+        ...category,
+        tasks: category.tasks
+          .filter((t) => isTodoTaskArchived(t, nowMs))
+          .sort(compareTodoTasksByCompletedAtDesc),
+      }))
+      .filter((category) => category.tasks.length > 0),
   };
 }
 
@@ -122,26 +140,17 @@ export async function listAgendaTodoLists(
     });
 
     const mapped = lists.map(mapTodoList);
+    const nowMs = Date.now();
 
     if (options?.archives) {
-      const archived = mapped.map((list) => ({
-        ...list,
-        categories: list.categories.map((c) => ({
-          ...c,
-          tasks: c.tasks
-            .filter((t) => t.completed)
-            .sort((a, b) => {
-              const aTime = a.completedAt?.getTime() ?? 0;
-              const bTime = b.completedAt?.getTime() ?? 0;
-              return bTime - aTime;
-            }),
-        })).filter((c) => c.tasks.length > 0),
-      })).filter((l) => l.categories.length > 0);
+      const archived = mapped
+        .map((list) => filterTasksForArchives(list, nowMs))
+        .filter((list) => list.categories.length > 0);
 
       return { status: 200, data: archived };
     }
 
-    return { status: 200, data: mapped.map(filterTasksForMainView) };
+    return { status: 200, data: mapped.map((list) => filterTasksForMainView(list, nowMs)) };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors du chargement des listes');
   }
@@ -430,6 +439,7 @@ export async function updateAgendaTodoTask(
     title?: string;
     description?: string | null;
     completed?: boolean;
+    categoryId?: string;
   },
 ) {
   try {
@@ -455,11 +465,42 @@ export async function updateAgendaTodoTask(
       return { status: guard.status, error: guard.error };
     }
 
+    if (validated.categoryId !== undefined) {
+      const currentTask = await prisma.agendaTodoTask.findUnique({
+        where: { id: validated.id },
+        select: {
+          category: { select: { listId: true } },
+        },
+      });
+      if (!currentTask) {
+        return { status: 404, error: 'Tâche introuvable' };
+      }
+
+      const targetCategory = await prisma.agendaTodoCategory.findFirst({
+        where: {
+          id: validated.categoryId,
+          list: {
+            agenda: tenantWhere(ctx.tenant.dispensaryId),
+          },
+        },
+        select: { id: true, listId: true },
+      });
+
+      if (!targetCategory) {
+        return { status: 404, error: 'Catégorie introuvable' };
+      }
+
+      if (targetCategory.listId !== currentTask.category.listId) {
+        return { status: 400, error: 'La catégorie doit appartenir à la même liste' };
+      }
+    }
+
     const updateData: {
       title?: string;
       description?: string | null;
       completed?: boolean;
       completedAt?: Date | null;
+      categoryId?: string;
     } = {};
 
     if (validated.title !== undefined) updateData.title = validated.title;
@@ -469,6 +510,9 @@ export async function updateAgendaTodoTask(
     if (validated.completed !== undefined) {
       updateData.completed = validated.completed;
       updateData.completedAt = validated.completed ? new Date() : null;
+    }
+    if (validated.categoryId !== undefined) {
+      updateData.categoryId = validated.categoryId;
     }
 
     const task = await prisma.agendaTodoTask.update({
@@ -566,6 +610,118 @@ export async function reorderAgendaTodoCategories(
     return { status: 200, data: { success: true } };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors du réordonnancement');
+  }
+}
+
+export async function moveAgendaTodoTask(
+  dispensarySlug: string,
+  data: {
+    taskId: string;
+    sourceCategoryId: string;
+    targetCategoryId: string;
+    sourceOrders: { id: string; order: number }[];
+    targetOrders: { id: string; order: number }[];
+  },
+) {
+  try {
+    const ctx = await getAgendaSessionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+
+    const validated = moveTodoTaskSchema.parse(data);
+    const agendaId = await resolveAgendaIdFromTodoTaskId(
+      ctx.tenant.dispensaryId,
+      validated.taskId,
+    );
+    if (!agendaId) {
+      return { status: 404, error: 'Tâche introuvable' };
+    }
+
+    const guard = await guardAgendaWrite(
+      ctx.tenant.dispensaryId,
+      agendaId,
+      ctx.session,
+      ctx.tenant.effectiveRole,
+    );
+    if (!guard.ok) {
+      return { status: guard.status, error: guard.error };
+    }
+
+    const task = await prisma.agendaTodoTask.findUnique({
+      where: { id: validated.taskId },
+      select: {
+        categoryId: true,
+        category: { select: { listId: true } },
+      },
+    });
+    if (!task) {
+      return { status: 404, error: 'Tâche introuvable' };
+    }
+
+    const [sourceCategory, targetCategory] = await Promise.all([
+      prisma.agendaTodoCategory.findFirst({
+        where: {
+          id: validated.sourceCategoryId,
+          list: { agenda: tenantWhere(ctx.tenant.dispensaryId) },
+        },
+        select: { id: true, listId: true },
+      }),
+      prisma.agendaTodoCategory.findFirst({
+        where: {
+          id: validated.targetCategoryId,
+          list: { agenda: tenantWhere(ctx.tenant.dispensaryId) },
+        },
+        select: { id: true, listId: true },
+      }),
+    ]);
+
+    if (!sourceCategory || !targetCategory) {
+      return { status: 404, error: 'Catégorie introuvable' };
+    }
+
+    if (sourceCategory.listId !== targetCategory.listId) {
+      return { status: 400, error: 'La catégorie doit appartenir à la même liste' };
+    }
+
+    if (task.category.listId !== sourceCategory.listId) {
+      return { status: 400, error: 'La tâche ne fait pas partie de cette liste' };
+    }
+
+    if (
+      task.categoryId !== validated.sourceCategoryId &&
+      task.categoryId !== validated.targetCategoryId
+    ) {
+      return { status: 409, error: 'La tâche a été modifiée entre-temps' };
+    }
+
+    await prisma.$transaction(async (tx) => {
+      if (validated.sourceCategoryId !== validated.targetCategoryId) {
+        await tx.agendaTodoTask.update({
+          where: { id: validated.taskId },
+          data: { categoryId: validated.targetCategoryId },
+        });
+      }
+
+      const orderUpdates = new Map<string, number>();
+      for (const item of validated.sourceOrders) {
+        orderUpdates.set(item.id, item.order);
+      }
+      for (const item of validated.targetOrders) {
+        orderUpdates.set(item.id, item.order);
+      }
+
+      await Promise.all(
+        [...orderUpdates.entries()].map(([id, order]) =>
+          tx.agendaTodoTask.update({
+            where: { id },
+            data: { order },
+          }),
+        ),
+      );
+    });
+
+    return { status: 200, data: { success: true } };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors du déplacement de la tâche');
   }
 }
 

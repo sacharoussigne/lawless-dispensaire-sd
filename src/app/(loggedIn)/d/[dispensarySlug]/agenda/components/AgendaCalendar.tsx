@@ -8,7 +8,6 @@ import dayjs from '@/lib/dayjs';
 import type { AgendaEventDTO } from '@/types/agenda';
 import { listAgendaEvents } from '@/app/_actions/agenda/events';
 import { handleAction } from '@/lib/action';
-import { AGENDA_PANEL_HEIGHT_PX } from '../constants';
 import {
   isAgendaCalendarView,
   parseAgendaCalendarDateParam,
@@ -32,6 +31,7 @@ interface AgendaCalendarProps {
   events: AgendaEventDTO[];
   onEventsChange: (events: AgendaEventDTO[]) => void;
   canWrite: boolean;
+  panelHeightPx: number;
   onSelectEvent: (event: AgendaEventDTO) => void;
   onSelectSlot: (start: Date, end: Date, view: View) => void;
 }
@@ -42,6 +42,7 @@ export function AgendaCalendar({
   events,
   onEventsChange,
   canWrite,
+  panelHeightPx,
   onSelectEvent,
   onSelectSlot,
 }: AgendaCalendarProps) {
@@ -199,7 +200,7 @@ export function AgendaCalendar({
         startAccessor="start"
         endAccessor="end"
         allDayAccessor="allDay"
-        style={{ height: AGENDA_PANEL_HEIGHT_PX }}
+        style={{ height: panelHeightPx }}
         culture="fr"
         messages={{
           today: "Aujourd'hui",
