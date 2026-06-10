@@ -45,6 +45,10 @@ import {
   updateAgendaTodoTask,
 } from '@/app/_actions/agenda/todoLists';
 import { handleAction } from '@/lib/action';
+import {
+  readTodoCategoryFilterForList,
+  writeTodoCategoryFilterForList,
+} from '@/lib/agenda/todoCategoryFilterPreference';
 import { canWriteAgenda, type AgendaTodoListDTO, type AgendaTodoTaskDTO } from '@/types/agenda';
 import type { AgendaAccessLevel } from '@prisma/client';
 import { SortableTodoCategory } from './SortableTodoCategory';
@@ -205,7 +209,6 @@ export function AgendaTodoPanel({
 
   if (selectedListId !== lastFilterListId) {
     setLastFilterListId(selectedListId);
-    setCategoryFilterIds(new Set());
     setTaskSearch('');
   }
 
@@ -213,6 +216,31 @@ export function AgendaTodoPanel({
     () => selectedList?.categories.map((category) => category.id) ?? [],
     [selectedList],
   );
+  const allCategoryIdsKey = allCategoryIds.join(',');
+
+  const persistCategoryFilter = useCallback(
+    (next: Set<string>) => {
+      if (!agendaId || !selectedListId) return;
+      writeTodoCategoryFilterForList(dispensarySlug, agendaId, selectedListId, next);
+    },
+    [agendaId, dispensarySlug, selectedListId],
+  );
+
+  useEffect(() => {
+    if (!agendaId || !selectedListId || !selectedList) {
+      setCategoryFilterIds(new Set());
+      return;
+    }
+
+    setCategoryFilterIds(
+      readTodoCategoryFilterForList(
+        dispensarySlug,
+        agendaId,
+        selectedListId,
+        allCategoryIds,
+      ),
+    );
+  }, [agendaId, allCategoryIds, allCategoryIdsKey, dispensarySlug, selectedListId]);
 
   const isCategoryFilterActive =
     categoryFilterIds.size > 0 && categoryFilterIds.size < allCategoryIds.length;
@@ -255,15 +283,17 @@ export function AgendaTodoPanel({
       } else {
         base.add(categoryId);
       }
-      if (base.size === 0 || base.size === allCategoryIds.length) {
-        return new Set();
-      }
-      return base;
+      const next =
+        base.size === 0 || base.size === allCategoryIds.length ? new Set<string>() : base;
+      persistCategoryFilter(next);
+      return next;
     });
   };
 
   const showAllCategories = () => {
-    setCategoryFilterIds(new Set());
+    const next = new Set<string>();
+    setCategoryFilterIds(next);
+    persistCategoryFilter(next);
   };
 
   const applyLists = useCallback((data: AgendaTodoListDTO[]) => {
