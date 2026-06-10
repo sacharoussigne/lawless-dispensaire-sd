@@ -40,15 +40,22 @@
   }
 
   .todoCategory {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
     padding: var(--mantine-spacing-sm);
     border: 1px solid var(--disp-border);
     border-radius: var(--mantine-radius-sm);
     background: var(--disp-paper-muted, var(--mantine-color-slate-0));
-    align-self: start;
 
     &:last-of-type {
       border-bottom: 1px solid var(--disp-border);
     }
+  }
+
+  .todoCategoryDropZone {
+    flex: 1;
+    min-height: 0.5rem;
   }
 }
 
