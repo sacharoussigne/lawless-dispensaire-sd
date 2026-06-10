@@ -1,7 +1,10 @@
 'use client';
 
 import { listAgendaEvents } from '@/app/_actions/agenda/events';
-import { buildAgendaDayViewHref } from '@/lib/agenda/calendarNavigation';
+import {
+  buildAgendaDayViewHref,
+  withAgendaCalendarFocus,
+} from '@/lib/agenda/calendarNavigation';
 import { subscribeUpcomingEventsRefresh } from '@/lib/agenda/upcomingEventsRefresh';
 import { formatAgendaTimeInput } from '@/lib/agenda/dates';
 import type { Dayjs } from 'dayjs';
@@ -199,7 +202,7 @@ export function HeaderUpcomingEvents({
   const handleIndicatorClick = () => {
     if (loading) return;
     if (!hasEvents) {
-      router.push(agendaHref);
+      router.push(withAgendaCalendarFocus(agendaHref));
       return;
     }
     handlePopoverChange(!opened);
@@ -266,7 +269,12 @@ export function HeaderUpcomingEvents({
             dayDate={bounds.tomorrowStart}
             onNavigate={() => setOpened(false)}
           />
-          <Anchor component={Link} href={agendaHref} size="sm" onClick={() => setOpened(false)}>
+          <Anchor
+            component={Link}
+            href={withAgendaCalendarFocus(agendaHref)}
+            size="sm"
+            onClick={() => setOpened(false)}
+          >
             Voir l&apos;agenda
           </Anchor>
         </Stack>

@@ -9,6 +9,10 @@ import { IconPlus } from '@tabler/icons-react';
 import Link from 'next/link';
 import dayjs from '@/lib/dayjs';
 import { buildDefaultTimedSlotForDay } from '@/lib/agenda/dates';
+import {
+  AGENDA_CALENDAR_FOCUS_PARAM,
+  isAgendaCalendarFocusParam,
+} from '@/lib/agenda/calendarNavigation';
 import { notifyUpcomingEventsRefresh } from '@/lib/agenda/upcomingEventsRefresh';
 import { PageHeader } from '@/app/_components/PageHeader/PageHeader';
 import {
@@ -88,8 +92,38 @@ export function AgendaPageClient({
   const t = tenantRoutes(dispensarySlug);
   const { layout, setWidthMode, toggleCalendar, toggleTodo } =
     useAgendaLayoutPreference(dispensarySlug);
+  const [calendarFocusOverride, setCalendarFocusOverride] = useState(false);
+  const calendarFocusParam = searchParams.get(AGENDA_CALENDAR_FOCUS_PARAM);
 
-  const isExpanded = layout.widthMode === 'expanded';
+  useEffect(() => {
+    if (!isAgendaCalendarFocusParam(calendarFocusParam)) return;
+
+    setCalendarFocusOverride(true);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete(AGENDA_CALENDAR_FOCUS_PARAM);
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [calendarFocusParam, pathname, router, searchParams]);
+
+  const effectiveLayout = useMemo(
+    () => ({
+      ...layout,
+      showCalendar: calendarFocusOverride ? true : layout.showCalendar,
+    }),
+    [calendarFocusOverride, layout],
+  );
+
+  const handleToggleCalendar = useCallback(() => {
+    const currentlyShown = calendarFocusOverride || layout.showCalendar;
+    setCalendarFocusOverride(false);
+    if (currentlyShown && layout.showCalendar) {
+      toggleCalendar();
+    } else if (!currentlyShown) {
+      toggleCalendar();
+    }
+  }, [calendarFocusOverride, layout.showCalendar, toggleCalendar]);
+
+  const isExpanded = effectiveLayout.widthMode === 'expanded';
   const panelHeightPx = isExpanded ? AGENDA_PANEL_HEIGHT_EXPANDED_PX : AGENDA_PANEL_HEIGHT_PX;
   const todoColumnWidthPx = isExpanded
     ? AGENDA_TODO_COLUMN_WIDTH_EXPANDED_PX
@@ -213,8 +247,8 @@ export function AgendaPageClient({
 
   const showCalendarPanel = Boolean(selectedAgendaId) || participantOnly;
   const showTodoPanel = !participantOnly;
-  const renderCalendar = showCalendarPanel && (participantOnly || layout.showCalendar);
-  const renderTodo = showTodoPanel && layout.showTodo;
+  const renderCalendar = showCalendarPanel && (participantOnly || effectiveLayout.showCalendar);
+  const renderTodo = showTodoPanel && effectiveLayout.showTodo;
   const eventModalAgendaId = selectedAgendaId ?? selectedEvent?.agendaId ?? '';
 
   const layoutClassName = [
@@ -242,11 +276,11 @@ export function AgendaPageClient({
         actions={
           <Group gap="sm">
             <AgendaLayoutControls
-              layout={layout}
+              layout={effectiveLayout}
               canToggleCalendar={!participantOnly}
               canToggleTodo={showTodoPanel}
               onWidthModeChange={setWidthMode}
-              onToggleCalendar={toggleCalendar}
+              onToggleCalendar={handleToggleCalendar}
               onToggleTodo={toggleTodo}
             />
             {!participantOnly && (
