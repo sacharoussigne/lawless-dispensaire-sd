@@ -25,8 +25,11 @@
 }
 
 .layoutTodoOnly {
-  @media (min-width: 62.01em) {
-    grid-template-columns: 1fr;
+  grid-template-columns: 1fr;
+
+  .todoPanel {
+    grid-column: 1;
+    grid-row: 1;
   }
 }
 
