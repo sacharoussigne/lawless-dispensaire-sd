@@ -6,7 +6,76 @@ import {
   resolveAgendaAccess,
 } from '@/lib/agenda/access';
 import prisma from '@/lib/prisma';
+import { isPlatformAdmin } from '@/lib/dispensary/platformAdmin';
 import { tenantWhere } from '@/lib/dispensary/tenantWhere';
+
+const agendaUserSelect = {
+  id: true,
+  name: true,
+  email: true,
+  image: true,
+} as const;
+
+export type AgendaEligibleUser = {
+  id: string;
+  name: string;
+  email: string;
+  image: string | null;
+};
+
+function buildAgendaUserSearchFilter(query: string) {
+  return {
+    OR: [
+      { name: { contains: query, mode: 'insensitive' as const } },
+      { email: { contains: query, mode: 'insensitive' as const } },
+    ],
+  };
+}
+
+export async function searchEligibleDispensaryUsersForAgenda(
+  dispensaryId: string,
+  query: string,
+): Promise<AgendaEligibleUser[]> {
+  const q = query.trim();
+  if (q.length < 2) {
+    return [];
+  }
+
+  const userFilter = buildAgendaUserSearchFilter(q);
+
+  const [members, matchingUsers] = await Promise.all([
+    prisma.dispensaryMember.findMany({
+      where: { dispensaryId, user: userFilter },
+      include: { user: { select: agendaUserSelect } },
+      take: 30,
+      orderBy: { user: { name: 'asc' } },
+    }),
+    prisma.user.findMany({
+      where: userFilter,
+      select: { ...agendaUserSelect, role: true },
+      take: 30,
+      orderBy: { name: 'asc' },
+    }),
+  ]);
+
+  const byId = new Map<string, AgendaEligibleUser>();
+  for (const member of members) {
+    byId.set(member.user.id, member.user);
+  }
+  for (const user of matchingUsers) {
+    if (!isPlatformAdmin(user.role)) continue;
+    byId.set(user.id, {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      image: user.image,
+    });
+  }
+
+  return Array.from(byId.values())
+    .sort((a, b) => a.name.localeCompare(b.name, 'fr'))
+    .slice(0, 20);
+}
 
 export async function requireAgendaFeatureContext(dispensarySlug: string) {
   return requireTenantServerActionContext(dispensarySlug, {
@@ -146,13 +215,27 @@ export async function validateDispensaryUserIds(
   userIds: string[],
 ): Promise<boolean> {
   if (userIds.length === 0) return true;
-  const count = await prisma.dispensaryMember.count({
+
+  const users = await prisma.user.findMany({
+    where: { id: { in: userIds } },
+    select: { id: true, role: true },
+  });
+  if (users.length !== userIds.length) return false;
+
+  const memberRequiredIds = users
+    .filter((user) => !isPlatformAdmin(user.role))
+    .map((user) => user.id);
+
+  if (memberRequiredIds.length === 0) return true;
+
+  const memberCount = await prisma.dispensaryMember.count({
     where: {
       ...tenantWhere(dispensaryId),
-      userId: { in: userIds },
+      userId: { in: memberRequiredIds },
     },
   });
-  return count === userIds.length;
+
+  return memberCount === memberRequiredIds.length;
 }
 
 export { resolveAgendaAccess };

@@ -19,6 +19,7 @@ import {
   getAgendaSessionContext,
   guardAgendaOwner,
   guardAgendaRead,
+  validateDispensaryUserIds,
 } from '@/app/_actions/agenda/internals';
 import { canManageAgendaMembers } from '@/lib/agenda/access';
 
@@ -131,20 +132,15 @@ export async function createAgenda(
 
     const validated = createAgendaSchema.parse(data);
 
-    const ownerMember = await prisma.dispensaryMember.findUnique({
-      where: {
-        dispensaryId_userId: {
-          dispensaryId: auth.ctx.dispensaryId,
-          userId: validated.ownerUserId,
-        },
-      },
-      select: { userId: true },
-    });
+    const validOwner = await validateDispensaryUserIds(
+      auth.ctx.dispensaryId,
+      [validated.ownerUserId],
+    );
 
-    if (!ownerMember) {
+    if (!validOwner) {
       return {
         status: 400,
-        error: 'Le propriétaire doit être membre du dispensaire',
+        error: 'Le propriétaire doit avoir accès au dispensaire',
       };
     }
 
