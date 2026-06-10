@@ -25,8 +25,10 @@ import {
   resolveAgendaIdFromTodoCategoryId,
   resolveAgendaIdFromTodoTaskId,
 } from '@/app/_actions/agenda/internals';
-
-const COMPLETED_PREVIEW_LIMIT = 10;
+import {
+  compareTodoTasksByCompletedAtDesc,
+  isTodoTaskArchived,
+} from '@/lib/agenda/todoArchive';
 
 const listInclude = {
   categories: {
@@ -73,24 +75,39 @@ function mapTodoList(list: {
   };
 }
 
-function filterTasksForMainView(list: AgendaTodoListDTO): AgendaTodoListDTO {
+function filterTasksForMainView(
+  list: AgendaTodoListDTO,
+  nowMs: number = Date.now(),
+): AgendaTodoListDTO {
   return {
     ...list,
     categories: list.categories.map((category) => {
       const active = category.tasks.filter((t) => !t.completed);
-      const completed = category.tasks
-        .filter((t) => t.completed)
-        .sort((a, b) => {
-          const aTime = a.completedAt?.getTime() ?? 0;
-          const bTime = b.completedAt?.getTime() ?? 0;
-          return bTime - aTime;
-        })
-        .slice(0, COMPLETED_PREVIEW_LIMIT);
+      const recentlyCompleted = category.tasks
+        .filter((t) => t.completed && !isTodoTaskArchived(t, nowMs))
+        .sort(compareTodoTasksByCompletedAtDesc);
       return {
         ...category,
-        tasks: [...active, ...completed],
+        tasks: [...active, ...recentlyCompleted],
       };
     }),
+  };
+}
+
+function filterTasksForArchives(
+  list: AgendaTodoListDTO,
+  nowMs: number = Date.now(),
+): AgendaTodoListDTO {
+  return {
+    ...list,
+    categories: list.categories
+      .map((category) => ({
+        ...category,
+        tasks: category.tasks
+          .filter((t) => isTodoTaskArchived(t, nowMs))
+          .sort(compareTodoTasksByCompletedAtDesc),
+      }))
+      .filter((category) => category.tasks.length > 0),
   };
 }
 
@@ -123,26 +140,17 @@ export async function listAgendaTodoLists(
     });
 
     const mapped = lists.map(mapTodoList);
+    const nowMs = Date.now();
 
     if (options?.archives) {
-      const archived = mapped.map((list) => ({
-        ...list,
-        categories: list.categories.map((c) => ({
-          ...c,
-          tasks: c.tasks
-            .filter((t) => t.completed)
-            .sort((a, b) => {
-              const aTime = a.completedAt?.getTime() ?? 0;
-              const bTime = b.completedAt?.getTime() ?? 0;
-              return bTime - aTime;
-            }),
-        })).filter((c) => c.tasks.length > 0),
-      })).filter((l) => l.categories.length > 0);
+      const archived = mapped
+        .map((list) => filterTasksForArchives(list, nowMs))
+        .filter((list) => list.categories.length > 0);
 
       return { status: 200, data: archived };
     }
 
-    return { status: 200, data: mapped.map(filterTasksForMainView) };
+    return { status: 200, data: mapped.map((list) => filterTasksForMainView(list, nowMs)) };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors du chargement des listes');
   }

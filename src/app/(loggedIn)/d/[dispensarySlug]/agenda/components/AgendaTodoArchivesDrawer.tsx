@@ -36,7 +36,9 @@ export function AgendaTodoArchivesDrawer({
     >
       <Stack gap="lg">
         {lists.length === 0 && (
-          <Text c="dimmed" size="sm">Aucune tâche terminée archivée.</Text>
+          <Text c="dimmed" size="sm">
+            Aucune tâche archivée (cochée depuis plus d&apos;une heure).
+          </Text>
         )}
         {lists.map((list) => (
           <Stack key={list.id} gap="sm">
