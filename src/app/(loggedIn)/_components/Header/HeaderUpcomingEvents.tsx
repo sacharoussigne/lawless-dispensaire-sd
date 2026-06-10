@@ -5,7 +5,9 @@ import {
   buildAgendaDayViewHref,
   withAgendaCalendarFocus,
 } from '@/lib/agenda/calendarNavigation';
-import { subscribeUpcomingEventsRefresh } from '@/lib/agenda/upcomingEventsRefresh';
+import { useAgendaRealtime } from '@/lib/agenda/realtime/useAgendaRealtime';
+import { isRelevantAgendaRealtimeEvent } from '@/lib/agenda/realtime/isRelevantAgendaEvent';
+import { subscribeUpcomingEventsLocalRefresh } from '@/lib/agenda/upcomingEventsLocalRefresh';
 import { formatAgendaTimeInput } from '@/lib/agenda/dates';
 import type { Dayjs } from 'dayjs';
 import dayjs from '@/lib/dayjs';
@@ -24,8 +26,9 @@ import {
 import { IconCalendarEvent } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import classes from './Header.module.scss';
+import { usePermissions } from '@/app/_contexts/PermissionsContext';
 
 function getTodayTomorrowBounds() {
   const todayStart = dayjs().tz('Europe/Paris').startOf('day');
@@ -127,6 +130,8 @@ export function HeaderUpcomingEvents({
   agendaHref: string;
 }) {
   const router = useRouter();
+  const { accessibleAgendaIds } = usePermissions();
+  const accessibleAgendaIdsRef = useRef(accessibleAgendaIds);
   const [opened, setOpened] = useState(false);
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState<AgendaEventDTO[]>([]);
@@ -149,6 +154,42 @@ export function HeaderUpcomingEvents({
     return null;
   }, [dispensarySlug, queryRange]);
 
+  const fetchUpcomingEventsRef = useRef(fetchUpcomingEvents);
+
+  useEffect(() => {
+    fetchUpcomingEventsRef.current = fetchUpcomingEvents;
+  }, [fetchUpcomingEvents]);
+
+  useEffect(() => {
+    accessibleAgendaIdsRef.current = accessibleAgendaIds;
+  }, [accessibleAgendaIds]);
+
+  useAgendaRealtime({
+    dispensarySlug,
+    onEventsChange: (event) => {
+      if (
+        !isRelevantAgendaRealtimeEvent(event, {
+          accessibleAgendaIds: accessibleAgendaIdsRef.current,
+        })
+      ) {
+        return;
+      }
+      void fetchUpcomingEventsRef.current().then((data) => {
+        if (data) setEvents(data);
+        setLoading(false);
+      });
+    },
+  });
+
+  useEffect(() => {
+    return subscribeUpcomingEventsLocalRefresh(() => {
+      void fetchUpcomingEventsRef.current().then((data) => {
+        if (data) setEvents(data);
+        setLoading(false);
+      });
+    });
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -162,15 +203,6 @@ export function HeaderUpcomingEvents({
     return () => {
       cancelled = true;
     };
-  }, [fetchUpcomingEvents]);
-
-  useEffect(() => {
-    return subscribeUpcomingEventsRefresh(() => {
-      void fetchUpcomingEvents().then((data) => {
-        if (data) setEvents(data);
-        setLoading(false);
-      });
-    });
   }, [fetchUpcomingEvents]);
 
   const handlePopoverChange = useCallback(

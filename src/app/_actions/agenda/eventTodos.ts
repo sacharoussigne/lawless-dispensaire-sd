@@ -14,10 +14,13 @@ import {
   resolveAgendaIdFromEventId,
   resolveAgendaIdFromEventTodoTaskId,
 } from '@/app/_actions/agenda/internals';
+import { emitAgendaEventTodosChange } from '@/lib/agenda/realtime/broadcast';
+import type { AgendaMutationMeta } from '@/lib/agenda/realtime/mutationMeta';
 
 export async function createAgendaEventTodoTask(
   dispensarySlug: string,
   data: { eventId: string; title: string; description?: string | null },
+  meta?: AgendaMutationMeta,
 ) {
   try {
     const ctx = await getAgendaSessionContext(dispensarySlug);
@@ -56,6 +59,13 @@ export async function createAgendaEventTodoTask(
       },
     });
 
+    await emitAgendaEventTodosChange(
+      ctx.tenant.dispensaryId,
+      agendaId,
+      validated.eventId,
+      meta,
+    );
+
     return { status: 201, data: task };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la création de la tâche');
@@ -70,6 +80,7 @@ export async function updateAgendaEventTodoTask(
     description?: string | null;
     completed?: boolean;
   },
+  meta?: AgendaMutationMeta,
 ) {
   try {
     const ctx = await getAgendaSessionContext(dispensarySlug);
@@ -115,13 +126,24 @@ export async function updateAgendaEventTodoTask(
       data: updateData,
     });
 
+    await emitAgendaEventTodosChange(
+      ctx.tenant.dispensaryId,
+      agendaId,
+      task.eventId,
+      meta,
+    );
+
     return { status: 200, data: task };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la mise à jour de la tâche');
   }
 }
 
-export async function deleteAgendaEventTodoTask(dispensarySlug: string, id: string) {
+export async function deleteAgendaEventTodoTask(
+  dispensarySlug: string,
+  id: string,
+  meta?: AgendaMutationMeta,
+) {
   try {
     const ctx = await getAgendaSessionContext(dispensarySlug);
     if (!ctx.ok) return ctx.response;
@@ -132,6 +154,14 @@ export async function deleteAgendaEventTodoTask(dispensarySlug: string, id: stri
       validated.id,
     );
     if (!agendaId) {
+      return { status: 404, error: 'Tâche introuvable' };
+    }
+
+    const existingTask = await prisma.agendaEventTodoTask.findUnique({
+      where: { id: validated.id },
+      select: { eventId: true },
+    });
+    if (!existingTask) {
       return { status: 404, error: 'Tâche introuvable' };
     }
 
@@ -147,6 +177,13 @@ export async function deleteAgendaEventTodoTask(dispensarySlug: string, id: stri
 
     await prisma.agendaEventTodoTask.delete({ where: { id: validated.id } });
 
+    await emitAgendaEventTodosChange(
+      ctx.tenant.dispensaryId,
+      agendaId,
+      existingTask.eventId,
+      meta,
+    );
+
     return { status: 200 };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la suppression de la tâche');
@@ -156,6 +193,7 @@ export async function deleteAgendaEventTodoTask(dispensarySlug: string, id: stri
 export async function reorderAgendaEventTodoTasks(
   dispensarySlug: string,
   data: { items: { id: string; order: number }[] },
+  meta?: AgendaMutationMeta,
 ) {
   try {
     const ctx = await getAgendaSessionContext(dispensarySlug);
@@ -184,6 +222,14 @@ export async function reorderAgendaEventTodoTasks(
       return { status: guard.status, error: guard.error };
     }
 
+    const firstTask = await prisma.agendaEventTodoTask.findUnique({
+      where: { id: validated.items[0].id },
+      select: { eventId: true },
+    });
+    if (!firstTask) {
+      return { status: 404, error: 'Tâche introuvable' };
+    }
+
     await Promise.all(
       validated.items.map(({ id, order }) =>
         prisma.agendaEventTodoTask.update({
@@ -191,6 +237,13 @@ export async function reorderAgendaEventTodoTasks(
           data: { order },
         }),
       ),
+    );
+
+    await emitAgendaEventTodosChange(
+      ctx.tenant.dispensaryId,
+      agendaId,
+      firstTask.eventId,
+      meta,
     );
 
     return { status: 200, data: { success: true } };

@@ -29,6 +29,8 @@ import {
   compareTodoTasksByCompletedAtDesc,
   isTodoTaskArchived,
 } from '@/lib/agenda/todoArchive';
+import { emitAgendaTodosChange } from '@/lib/agenda/realtime/broadcast';
+import type { AgendaMutationMeta } from '@/lib/agenda/realtime/mutationMeta';
 
 const listInclude = {
   categories: {
@@ -159,6 +161,7 @@ export async function listAgendaTodoLists(
 export async function createAgendaTodoList(
   dispensarySlug: string,
   data: { agendaId: string; name: string },
+  meta?: AgendaMutationMeta,
 ) {
   try {
     const ctx = await getAgendaSessionContext(dispensarySlug);
@@ -190,6 +193,8 @@ export async function createAgendaTodoList(
       include: listInclude,
     });
 
+    await emitAgendaTodosChange(ctx.tenant.dispensaryId, validated.agendaId, meta);
+
     return { status: 201, data: mapTodoList(list) };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la création de la liste');
@@ -199,6 +204,7 @@ export async function createAgendaTodoList(
 export async function updateAgendaTodoList(
   dispensarySlug: string,
   data: { id: string; name: string },
+  meta?: AgendaMutationMeta,
 ) {
   try {
     const ctx = await getAgendaSessionContext(dispensarySlug);
@@ -229,13 +235,19 @@ export async function updateAgendaTodoList(
       include: listInclude,
     });
 
+    await emitAgendaTodosChange(ctx.tenant.dispensaryId, agendaId, meta);
+
     return { status: 200, data: mapTodoList(list) };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la mise à jour de la liste');
   }
 }
 
-export async function deleteAgendaTodoList(dispensarySlug: string, id: string) {
+export async function deleteAgendaTodoList(
+  dispensarySlug: string,
+  id: string,
+  meta?: AgendaMutationMeta,
+) {
   try {
     const ctx = await getAgendaSessionContext(dispensarySlug);
     if (!ctx.ok) return ctx.response;
@@ -261,6 +273,8 @@ export async function deleteAgendaTodoList(dispensarySlug: string, id: string) {
 
     await prisma.agendaTodoList.delete({ where: { id: validated.id } });
 
+    await emitAgendaTodosChange(ctx.tenant.dispensaryId, agendaId, meta);
+
     return { status: 200 };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la suppression de la liste');
@@ -270,6 +284,7 @@ export async function deleteAgendaTodoList(dispensarySlug: string, id: string) {
 export async function createAgendaTodoCategory(
   dispensarySlug: string,
   data: { listId: string; name: string },
+  meta?: AgendaMutationMeta,
 ) {
   try {
     const ctx = await getAgendaSessionContext(dispensarySlug);
@@ -308,6 +323,8 @@ export async function createAgendaTodoCategory(
       include: { tasks: { orderBy: { order: 'asc' } } },
     });
 
+    await emitAgendaTodosChange(ctx.tenant.dispensaryId, agendaId, meta);
+
     return { status: 201, data: category };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la création de la catégorie');
@@ -317,6 +334,7 @@ export async function createAgendaTodoCategory(
 export async function updateAgendaTodoCategory(
   dispensarySlug: string,
   data: { id: string; name: string },
+  meta?: AgendaMutationMeta,
 ) {
   try {
     const ctx = await getAgendaSessionContext(dispensarySlug);
@@ -347,13 +365,19 @@ export async function updateAgendaTodoCategory(
       include: { tasks: { orderBy: { order: 'asc' } } },
     });
 
+    await emitAgendaTodosChange(ctx.tenant.dispensaryId, agendaId, meta);
+
     return { status: 200, data: category };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la mise à jour de la catégorie');
   }
 }
 
-export async function deleteAgendaTodoCategory(dispensarySlug: string, id: string) {
+export async function deleteAgendaTodoCategory(
+  dispensarySlug: string,
+  id: string,
+  meta?: AgendaMutationMeta,
+) {
   try {
     const ctx = await getAgendaSessionContext(dispensarySlug);
     if (!ctx.ok) return ctx.response;
@@ -379,6 +403,8 @@ export async function deleteAgendaTodoCategory(dispensarySlug: string, id: strin
 
     await prisma.agendaTodoCategory.delete({ where: { id: validated.id } });
 
+    await emitAgendaTodosChange(ctx.tenant.dispensaryId, agendaId, meta);
+
     return { status: 200 };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la suppression de la catégorie');
@@ -388,6 +414,7 @@ export async function deleteAgendaTodoCategory(dispensarySlug: string, id: strin
 export async function createAgendaTodoTask(
   dispensarySlug: string,
   data: { categoryId: string; title: string; description?: string | null },
+  meta?: AgendaMutationMeta,
 ) {
   try {
     const ctx = await getAgendaSessionContext(dispensarySlug);
@@ -426,6 +453,8 @@ export async function createAgendaTodoTask(
       },
     });
 
+    await emitAgendaTodosChange(ctx.tenant.dispensaryId, agendaId, meta);
+
     return { status: 201, data: task };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la création de la tâche');
@@ -441,6 +470,7 @@ export async function updateAgendaTodoTask(
     completed?: boolean;
     categoryId?: string;
   },
+  meta?: AgendaMutationMeta,
 ) {
   try {
     const ctx = await getAgendaSessionContext(dispensarySlug);
@@ -520,13 +550,19 @@ export async function updateAgendaTodoTask(
       data: updateData,
     });
 
+    await emitAgendaTodosChange(ctx.tenant.dispensaryId, agendaId, meta);
+
     return { status: 200, data: task };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la mise à jour de la tâche');
   }
 }
 
-export async function deleteAgendaTodoTask(dispensarySlug: string, id: string) {
+export async function deleteAgendaTodoTask(
+  dispensarySlug: string,
+  id: string,
+  meta?: AgendaMutationMeta,
+) {
   try {
     const ctx = await getAgendaSessionContext(dispensarySlug);
     if (!ctx.ok) return ctx.response;
@@ -561,6 +597,8 @@ export async function deleteAgendaTodoTask(dispensarySlug: string, id: string) {
 
     await prisma.agendaTodoTask.delete({ where: { id: validated.id } });
 
+    await emitAgendaTodosChange(ctx.tenant.dispensaryId, agendaId, meta);
+
     return { status: 200 };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la suppression de la tâche');
@@ -570,6 +608,7 @@ export async function deleteAgendaTodoTask(dispensarySlug: string, id: string) {
 export async function reorderAgendaTodoCategories(
   dispensarySlug: string,
   data: { items: { id: string; order: number }[] },
+  meta?: AgendaMutationMeta,
 ) {
   try {
     const ctx = await getAgendaSessionContext(dispensarySlug);
@@ -607,6 +646,8 @@ export async function reorderAgendaTodoCategories(
       ),
     );
 
+    await emitAgendaTodosChange(ctx.tenant.dispensaryId, agendaId, meta);
+
     return { status: 200, data: { success: true } };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors du réordonnancement');
@@ -622,6 +663,7 @@ export async function moveAgendaTodoTask(
     sourceOrders: { id: string; order: number }[];
     targetOrders: { id: string; order: number }[];
   },
+  meta?: AgendaMutationMeta,
 ) {
   try {
     const ctx = await getAgendaSessionContext(dispensarySlug);
@@ -719,6 +761,8 @@ export async function moveAgendaTodoTask(
       );
     });
 
+    await emitAgendaTodosChange(ctx.tenant.dispensaryId, agendaId, meta);
+
     return { status: 200, data: { success: true } };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors du déplacement de la tâche');
@@ -728,6 +772,7 @@ export async function moveAgendaTodoTask(
 export async function reorderAgendaTodoTasks(
   dispensarySlug: string,
   data: { items: { id: string; order: number }[] },
+  meta?: AgendaMutationMeta,
 ) {
   try {
     const ctx = await getAgendaSessionContext(dispensarySlug);
@@ -764,6 +809,8 @@ export async function reorderAgendaTodoTasks(
         }),
       ),
     );
+
+    await emitAgendaTodosChange(ctx.tenant.dispensaryId, agendaId, meta);
 
     return { status: 200, data: { success: true } };
   } catch (error) {
