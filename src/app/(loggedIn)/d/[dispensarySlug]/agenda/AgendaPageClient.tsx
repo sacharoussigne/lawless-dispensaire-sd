@@ -295,6 +295,7 @@ export function AgendaPageClient({
             initialLists={
               selectedAgendaId === initialAgendas[0]?.id ? initialTodoLists : []
             }
+            wideLayout={!renderCalendar}
           />
         )}
       </div>

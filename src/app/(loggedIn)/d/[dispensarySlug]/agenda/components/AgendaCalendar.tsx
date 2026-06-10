@@ -8,7 +8,6 @@ import dayjs from '@/lib/dayjs';
 import type { AgendaEventDTO } from '@/types/agenda';
 import { listAgendaEvents } from '@/app/_actions/agenda/events';
 import { handleAction } from '@/lib/action';
-import { AGENDA_PANEL_HEIGHT_PX } from '../constants';
 import {
   isAgendaCalendarView,
   parseAgendaCalendarDateParam,
@@ -199,7 +198,6 @@ export function AgendaCalendar({
         startAccessor="start"
         endAccessor="end"
         allDayAccessor="allDay"
-        style={{ height: AGENDA_PANEL_HEIGHT_PX }}
         culture="fr"
         messages={{
           today: "Aujourd'hui",

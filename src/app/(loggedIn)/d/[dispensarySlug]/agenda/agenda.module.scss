@@ -27,7 +27,38 @@
 .layoutTodoOnly {
   @media (min-width: 62.01em) {
     grid-template-columns: 1fr;
+
+    .todoPanel {
+      height: min(calc(100vh - 12rem), 920px);
+      max-height: min(calc(100vh - 12rem), 920px);
+    }
   }
+}
+
+.todoCategoriesGrid {
+  display: grid;
+  gap: var(--mantine-spacing-md);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  @media (max-width: 48em) {
+    grid-template-columns: 1fr;
+  }
+
+  .todoCategory {
+    padding: var(--mantine-spacing-sm);
+    border: 1px solid var(--disp-border);
+    border-radius: var(--mantine-radius-sm);
+    background: var(--disp-paper-muted, var(--mantine-color-slate-0));
+    align-self: start;
+
+    &:last-of-type {
+      border-bottom: 1px solid var(--disp-border);
+    }
+  }
+}
+
+.todoCategoriesGridSingle {
+  grid-template-columns: 1fr;
 }
 
 .agendaContainerExpanded {
@@ -45,27 +76,32 @@
   min-width: 0;
   grid-column: 1;
   grid-row: 1;
+  height: var(--agenda-panel-height, 620px);
 }
 
 .todoPanel {
   grid-column: 2;
   grid-row: 1;
   min-width: 0;
+  height: var(--agenda-panel-height, 620px);
+  max-height: var(--agenda-panel-height, 620px);
   border: 1px solid var(--disp-border);
   border-radius: var(--mantine-radius-sm);
   background: var(--disp-surface);
   padding: var(--mantine-spacing-md);
-  max-height: var(--agenda-panel-height, 620px);
   overflow-y: auto;
-  overscroll-behavior: contain;
 
   @media (max-width: 62em) {
+    height: auto;
     max-height: none;
   }
 }
 
 .calendarWrapper {
+  height: 100%;
+
   :global(.rbc-calendar) {
+    height: 100% !important;
     font-family: var(--disp-font-ui);
     color: var(--disp-ink);
   }

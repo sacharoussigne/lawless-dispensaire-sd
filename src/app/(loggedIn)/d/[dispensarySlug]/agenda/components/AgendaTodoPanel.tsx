@@ -160,6 +160,18 @@ interface AgendaTodoPanelProps {
   agendaId: string | null;
   accessLevel: AgendaAccessLevel | null;
   initialLists: AgendaTodoListDTO[];
+  wideLayout?: boolean;
+}
+
+function getCategoriesGridClass(wideLayout: boolean, categoryCount: number) {
+  if (!wideLayout) return undefined;
+
+  return [
+    classes.todoCategoriesGrid,
+    categoryCount <= 1 ? classes.todoCategoriesGridSingle : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
 export function AgendaTodoPanel({
@@ -167,6 +179,7 @@ export function AgendaTodoPanel({
   agendaId,
   accessLevel,
   initialLists,
+  wideLayout = false,
 }: AgendaTodoPanelProps) {
   const [lists, setLists] = useState<AgendaTodoListDTO[]>(initialLists);
   const [selectedListId, setSelectedListId] = useState<string | null>(
@@ -322,14 +335,14 @@ export function AgendaTodoPanel({
   const dragCategoriesRef = useRef<TodoCategories | null>(null);
   const lastDragOverKeyRef = useRef<string | null>(null);
   const todoPanelRef = useRef<HTMLDivElement>(null);
+  const activeDragRef = useRef(activeDrag);
+  activeDragRef.current = activeDrag;
 
   useEffect(() => {
-    if (!activeDrag) return;
-
-    const panel = todoPanelRef.current;
-    if (!panel) return;
-
     const handleWheel = (event: WheelEvent) => {
+      const panel = todoPanelRef.current;
+      if (!panel) return;
+
       const rect = panel.getBoundingClientRect();
       const { clientX, clientY } = event;
       if (
@@ -342,7 +355,14 @@ export function AgendaTodoPanel({
       }
 
       const maxScroll = panel.scrollHeight - panel.clientHeight;
-      if (maxScroll <= 0) return;
+
+      if (maxScroll <= 0) {
+        window.scrollBy({ top: event.deltaY, left: event.deltaX });
+        event.preventDefault();
+        return;
+      }
+
+      if (!activeDragRef.current) return;
 
       const nextScroll = Math.min(
         maxScroll,
@@ -357,7 +377,7 @@ export function AgendaTodoPanel({
 
     document.addEventListener('wheel', handleWheel, { passive: false, capture: true });
     return () => document.removeEventListener('wheel', handleWheel, { capture: true });
-  }, [activeDrag]);
+  }, []);
 
   const handleDragStart = (event: DragStartEvent) => {
     if (!selectedList) return;
@@ -924,7 +944,7 @@ export function AgendaTodoPanel({
                 items={visibleCategories.map((category) => category.id)}
                 strategy={verticalListSortingStrategy}
               >
-                <Stack gap={0}>
+                <Stack gap={0} className={getCategoriesGridClass(wideLayout, visibleCategories.length)}>
                   {visibleCategories.map((category) => (
                     <SortableTodoCategory
                       key={category.id}
@@ -960,7 +980,10 @@ export function AgendaTodoPanel({
                   items={selectedList.categories.map((c) => c.id)}
                   strategy={verticalListSortingStrategy}
                 >
-                  <Stack gap={0}>
+                  <Stack
+                    gap={0}
+                    className={getCategoriesGridClass(wideLayout, selectedList.categories.length)}
+                  >
                     {selectedList.categories.map((category) => (
                       <SortableTodoCategory
                         key={category.id}
