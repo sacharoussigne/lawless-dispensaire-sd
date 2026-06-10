@@ -54,7 +54,6 @@ import type { AgendaAccessLevel } from '@prisma/client';
 import { SortableTodoCategory } from './SortableTodoCategory';
 import { AgendaTodoArchivesDrawer } from './AgendaTodoArchivesDrawer';
 import { InlineNoteInput } from './InlineNoteInput';
-import { InlineEditableText } from './InlineEditableText';
 import { EditableTodoListTab } from './EditableTodoListTab';
 import { DeleteTodoListButton } from './DeleteTodoListButton';
 import { usePressHoldPointerSensor } from './agendaDnd';
@@ -878,24 +877,6 @@ export function AgendaTodoPanel({
               ))}
             </div>
             {canWrite && selectedList && (
-              <DeleteTodoListButton
-                listName={selectedList.name}
-                onConfirm={() => void handleDeleteList(selectedList.id)}
-              />
-            )}
-          </Group>
-        )}
-
-        {lists.length === 1 && selectedList && (
-          <Group justify="space-between" align="center" wrap="nowrap" gap="xs">
-            <InlineEditableText
-              value={selectedList.name}
-              canEdit={canWrite}
-              onSave={(name) => handleRenameList(selectedList.id, name)}
-              textClassName={`disp-display-title ${classes.todoListTitle}`}
-              inputClassName={classes.todoListEditInput}
-            />
-            {canWrite && (
               <DeleteTodoListButton
                 listName={selectedList.name}
                 onConfirm={() => void handleDeleteList(selectedList.id)}
