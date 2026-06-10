@@ -1031,7 +1031,7 @@ export function AgendaTodoPanel({
               </Text>
             )}
 
-            {canWrite && !isFiltering && (
+            {canWrite && (
               <InlineNoteInput
                 placeholder="Nouvelle catégorie…"
                 onSubmit={handleCreateCategory}

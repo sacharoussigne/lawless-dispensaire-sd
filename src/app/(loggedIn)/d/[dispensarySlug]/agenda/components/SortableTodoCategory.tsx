@@ -204,7 +204,7 @@ export function SortableTodoCategory({
           </Stack>
         </SortableContext>
       </CategoryTaskDropZone>
-      {canWrite && dragEnabled && (
+      {canWrite && (
         <InlineNoteInput
           placeholder="Nouvelle tâche…"
           onSubmit={(title) => onAddTask(category.id, title)}
