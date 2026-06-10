@@ -154,6 +154,7 @@ interface SortableTodoCategoryProps {
   category: AgendaTodoCategoryDTO;
   canWrite: boolean;
   dragEnabled?: boolean;
+  categoryDragEnabled?: boolean;
   onToggleTask: (id: string, completed: boolean) => void;
   onRenameTask: (id: string, title: string) => void | Promise<void>;
   onDeleteTask: (id: string) => void;
@@ -166,6 +167,7 @@ export function SortableTodoCategory({
   category,
   canWrite,
   dragEnabled = true,
+  categoryDragEnabled,
   onToggleTask,
   onRenameTask,
   onDeleteTask,
@@ -173,13 +175,13 @@ export function SortableTodoCategory({
   onRenameCategory,
   onAddTask,
 }: SortableTodoCategoryProps) {
-  const canDrag = canWrite && dragEnabled;
+  const canDragCategory = canWrite && (categoryDragEnabled ?? dragEnabled);
 
   return (
     <SortableCategoryShell
       category={category}
       canWrite={canWrite}
-      canDrag={canDrag}
+      canDrag={canDragCategory}
       onDelete={() => onDeleteCategory(category.id)}
       onRename={onRenameCategory}
     >

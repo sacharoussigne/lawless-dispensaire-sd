@@ -219,6 +219,7 @@ export function AgendaTodoPanel({
 
   const isTaskSearchActive = taskSearch.trim().length > 0;
   const isFiltering = isCategoryFilterActive || isTaskSearchActive;
+  const categoryDragEnabled = canWrite && !wideLayout;
 
   const visibleCategories = useMemo(() => {
     if (!selectedList) return [];
@@ -990,6 +991,7 @@ export function AgendaTodoPanel({
                         category={category}
                         canWrite={canWrite}
                         dragEnabled
+                        categoryDragEnabled={categoryDragEnabled}
                         onToggleTask={handleToggleTask}
                         onRenameTask={handleRenameTask}
                         onDeleteTask={handleDeleteTask}
