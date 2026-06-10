@@ -171,6 +171,11 @@ export function AgendaFormModal({
                 setOwnerName('');
               }
             }}
+            autoComplete="off"
+            name="agenda-owner-user-search"
+            data-1p-ignore
+            data-lpignore="true"
+            data-form-type="other"
             required
           />
           {ownerUserId && (
