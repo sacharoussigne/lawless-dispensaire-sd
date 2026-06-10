@@ -1,6 +1,6 @@
 .layout {
   display: grid;
-  grid-template-columns: 1fr 360px;
+  grid-template-columns: 1fr var(--agenda-todo-column-width, 360px);
   gap: var(--mantine-spacing-md);
   align-items: start;
 
@@ -18,24 +18,86 @@
   }
 }
 
+.layoutCalendarOnly {
+  @media (min-width: 62.01em) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.layoutTodoOnly {
+  grid-template-columns: 1fr;
+
+  .todoPanel {
+    grid-column: 1;
+    grid-row: 1;
+  }
+}
+
+.todoCategoriesGrid {
+  display: grid;
+  gap: var(--mantine-spacing-md);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  @media (max-width: 48em) {
+    grid-template-columns: 1fr;
+  }
+
+  .todoCategory {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: var(--mantine-spacing-sm);
+    border: 1px solid var(--disp-border);
+    border-radius: var(--mantine-radius-sm);
+    background: var(--disp-paper-muted, var(--mantine-color-slate-0));
+
+    &:last-of-type {
+      border-bottom: 1px solid var(--disp-border);
+    }
+  }
+
+  .todoCategoryDropZone {
+    flex: 1;
+    min-height: 0.5rem;
+  }
+}
+
+.todoCategoriesGridSingle {
+  grid-template-columns: 1fr;
+}
+
+.agendaContainerExpanded {
+  max-width: var(--agenda-container-max-width, 1680px);
+}
+
+.agendaLayoutControls {
+  padding: 2px;
+  border: 1px solid var(--disp-border);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--disp-surface);
+}
+
 .calendarPanel {
   min-width: 0;
   grid-column: 1;
   grid-row: 1;
+  height: var(--agenda-panel-height, 620px);
 }
 
 .todoPanel {
   grid-column: 2;
   grid-row: 1;
   min-width: 0;
+  height: var(--agenda-panel-height, 620px);
+  max-height: var(--agenda-panel-height, 620px);
   border: 1px solid var(--disp-border);
   border-radius: var(--mantine-radius-sm);
   background: var(--disp-surface);
   padding: var(--mantine-spacing-md);
-  max-height: var(--agenda-panel-height, 620px);
   overflow-y: auto;
 
   @media (max-width: 62em) {
+    height: auto;
     max-height: none;
   }
 }
@@ -172,6 +234,49 @@
   }
 }
 
+.todoSearchClear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--mantine-color-dimmed);
+  padding: 0.15rem;
+  border-radius: var(--mantine-radius-xs);
+
+  &:hover {
+    color: var(--disp-ink);
+    background: var(--mantine-color-sage-0);
+  }
+}
+
+.todoCategoryFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.todoCategoryFilterChip {
+  font-family: var(--disp-font-ui);
+  font-size: 0.75rem;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: var(--mantine-radius-sm);
+  background: transparent;
+  color: var(--mantine-color-dimmed);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+
+  &:hover {
+    color: var(--disp-ink);
+    background: var(--mantine-color-sage-0);
+  }
+}
+
+.todoCategoryFilterChipActive {
+  color: var(--disp-ink);
+  border-color: var(--disp-border);
+  background: var(--mantine-color-sage-0);
+}
+
 .todoListTabsRow {
   min-width: 0;
 }
@@ -268,6 +373,43 @@
   &:last-of-type {
     border-bottom: none;
   }
+}
+
+.todoCategoryDropZone {
+  min-height: 0.5rem;
+  border-radius: var(--mantine-radius-xs);
+  transition: background-color 0.15s ease;
+}
+
+.todoCategoryDropZoneOver {
+  background-color: var(--mantine-color-sage-0);
+  outline: 1px dashed var(--mantine-color-sage-4);
+  outline-offset: 2px;
+}
+
+.todoTaskDragOverlay {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--mantine-spacing-xs);
+  padding: 0.35rem 0.5rem;
+  min-width: 12rem;
+  max-width: 20rem;
+  background: var(--disp-surface);
+  border: 1px solid var(--mantine-color-sage-4);
+  border-radius: var(--mantine-radius-sm);
+  box-shadow: var(--disp-shadow-header);
+  cursor: grabbing;
+  pointer-events: none;
+}
+
+.todoCategoryDragOverlay {
+  padding: 0.35rem 0.65rem;
+  background: var(--disp-surface);
+  border: 1px solid var(--disp-border);
+  border-radius: var(--mantine-radius-sm);
+  box-shadow: var(--disp-shadow-header);
+  cursor: grabbing;
+  pointer-events: none;
 }
 
 .todoCategoryTitle {

@@ -9,18 +9,9 @@ import {
   Stack,
   Text,
 } from '@mantine/core';
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from '@dnd-kit/core';
+import { useDroppable } from '@dnd-kit/core';
 import {
   SortableContext,
-  arrayMove,
-  sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
@@ -30,18 +21,42 @@ import type { AgendaTodoCategoryDTO } from '@/types/agenda';
 import { SortableTodoTask } from './SortableTodoTask';
 import { InlineNoteInput } from './InlineNoteInput';
 import { InlineEditableText } from './InlineEditableText';
-import { stopDragPointer, usePressHoldPointerSensor } from './agendaDnd';
+import { stopDragPointer } from './agendaDnd';
 import classes from '../agenda.module.scss';
+
+function CategoryTaskDropZone({
+  categoryId,
+  children,
+}: {
+  categoryId: string;
+  children: ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `category-drop-${categoryId}`,
+    data: { type: 'category-drop', categoryId },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`${classes.todoCategoryDropZone} ${isOver ? classes.todoCategoryDropZoneOver : ''}`}
+    >
+      {children}
+    </div>
+  );
+}
 
 function SortableCategoryShell({
   category,
   canWrite,
+  canDrag,
   children,
   onDelete,
   onRename,
 }: {
   category: AgendaTodoCategoryDTO;
   canWrite: boolean;
+  canDrag: boolean;
   children: ReactNode;
   onDelete: () => void;
   onRename: (id: string, name: string) => void | Promise<void>;
@@ -50,7 +65,11 @@ function SortableCategoryShell({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: category.id, disabled: !canWrite || editing });
+    useSortable({
+      id: category.id,
+      disabled: !canDrag || editing,
+      data: { type: 'category' },
+    });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -62,10 +81,10 @@ function SortableCategoryShell({
     <div ref={setNodeRef} style={style} className={classes.todoCategory}>
       <div
         className={`${classes.todoCategoryHeader} ${
-          canWrite && !editing ? classes.todoCategoryHeaderDraggable : ''
+          canDrag && !editing ? classes.todoCategoryHeaderDraggable : ''
         }`}
         data-dragging={isDragging || undefined}
-        {...(canWrite && !editing ? { ...attributes, ...listeners } : {})}
+        {...(canDrag && !editing ? { ...attributes, ...listeners } : {})}
       >
         <InlineEditableText
           value={category.name}
@@ -134,7 +153,8 @@ function SortableCategoryShell({
 interface SortableTodoCategoryProps {
   category: AgendaTodoCategoryDTO;
   canWrite: boolean;
-  onReorderTasks: (categoryId: string, taskIds: string[]) => void;
+  dragEnabled?: boolean;
+  categoryDragEnabled?: boolean;
   onToggleTask: (id: string, completed: boolean) => void;
   onRenameTask: (id: string, title: string) => void | Promise<void>;
   onDeleteTask: (id: string) => void;
@@ -146,7 +166,8 @@ interface SortableTodoCategoryProps {
 export function SortableTodoCategory({
   category,
   canWrite,
-  onReorderTasks,
+  dragEnabled = true,
+  categoryDragEnabled,
   onToggleTask,
   onRenameTask,
   onDeleteTask,
@@ -154,34 +175,19 @@ export function SortableTodoCategory({
   onRenameCategory,
   onAddTask,
 }: SortableTodoCategoryProps) {
-  const sensors = useSensors(
-    usePressHoldPointerSensor(),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
-
-  const handleTaskDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const oldIndex = category.tasks.findIndex((t) => t.id === active.id);
-    const newIndex = category.tasks.findIndex((t) => t.id === over.id);
-    if (oldIndex < 0 || newIndex < 0) return;
-    const reordered = arrayMove(category.tasks, oldIndex, newIndex);
-    onReorderTasks(
-      category.id,
-      reordered.map((t) => t.id),
-    );
-  };
+  const canDragCategory = canWrite && (categoryDragEnabled ?? dragEnabled);
 
   return (
     <SortableCategoryShell
       category={category}
       canWrite={canWrite}
+      canDrag={canDragCategory}
       onDelete={() => onDeleteCategory(category.id)}
       onRename={onRenameCategory}
     >
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleTaskDragEnd}>
+      <CategoryTaskDropZone categoryId={category.id}>
         <SortableContext
-          items={category.tasks.map((t) => t.id)}
+          items={category.tasks.map((task) => task.id)}
           strategy={verticalListSortingStrategy}
         >
           <Stack gap={2}>
@@ -189,7 +195,9 @@ export function SortableTodoCategory({
               <SortableTodoTask
                 key={task.id}
                 task={task}
+                categoryId={category.id}
                 canWrite={canWrite}
+                dragEnabled={dragEnabled}
                 onToggle={onToggleTask}
                 onRename={onRenameTask}
                 onDelete={onDeleteTask}
@@ -197,7 +205,7 @@ export function SortableTodoCategory({
             ))}
           </Stack>
         </SortableContext>
-      </DndContext>
+      </CategoryTaskDropZone>
       {canWrite && (
         <InlineNoteInput
           placeholder="Nouvelle tâche…"
