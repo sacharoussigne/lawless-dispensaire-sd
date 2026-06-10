@@ -23,6 +23,8 @@ import {
   resolveAgendaIdFromEventId,
   validateDispensaryUserIds,
 } from '@/app/_actions/agenda/internals';
+import { emitAgendaEventsChange } from '@/lib/agenda/realtime/broadcast';
+import type { AgendaMutationMeta } from '@/lib/agenda/realtime/mutationMeta';
 
 const eventInclude = {
   participants: {
@@ -204,6 +206,7 @@ export async function createAgendaEvent(
     allDay: boolean;
     participantUserIds: string[];
   },
+  meta?: AgendaMutationMeta,
 ) {
   try {
     const ctx = await getAgendaSessionContext(dispensarySlug);
@@ -265,6 +268,8 @@ export async function createAgendaEvent(
       include: eventInclude,
     });
 
+    await emitAgendaEventsChange(ctx.tenant.dispensaryId, validated.agendaId, meta);
+
     return { status: 201, data: mapEvent(event, ctx.session.user.id) };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la création de l\'événement');
@@ -285,6 +290,7 @@ export async function updateAgendaEvent(
     allDay: boolean;
     participantUserIds: string[];
   },
+  meta?: AgendaMutationMeta,
 ) {
   try {
     const ctx = await getAgendaSessionContext(dispensarySlug);
@@ -363,13 +369,19 @@ export async function updateAgendaEvent(
       });
     });
 
+    await emitAgendaEventsChange(ctx.tenant.dispensaryId, existing.agendaId, meta);
+
     return { status: 200, data: mapEvent(event, ctx.session.user.id) };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la mise à jour de l\'événement');
   }
 }
 
-export async function deleteAgendaEvent(dispensarySlug: string, id: string) {
+export async function deleteAgendaEvent(
+  dispensarySlug: string,
+  id: string,
+  meta?: AgendaMutationMeta,
+) {
   try {
     const ctx = await getAgendaSessionContext(dispensarySlug);
     if (!ctx.ok) return ctx.response;
@@ -395,6 +407,8 @@ export async function deleteAgendaEvent(dispensarySlug: string, id: string) {
     }
 
     await prisma.agendaEvent.delete({ where: { id: validated.id } });
+
+    await emitAgendaEventsChange(ctx.tenant.dispensaryId, agendaId, meta);
 
     return { status: 200 };
   } catch (error) {

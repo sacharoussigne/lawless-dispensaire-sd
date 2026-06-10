@@ -48,4 +48,5 @@ export interface PermissionsContextType {
   dispensaryId: string | null;
   accessibleDispensaries: AccessibleDispensary[];
   agendaModuleAccess: boolean;
+  accessibleAgendaIds: string[];
 }

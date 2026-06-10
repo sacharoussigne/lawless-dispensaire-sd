@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActionIcon,
   Button,
@@ -20,6 +20,7 @@ import { AppModal, AppModalFooter } from '@/app/_components/AppModal/AppModal';
 import {
   createAgendaEvent,
   deleteAgendaEvent,
+  getAgendaEvent,
   updateAgendaEvent,
 } from '@/app/_actions/agenda/events';
 import {
@@ -29,6 +30,9 @@ import {
 } from '@/app/_actions/agenda/eventTodos';
 import { searchDispensaryUsersForAgenda } from '@/app/_actions/agenda/members';
 import { handleAction } from '@/lib/action';
+import { agendaMutationMeta } from '@/lib/agenda/realtime/mutationMeta';
+import { useAgendaRealtime } from '@/lib/agenda/realtime/useAgendaRealtime';
+import { isRelevantAgendaRealtimeEvent } from '@/lib/agenda/realtime/isRelevantAgendaEvent';
 import {
   assertAgendaEventRangeValid,
   formatAgendaDateInput,
@@ -48,6 +52,7 @@ interface EventModalProps {
   slotStart?: Date | null;
   slotEnd?: Date | null;
   canWrite: boolean;
+  clientId?: string;
   onSuccess: () => void;
 }
 
@@ -60,6 +65,7 @@ export function EventModal({
   slotStart,
   slotEnd,
   canWrite,
+  clientId,
   onSuccess,
 }: EventModalProps) {
   const [title, setTitle] = useState('');
@@ -74,6 +80,40 @@ export function EventModal({
   const [newTodoTitle, setNewTodoTitle] = useState('');
   const [todoTasks, setTodoTasks] = useState(event?.todoTasks ?? []);
   const [submitting, setSubmitting] = useState(false);
+  const mutationMeta = agendaMutationMeta(clientId);
+  const eventIdRef = useRef(event?.id);
+  const agendaIdRef = useRef(agendaId);
+
+  useEffect(() => {
+    eventIdRef.current = event?.id;
+  }, [event?.id]);
+
+  useEffect(() => {
+    agendaIdRef.current = agendaId;
+  }, [agendaId]);
+
+  useAgendaRealtime({
+    dispensarySlug,
+    enabled: opened && !!event?.id,
+    onEventTodosChange: (payload) => {
+      const eventId = eventIdRef.current;
+      if (!eventId || payload.eventId !== eventId) return;
+      if (
+        !isRelevantAgendaRealtimeEvent(payload, {
+          selectedAgendaId: agendaIdRef.current,
+        })
+      ) {
+        return;
+      }
+
+      void getAgendaEvent(dispensarySlug, eventId).then((result) => {
+        const data = handleAction(result);
+        if (data) {
+          setTodoTasks(data.todoTasks);
+        }
+      });
+    },
+  });
 
   useEffect(() => {
     if (!opened) return;
@@ -173,8 +213,12 @@ export function EventModal({
       };
 
       const result = event
-        ? await updateAgendaEvent(dispensarySlug, { id: event.id, ...payload })
-        : await createAgendaEvent(dispensarySlug, payload);
+        ? await updateAgendaEvent(
+            dispensarySlug,
+            { id: event.id, ...payload },
+            mutationMeta,
+          )
+        : await createAgendaEvent(dispensarySlug, payload, mutationMeta);
 
       handleAction(result);
       notifications.show({
@@ -199,7 +243,7 @@ export function EventModal({
     if (!event) return;
     setSubmitting(true);
     try {
-      const result = await deleteAgendaEvent(dispensarySlug, event.id);
+      const result = await deleteAgendaEvent(dispensarySlug, event.id, mutationMeta);
       handleAction(result);
       onSuccess();
       onClose();
@@ -217,10 +261,14 @@ export function EventModal({
   const handleAddEventTodo = async () => {
     if (!event || !newTodoTitle.trim()) return;
     try {
-      const result = await createAgendaEventTodoTask(dispensarySlug, {
-        eventId: event.id,
-        title: newTodoTitle.trim(),
-      });
+      const result = await createAgendaEventTodoTask(
+        dispensarySlug,
+        {
+          eventId: event.id,
+          title: newTodoTitle.trim(),
+        },
+        mutationMeta,
+      );
       const data = handleAction(result);
       if (data) {
         setTodoTasks((prev) => [...prev, data]);
@@ -237,10 +285,14 @@ export function EventModal({
 
   const toggleEventTodo = async (taskId: string, completed: boolean) => {
     try {
-      const result = await updateAgendaEventTodoTask(dispensarySlug, {
-        id: taskId,
-        completed,
-      });
+      const result = await updateAgendaEventTodoTask(
+        dispensarySlug,
+        {
+          id: taskId,
+          completed,
+        },
+        mutationMeta,
+      );
       const data = handleAction(result);
       if (data) {
         setTodoTasks((prev) =>
@@ -258,7 +310,7 @@ export function EventModal({
 
   const removeEventTodo = async (taskId: string) => {
     try {
-      const result = await deleteAgendaEventTodoTask(dispensarySlug, taskId);
+      const result = await deleteAgendaEventTodoTask(dispensarySlug, taskId, mutationMeta);
       handleAction(result);
       setTodoTasks((prev) => prev.filter((t) => t.id !== taskId));
     } catch (error: unknown) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { listAgendaEvents } from '@/app/_actions/agenda/events';
 import { handleAction } from '@/lib/action';
@@ -13,7 +13,9 @@ import {
   AGENDA_CALENDAR_FOCUS_PARAM,
   isAgendaCalendarFocusParam,
 } from '@/lib/agenda/calendarNavigation';
-import { notifyUpcomingEventsRefresh } from '@/lib/agenda/upcomingEventsRefresh';
+import { useAgendaRealtime } from '@/lib/agenda/realtime/useAgendaRealtime';
+import { isRelevantAgendaRealtimeEvent } from '@/lib/agenda/realtime/isRelevantAgendaEvent';
+import { notifyUpcomingEventsLocalRefresh } from '@/lib/agenda/upcomingEventsLocalRefresh';
 import { PageHeader } from '@/app/_components/PageHeader/PageHeader';
 import {
   canWriteAgenda,
@@ -66,6 +68,7 @@ export function AgendaPageClient({
   const [selectedEvent, setSelectedEvent] = useState<AgendaEventDTO | null>(null);
   const [slotStart, setSlotStart] = useState<Date | null>(null);
   const [slotEnd, setSlotEnd] = useState<Date | null>(null);
+  const [remoteTodosToken, setRemoteTodosToken] = useState(0);
 
   const participantOnly = agendas.length === 0 && events.length > 0;
 
@@ -139,6 +142,9 @@ export function AgendaPageClient({
     [panelHeightPx, todoColumnWidthPx],
   );
 
+  const fetchEventsRef = useRef<() => Promise<void>>(async () => {});
+  const selectedAgendaIdRef = useRef(selectedAgendaId);
+
   const fetchEvents = useCallback(
     async (agendaId: string | null = selectedAgendaId) => {
       const rangeStart = dayjs().startOf('month').subtract(1, 'week').toDate();
@@ -153,6 +159,38 @@ export function AgendaPageClient({
     },
     [dispensarySlug, selectedAgendaId],
   );
+
+  useEffect(() => {
+    selectedAgendaIdRef.current = selectedAgendaId;
+  }, [selectedAgendaId]);
+
+  useEffect(() => {
+    fetchEventsRef.current = () => fetchEvents();
+  }, [fetchEvents]);
+
+  const { clientId } = useAgendaRealtime({
+    dispensarySlug,
+    onEventsChange: (event) => {
+      if (
+        !isRelevantAgendaRealtimeEvent(event, {
+          selectedAgendaId: selectedAgendaIdRef.current,
+        })
+      ) {
+        return;
+      }
+      void fetchEventsRef.current();
+    },
+    onTodosChange: (event) => {
+      if (
+        !isRelevantAgendaRealtimeEvent(event, {
+          selectedAgendaId: selectedAgendaIdRef.current,
+        })
+      ) {
+        return;
+      }
+      setRemoteTodosToken((token) => token + 1);
+    },
+  });
 
   useEffect(() => {
     if (!urlAgendaId) return;
@@ -194,7 +232,7 @@ export function AgendaPageClient({
 
   const refreshCalendar = useCallback(() => {
     void fetchEvents();
-    notifyUpcomingEventsRefresh();
+    notifyUpcomingEventsLocalRefresh();
   }, [fetchEvents]);
 
   const handleSelectEvent = async (event: AgendaEventDTO) => {
@@ -332,6 +370,8 @@ export function AgendaPageClient({
               selectedAgendaId === initialAgendas[0]?.id ? initialTodoLists : []
             }
             wideLayout={!renderCalendar}
+            clientId={clientId}
+            remoteTodosToken={remoteTodosToken}
           />
         )}
       </div>
@@ -346,6 +386,7 @@ export function AgendaPageClient({
           slotStart={slotStart}
           slotEnd={slotEnd}
           canWrite={canWrite && !participantOnly}
+          clientId={clientId}
           onSuccess={refreshCalendar}
         />
       )}
