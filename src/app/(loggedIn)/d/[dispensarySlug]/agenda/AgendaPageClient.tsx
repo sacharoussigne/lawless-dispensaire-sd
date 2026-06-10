@@ -277,11 +277,13 @@ export function AgendaPageClient({
       >
         {renderCalendar && (
           <AgendaCalendar
+            key={renderTodo ? 'calendar-with-todo' : 'calendar-solo'}
             dispensarySlug={dispensarySlug}
             agendaId={selectedAgendaId}
             events={events}
             onEventsChange={setEvents}
             canWrite={canWrite && !participantOnly}
+            panelHeightPx={panelHeightPx}
             onSelectEvent={handleSelectEvent}
             onSelectSlot={handleSelectSlot}
           />

@@ -27,11 +27,6 @@
 .layoutTodoOnly {
   @media (min-width: 62.01em) {
     grid-template-columns: 1fr;
-
-    .todoPanel {
-      height: min(calc(100vh - 12rem), 920px);
-      max-height: min(calc(100vh - 12rem), 920px);
-    }
   }
 }
 
@@ -98,10 +93,7 @@
 }
 
 .calendarWrapper {
-  height: 100%;
-
   :global(.rbc-calendar) {
-    height: 100% !important;
     font-family: var(--disp-font-ui);
     color: var(--disp-ink);
   }

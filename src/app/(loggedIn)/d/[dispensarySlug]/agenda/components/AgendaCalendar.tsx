@@ -31,6 +31,7 @@ interface AgendaCalendarProps {
   events: AgendaEventDTO[];
   onEventsChange: (events: AgendaEventDTO[]) => void;
   canWrite: boolean;
+  panelHeightPx: number;
   onSelectEvent: (event: AgendaEventDTO) => void;
   onSelectSlot: (start: Date, end: Date, view: View) => void;
 }
@@ -41,6 +42,7 @@ export function AgendaCalendar({
   events,
   onEventsChange,
   canWrite,
+  panelHeightPx,
   onSelectEvent,
   onSelectSlot,
 }: AgendaCalendarProps) {
@@ -198,6 +200,7 @@ export function AgendaCalendar({
         startAccessor="start"
         endAccessor="end"
         allDayAccessor="allDay"
+        style={{ height: panelHeightPx }}
         culture="fr"
         messages={{
           today: "Aujourd'hui",
