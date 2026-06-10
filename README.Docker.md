@@ -79,3 +79,30 @@ volumes:
 ```
 
 Adapt variable names and commands to match your final `Dockerfile` and entrypoint.
+
+## Reverse proxy (SSE / agenda realtime)
+
+The agenda module uses **Server-Sent Events** at `/api/d/[dispensarySlug]/agenda/stream`. Mutations publish through PostgreSQL `NOTIFY`/`LISTEN`, so the app container must reach the same PostgreSQL instance for realtime sync between users.
+
+If nginx, Traefik, or another reverse proxy sits in front of the Node container, disable response buffering for that path or the stream will appear stuck until the buffer fills.
+
+### nginx example
+
+```nginx
+location /api/d/ {
+    proxy_pass http://app:3000;
+    proxy_http_version 1.1;
+    proxy_set_header Connection '';
+    proxy_set_header Host $host;
+    proxy_buffering off;
+    proxy_cache off;
+    proxy_read_timeout 86400s;
+    proxy_send_timeout 86400s;
+}
+```
+
+The app route already sets `X-Accel-Buffering: no` for nginx. Long `proxy_read_timeout` keeps idle SSE connections open across heartbeats (every 30 seconds).
+
+### Traefik
+
+For the app service, avoid buffering middleware on routes that include `/api/d/*/agenda/stream`, or use a dedicated router with `buffering: false` if your Traefik version supports it.

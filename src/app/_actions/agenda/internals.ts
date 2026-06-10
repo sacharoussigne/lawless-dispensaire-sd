@@ -25,10 +25,7 @@ export type AgendaEligibleUser = {
 
 function buildAgendaUserSearchFilter(query: string) {
   return {
-    OR: [
-      { name: { contains: query, mode: 'insensitive' as const } },
-      { email: { contains: query, mode: 'insensitive' as const } },
-    ],
+    name: { contains: query, mode: 'insensitive' as const },
   };
 }
 

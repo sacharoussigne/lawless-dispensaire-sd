@@ -45,9 +45,7 @@ export function AgendaMembersModal({
   const [members, setMembers] = useState<AgendaMemberDTO[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<
-    { id: string; name: string; email: string }[]
-  >([]);
+  const [searchResults, setSearchResults] = useState<{ id: string; name: string }[]>([]);
   const [accessLevel, setAccessLevel] = useState<AgendaAccessLevel>('READ');
 
   const loadMembers = useCallback(async () => {
@@ -176,9 +174,14 @@ export function AgendaMembersModal({
         <Group align="flex-end" grow>
           <TextInput
             label="Rechercher un utilisateur"
-            placeholder="Pseudo ou e-mail…"
+            placeholder="Pseudo…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.currentTarget.value)}
+            autoComplete="off"
+            name="agenda-member-user-search"
+            data-1p-ignore
+            data-lpignore="true"
+            data-form-type="other"
           />
           <Select
             label="Permission"
@@ -195,12 +198,7 @@ export function AgendaMembersModal({
           <Stack gap="xs">
             {searchResults.map((user) => (
               <Group key={user.id} justify="space-between">
-                <div>
-                  <Text size="sm">{user.name}</Text>
-                  <Text size="xs" c="dimmed">
-                    {user.email}
-                  </Text>
-                </div>
+                <Text size="sm">{user.name}</Text>
                 <Button
                   size="xs"
                   color="sage"

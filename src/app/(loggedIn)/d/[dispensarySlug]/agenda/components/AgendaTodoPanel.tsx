@@ -45,6 +45,7 @@ import {
   updateAgendaTodoTask,
 } from '@/app/_actions/agenda/todoLists';
 import { handleAction } from '@/lib/action';
+import { agendaMutationMeta } from '@/lib/agenda/realtime/mutationMeta';
 import {
   readTodoCategoryFilterForList,
   writeTodoCategoryFilterForList,
@@ -164,6 +165,8 @@ interface AgendaTodoPanelProps {
   accessLevel: AgendaAccessLevel | null;
   initialLists: AgendaTodoListDTO[];
   wideLayout?: boolean;
+  clientId?: string;
+  remoteTodosToken?: number;
 }
 
 function getCategoriesGridClass(wideLayout: boolean, categoryCount: number) {
@@ -183,6 +186,8 @@ export function AgendaTodoPanel({
   accessLevel,
   initialLists,
   wideLayout = false,
+  clientId,
+  remoteTodosToken = 0,
 }: AgendaTodoPanelProps) {
   const [lists, setLists] = useState<AgendaTodoListDTO[]>(initialLists);
   const [selectedListId, setSelectedListId] = useState<string | null>(
@@ -195,6 +200,8 @@ export function AgendaTodoPanel({
   const [taskSearch, setTaskSearch] = useState('');
   const [lastFilterListId, setLastFilterListId] = useState(selectedListId);
   const canWrite = canWriteAgenda(accessLevel);
+  const mutationMeta = agendaMutationMeta(clientId);
+  const pendingRemoteReloadRef = useRef(false);
 
   if (agendaId !== syncedAgendaId) {
     setSyncedAgendaId(agendaId);
@@ -374,6 +381,24 @@ export function AgendaTodoPanel({
   activeDragRef.current = activeDrag;
 
   useEffect(() => {
+    if (remoteTodosToken === 0) return;
+
+    if (activeDragRef.current) {
+      pendingRemoteReloadRef.current = true;
+      return;
+    }
+
+    void reload();
+  }, [remoteTodosToken, reload]);
+
+  useEffect(() => {
+    if (activeDrag || !pendingRemoteReloadRef.current) return;
+
+    pendingRemoteReloadRef.current = false;
+    void reload();
+  }, [activeDrag, reload]);
+
+  useEffect(() => {
     const handleWheel = (event: WheelEvent) => {
       const panel = todoPanelRef.current;
       if (!panel) return;
@@ -529,13 +554,17 @@ export function AgendaTodoPanel({
     }
 
     handleAction(
-      await moveAgendaTodoTask(dispensarySlug, {
-        taskId,
-        sourceCategoryId: startCategoryId,
-        targetCategoryId: currentLocation.categoryId,
-        sourceOrders: sourceFinal.tasks.map((task, order) => ({ id: task.id, order })),
-        targetOrders: targetFinal.tasks.map((task, order) => ({ id: task.id, order })),
-      }),
+      await moveAgendaTodoTask(
+        dispensarySlug,
+        {
+          taskId,
+          sourceCategoryId: startCategoryId,
+          targetCategoryId: currentLocation.categoryId,
+          sourceOrders: sourceFinal.tasks.map((task, order) => ({ id: task.id, order })),
+          targetOrders: targetFinal.tasks.map((task, order) => ({ id: task.id, order })),
+        },
+        mutationMeta,
+      ),
     );
   };
 
@@ -622,9 +651,13 @@ export function AgendaTodoPanel({
         applyCategoryUpdates(selectedList.id, reordered);
 
         handleAction(
-          await reorderAgendaTodoCategories(dispensarySlug, {
-            items: reordered.map((category, index) => ({ id: category.id, order: index })),
-          }),
+          await reorderAgendaTodoCategories(
+            dispensarySlug,
+            {
+              items: reordered.map((category, index) => ({ id: category.id, order: index })),
+            },
+            mutationMeta,
+          ),
         );
         return;
       }
@@ -673,7 +706,7 @@ export function AgendaTodoPanel({
 
   const handleToggleTask = async (id: string, completed: boolean) => {
     try {
-      await updateAgendaTodoTask(dispensarySlug, { id, completed });
+      await updateAgendaTodoTask(dispensarySlug, { id, completed }, mutationMeta);
       await reload();
     } catch (error: unknown) {
       notifications.show({
@@ -686,7 +719,7 @@ export function AgendaTodoPanel({
 
   const handleRenameTask = async (id: string, title: string) => {
     try {
-      await updateAgendaTodoTask(dispensarySlug, { id, title });
+      await updateAgendaTodoTask(dispensarySlug, { id, title }, mutationMeta);
       await reload();
     } catch (error: unknown) {
       notifications.show({
@@ -699,7 +732,7 @@ export function AgendaTodoPanel({
 
   const handleRenameList = async (id: string, name: string) => {
     try {
-      await updateAgendaTodoList(dispensarySlug, { id, name });
+      await updateAgendaTodoList(dispensarySlug, { id, name }, mutationMeta);
       await reload();
     } catch (error: unknown) {
       notifications.show({
@@ -712,7 +745,7 @@ export function AgendaTodoPanel({
 
   const handleRenameCategory = async (id: string, name: string) => {
     try {
-      await updateAgendaTodoCategory(dispensarySlug, { id, name });
+      await updateAgendaTodoCategory(dispensarySlug, { id, name }, mutationMeta);
       await reload();
     } catch (error: unknown) {
       notifications.show({
@@ -725,7 +758,7 @@ export function AgendaTodoPanel({
 
   const handleDeleteTask = async (id: string) => {
     try {
-      await deleteAgendaTodoTask(dispensarySlug, id);
+      await deleteAgendaTodoTask(dispensarySlug, id, mutationMeta);
       await reload();
       if (archivesOpen) {
         await openArchives();
@@ -762,10 +795,14 @@ export function AgendaTodoPanel({
   const handleCreateList = async (name: string) => {
     if (!agendaId) return;
     try {
-      const result = await createAgendaTodoList(dispensarySlug, {
-        agendaId,
-        name,
-      });
+      const result = await createAgendaTodoList(
+        dispensarySlug,
+        {
+          agendaId,
+          name,
+        },
+        mutationMeta,
+      );
       const data = handleAction(result);
       if (data) {
         setSelectedListId(data.id);
@@ -783,10 +820,21 @@ export function AgendaTodoPanel({
   const handleCreateCategory = async (name: string) => {
     if (!selectedList) return;
     try {
-      await createAgendaTodoCategory(dispensarySlug, {
-        listId: selectedList.id,
-        name,
-      });
+      const result = await createAgendaTodoCategory(
+        dispensarySlug,
+        {
+          listId: selectedList.id,
+          name,
+        },
+        mutationMeta,
+      );
+      const category = handleAction(result);
+      if (category && isCategoryFilterActive) {
+        const next = new Set(categoryFilterIds);
+        next.add(category.id);
+        setCategoryFilterIds(next);
+        persistCategoryFilter(next);
+      }
       await reload();
     } catch (error: unknown) {
       notifications.show({
@@ -799,7 +847,7 @@ export function AgendaTodoPanel({
 
   const handleAddTask = async (categoryId: string, title: string) => {
     try {
-      await createAgendaTodoTask(dispensarySlug, { categoryId, title });
+      await createAgendaTodoTask(dispensarySlug, { categoryId, title }, mutationMeta);
       await reload();
     } catch (error: unknown) {
       notifications.show({
@@ -812,7 +860,7 @@ export function AgendaTodoPanel({
 
   const handleDeleteCategory = async (id: string) => {
     try {
-      await deleteAgendaTodoCategory(dispensarySlug, id);
+      await deleteAgendaTodoCategory(dispensarySlug, id, mutationMeta);
       await reload();
     } catch (error: unknown) {
       notifications.show({
@@ -825,7 +873,7 @@ export function AgendaTodoPanel({
 
   const handleDeleteList = async (id: string) => {
     try {
-      await deleteAgendaTodoList(dispensarySlug, id);
+      await deleteAgendaTodoList(dispensarySlug, id, mutationMeta);
       await reload();
     } catch (error: unknown) {
       notifications.show({
