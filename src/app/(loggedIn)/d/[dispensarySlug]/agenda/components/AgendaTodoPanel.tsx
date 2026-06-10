@@ -231,22 +231,27 @@ export function AgendaTodoPanel({
       return;
     }
 
-    setCategoryFilterIds(
-      readTodoCategoryFilterForList(
-        dispensarySlug,
-        agendaId,
-        selectedListId,
-        allCategoryIds,
-      ),
+    const stored = readTodoCategoryFilterForList(
+      dispensarySlug,
+      agendaId,
+      selectedListId,
+      allCategoryIds,
     );
-  }, [agendaId, allCategoryIds, allCategoryIdsKey, dispensarySlug, selectedListId]);
+    setCategoryFilterIds((prev) => {
+      if (prev.size === stored.size && [...prev].every((id) => stored.has(id))) {
+        return prev;
+      }
+      return stored;
+    });
+    // Only re-load when list/agenda or category set changes — not on task reorder during drag.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- allCategoryIds read via allCategoryIdsKey
+  }, [agendaId, allCategoryIdsKey, dispensarySlug, selectedListId]);
 
   const isCategoryFilterActive =
     categoryFilterIds.size > 0 && categoryFilterIds.size < allCategoryIds.length;
 
   const isTaskSearchActive = taskSearch.trim().length > 0;
-  const isFiltering = isCategoryFilterActive || isTaskSearchActive;
-  const categoryDragEnabled = canWrite && !wideLayout;
+  const categoryDragEnabled = canWrite && !wideLayout && !isCategoryFilterActive;
 
   const visibleCategories = useMemo(() => {
     if (!selectedList) return [];
@@ -488,19 +493,13 @@ export function AgendaTodoPanel({
 
     lastDragOverKeyRef.current = nextKey;
 
-    const clonedCategories = nextCategories.map((category) => ({
+    taskDragCrossedRef.current = true;
+    dragCategoriesRef.current = nextCategories.map((category) => ({
       ...category,
       tasks: [...category.tasks],
     }));
-
-    taskDragCrossedRef.current = true;
-    dragCategoriesRef.current = clonedCategories;
-
-    setLists((prev) =>
-      prev.map((item) =>
-        item.id === selectedListId ? { ...item, categories: clonedCategories } : item,
-      ),
-    );
+    // Keep preview in refs only — updating React state during cross-category drag
+    // remounts sortable items and triggers dnd-kit measureRects loops.
   };
 
   const resetTaskDragState = () => {
@@ -951,28 +950,24 @@ export function AgendaTodoPanel({
 
         {selectedList && (
           <>
-            {isFiltering ? (
-              <SortableContext
-                items={visibleCategories.map((category) => category.id)}
-                strategy={verticalListSortingStrategy}
-              >
-                <Stack gap={0} className={getCategoriesGridClass(wideLayout, visibleCategories.length)}>
-                  {visibleCategories.map((category) => (
-                    <SortableTodoCategory
-                      key={category.id}
-                      category={category}
-                      canWrite={canWrite}
-                      dragEnabled={false}
-                      onToggleTask={handleToggleTask}
-                      onRenameTask={handleRenameTask}
-                      onDeleteTask={handleDeleteTask}
-                      onDeleteCategory={handleDeleteCategory}
-                      onRenameCategory={handleRenameCategory}
-                      onAddTask={handleAddTask}
-                    />
-                  ))}
-                </Stack>
-              </SortableContext>
+            {isTaskSearchActive ? (
+              <Stack gap={0} className={getCategoriesGridClass(wideLayout, visibleCategories.length)}>
+                {visibleCategories.map((category) => (
+                  <SortableTodoCategory
+                    key={category.id}
+                    category={category}
+                    canWrite={canWrite}
+                    dragEnabled={false}
+                    categoryDragEnabled={false}
+                    onToggleTask={handleToggleTask}
+                    onRenameTask={handleRenameTask}
+                    onDeleteTask={handleDeleteTask}
+                    onDeleteCategory={handleDeleteCategory}
+                    onRenameCategory={handleRenameCategory}
+                    onAddTask={handleAddTask}
+                  />
+                ))}
+              </Stack>
             ) : (
               <DndContext
                 sensors={sensors}
@@ -989,14 +984,22 @@ export function AgendaTodoPanel({
                 onDragEnd={(e) => void handleDragEnd(e)}
               >
                 <SortableContext
-                  items={selectedList.categories.map((c) => c.id)}
+                  items={
+                    (isCategoryFilterActive ? visibleCategories : selectedList.categories).map(
+                      (c) => c.id,
+                    )
+                  }
                   strategy={verticalListSortingStrategy}
                 >
                   <Stack
                     gap={0}
-                    className={getCategoriesGridClass(wideLayout, selectedList.categories.length)}
+                    className={getCategoriesGridClass(
+                      wideLayout,
+                      (isCategoryFilterActive ? visibleCategories : selectedList.categories).length,
+                    )}
                   >
-                    {selectedList.categories.map((category) => (
+                    {(isCategoryFilterActive ? visibleCategories : selectedList.categories).map(
+                      (category) => (
                       <SortableTodoCategory
                         key={category.id}
                         category={category}
@@ -1010,7 +1013,8 @@ export function AgendaTodoPanel({
                         onRenameCategory={handleRenameCategory}
                         onAddTask={handleAddTask}
                       />
-                    ))}
+                    ),
+                    )}
                   </Stack>
                 </SortableContext>
                 <DragOverlay dropAnimation={null}>
@@ -1038,7 +1042,7 @@ export function AgendaTodoPanel({
               </DndContext>
             )}
 
-            {isFiltering && visibleCategories.length === 0 && (
+            {isTaskSearchActive && visibleCategories.length === 0 && (
               <Text size="sm" c="dimmed" py="sm">
                 Aucune tâche ne correspond à votre recherche.
               </Text>
