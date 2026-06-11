@@ -34,6 +34,7 @@ import {
   calculateOrderPriceFromItems,
   normalizeItemPrice,
 } from '@/lib/orders/calculateOrderPriceFromItems';
+import { calculateOrderWeightFromItems } from '@/lib/orders/calculateOrderWeightFromItems';
 import type { ItemWithRelations } from '@/types/stock';
 import {
   getOrderTypeLabel,
@@ -349,6 +350,21 @@ export default function OrderModal({
           return {
             quantity: orderItem.quantity,
             price: item.price,
+          };
+        })
+      ),
+    [orderItems, itemsToUse]
+  );
+
+  const totalWeight = useMemo(
+    () =>
+      calculateOrderWeightFromItems(
+        orderItems.map((orderItem) => {
+          const item =
+            itemsToUse.find((i) => i.id === orderItem.itemId) || orderItem.item;
+          return {
+            quantity: orderItem.quantity,
+            weight: item.weight,
           };
         })
       ),
@@ -753,6 +769,15 @@ export default function OrderModal({
               fixedDecimalScale
               prefix="$ "
             />
+
+            {totalWeight != null && (
+              <Text size="sm" c="dimmed">
+                Poids total :{' '}
+                <Text span fw={500} c="inherit">
+                  {totalWeight.toFixed(2)} kg
+                </Text>
+              </Text>
+            )}
 
             <Text fw={500}>Objets de la commande</Text>
 

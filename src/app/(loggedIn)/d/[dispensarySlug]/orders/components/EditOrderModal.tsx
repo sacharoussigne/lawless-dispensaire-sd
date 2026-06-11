@@ -27,6 +27,7 @@ import {
   calculateOrderPriceFromItems,
   normalizeItemPrice,
 } from '@/lib/orders/calculateOrderPriceFromItems';
+import { calculateOrderWeightFromItems } from '@/lib/orders/calculateOrderWeightFromItems';
 import { handleApiZodError } from '@/lib/services/zod';
 import { ParsedZodError } from '@/lib/errors/ParsedZodError';
 import {
@@ -47,6 +48,7 @@ interface OrderItem {
     id: string;
     name: string;
     price: number | null;
+    weight?: number | null;
   };
 }
 
@@ -150,6 +152,7 @@ export function EditOrderModal({
             id: item.item.id,
             name: item.item.name,
             price: item.item.price,
+            weight: item.item.weight ?? null,
           },
         }))
       );
@@ -162,6 +165,17 @@ export function EditOrderModal({
         orderItems.map((orderItem) => ({
           quantity: orderItem.quantity,
           price: orderItem.item.price,
+        }))
+      ),
+    [orderItems]
+  );
+
+  const totalWeight = useMemo(
+    () =>
+      calculateOrderWeightFromItems(
+        orderItems.map((orderItem) => ({
+          quantity: orderItem.quantity,
+          weight: orderItem.item.weight,
         }))
       ),
     [orderItems]
@@ -242,6 +256,7 @@ export function EditOrderModal({
             id: itemToAdd.id,
             name: itemToAdd.name,
             price: normalizeItemPrice(itemToAdd.price),
+            weight: itemToAdd.weight ?? null,
           },
         },
       ]);
@@ -373,6 +388,15 @@ export function EditOrderModal({
               {...form.getInputProps('details')}
               disabled={isCompleted}
             />
+
+            {totalWeight != null && (
+              <Text size="sm" c="dimmed">
+                Poids total :{' '}
+                <Text span fw={500} c="inherit">
+                  {totalWeight.toFixed(2)} kg
+                </Text>
+              </Text>
+            )}
           </Stack>
 
           <Divider />
