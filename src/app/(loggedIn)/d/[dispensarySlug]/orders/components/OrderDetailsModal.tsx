@@ -1,6 +1,8 @@
 'use client';
 
+import { useMemo } from 'react';
 import { Modal, Stack, Group, Text, Divider, Table, SimpleGrid } from '@mantine/core';
+import { calculateOrderWeightFromItems } from '@/lib/orders/calculateOrderWeightFromItems';
 import { OrderStatusBadge } from '@/app/_components/OrderBadges/OrderStatusBadge';
 import { OrderTypeBadge } from '@/app/_components/OrderBadges/OrderTypeBadge';
 import { getOrderClientDisplayName, type OrderWithRelations } from '@/types/orders';
@@ -16,6 +18,19 @@ export function OrderDetailsModal({
   onClose,
   viewingOrder,
 }: OrderDetailsModalProps) {
+  const totalWeight = useMemo(
+    () =>
+      viewingOrder
+        ? calculateOrderWeightFromItems(
+            viewingOrder.items.map((orderItem) => ({
+              quantity: orderItem.quantity,
+              weight: orderItem.item.weight,
+            }))
+          )
+        : null,
+    [viewingOrder]
+  );
+
   return (
     <Modal
       opened={opened}
@@ -64,6 +79,14 @@ export function OrderDetailsModal({
                     Prix total
                   </Text>
                   <Text fw={500}>{viewingOrder.price.toFixed(2)} $</Text>
+                </Stack>
+              )}
+              {totalWeight != null && (
+                <Stack gap={2}>
+                  <Text size="xs" c="dimmed">
+                    Poids total
+                  </Text>
+                  <Text fw={500}>{totalWeight.toFixed(2)} kg</Text>
                 </Stack>
               )}
               <Stack gap={2}>

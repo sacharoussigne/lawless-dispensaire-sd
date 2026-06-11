@@ -8,6 +8,7 @@ export interface OrderItem {
     id: string;
     name: string;
     price: number | null;
+    weight?: number | null;
   };
 }
 
