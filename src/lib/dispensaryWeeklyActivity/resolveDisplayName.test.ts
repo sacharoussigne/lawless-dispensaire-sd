@@ -2,11 +2,20 @@ import { describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import {
   genericDoctorFallbackName,
+  getLatestDiscordDisplayNames,
   mergeResolvedDisplayNames,
   resolveBotWeeklyActivityDisplayName,
 } from '@/lib/dispensaryWeeklyActivity/resolveDisplayName';
 
 function mockPrisma(displayNamesByDiscordId: Record<string, string[]>) {
+  const flatRows = Object.entries(displayNamesByDiscordId).flatMap(([discordUserId, names]) =>
+    names.map((displayName, index) => ({
+      discordUserId,
+      displayName,
+      updatedAt: new Date(Date.now() - index * 1000),
+    })),
+  );
+
   return {
     dispensaryWeeklyActivity: {
       findFirst: vi.fn(async ({ where }: { where: { discordUserId: string } }) => {
@@ -14,12 +23,49 @@ function mockPrisma(displayNamesByDiscordId: Record<string, string[]>) {
         const displayName = names[0];
         return displayName ? { displayName } : null;
       }),
+      findMany: vi.fn(
+        async ({
+          where,
+        }: {
+          where: { discordUserId: { in: string[] } };
+        }) => {
+          const ids = new Set(where.discordUserId.in);
+          return flatRows
+            .filter((r) => ids.has(r.discordUserId))
+            .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+        },
+      ),
     },
     account: {
       findFirst: vi.fn(),
     },
   } as unknown as Pick<PrismaClient, 'dispensaryWeeklyActivity' | 'account'>;
 }
+
+describe('getLatestDiscordDisplayNames', () => {
+  it('returns the most recently updated display name per discord user in one batch', async () => {
+    const discordUserId = '456';
+    const prisma = mockPrisma({
+      [discordUserId]: ['LatestDiscordName', 'OlderName'],
+    });
+
+    const map = await getLatestDiscordDisplayNames(prisma, [discordUserId, discordUserId]);
+
+    expect(map.get(discordUserId)).toBe('LatestDiscordName');
+    expect(prisma.dispensaryWeeklyActivity.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips generic fallback display names', async () => {
+    const discordUserId = '111';
+    const prisma = mockPrisma({
+      [discordUserId]: [genericDoctorFallbackName(discordUserId)],
+    });
+
+    const map = await getLatestDiscordDisplayNames(prisma, [discordUserId]);
+
+    expect(map.has(discordUserId)).toBe(false);
+  });
+});
 
 describe('mergeResolvedDisplayNames', () => {
   it('uses stored displayName even when a linked intranet user name differs', async () => {

@@ -739,6 +739,7 @@ model DispensaryWeeklyActivity {
   @@index([discordUserId])
   @@index([userId])
   @@index([dispensaryId])
+  @@index([dispensaryId, periodStart])
   @@map("dispensary_weekly_activity")
 }
 
@@ -756,6 +757,7 @@ model DispensaryWeeklyActivityHistory {
   createdAt          DateTime                          @default(now())
 
   @@index([activityId])
+  @@index([activityId, createdAt])
   @@index([actorUserId])
   @@map("dispensary_weekly_activity_history")
 }

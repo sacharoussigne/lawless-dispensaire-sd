@@ -43,15 +43,19 @@ export async function getLatestDiscordDisplayNames(
   const unique = [...new Set(discordUserIds)];
   if (unique.length === 0) return new Map();
 
+  const rows = await prisma.dispensaryWeeklyActivity.findMany({
+    where: { discordUserId: { in: unique } },
+    orderBy: { updatedAt: 'desc' },
+    select: { discordUserId: true, displayName: true },
+  });
+
   const map = new Map<string, string>();
-  await Promise.all(
-    unique.map(async (discordUserId) => {
-      const name = await getLatestDiscordDisplayName(prisma, discordUserId);
-      if (name) {
-        map.set(discordUserId, name);
-      }
-    }),
-  );
+  for (const row of rows) {
+    if (map.has(row.discordUserId)) continue;
+    const name = row.displayName?.trim();
+    if (!name || isGenericDoctorFallbackName(name, row.discordUserId)) continue;
+    map.set(row.discordUserId, trimDisplayName(name));
+  }
   return map;
 }
 
