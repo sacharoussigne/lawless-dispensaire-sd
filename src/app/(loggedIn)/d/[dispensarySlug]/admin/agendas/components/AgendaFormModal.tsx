@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Button, Group, Stack, Text, TextInput, Textarea } from '@mantine/core';
+import { useCallback, useEffect, useState } from 'react';
+import { Button, Stack, Text, TextInput, Textarea } from '@mantine/core';
 import { IconCalendarEvent } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { AppModal, AppModalFooter } from '@/app/_components/AppModal/AppModal';
+import { UserPseudoSearch } from '@/app/_components/UserPseudoSearch/UserPseudoSearch';
 import { createAgenda, updateAgenda } from '@/app/_actions/agenda/agendas';
 import { searchDispensaryUsersForAgenda } from '@/app/_actions/agenda/members';
 import { handleAction } from '@/lib/action';
@@ -35,12 +36,22 @@ export function AgendaFormModal({
   const [ownerQuery, setOwnerQuery] = useState('');
   const [ownerUserId, setOwnerUserId] = useState<string | null>(null);
   const [ownerName, setOwnerName] = useState('');
-  const [ownerResults, setOwnerResults] = useState<
-    { id: string; name: string }[]
-  >([]);
   const [submitting, setSubmitting] = useState(false);
 
   const isCreate = !agenda?.id;
+
+  const searchAgendaUsers = useCallback(
+    async (query: string) => {
+      const result = await searchDispensaryUsersForAgenda(
+        dispensarySlug,
+        query,
+        { adminContext: true },
+      );
+      const data = handleAction(result);
+      return data ?? [];
+    },
+    [dispensarySlug],
+  );
 
   useEffect(() => {
     if (opened) {
@@ -49,41 +60,15 @@ export function AgendaFormModal({
       setOwnerQuery('');
       setOwnerUserId(null);
       setOwnerName('');
-      setOwnerResults([]);
     }
   }, [opened, agenda]);
-
-  useEffect(() => {
-    if (!opened || !isCreate || ownerQuery.trim().length < 2) {
-      setOwnerResults([]);
-      return;
-    }
-
-    const timer = setTimeout(async () => {
-      try {
-        const result = await searchDispensaryUsersForAgenda(
-          dispensarySlug,
-          ownerQuery,
-          { adminContext: true },
-        );
-        const data = handleAction(result);
-        if (data) {
-          setOwnerResults(data);
-        }
-      } catch {
-        setOwnerResults([]);
-      }
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [opened, isCreate, ownerQuery, dispensarySlug]);
 
   const handleSubmit = async () => {
     if (isCreate && !ownerUserId) {
       notifications.show({
         title: 'Erreur',
         message: 'Veuillez sélectionner un propriétaire',
-        color: 'red',
+        color: 'danger',
       });
       return;
     }
@@ -106,7 +91,7 @@ export function AgendaFormModal({
       notifications.show({
         title: 'Succès',
         message: agenda?.id ? 'Agenda mis à jour' : 'Agenda créé',
-        color: 'green',
+        color: 'moss',
       });
       onSuccess();
       onClose();
@@ -114,7 +99,7 @@ export function AgendaFormModal({
       notifications.show({
         title: 'Erreur',
         message: error instanceof Error ? error.message : 'Échec de l\'opération',
-        color: 'red',
+        color: 'danger',
       });
     } finally {
       setSubmitting(false);
@@ -125,7 +110,6 @@ export function AgendaFormModal({
     setOwnerUserId(user.id);
     setOwnerName(user.name);
     setOwnerQuery(user.name);
-    setOwnerResults([]);
   };
 
   return (
@@ -159,46 +143,28 @@ export function AgendaFormModal({
       />
       {isCreate && (
         <Stack gap="xs">
-          <TextInput
+          <UserPseudoSearch
             label="Propriétaire"
             description="Recherche par pseudo (membre du dispensaire)"
-            placeholder="Pseudo…"
-            value={ownerQuery}
-            onChange={(e) => {
-              setOwnerQuery(e.currentTarget.value);
-              if (ownerUserId && e.currentTarget.value !== ownerName) {
+            inputName="agenda-owner-user-search"
+            enabled={opened && isCreate}
+            query={ownerQuery}
+            onQueryChange={(next) => {
+              setOwnerQuery(next);
+              if (ownerUserId && next !== ownerName) {
                 setOwnerUserId(null);
                 setOwnerName('');
               }
             }}
-            autoComplete="off"
-            name="agenda-owner-user-search"
-            data-1p-ignore
-            data-lpignore="true"
-            data-form-type="other"
-            required
+            onSearch={searchAgendaUsers}
+            onSelect={selectOwner}
+            hideResults={!!ownerUserId}
+            clearQueryOnSelect={false}
           />
           {ownerUserId && (
             <Text size="sm" c="dimmed">
               Propriétaire sélectionné : {ownerName}
             </Text>
-          )}
-          {ownerResults.length > 0 && !ownerUserId && (
-            <Stack gap={4}>
-              {ownerResults.map((user) => (
-                <Group key={user.id} justify="space-between">
-                  <Text size="sm">{user.name}</Text>
-                  <Button
-                    size="xs"
-                    color="sage"
-                    variant="light"
-                    onClick={() => selectOwner(user)}
-                  >
-                    Sélectionner
-                  </Button>
-                </Group>
-              ))}
-            </Stack>
           )}
         </Stack>
       )}

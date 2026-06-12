@@ -1,19 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Button,
   Card,
   Container,
   Group,
   MultiSelect,
-  Select,
   Stack,
   Text,
-  TextInput,
   Title,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
+import { UserPseudoSearch } from '@/app/_components/UserPseudoSearch/UserPseudoSearch';
 import {
   listDispensaryMembers,
   removeDispensaryMember,
@@ -49,14 +48,28 @@ export function DispensaryMembersClient({
   error?: string;
 }) {
   const [members, setMembers] = useState(initialMembers);
-  const [search, setSearch] = useState('');
-  const [searchResults, setSearchResults] = useState<{ id: string; name: string }[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [selectedUser, setSelectedUser] = useState<{ id: string; name: string } | null>(null);
   const [selectedRoles, setSelectedRoles] = useState<string[]>([Role.EMPLOYEE]);
   const [loading, setLoading] = useState(false);
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
   const [roleEdits, setRoleEdits] = useState<Record<string, string[]>>(() =>
     Object.fromEntries(initialMembers.map((m) => [m.user.id, parseRoleList(m.role)])),
+  );
+
+  const memberUserIds = useMemo(
+    () => members.map((member) => member.user.id),
+    [members],
+  );
+
+  const searchUsers = useCallback(
+    async (query: string) => {
+      const result = await searchUsersForDispensaryInvite(dispensarySlug, query);
+      if (result.status === 200 && result.data) {
+        return result.data;
+      }
+      return [];
+    },
+    [dispensarySlug],
   );
 
   const refresh = async () => {
@@ -77,13 +90,6 @@ export function DispensaryMembersClient({
     return parseRoleList(member.role);
   };
 
-  const handleSearch = async () => {
-    const result = await searchUsersForDispensaryInvite(dispensarySlug, search);
-    if (result.status === 200 && result.data) {
-      setSearchResults(result.data);
-    }
-  };
-
   const saveMemberRoles = async (
     userId: string,
     roles: string[],
@@ -93,7 +99,7 @@ export function DispensaryMembersClient({
       notifications.show({
         title: 'Erreur',
         message: 'Sélectionnez au moins un rôle.',
-        color: 'red',
+        color: 'danger',
       });
       return false;
     }
@@ -106,7 +112,7 @@ export function DispensaryMembersClient({
     if (result.status !== 200) {
       const message =
         'error' in result && typeof result.error === 'string' ? result.error : 'Erreur';
-      notifications.show({ title: 'Erreur', message, color: 'red' });
+      notifications.show({ title: 'Erreur', message, color: 'danger' });
       return false;
     }
 
@@ -114,7 +120,7 @@ export function DispensaryMembersClient({
       notifications.show({
         title: 'Enregistré',
         message: options.successMessage,
-        color: 'green',
+        color: 'moss',
       });
     }
     await refresh();
@@ -122,16 +128,14 @@ export function DispensaryMembersClient({
   };
 
   const handleAdd = async () => {
-    if (!selectedUserId) return;
+    if (!selectedUser) return;
     setLoading(true);
     try {
-      const ok = await saveMemberRoles(selectedUserId, selectedRoles, {
+      const ok = await saveMemberRoles(selectedUser.id, selectedRoles, {
         successMessage: 'Membre ajouté',
       });
       if (!ok) return;
-      setSearch('');
-      setSearchResults([]);
-      setSelectedUserId(null);
+      setSelectedUser(null);
       setSelectedRoles([Role.EMPLOYEE]);
     } finally {
       setLoading(false);
@@ -153,7 +157,7 @@ export function DispensaryMembersClient({
     if (result.status !== 200) {
       const message =
         'error' in result && typeof result.error === 'string' ? result.error : 'Erreur';
-      notifications.show({ title: 'Erreur', message, color: 'red' });
+      notifications.show({ title: 'Erreur', message, color: 'danger' });
       return;
     }
     await refresh();
@@ -170,7 +174,7 @@ export function DispensaryMembersClient({
     <Stack gap="lg">
       <Title order={2}>Membres du dispensaire</Title>
       {error && (
-        <Text c="red" size="sm">
+        <Text c="danger" size="sm">
           {error}
         </Text>
       )}
@@ -178,27 +182,16 @@ export function DispensaryMembersClient({
       <Card withBorder padding="md">
         <Stack gap="sm">
           <Text fw={600}>Ajouter un membre</Text>
-          <Group align="flex-end">
-            <TextInput
-              label="Rechercher par nom"
-              className="flex-1"
-              value={search}
-              onChange={(e) => setSearch(e.currentTarget.value)}
-            />
-            <Button variant="default" onClick={handleSearch}>
-              Rechercher
-            </Button>
-          </Group>
-          {searchResults.length > 0 && (
-            <Select
-              label="Utilisateur"
-              data={searchResults.map((u) => ({
-                value: u.id,
-                label: u.name,
-              }))}
-              value={selectedUserId}
-              onChange={setSelectedUserId}
-            />
+          <UserPseudoSearch
+            inputName="dispensary-member-user-search"
+            excludeUserIds={memberUserIds}
+            onSearch={searchUsers}
+            onSelect={setSelectedUser}
+          />
+          {selectedUser && (
+            <Text size="sm" c="dimmed">
+              Utilisateur sélectionné : {selectedUser.name}
+            </Text>
           )}
           <MultiSelect
             label="Rôles"
@@ -209,9 +202,10 @@ export function DispensaryMembersClient({
             clearable={false}
           />
           <Button
+            color="sage"
             loading={loading}
             onClick={handleAdd}
-            disabled={!selectedUserId || selectedRoles.length === 0}
+            disabled={!selectedUser || selectedRoles.length === 0}
           >
             Enregistrer
           </Button>
@@ -227,7 +221,7 @@ export function DispensaryMembersClient({
                 <Group justify="space-between" align="flex-start">
                   <Text fw={600}>{m.user.name}</Text>
                   <Button
-                    color="red"
+                    color="danger"
                     variant="light"
                     size="xs"
                     onClick={() => handleRemove(m.user.id)}
@@ -248,6 +242,7 @@ export function DispensaryMembersClient({
                 <Group justify="flex-end">
                   <Button
                     variant="light"
+                    color="sage"
                     loading={savingUserId === m.user.id}
                     disabled={!rolesChanged(m) || memberRoles.length === 0}
                     onClick={() => handleSaveRoles(m.user.id)}
