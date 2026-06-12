@@ -12,10 +12,10 @@ import { handleAction } from '@/lib/action';
 import { notifications } from '@mantine/notifications';
 import type { OrderMailTemplateAssignment, OrderType, OrderStatus } from '@prisma/client';
 import type { MailTemplate } from '@/types/mailTemplates';
-import { OrderTypeEnum } from '@/types/enum/orderType';
-import { OrderStatusEnum } from '@/types/enum/orderStatus';
-import { getOrderTypeLabel } from '@/types/enum/orderType';
-import { getOrderStatusLabel } from '@/types/enum/orderStatus';
+import {
+  orderStatusSelectOptions,
+  orderTypeSelectOptions,
+} from '@/lib/orders/orderSelectOptions';
 
 interface OrderMailTemplateAssignmentWithTemplate extends OrderMailTemplateAssignment {
   mailTemplate: {
@@ -88,7 +88,7 @@ export function OrderLetterTemplateAssignmentModal({
           message: editingAssignment
             ? 'Assignation modifiée avec succès'
             : 'Assignation créée avec succès',
-          color: 'green',
+          color: 'moss',
         });
         onSuccess();
         onClose();
@@ -98,24 +98,10 @@ export function OrderLetterTemplateAssignmentModal({
       notifications.show({
         title: 'Erreur',
         message: error.message || 'Erreur lors de la sauvegarde de l\'assignation',
-        color: 'red',
+        color: 'danger',
       });
     }
   };
-
-  const orderTypeOptions = [
-    { value: OrderTypeEnum.INCOMING, label: getOrderTypeLabel(OrderTypeEnum.INCOMING) },
-    { value: OrderTypeEnum.OUTGOING, label: getOrderTypeLabel(OrderTypeEnum.OUTGOING) },
-  ];
-
-  const orderStatusOptions = [
-    { value: OrderStatusEnum.DRAFT, label: getOrderStatusLabel(OrderStatusEnum.DRAFT) },
-    { value: OrderStatusEnum.LETTER_SENT, label: getOrderStatusLabel(OrderStatusEnum.LETTER_SENT) },
-    { value: OrderStatusEnum.PROCESSING, label: getOrderStatusLabel(OrderStatusEnum.PROCESSING) },
-    { value: OrderStatusEnum.READY, label: getOrderStatusLabel(OrderStatusEnum.READY) },
-    { value: OrderStatusEnum.COMPLETED, label: getOrderStatusLabel(OrderStatusEnum.COMPLETED) },
-    { value: OrderStatusEnum.CANCELLED, label: getOrderStatusLabel(OrderStatusEnum.CANCELLED) },
-  ];
 
   const mailTemplateOptions = mailTemplates.map((template) => ({
     value: template.id,
@@ -137,7 +123,7 @@ export function OrderLetterTemplateAssignmentModal({
           <Select
             label="Type de commande"
             placeholder="Sélectionner un type"
-            data={orderTypeOptions}
+            data={orderTypeSelectOptions}
             required
             disabled={!!editingAssignment}
             {...form.getInputProps('orderType')}
@@ -145,7 +131,7 @@ export function OrderLetterTemplateAssignmentModal({
           <Select
             label="Statut de commande"
             placeholder="Sélectionner un statut"
-            data={orderStatusOptions}
+            data={orderStatusSelectOptions}
             required
             disabled={!!editingAssignment}
             {...form.getInputProps('orderStatus')}

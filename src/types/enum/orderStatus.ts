@@ -46,19 +46,6 @@ const orderStatusPillPalettes: Record<OrderStatus, ApothecaryPalette> = {
   CANCELLED: dangerPalette,
 };
 
-/** @deprecated Prefer OrderStatusBadge or getOrderStatusPillStyle */
-export function getOrderStatusColor(status: OrderStatus): string {
-  const colors: Record<OrderStatus, string> = {
-    DRAFT: 'slate',
-    LETTER_SENT: 'wine',
-    PROCESSING: 'clay',
-    READY: 'sage',
-    COMPLETED: 'moss',
-    CANCELLED: 'danger',
-  };
-  return colors[status];
-}
-
 export function getOrderStatusPillStyle(status: OrderStatus): CSSProperties {
   return apothecaryPillStyle(orderStatusPillPalettes[status]);
 }

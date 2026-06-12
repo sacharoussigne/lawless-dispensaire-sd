@@ -1,15 +1,17 @@
 'use client';
 
-import { Paper, TextInput, Select, Group, ActionIcon } from '@mantine/core';
+import { Paper, TextInput, Select, Group, ActionIcon, Tooltip } from '@mantine/core';
+import type { CSSProperties, ReactNode } from 'react';
 import { OrderStatusBadge } from '@/app/_components/OrderBadges/OrderStatusBadge';
 import { OrderTypeBadge } from '@/app/_components/OrderBadges/OrderTypeBadge';
 import { DataTable } from 'mantine-datatable';
 import { IconEdit, IconTrash, IconEye, IconMail } from '@tabler/icons-react';
-import { getOrderStatusLabel, OrderStatusEnum } from '@/types/enum/orderStatus';
-import { getOrderClientDisplayName, type OrderWithRelations } from '@/types/orders';
+import { orderStatusFilterOptions } from '@/lib/orders/orderSelectOptions';
+import { getOrderClientDisplayName, type OrderSummary } from '@/types/orders';
+import { OrderStatusEnum } from '@/types/enum/orderStatus';
 
 interface OrdersTableProps {
-  orders: OrderWithRelations[];
+  orders: OrderSummary[];
   loading: boolean;
   statusFilter: string | null;
   nameFilter: string;
@@ -20,38 +22,60 @@ interface OrdersTableProps {
   onStatusFilterChange: (value: string | null) => void;
   onNameFilterChange: (value: string) => void;
   onPageChange: (page: number) => void;
-  onView: (order: OrderWithRelations) => void;
-  onEdit: (order: OrderWithRelations) => void;
-  onDelete: (order: OrderWithRelations) => void;
-  onPreviewLetter?: (order: OrderWithRelations) => void;
-  hasLetterTemplateForOrder?: (order: OrderWithRelations) => boolean;
+  onView: (order: OrderSummary) => void;
+  onEdit: (order: OrderSummary) => void;
+  onDelete: (order: OrderSummary) => void;
+  onPreviewLetter?: (order: OrderSummary) => void;
+  hasLetterTemplateForOrder?: (order: OrderSummary) => boolean;
 }
 
-const statusOptions: { value: string; label: string }[] = [
-  { value: OrderStatusEnum.DRAFT, label: getOrderStatusLabel(OrderStatusEnum.DRAFT) },
-  {
-    value: OrderStatusEnum.LETTER_SENT,
-    label: getOrderStatusLabel(OrderStatusEnum.LETTER_SENT),
-  },
-  {
-    value: OrderStatusEnum.PROCESSING,
-    label: getOrderStatusLabel(OrderStatusEnum.PROCESSING),
-  },
-  { value: OrderStatusEnum.READY, label: getOrderStatusLabel(OrderStatusEnum.READY) },
-  {
-    value: OrderStatusEnum.COMPLETED,
-    label: getOrderStatusLabel(OrderStatusEnum.COMPLETED),
-  },
-  {
-    value: OrderStatusEnum.CANCELLED,
-    label: getOrderStatusLabel(OrderStatusEnum.CANCELLED),
-  },
-];
+const disabledActionStyle: CSSProperties = {
+  opacity: 0.38,
+  cursor: 'not-allowed',
+};
 
-const filterOptions = [
-  { value: '', label: 'Tous les statuts' },
-  ...statusOptions,
-];
+function LockedActionIcon({
+  label,
+  activeLabel,
+  locked,
+  activeColor,
+  onClick,
+  children,
+}: {
+  label: string;
+  activeLabel: string;
+  locked: boolean;
+  activeColor: string;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  const icon = (
+    <ActionIcon
+      variant={locked ? 'subtle' : 'light'}
+      color={locked ? 'slate' : activeColor}
+      onClick={locked ? undefined : onClick}
+      disabled={locked}
+      style={locked ? disabledActionStyle : undefined}
+      aria-label={locked ? label : activeLabel}
+    >
+      {children}
+    </ActionIcon>
+  );
+
+  if (!locked) {
+    return (
+      <Tooltip label={activeLabel} withArrow>
+        {icon}
+      </Tooltip>
+    );
+  }
+
+  return (
+    <Tooltip label={label} withArrow>
+      <span style={{ display: 'inline-flex' }}>{icon}</span>
+    </Tooltip>
+  );
+}
 
 export function OrdersTable({
   orders,
@@ -75,17 +99,18 @@ export function OrdersTable({
     <Paper shadow="sm" withBorder>
       <DataTable
         records={orders}
+        fetching={loading}
         columns={[
           {
             accessor: 'status',
             title: 'Statut',
-            render: (order: OrderWithRelations) => (
+            render: (order: OrderSummary) => (
               <OrderStatusBadge status={order.status} />
             ),
             filter: (
               <Select
                 placeholder="Tous les statuts"
-                data={filterOptions}
+                data={orderStatusFilterOptions}
                 value={statusFilter || ''}
                 onChange={(value) => onStatusFilterChange(value || null)}
                 clearable
@@ -96,43 +121,43 @@ export function OrdersTable({
           {
             accessor: 'type',
             title: 'Type',
-            render: (order: OrderWithRelations) => (
+            render: (order: OrderSummary) => (
               <OrderTypeBadge type={order.type || 'INCOMING'} />
             ),
           },
-          // {
-          //   accessor: 'name',
-          //   title: 'Nom',
-          //   sortable: true,
-          //   filter: (
-          //     <TextInput
-          //       placeholder="Rechercher un nom..."
-          //       value={nameFilter}
-          //       onChange={(e) => onNameFilterChange(e.currentTarget.value)}
-          //       style={{ minWidth: 200 }}
-          //     />
-          //   ),
-          // },
+          {
+            accessor: 'name',
+            title: 'Nom',
+            sortable: true,
+            filter: (
+              <TextInput
+                placeholder="Rechercher un nom..."
+                value={nameFilter}
+                onChange={(e) => onNameFilterChange(e.currentTarget.value)}
+                style={{ minWidth: 200 }}
+              />
+            ),
+          },
           {
             accessor: 'client',
             title: 'Client',
-            render: (order: OrderWithRelations) => getOrderClientDisplayName(order),
+            render: (order: OrderSummary) => getOrderClientDisplayName(order),
             sortable: false,
           },
           {
             accessor: 'price',
             title: 'Prix',
-            render: (order: OrderWithRelations) =>
+            render: (order: OrderSummary) =>
               order.price != null ? `${order.price.toFixed(2)} $` : '-',
             sortable: true,
           },
           {
             accessor: 'createdAt',
             title: 'Date de création',
-            render: (order: OrderWithRelations) =>
+            render: (order: OrderSummary) =>
               new Date(order.createdAt).toLocaleDateString('fr-FR', {
                 year: 'numeric',
-                month: 'long',
+                month: 'short',
                 day: 'numeric',
               }),
             sortable: true,
@@ -140,60 +165,55 @@ export function OrdersTable({
           {
             accessor: 'actions',
             title: 'Actions',
-            render: (order: OrderWithRelations) => {
+            textAlign: 'right',
+            render: (order: OrderSummary) => {
               const isCompleted = order.status === OrderStatusEnum.COMPLETED;
-              const hasLetterTemplate =
-                hasLetterTemplateForOrder ? hasLetterTemplateForOrder(order) : false;
+
               return (
-                <Group gap="xs" wrap="nowrap" justify="flex-end">
-                  {onPreviewLetter && hasLetterTemplate && (
-                    <ActionIcon
-                      variant="light"
-                      color="wine"
-                      onClick={() => onPreviewLetter(order)}
-                      title="Aperçu du courrier"
-                    >
-                      <IconMail size={16} />
-                    </ActionIcon>
+                <Group gap="xs" justify="flex-end" wrap="nowrap">
+                  {hasLetterTemplateForOrder?.(order) && onPreviewLetter && (
+                    <Tooltip label="Aperçu du courrier" withArrow>
+                      <ActionIcon
+                        variant="light"
+                        color="denim"
+                        onClick={() => onPreviewLetter(order)}
+                        aria-label="Aperçu du courrier"
+                      >
+                        <IconMail size={16} />
+                      </ActionIcon>
+                    </Tooltip>
                   )}
-                  {permissions?.orders.view && (
-                    <ActionIcon
-                      variant="light"
-                      color="denim"
-                      onClick={() => onView(order)}
-                    >
-                      <IconEye size={16} />
-                    </ActionIcon>
-                  )}
-                  {permissions?.orders.update && (
+                  <Tooltip label="Voir les détails" withArrow>
                     <ActionIcon
                       variant="light"
                       color="slate"
+                      onClick={() => onView(order)}
+                      aria-label="Voir les détails"
+                    >
+                      <IconEye size={16} />
+                    </ActionIcon>
+                  </Tooltip>
+                  {permissions?.orders.update && (
+                    <LockedActionIcon
+                      locked={isCompleted}
+                      label="Commande terminée — modification impossible"
+                      activeLabel="Modifier"
+                      activeColor="slate"
                       onClick={() => onEdit(order)}
-                      disabled={isCompleted}
-                      title={
-                        isCompleted
-                          ? 'Les commandes terminées ne peuvent pas être modifiées'
-                          : 'Modifier'
-                      }
                     >
                       <IconEdit size={16} />
-                    </ActionIcon>
+                    </LockedActionIcon>
                   )}
                   {permissions?.orders.delete && (
-                    <ActionIcon
-                      variant="light"
-                      color="danger"
+                    <LockedActionIcon
+                      locked={isCompleted}
+                      label="Commande terminée — suppression impossible"
+                      activeLabel="Supprimer"
+                      activeColor="danger"
                       onClick={() => onDelete(order)}
-                      disabled={isCompleted}
-                      title={
-                        isCompleted
-                          ? 'Les commandes terminées ne peuvent pas être supprimées'
-                          : 'Supprimer'
-                      }
                     >
                       <IconTrash size={16} />
-                    </ActionIcon>
+                    </LockedActionIcon>
                   )}
                 </Group>
               );
@@ -204,10 +224,9 @@ export function OrdersTable({
         recordsPerPage={pageSize}
         page={page}
         onPageChange={onPageChange}
-        fetching={loading}
+        minHeight={200}
         noRecordsText="Aucune commande trouvée"
       />
     </Paper>
   );
 }
-

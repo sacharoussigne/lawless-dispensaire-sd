@@ -3,120 +3,61 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   Container,
-  Title,
-  Group,
   Button,
   Paper,
   Stack,
   Text,
 } from '@mantine/core';
 import { IconPlus, IconPackage } from '@tabler/icons-react';
-import { getOrders } from '@/app/_actions/orders';
-import { handleAction } from '@/lib/action';
-import { notifications } from '@mantine/notifications';
 import { EditOrderModal } from './components/EditOrderModal';
 import { DeleteOrderModal } from './components/DeleteOrderModal';
 import { OrderDetailsModal } from './components/OrderDetailsModal';
 import { OrderLetterPreviewModal } from './components/OrderLetterPreviewModal';
 import { ActiveFilters } from '@/app/_components/ActiveFilters/ActiveFilters';
 import { OrdersTable } from './components/OrdersTable';
-import OrderModal from '../stock/modals/OrderModal';
+import CreateOrderModal from './components/CreateOrderModal';
+import { PageHeader } from '@/app/_components/PageHeader/PageHeader';
 import { usePermissions } from '@/app/_contexts/PermissionsContext';
-import type { OrderWithRelations } from '@/types/orders';
-import { getOrderLetterTemplateAssignments } from '@/app/_actions/orderLetterTemplateAssignments';
+import type { OrderSummary, OrdersPageResult } from '@/types/orders';
 import type { OrderMailTemplateAssignment } from '@prisma/client';
+import {
+  defaultOrdersPageFilters,
+  useOrderLetterAssignments,
+  useOrdersPage,
+} from './hooks/useOrdersQueries';
+import type { OrdersPageFilters } from '@/lib/orders/queryKeys';
 
 interface OrdersPageClientProps {
-  initialOrders: OrderWithRelations[];
+  initialOrdersPage: OrdersPageResult;
+  initialAssignments: OrderMailTemplateAssignment[];
 }
 
-// Function to transform text into slug (like order names)
-const toSlug = (text: string): string => {
-  return text
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-};
-
 export default function OrdersPageClient({
-  initialOrders,
+  initialOrdersPage,
+  initialAssignments,
 }: OrdersPageClientProps) {
-  const { permissions, dispensarySlug } = usePermissions();
-  const [orders, setOrders] = useState<OrderWithRelations[]>(initialOrders);
-  const [assignments, setAssignments] = useState<OrderMailTemplateAssignment[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [assignmentsLoading, setAssignmentsLoading] = useState(false);
+  const { permissions } = usePermissions();
+  const [filters, setFilters] = useState<OrdersPageFilters>(defaultOrdersPageFilters);
   const [modalOpened, setModalOpened] = useState(false);
   const [detailsModalOpened, setDetailsModalOpened] = useState(false);
-  const [editingOrder, setEditingOrder] = useState<OrderWithRelations | null>(null);
-  const [viewingOrder, setViewingOrder] = useState<OrderWithRelations | null>(null);
   const [deleteModalOpened, setDeleteModalOpened] = useState(false);
-  const [orderToDelete, setOrderToDelete] = useState<OrderWithRelations | null>(null);
   const [createModalOpened, setCreateModalOpened] = useState(false);
   const [letterPreviewModalOpened, setLetterPreviewModalOpened] = useState(false);
-  const [orderForLetterPreview, setOrderForLetterPreview] = useState<OrderWithRelations | null>(null);
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+  const [viewingOrderId, setViewingOrderId] = useState<string | null>(null);
+  const [orderToDelete, setOrderToDelete] = useState<OrderSummary | null>(null);
+  const [orderForLetterPreviewId, setOrderForLetterPreviewId] = useState<string | null>(
+    null,
+  );
 
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  const [nameFilter, setNameFilter] = useState<string>('');
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(10);
+  const { data: ordersPage, isFetching } = useOrdersPage(filters, initialOrdersPage);
+  const { data: assignments = initialAssignments } = useOrderLetterAssignments(
+    initialAssignments,
+  );
 
-  const loadOrders = async () => {
-    try {
-      setLoading(true);
-      const result = await getOrders(dispensarySlug!, );
-      const data = handleAction(result);
-      if (data) {
-        setOrders(data);
-      }
-    } catch (error: any) {
-      notifications.show({
-        title: 'Erreur',
-        message: error.message || 'Erreur lors du chargement des commandes',
-        color: 'red',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const orders = ordersPage?.orders ?? [];
+  const totalRecords = ordersPage?.totalCount ?? 0;
 
-  const loadAssignments = async () => {
-    try {
-      setAssignmentsLoading(true);
-      const result = await getOrderLetterTemplateAssignments(dispensarySlug!, );
-      const data = handleAction(result);
-      if (data) {
-        setAssignments(data);
-      }
-    } catch (error: any) {
-      notifications.show({
-        title: 'Erreur',
-        message: error.message || 'Erreur lors du chargement des assignations de modèles de courriers',
-        color: 'red',
-      });
-    } finally {
-      setAssignmentsLoading(false);
-    }
-  };
-
-  const handleEdit = (order: OrderWithRelations) => {
-    setEditingOrder(order);
-    setModalOpened(true);
-  };
-
-  const handleViewDetails = (order: OrderWithRelations) => {
-    setViewingOrder(order);
-    setDetailsModalOpened(true);
-  };
-
-  const handlePreviewLetter = (order: OrderWithRelations) => {
-    setOrderForLetterPreview(order);
-    setLetterPreviewModalOpened(true);
-  };
-
-  // Pre-calculate (type, status) pairs that have a letter template
   const assignmentKeys = useMemo(() => {
     const keys = new Set<string>();
     assignments.forEach((assignment) => {
@@ -126,55 +67,46 @@ export default function OrdersPageClient({
   }, [assignments]);
 
   const hasLetterTemplateForOrder = useCallback(
-    (order: OrderWithRelations) => {
+    (order: OrderSummary) => {
       const key = `${order.type || 'INCOMING'}-${order.status}`;
       return assignmentKeys.has(key);
     },
-    [assignmentKeys]
-  );
-
-  const filteredOrders = orders.filter((order) => {
-    const matchesStatus = !statusFilter || order.status === statusFilter;
-    const orderNameSlug = toSlug(order.name);
-    const filterSlug = toSlug(nameFilter);
-    const matchesName = !nameFilter || orderNameSlug.includes(filterSlug);
-    return matchesStatus && matchesName;
-  });
-
-  const sortedOrders = [...filteredOrders].sort((a, b) => {
-    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-  });
-
-  const totalRecords = sortedOrders.length;
-  const paginatedOrders = sortedOrders.slice(
-    (page - 1) * pageSize,
-    page * pageSize
+    [assignmentKeys],
   );
 
   useEffect(() => {
-    setPage(1);
-  }, [statusFilter, nameFilter]);
+    setFilters((current) => ({ ...current, page: 1 }));
+  }, [filters.status, filters.search]);
 
-  useEffect(() => {
-    loadAssignments();
-     
-  }, []);
+  const handleStatusFilterChange = (value: string | null) => {
+    setFilters((current) => ({ ...current, status: value }));
+  };
+
+  const handleNameFilterChange = (value: string) => {
+    setFilters((current) => ({ ...current, search: value }));
+  };
+
+  const handlePageChange = (page: number) => {
+    setFilters((current) => ({ ...current, page }));
+  };
 
   return (
     <Container size="xl" py="xl">
-      <Group justify="space-between" mb="xl">
-        <Title order={1}>Commandes</Title>
-        {permissions?.orders.create && (
-          <Button
-            leftSection={<IconPlus size={16} />}
-            onClick={() => setCreateModalOpened(true)}
-          >
-            Créer une commande
-          </Button>
-        )}
-      </Group>
+      <PageHeader
+        title="Commandes"
+        actions={
+          permissions?.orders.create ? (
+            <Button
+              leftSection={<IconPlus size={16} />}
+              onClick={() => setCreateModalOpened(true)}
+            >
+              Créer une commande
+            </Button>
+          ) : undefined
+        }
+      />
 
-      {orders.length === 0 && !loading ? (
+      {totalRecords === 0 && !isFetching ? (
         <Paper shadow="sm" withBorder>
           <Stack align="center" gap="xs" py="xl">
             <IconPackage size={48} stroke={1.5} style={{ color: 'var(--mantine-color-dimmed)' }} />
@@ -189,36 +121,45 @@ export default function OrdersPageClient({
             filters={[
               {
                 label: 'Nom',
-                value: nameFilter,
-                onRemove: () => setNameFilter(''),
+                value: filters.search,
+                onRemove: () => handleNameFilterChange(''),
               },
               {
                 label: 'Statut',
-                value: statusFilter,
-                onRemove: () => setStatusFilter(null),
+                value: filters.status,
+                onRemove: () => handleStatusFilterChange(null),
               },
             ]}
           />
 
           <OrdersTable
-            orders={paginatedOrders}
-            loading={loading}
-            statusFilter={statusFilter}
-            nameFilter={nameFilter}
-            page={page}
-            pageSize={pageSize}
+            orders={orders}
+            loading={isFetching}
+            statusFilter={filters.status}
+            nameFilter={filters.search}
+            page={filters.page}
+            pageSize={filters.pageSize}
             totalRecords={totalRecords}
             permissions={permissions}
-            onStatusFilterChange={(value) => setStatusFilter(value)}
-            onNameFilterChange={(value) => setNameFilter(value)}
-            onPageChange={(p) => setPage(p)}
-            onView={handleViewDetails}
-            onEdit={handleEdit}
+            onStatusFilterChange={handleStatusFilterChange}
+            onNameFilterChange={handleNameFilterChange}
+            onPageChange={handlePageChange}
+            onView={(order) => {
+              setViewingOrderId(order.id);
+              setDetailsModalOpened(true);
+            }}
+            onEdit={(order) => {
+              setEditingOrderId(order.id);
+              setModalOpened(true);
+            }}
             onDelete={(order) => {
               setOrderToDelete(order);
               setDeleteModalOpened(true);
             }}
-            onPreviewLetter={handlePreviewLetter}
+            onPreviewLetter={(order) => {
+              setOrderForLetterPreviewId(order.id);
+              setLetterPreviewModalOpened(true);
+            }}
             hasLetterTemplateForOrder={hasLetterTemplateForOrder}
           />
         </>
@@ -228,19 +169,18 @@ export default function OrdersPageClient({
         opened={modalOpened}
         onClose={() => {
           setModalOpened(false);
-          setEditingOrder(null);
+          setEditingOrderId(null);
         }}
-        editingOrder={editingOrder}
-        onSuccess={loadOrders}
+        orderId={editingOrderId}
       />
 
       <OrderDetailsModal
         opened={detailsModalOpened}
         onClose={() => {
           setDetailsModalOpened(false);
-          setViewingOrder(null);
+          setViewingOrderId(null);
         }}
-        viewingOrder={viewingOrder}
+        orderId={viewingOrderId}
       />
 
       <DeleteOrderModal
@@ -250,27 +190,22 @@ export default function OrdersPageClient({
           setOrderToDelete(null);
         }}
         orderToDelete={orderToDelete}
-        onSuccess={loadOrders}
       />
 
       <OrderLetterPreviewModal
         opened={letterPreviewModalOpened}
         onClose={() => {
           setLetterPreviewModalOpened(false);
-          setOrderForLetterPreview(null);
+          setOrderForLetterPreviewId(null);
         }}
-        order={orderForLetterPreview}
+        orderId={orderForLetterPreviewId}
       />
 
-      <OrderModal
+      <CreateOrderModal
         opened={createModalOpened}
         onClose={() => setCreateModalOpened(false)}
         prefillItemsNeedingRestock={false}
-        onOrderCreated={async () => {
-          await loadOrders();
-        }}
       />
     </Container>
   );
 }
-

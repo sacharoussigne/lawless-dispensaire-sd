@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
 import { requirePermission, requireTenantServerActionContext } from '@/lib/serverActionAuth';
 import { tenantWhere } from '@/lib/dispensary/tenantWhere';
+import type { OrderStatus, OrderType } from '@prisma/client';
 
 const optionalDefaultMailName = z
   .string()
@@ -208,10 +209,23 @@ export async function deleteMailTemplate(dispensarySlug: string, data: { id: str
   }
 }
 
+type OrderMailPreviewSource = {
+  type: string;
+  status: string;
+  price: unknown;
+  company: { name: string } | null;
+  individualCustomer: { name: string } | null;
+  items: Array<{
+    quantity: number;
+    item: { name: string };
+  }>;
+};
+
 export async function generateOrderMailPreview(
   dispensarySlug: string,
   data: {
-    orderId: string;
+    orderId?: string;
+    order?: OrderMailPreviewSource;
   },
 ) {
   try {
@@ -221,48 +235,61 @@ export async function generateOrderMailPreview(
     if (!ctx.ok) return ctx.response;
     const { dispensaryId } = ctx.tenant;
 
-    const order = await prisma.order.findFirst({
-      where: { id: data.orderId, ...tenantWhere(dispensaryId) },
-      include: {
-        company: {
-          select: {
-            id: true,
-            name: true,
+    let order: OrderMailPreviewSource | null = data.order ?? null;
+
+    if (!order) {
+      if (!data.orderId) {
+        return {
+          status: 400,
+          error: 'Commande requise pour générer l\'aperçu',
+        };
+      }
+
+      const dbOrder = await prisma.order.findFirst({
+        where: { id: data.orderId, ...tenantWhere(dispensaryId) },
+        include: {
+          company: {
+            select: {
+              id: true,
+              name: true,
+            },
           },
-        },
-        individualCustomer: {
-          select: {
-            id: true,
-            name: true,
+          individualCustomer: {
+            select: {
+              id: true,
+              name: true,
+            },
           },
-        },
-        items: {
-          include: {
-            item: {
-              select: {
-                id: true,
-                name: true,
-                price: true,
+          items: {
+            include: {
+              item: {
+                select: {
+                  id: true,
+                  name: true,
+                  price: true,
+                },
               },
             },
           },
         },
-      },
-    });
+      });
 
-    if (!order) {
-      return {
-        status: 404,
-        error: 'Commande introuvable',
-      };
+      if (!dbOrder) {
+        return {
+          status: 404,
+          error: 'Commande introuvable',
+        };
+      }
+
+      order = dbOrder;
     }
 
     const assignment = await prisma.orderMailTemplateAssignment.findUnique({
       where: {
         dispensaryId_orderType_orderStatus: {
           dispensaryId,
-          orderType: order.type,
-          orderStatus: order.status,
+          orderType: order.type as OrderType,
+          orderStatus: order.status as OrderStatus,
         },
       },
       include: {
@@ -287,7 +314,11 @@ export async function generateOrderMailPreview(
       })
       .join('\n');
 
-    const priceText = order.price != null ? `${order.price.toFixed(2)} $` : 'Non spécifié';
+    const priceValue = order.price != null ? Number(order.price) : null;
+    const priceText =
+      priceValue != null && Number.isFinite(priceValue)
+        ? `${priceValue.toFixed(2)} $`
+        : 'Non spécifié';
 
     const username = ctx.session.user.name || 'Utilisateur';
 

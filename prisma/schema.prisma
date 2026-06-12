@@ -462,6 +462,7 @@ model Order {
   @@index([status])
   @@index([type])
   @@index([dispensaryId])
+  @@index([dispensaryId, createdAt(sort: Desc)])
   @@map("order")
 }
 

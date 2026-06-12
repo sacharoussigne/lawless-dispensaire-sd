@@ -1,65 +1,59 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
-import { Modal, Stack, Button, Group, Text } from '@mantine/core';
-import { notifications } from '@mantine/notifications';
-import { deleteOrder } from '@/app/_actions/orders';
-import { handleAction } from '@/lib/action';
-import type { OrderWithRelations } from '@/types/orders';
+import { Button, Text } from '@mantine/core';
+import { AppModal, AppModalFooter } from '@/app/_components/AppModal/AppModal';
+import type { OrderSummary } from '@/types/orders';
+import { useDeleteOrderMutation } from '../hooks/useOrdersQueries';
 
 interface DeleteOrderModalProps {
   opened: boolean;
   onClose: () => void;
-  orderToDelete: OrderWithRelations | null;
-  onSuccess: () => void;
+  orderToDelete: OrderSummary | null;
 }
 
 export function DeleteOrderModal({
   opened,
   onClose,
   orderToDelete,
-  onSuccess,
 }: DeleteOrderModalProps) {
-  const { dispensarySlug } = usePermissions();
+  const deleteOrderMutation = useDeleteOrderMutation();
+
   const handleDelete = async () => {
     if (!orderToDelete) return;
 
     try {
-      const result = await deleteOrder(dispensarySlug!, { id: orderToDelete.id });
-      handleAction(result);
-      notifications.show({
-        title: 'Succès',
-        message: 'Commande supprimée avec succès',
-        color: 'green',
-      });
+      await deleteOrderMutation.mutateAsync({ id: orderToDelete.id });
       onClose();
-      onSuccess();
-    } catch (error: any) {
-      notifications.show({
-        title: 'Erreur',
-        message: error.message || 'Erreur lors de la suppression',
-        color: 'red',
-      });
+    } catch {
+      // Notification handled by mutation hook
     }
   };
 
   return (
-    <Modal opened={opened} onClose={onClose} title="Supprimer la commande">
-      <Stack gap="md">
-        <Text>
-          Êtes-vous sûr de vouloir supprimer la commande{' '}
-          <strong>{orderToDelete?.name}</strong> ?
-        </Text>
-        <Group justify="flex-end" mt="md">
-          <Button variant="subtle" onClick={onClose}>
+    <AppModal
+      opened={opened}
+      onClose={onClose}
+      title="Supprimer la commande"
+      size="md"
+      footer={
+        <AppModalFooter>
+          <Button variant="subtle" color="slate" onClick={onClose}>
             Annuler
           </Button>
-          <Button color="red" onClick={handleDelete}>
+          <Button
+            color="danger"
+            onClick={handleDelete}
+            loading={deleteOrderMutation.isPending}
+          >
             Supprimer
           </Button>
-        </Group>
-      </Stack>
-    </Modal>
+        </AppModalFooter>
+      }
+    >
+      <Text>
+        Êtes-vous sûr de vouloir supprimer la commande{' '}
+        <strong>{orderToDelete?.name}</strong> ?
+      </Text>
+    </AppModal>
   );
 }
-

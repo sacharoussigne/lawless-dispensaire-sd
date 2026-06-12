@@ -1,7 +1,7 @@
 import type { Order } from '@prisma/client';
 
 export interface OrderItem {
-  id: string;
+  id?: string;
   itemId: string;
   quantity: number;
   item: {
@@ -23,6 +23,40 @@ export interface OrderWithRelations extends Omit<Order, 'price'> {
     name: string;
   } | null;
   items: OrderItem[];
+}
+
+export interface OrderSummary extends Omit<OrderWithRelations, 'items'> {
+  itemCount: number;
+}
+
+export interface OrdersPageResult {
+  orders: OrderSummary[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface ActiveOrderSummary {
+  id: string;
+  name: string;
+  status: string;
+  companyGroupId?: string | null;
+  company: {
+    id: string;
+    name: string;
+  } | null;
+  individualCustomer?: {
+    id: string;
+    name: string;
+  } | null;
+  items: Array<{
+    itemId: string;
+    quantity: number;
+    item: {
+      id: string;
+      name: string;
+    };
+  }>;
 }
 
 export function getOrderClientDisplayName(

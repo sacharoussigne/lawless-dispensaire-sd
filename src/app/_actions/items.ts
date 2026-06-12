@@ -141,14 +141,22 @@ export async function createItem(
   }
 }
 
-export async function getItems(dispensarySlug: string) {
+export async function getItems(
+  dispensarySlug: string,
+  options?: { companyGroupId?: string | null },
+) {
   try {
     const ctx = await requireTenantServerActionContext(dispensarySlug);
     if (!ctx.ok) return ctx.response;
     const { dispensaryId } = ctx.tenant;
 
     const items = await prisma.item.findMany({
-      where: tenantWhere(dispensaryId),
+      where: {
+        ...tenantWhere(dispensaryId),
+        ...(options?.companyGroupId
+          ? { companyGroupId: options.companyGroupId }
+          : {}),
+      },
       orderBy: [
         {
           category: {
