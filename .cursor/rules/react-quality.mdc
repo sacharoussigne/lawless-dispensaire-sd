@@ -1,0 +1,52 @@
+---
+description: React hooks, effects, and ESLint quality patterns for this codebase
+globs: "**/*.{tsx,ts}"
+alwaysApply: false
+---
+
+# React quality (ESLint-aligned)
+
+## `react-hooks/set-state-in-effect`
+
+Do **not** call functions that update React state synchronously in a `useEffect` body.
+
+```tsx
+// Bad — triggers eslint react-hooks/set-state-in-effect
+useEffect(() => {
+  void reload(); // reload() may call setState before awaiting
+}, [token]);
+
+// Good — setState only in async callback
+useEffect(() => {
+  let cancelled = false;
+  runAsyncEffect(fetchLists, {
+    isCancelled: () => cancelled,
+    onSuccess: applyLists,
+    onError: showError,
+  });
+  return () => { cancelled = true; };
+}, [token]);
+```
+
+Prefer `runAsyncEffect` from `@/lib/react/runAsyncEffect` for fetch/reload patterns in effects.
+
+Other valid alternatives:
+- Derive state during render instead of syncing in an effect
+- Update state in event handlers / server action `.then()` after user actions
+- `useSyncExternalStore` for external subscriptions
+
+## `react-hooks/exhaustive-deps`
+
+Include all values from the component scope used inside the effect/callback, or refactor to refs when intentional.
+
+## TypeScript
+
+- Prefer `import type` for type-only imports (`@typescript-eslint/consistent-type-imports`)
+- Prefix intentionally unused vars with `_`
+- Avoid `any`; use `unknown` + narrowing
+
+## General
+
+- Use `===` / `!==` (`eqeqeq`)
+- No `console.log` in committed code (`no-console`); use `console.warn` / `console.error` if needed
+- Prefer a single import line per module (`import { type Foo, bar }`); avoid splitting value + type imports when possible

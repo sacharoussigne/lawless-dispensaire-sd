@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { listAgendaTodoLists } from '@/app/_actions/agenda/todoLists';
 import { handleAction } from '@/lib/action';
+import { runAsyncEffect } from '@/lib/react/runAsyncEffect';
 import type { AgendaTodoListDTO } from '@/types/agenda';
 import { notifications } from '@mantine/notifications';
 
@@ -14,6 +15,14 @@ type UseAgendaTodoListsOptions = {
   remoteTodosToken?: number;
   isDragging?: boolean;
 };
+
+function showListsLoadError(error: unknown) {
+  notifications.show({
+    title: 'Erreur',
+    message: error instanceof Error ? error.message : 'Chargement impossible',
+    color: 'danger',
+  });
+}
 
 export function useAgendaTodoLists({
   dispensarySlug,
@@ -62,29 +71,19 @@ export function useAgendaTodoLists({
       const data = await fetchTodoLists();
       if (data) applyLists(data);
     } catch (error: unknown) {
-      notifications.show({
-        title: 'Erreur',
-        message: error instanceof Error ? error.message : 'Chargement impossible',
-        color: 'danger',
-      });
+      showListsLoadError(error);
     }
   }, [agendaId, applyLists, fetchTodoLists]);
 
   const fetchListsIntoState = useCallback(
     (isCancelled: () => boolean) => {
-      void fetchTodoLists()
-        .then((data) => {
-          if (isCancelled() || !data) return;
-          applyLists(data);
-        })
-        .catch((error: unknown) => {
-          if (isCancelled()) return;
-          notifications.show({
-            title: 'Erreur',
-            message: error instanceof Error ? error.message : 'Chargement impossible',
-            color: 'danger',
-          });
-        });
+      runAsyncEffect(fetchTodoLists, {
+        isCancelled,
+        onSuccess: (data) => {
+          if (data) applyLists(data);
+        },
+        onError: showListsLoadError,
+      });
     },
     [applyLists, fetchTodoLists],
   );
@@ -98,25 +97,12 @@ export function useAgendaTodoLists({
     }
 
     let cancelled = false;
-
-    void fetchTodoLists()
-      .then((data) => {
-        if (cancelled || !data) return;
-        applyLists(data);
-      })
-      .catch((error: unknown) => {
-        if (cancelled) return;
-        notifications.show({
-          title: 'Erreur',
-          message: error instanceof Error ? error.message : 'Chargement impossible',
-          color: 'danger',
-        });
-      });
+    fetchListsIntoState(() => cancelled);
 
     return () => {
       cancelled = true;
     };
-  }, [agendaId, applyLists, fetchTodoLists]);
+  }, [agendaId, fetchListsIntoState]);
 
   useEffect(() => {
     if (remoteTodosToken === 0) return;
