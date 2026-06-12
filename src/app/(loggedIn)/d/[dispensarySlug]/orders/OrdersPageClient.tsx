@@ -8,6 +8,7 @@ import {
   Stack,
   Text,
 } from '@mantine/core';
+import { useDebouncedValue } from '@mantine/hooks';
 import { IconPlus, IconPackage } from '@tabler/icons-react';
 import { EditOrderModal } from './components/EditOrderModal';
 import { DeleteOrderModal } from './components/DeleteOrderModal';
@@ -37,7 +38,18 @@ export default function OrdersPageClient({
   initialAssignments,
 }: OrdersPageClientProps) {
   const { permissions } = usePermissions();
-  const [filters, setFilters] = useState<OrdersPageFilters>(defaultOrdersPageFilters);
+  const [filters, setFilters] = useState<Omit<OrdersPageFilters, 'search'>>({
+    page: defaultOrdersPageFilters.page,
+    pageSize: defaultOrdersPageFilters.pageSize,
+    status: defaultOrdersPageFilters.status,
+  });
+  const [searchInput, setSearchInput] = useState('');
+  const [debouncedSearch] = useDebouncedValue(searchInput, 300);
+
+  const queryFilters = useMemo<OrdersPageFilters>(
+    () => ({ ...filters, search: debouncedSearch }),
+    [filters, debouncedSearch],
+  );
   const [modalOpened, setModalOpened] = useState(false);
   const [detailsModalOpened, setDetailsModalOpened] = useState(false);
   const [deleteModalOpened, setDeleteModalOpened] = useState(false);
@@ -50,13 +62,17 @@ export default function OrdersPageClient({
     null,
   );
 
-  const { data: ordersPage, isFetching } = useOrdersPage(filters, initialOrdersPage);
+  const { data: ordersPage, isFetching } = useOrdersPage(queryFilters, initialOrdersPage);
   const { data: assignments = initialAssignments } = useOrderLetterAssignments(
     initialAssignments,
   );
 
   const orders = ordersPage?.orders ?? [];
   const totalRecords = ordersPage?.totalCount ?? 0;
+  const hasActiveFilters = Boolean(filters.status || searchInput.trim());
+  const isSearchDebouncing = searchInput !== debouncedSearch;
+  const showEmptyCatalog = totalRecords === 0 && !isFetching && !hasActiveFilters;
+  const tableLoading = isFetching && !isSearchDebouncing;
 
   const assignmentKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -76,14 +92,14 @@ export default function OrdersPageClient({
 
   useEffect(() => {
     setFilters((current) => ({ ...current, page: 1 }));
-  }, [filters.status, filters.search]);
+  }, [filters.status, debouncedSearch]);
 
   const handleStatusFilterChange = (value: string | null) => {
     setFilters((current) => ({ ...current, status: value }));
   };
 
   const handleNameFilterChange = (value: string) => {
-    setFilters((current) => ({ ...current, search: value }));
+    setSearchInput(value);
   };
 
   const handlePageChange = (page: number) => {
@@ -106,7 +122,7 @@ export default function OrdersPageClient({
         }
       />
 
-      {totalRecords === 0 && !isFetching ? (
+      {showEmptyCatalog ? (
         <Paper shadow="sm" withBorder>
           <Stack align="center" gap="xs" py="xl">
             <IconPackage size={48} stroke={1.5} style={{ color: 'var(--mantine-color-dimmed)' }} />
@@ -121,8 +137,8 @@ export default function OrdersPageClient({
             filters={[
               {
                 label: 'Nom',
-                value: filters.search,
-                onRemove: () => handleNameFilterChange(''),
+                value: searchInput,
+                onRemove: () => setSearchInput(''),
               },
               {
                 label: 'Statut',
@@ -134,9 +150,9 @@ export default function OrdersPageClient({
 
           <OrdersTable
             orders={orders}
-            loading={isFetching}
+            loading={tableLoading}
             statusFilter={filters.status}
-            nameFilter={filters.search}
+            nameFilter={searchInput}
             page={filters.page}
             pageSize={filters.pageSize}
             totalRecords={totalRecords}
