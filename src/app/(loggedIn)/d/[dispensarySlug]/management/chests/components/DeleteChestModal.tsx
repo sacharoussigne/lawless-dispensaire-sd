@@ -102,9 +102,9 @@ export function DeleteChestModal({
               Êtes-vous sûr de vouloir supprimer le coffre{' '}
               <strong>{chestToDelete?.name}</strong> ?
             </Text>
-            {chestToDelete && chestToDelete.stockHistory.length > 0 && (
+            {chestToDelete && chestToDelete.stockHistoryCount > 0 && (
               <Text c="orange" size="sm" mt="xs">
-                Ce coffre contient {chestToDelete.stockHistory.length} enregistrement(s) de stock.
+                Ce coffre contient {chestToDelete.stockHistoryCount} enregistrement(s) de stock.
                 Tous les stocks seront transférés vers le coffre de destination.
               </Text>
             )}

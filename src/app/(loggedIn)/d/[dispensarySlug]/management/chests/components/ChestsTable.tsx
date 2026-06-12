@@ -80,9 +80,9 @@ export function ChestsTable({
               ),
           },
           {
-            accessor: 'stockHistory.length',
+            accessor: 'stockHistoryCount',
             title: "Nombre d'enregistrements de stock",
-            render: (chest: ChestWithStockHistory) => chest.stockHistory.length,
+            render: (chest: ChestWithStockHistory) => chest.stockHistoryCount,
           },
           {
             accessor: 'actions',

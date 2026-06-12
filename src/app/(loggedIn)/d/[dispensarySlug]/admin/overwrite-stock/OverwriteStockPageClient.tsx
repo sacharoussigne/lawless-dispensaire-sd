@@ -1,7 +1,7 @@
 'use client';
 
 import { usePermissions } from '@/app/_contexts/PermissionsContext';
-import { useEffect, useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Container,
   Title,
@@ -13,19 +13,20 @@ import {
   Alert,
   Select,
 } from '@mantine/core';
-import { notifications } from '@mantine/notifications';
 import { IconAlertCircle } from '@tabler/icons-react';
-import { getItemsWithStockForDate, overwriteStockForDate } from '@/app/_actions/stock';
-import { handleAction } from '@/lib/action';
-import dayjs from '@/lib/dayjs';
 import { OverwriteStockTable } from './components/OverwriteStockTable';
 import type { ItemWithStock } from '@/types/overwriteStock';
-import type { ChestWithStockHistory } from '@/types/chests';
+import type { ChestListItem } from '@/types/chests';
+import {
+  overwriteStockKeys,
+  useOverwriteStockItems,
+  useOverwriteStockMutation,
+} from './hooks/useOverwriteStockQueries';
 
 interface OverwriteStockPageClientProps {
   initialItems: ItemWithStock[];
   initialDate: string;
-  initialChests: ChestWithStockHistory[];
+  initialChests: ChestListItem[];
 }
 
 export default function OverwriteStockPageClient({
@@ -34,113 +35,61 @@ export default function OverwriteStockPageClient({
   initialChests,
 }: OverwriteStockPageClientProps) {
   const { dispensarySlug } = usePermissions();
-  const [items, setItems] = useState<ItemWithStock[]>(initialItems);
-  const [chests] = useState<ChestWithStockHistory[]>(initialChests);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const chests = initialChests;
   const [selectedDate, setSelectedDate] = useState<string>(initialDate);
-  // null = "Tous les coffres", une valeur = coffre spécifique
   const [selectedChestId, setSelectedChestId] = useState<string | null>(null);
-  const [stockValues, setStockValues] = useState<Record<string, number | null>>({});
-  const [initialStockValues, setInitialStockValues] = useState<Record<string, number | null>>({});
-  const [hasChanges, setHasChanges] = useState(false);
+  const [edits, setEdits] = useState<Record<string, number | null>>({});
 
-  const loadItems = async () => {
-    if (!selectedDate) return;
+  const { data: items = [], isFetching: loading } = useOverwriteStockItems(
+    selectedDate,
+    selectedChestId,
+    initialItems,
+    initialDate,
+  );
+  const overwriteMutation = useOverwriteStockMutation();
 
-    try {
-      setLoading(true);
-      const date = dayjs(selectedDate).toDate();
-      const result = await getItemsWithStockForDate(dispensarySlug!, date, selectedChestId);
-      const data = handleAction(result);
+  const stockValues = useMemo(() => {
+    const values: Record<string, number | null> = {};
+    items.forEach((item) => {
+      values[item.id] = edits[item.id] ?? item.stockForDate ?? null;
+    });
+    return values;
+  }, [items, edits]);
 
-      if (data && Array.isArray(data)) {
-        setItems(data);
-        const initialValues: Record<string, number | null> = {};
-        data.forEach((item: ItemWithStock) => {
-          initialValues[item.id] = item.stockForDate ?? null;
-        });
-        setInitialStockValues({ ...initialValues });
-        setStockValues({ ...initialValues });
-        setHasChanges(false);
-      } else {
-        setItems([]);
-        setStockValues({});
-        setInitialStockValues({});
-        setHasChanges(false);
-      }
-    } catch (error: any) {
-      notifications.show({
-        title: 'Erreur',
-        message: error.message || 'Erreur lors du chargement des objets',
-        color: 'red',
-      });
-      setItems([]);
-      setStockValues({});
-      setInitialStockValues({});
-      setHasChanges(false);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    setStockValues({});
-    setInitialStockValues({});
-    setItems([]);
-    setHasChanges(false);
-    loadItems();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate, selectedChestId]);
+  const hasChanges = Object.keys(edits).length > 0;
 
   const handleStockChange = (itemId: string, value: number | null) => {
-    // Mode "Tous les coffres" = lecture seule
     if (selectedChestId === null) return;
-    setStockValues((prev) => ({
+    setEdits((prev) => ({
       ...prev,
       [itemId]: value,
     }));
-    setHasChanges(true);
   };
 
   const handleSave = async () => {
     if (!selectedDate || selectedChestId === null) return;
 
+    const stocks = Object.entries(stockValues)
+      .map(([itemId, quantity]) => ({
+        itemId,
+        quantity: quantity ?? 0,
+      }))
+      .filter((stock) => stock.quantity !== null && stock.quantity !== undefined);
+
+    const chestName = chests.find((c) => c.id === selectedChestId)?.name || 'le coffre sélectionné';
+    const queryKey = overwriteStockKeys.items(dispensarySlug!, selectedDate, selectedChestId);
+
     try {
-      setSaving(true);
-      const date = dayjs(selectedDate).toDate();
-
-      // Envoyer tous les stocks (modifiés et non modifiés) pour préserver les stocks non modifiés
-      const stocks = Object.entries(stockValues)
-        .map(([itemId, quantity]) => ({
-          itemId,
-          quantity: quantity ?? 0,
-        }))
-        .filter((stock) => stock.quantity !== null && stock.quantity !== undefined);
-
-      const result = await overwriteStockForDate(dispensarySlug!, {
-        date,
-        stocks,
+      await overwriteMutation.mutateAsync({
+        date: selectedDate,
         chestId: selectedChestId,
+        stocks,
+        chestName,
+        queryKey,
       });
-
-      handleAction(result);
-      const chestName = chests.find(c => c.id === selectedChestId)?.name || 'le coffre sélectionné';
-      notifications.show({
-        title: 'Succès',
-        message: `Stocks écrasés avec succès pour ${chestName}`,
-        color: 'green',
-      });
-      setHasChanges(false);
-      loadItems();
-    } catch (error: any) {
-      notifications.show({
-        title: 'Erreur',
-        message: error.message || 'Erreur lors de l\'écrasement des stocks',
-        color: 'red',
-      });
-    } finally {
-      setSaving(false);
+      setEdits({});
+    } catch {
+      // Notification handled in mutation hook
     }
   };
 
@@ -165,7 +114,10 @@ export default function OverwriteStockPageClient({
                 label="Date"
                 type="date"
                 value={selectedDate}
-                onChange={(e) => setSelectedDate(e.currentTarget.value)}
+                onChange={(e) => {
+                  setSelectedDate(e.currentTarget.value);
+                  setEdits({});
+                }}
                 style={{ width: 200 }}
               />
               <Select
@@ -179,14 +131,14 @@ export default function OverwriteStockPageClient({
                   })),
                 ]}
                 value={selectedChestId ?? ''}
-                onChange={(value) => setSelectedChestId(value === '' ? null : value)}
+                onChange={(value) => {
+                  setSelectedChestId(value === '' ? null : value);
+                  setEdits({});
+                }}
                 required
                 clearable={false}
                 style={{ width: 200 }}
               />
-              <Button onClick={loadItems} loading={loading}>
-                Charger
-              </Button>
             </Group>
 
             <OverwriteStockTable
@@ -200,9 +152,9 @@ export default function OverwriteStockPageClient({
             <Group justify="flex-end" mt="md">
               <Button
                 onClick={handleSave}
-                loading={saving}
-                color="red"
-                disabled={items.length === 0 || loading || selectedChestId === null}
+                loading={overwriteMutation.isPending}
+                color="danger"
+                disabled={items.length === 0 || loading || selectedChestId === null || !hasChanges}
               >
                 Écraser les stocks
               </Button>
@@ -213,4 +165,3 @@ export default function OverwriteStockPageClient({
     </Container>
   );
 }
-

@@ -304,6 +304,7 @@ model StockHistory {
   @@index([itemId])
   @@index([chestId])
   @@index([timestamp])
+  @@index([itemId, chestId, timestamp])
   @@map("stock_history")
 }
 

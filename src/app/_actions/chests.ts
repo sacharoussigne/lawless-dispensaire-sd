@@ -90,11 +90,43 @@ export async function getChests(dispensarySlug: string, onlyEnabled: boolean = f
         { createdAt: 'desc' },
       ],
       include: {
-        stockHistory: {
-          select: {
-            id: true,
-          },
+        _count: {
+          select: { stockHistory: true },
         },
+      },
+    });
+
+    return {
+      status: 200,
+      data: chests.map(({ _count, ...chest }) => ({
+        ...chest,
+        stockHistoryCount: _count.stockHistory,
+      })),
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de la récupération des coffres');
+  }
+}
+
+export async function getChestsList(dispensarySlug: string, onlyEnabled: boolean = false) {
+  try {
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
+
+    const chests = await prisma.chest.findMany({
+      where: {
+        ...tenantWhere(dispensaryId),
+        ...(onlyEnabled && { isEnabled: true }),
+      },
+      orderBy: [
+        { order: 'asc' },
+        { createdAt: 'desc' },
+      ],
+      select: {
+        id: true,
+        name: true,
+        order: true,
       },
     });
 

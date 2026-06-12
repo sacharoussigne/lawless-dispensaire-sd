@@ -47,3 +47,8 @@ export const formatTruncated = (value: number, minDecimals = 1, maxDecimals = 2)
   return `${intPart}.${trimmed}`;
 };
 
+export const normalizeQuantity = (quantity: number | null | undefined): number => {
+  if (quantity == null) return 0;
+  return quantity;
+};
+

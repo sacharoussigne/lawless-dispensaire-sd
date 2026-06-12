@@ -1,7 +1,8 @@
 'use client';
 
 import { usePermissions } from '@/app/_contexts/PermissionsContext';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   Box,
   Checkbox,
@@ -15,7 +16,6 @@ import {
   Title,
 } from '@mantine/core';
 import { DatePickerInput, DatesProvider } from '@mantine/dates';
-import { notifications } from '@mantine/notifications';
 import { DataTable, type DataTableSortStatus } from 'mantine-datatable';
 import { getStockConsumptionStats } from '@/app/_actions/stock';
 import type { StockConsumptionStatsResult } from '@/app/_actions/stock/statistics';
@@ -29,6 +29,12 @@ import {
   type StockStatsItemRowWithDisplay,
 } from '@/lib/stock/movements';
 import { StockStatsTopChart } from './StockStatsTopChart';
+import { DEFAULT_STALE_TIME_MS } from '@/lib/react-query/QueryProvider';
+
+const statsKeys = {
+  consumption: (slug: string, from: string, to: string) =>
+    ['stock-stats', slug, 'consumption', from, to] as const,
+};
 
 const PAGE_SIZE = 25;
 const TOP_N_OPTIONS = ['10', '15', '20'];
@@ -52,34 +58,26 @@ export default function StockStatisticsPageClient() {
   const [topN, setTopN] = useState('15');
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [stats, setStats] = useState<StockConsumptionStatsResult | null>(null);
   const [page, setPage] = useState(1);
   const [sortStatus, setSortStatus] = useState<DataTableSortStatus<StockStatsItemRowWithDisplay>>({
     columnAccessor: 'displayValue',
     direction: 'desc',
   });
 
-  const loadStats = useCallback(async () => {
-    const [from, to] = dateRange;
-    if (!from || !to) return;
+  const fromKey = dateRange[0]?.toISOString() ?? '';
+  const toKey = dateRange[1]?.toISOString() ?? '';
 
-    try {
-      setLoading(true);
+  const { data: stats = null, isFetching: loading } = useQuery({
+    queryKey: statsKeys.consumption(dispensarySlug!, fromKey, toKey),
+    queryFn: async () => {
+      const [from, to] = dateRange;
+      if (!from || !to) throw new Error('Plage de dates invalide');
       const result = await getStockConsumptionStats(dispensarySlug!, { from, to });
-      const data = handleAction(result);
-      if (data) setStats(data);
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Erreur lors du chargement';
-      notifications.show({ title: 'Erreur', message, color: 'red' });
-    } finally {
-      setLoading(false);
-    }
-  }, [dateRange]);
-
-  useEffect(() => {
-    loadStats();
-  }, [loadStats]);
+      return handleAction(result) as StockConsumptionStatsResult;
+    },
+    enabled: Boolean(dispensarySlug && dateRange[0] && dateRange[1]),
+    staleTime: DEFAULT_STALE_TIME_MS,
+  });
 
   useEffect(() => {
     setPage(1);

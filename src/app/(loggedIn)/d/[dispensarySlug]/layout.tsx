@@ -16,6 +16,7 @@ import {
 import { notFound, redirect } from 'next/navigation';
 import { userHasAnyAgendaAccess, listAccessibleAgendaIds } from '@/lib/agenda/access';
 import { DispensaryRealtimeShell } from './DispensaryRealtimeShell';
+import { QueryProvider } from '@/lib/react-query/QueryProvider';
 
 export default async function DispensaryLayout({
   children,
@@ -77,7 +78,8 @@ export default async function DispensaryLayout({
       accessibleAgendaIds={accessibleAgendaIds}
     >
       <DispensaryRealtimeShell>
-        <LoggedInShell>
+        <QueryProvider>
+          <LoggedInShell>
           <Header
             session={session as AuthSession | null}
             impersonatorDisplayName={impersonatorDisplayName}
@@ -88,6 +90,7 @@ export default async function DispensaryLayout({
             {children}
           </div>
         </LoggedInShell>
+        </QueryProvider>
       </DispensaryRealtimeShell>
     </PermissionsProvider>
   );
