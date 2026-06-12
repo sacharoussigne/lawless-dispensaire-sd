@@ -3,8 +3,8 @@
 import { ActionIcon, Group, Text } from '@mantine/core';
 import { DatePickerInput, DatesProvider } from '@mantine/dates';
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
-import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { formatDate, parsePickerDate } from '@/lib/date';
+import dayjs from '@/lib/dayjs';
 
 interface WeekNavigationProps {
   weekStart: Date;
@@ -25,7 +25,8 @@ export function WeekNavigation({
   onNextWeek,
   loading = false,
 }: WeekNavigationProps) {
-  const weekRange = `${format(weekStart, 'd MMM', { locale: fr })} - ${format(weekEnd, 'd MMM yyyy', { locale: fr })}`;
+  const weekRange = `${dayjs(weekStart).tz('Europe/Paris').format('D MMM')} - ${dayjs(weekEnd).tz('Europe/Paris').format('D MMM YYYY')}`;
+  const pickerValue = weekDateValue ? formatDate(weekDateValue) : null;
 
   return (
     <DatesProvider settings={{ locale: 'fr' }}>
@@ -44,10 +45,9 @@ export function WeekNavigation({
             Semaine du
           </Text>
           <DatePickerInput
-            value={weekDateValue}
+            value={pickerValue}
             onChange={(date) => {
-              const dateValue = date as unknown as Date | null;
-              onWeekChange(dateValue);
+              onWeekChange(parsePickerDate(date as Date | string | null));
             }}
             placeholder="Sélectionner le lundi"
             valueFormat="D MMMM YYYY"

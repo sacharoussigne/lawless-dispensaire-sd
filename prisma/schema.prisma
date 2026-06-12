@@ -108,6 +108,7 @@ model PayrollWeeklyReport {
   @@index([createdById])
   @@index([weekStart])
   @@index([dispensaryId])
+  @@index([dispensaryId, weekStart(sort: Desc)])
   @@map("payroll_weekly_report")
 }
 

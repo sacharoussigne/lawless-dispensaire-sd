@@ -1,26 +1,33 @@
 'use client';
 
-import { usePermissions, useTenantRoutes } from '@/app/_contexts/PermissionsContext';
-import { useMemo, useState } from 'react';
-import { ActionIcon, Group, Paper, Select, Text, TextInput, Tooltip } from '@mantine/core';
+import { useTenantRoutes } from '@/app/_contexts/PermissionsContext';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ActionIcon, Button, Group, Paper, Select, Text, TextInput, Tooltip } from '@mantine/core';
 import { modals } from '@mantine/modals';
-import { notifications } from '@mantine/notifications';
 import { DataTable, type DataTableSortStatus } from 'mantine-datatable';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { IconEye, IconTrash } from '@tabler/icons-react';
-import { deletePayrollReport } from '@/app/_actions/payrollReports';
+import { IconEye, IconSearch, IconTrash } from '@tabler/icons-react';
+import { WeekNavigation } from '@/app/_components/WeekNavigation/WeekNavigation';
 import { ActiveFilters } from '@/app/_components/ActiveFilters/ActiveFilters';
-import { handleAction } from '@/lib/action';
+import { addParisWeeks, getBankWeekBounds } from '@/lib/bankWeek';
+import { parsePickerDate } from '@/lib/date';
 import {
   PAYROLL_REPORT_TYPE_EMPLOYES,
   PAYROLL_REPORT_TYPE_PREPARATEURS_CAISSE,
 } from '@/lib/payroll/constants';
+import {
+  formatPayrollWeekRangeParis,
+  getLatestPayrollListWeekMonday,
+  isSamePayrollWeek,
+} from '@/lib/payroll/week';
+import {
+  useDeletePayrollReportMutation,
+  type PayrollReportListItem,
+} from './hooks/usePayrollQueries';
 
-
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 function normalizeString(str: string): string {
   return str
@@ -44,12 +51,20 @@ function compareReportRows(
   } else if (columnAccessor === 'createdBy.name') {
     cmp = a.createdBy.name.localeCompare(b.createdBy.name, 'fr', { sensitivity: 'base' });
   } else if (columnAccessor === 'patientsSoignes') {
-    const valA = a.reportType === PAYROLL_REPORT_TYPE_PREPARATEURS_CAISSE ? -1 : (a.resultJson?.global_stats?.total_patients_soignes ?? 0);
-    const valB = b.reportType === PAYROLL_REPORT_TYPE_PREPARATEURS_CAISSE ? -1 : (b.resultJson?.global_stats?.total_patients_soignes ?? 0);
+    const valA =
+      a.reportType === PAYROLL_REPORT_TYPE_PREPARATEURS_CAISSE
+        ? -1
+        : (a.summary?.totalPatientsSoignes ?? 0);
+    const valB =
+      b.reportType === PAYROLL_REPORT_TYPE_PREPARATEURS_CAISSE
+        ? -1
+        : (b.summary?.totalPatientsSoignes ?? 0);
     cmp = valA - valB;
   } else if (columnAccessor === 'sherifsSoignes') {
-    const valA = a.reportType === PAYROLL_REPORT_TYPE_PREPARATEURS_CAISSE ? -1 : (a.resultJson?.global_stats?.total_sherifs ?? 0);
-    const valB = b.reportType === PAYROLL_REPORT_TYPE_PREPARATEURS_CAISSE ? -1 : (b.resultJson?.global_stats?.total_sherifs ?? 0);
+    const valA =
+      a.reportType === PAYROLL_REPORT_TYPE_PREPARATEURS_CAISSE ? -1 : (a.summary?.totalSherifs ?? 0);
+    const valB =
+      b.reportType === PAYROLL_REPORT_TYPE_PREPARATEURS_CAISSE ? -1 : (b.summary?.totalSherifs ?? 0);
     cmp = valA - valB;
   } else {
     return 0;
@@ -57,36 +72,48 @@ function compareReportRows(
   return cmp * m;
 }
 
-export interface PayrollReportListItem {
-  id: string;
-  weekStart: string;
-  weekEnd: string;
-  reportType: string;
-  createdAt: string;
-  createdBy: { name: string; id: string };
-  resultJson?: any;
-}
-
 export default function PayrollReportsList({
   reports,
   canDelete,
+  isFetching = false,
 }: {
   reports: PayrollReportListItem[];
   canDelete: boolean;
+  isFetching?: boolean;
 }) {
   const routes = useTenantRoutes();
-  const { dispensarySlug } = usePermissions();
-  const router = useRouter();
+  const deleteMutation = useDeletePayrollReportMutation();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [weekFilterCleared, setWeekFilterCleared] = useState(false);
+  const [weekDateValue, setWeekDateValue] = useState<Date | null>(() =>
+    getLatestPayrollListWeekMonday(reports),
+  );
+  const defaultWeekApplied = useRef(weekDateValue !== null);
+
+  useEffect(() => {
+    if (weekFilterCleared || defaultWeekApplied.current) return;
+    const latest = getLatestPayrollListWeekMonday(reports);
+    if (!latest) return;
+    setWeekDateValue(latest);
+    defaultWeekApplied.current = true;
+  }, [reports, weekFilterCleared]);
   const [page, setPage] = useState(1);
   const [sortStatus, setSortStatus] = useState<DataTableSortStatus<PayrollReportListItem>>({
     columnAccessor: 'weekStart',
     direction: 'desc',
   });
 
+  const weekBounds = useMemo(
+    () => (weekDateValue ? getBankWeekBounds(weekDateValue) : null),
+    [weekDateValue],
+  );
+
   const filteredReports = useMemo(() => {
     let result = reports;
+    if (weekDateValue) {
+      result = result.filter((r) => isSamePayrollWeek(r.weekStart, weekDateValue));
+    }
     if (selectedType) {
       result = result.filter((r) => r.reportType === selectedType);
     }
@@ -101,7 +128,7 @@ export default function PayrollReportsList({
         r.weekStart.slice(0, 10).includes(q)
       );
     });
-  }, [reports, searchQuery, selectedType]);
+  }, [reports, weekDateValue, searchQuery, selectedType]);
 
   const sortedReports = useMemo(() => {
     return [...filteredReports].sort((a, b) =>
@@ -117,26 +144,16 @@ export default function PayrollReportsList({
     [sortedReports, safePage],
   );
 
+  const weekFilterLabel =
+    weekBounds && formatPayrollWeekRangeParis(weekBounds.start, weekBounds.end);
+
   const confirmDelete = (r: PayrollReportListItem) => {
     modals.openConfirmModal({
       title: 'Supprimer ce rapport ?',
       children: <Text size="sm">Cette action est irréversible.</Text>,
       labels: { confirm: 'Supprimer', cancel: 'Annuler' },
-      confirmProps: { color: 'red' },
-      onConfirm: async () => {
-        try {
-          const result = await deletePayrollReport(dispensarySlug!, r.id);
-          handleAction(result);
-          notifications.show({ title: 'Rapport supprimé', message: '', color: 'green' });
-          router.refresh();
-        } catch (e: unknown) {
-          notifications.show({
-            title: 'Erreur',
-            message: e instanceof Error ? e.message : 'Erreur inconnue',
-            color: 'red',
-          });
-        }
-      },
+      confirmProps: { color: 'danger' },
+      onConfirm: () => deleteMutation.mutate(r.id),
     });
   };
 
@@ -145,17 +162,93 @@ export default function PayrollReportsList({
       <ActiveFilters
         filters={[
           {
+            label: 'Semaine',
+            value: weekFilterLabel ?? '',
+            onRemove: () => {
+              setWeekFilterCleared(true);
+              setWeekDateValue(null);
+              setPage(1);
+            },
+          },
+          {
             label: 'Recherche',
             value: searchQuery,
-            onRemove: () => setSearchQuery(''),
+            onRemove: () => {
+              setSearchQuery('');
+              setPage(1);
+            },
           },
           {
             label: 'Type',
             value: selectedType ?? '',
-            onRemove: () => setSelectedType(null),
+            onRemove: () => {
+              setSelectedType(null);
+              setPage(1);
+            },
           },
         ]}
       />
+      <Group gap="md" mb="md" wrap="wrap" align="flex-end">
+        {weekDateValue && weekBounds ? (
+          <WeekNavigation
+            weekStart={weekBounds.start}
+            weekEnd={weekBounds.end}
+            weekDateValue={weekDateValue}
+            onWeekChange={(date) => {
+              const parsed = parsePickerDate(date);
+              if (parsed) {
+                setWeekDateValue(parsed);
+                setPage(1);
+              }
+            }}
+            onPreviousWeek={() => {
+              setWeekDateValue((prev) => (prev ? addParisWeeks(prev, -1) : prev));
+              setPage(1);
+            }}
+            onNextWeek={() => {
+              setWeekDateValue((prev) => (prev ? addParisWeeks(prev, 1) : prev));
+              setPage(1);
+            }}
+            loading={isFetching}
+          />
+        ) : (
+          <Button
+            variant="light"
+            size="sm"
+            onClick={() => {
+              setWeekFilterCleared(false);
+              setWeekDateValue(getLatestPayrollListWeekMonday(reports));
+              setPage(1);
+            }}
+          >
+            Filtrer par semaine
+          </Button>
+        )}
+        {weekDateValue && (
+          <Button
+            variant="subtle"
+            color="slate"
+            size="sm"
+            onClick={() => {
+              setWeekFilterCleared(true);
+              setWeekDateValue(null);
+              setPage(1);
+            }}
+          >
+            Toutes les semaines
+          </Button>
+        )}
+        <TextInput
+          placeholder="Rechercher…"
+          leftSection={<IconSearch size={16} stroke={1.5} />}
+          value={searchQuery}
+          onChange={(e) => {
+            setSearchQuery(e.currentTarget.value);
+            setPage(1);
+          }}
+          style={{ minWidth: 220, flex: 1 }}
+        />
+      </Group>
       <Paper shadow="sm" p="md" withBorder>
         <DataTable
           sortStatus={sortStatus}
@@ -164,6 +257,7 @@ export default function PayrollReportsList({
             setPage(1);
           }}
           records={paginatedReports}
+          fetching={isFetching}
           columns={[
             {
               accessor: 'reportType',
@@ -174,7 +268,10 @@ export default function PayrollReportsList({
                   placeholder="Tous les types"
                   data={[
                     { value: PAYROLL_REPORT_TYPE_EMPLOYES, label: PAYROLL_REPORT_TYPE_EMPLOYES },
-                    { value: PAYROLL_REPORT_TYPE_PREPARATEURS_CAISSE, label: PAYROLL_REPORT_TYPE_PREPARATEURS_CAISSE },
+                    {
+                      value: PAYROLL_REPORT_TYPE_PREPARATEURS_CAISSE,
+                      label: PAYROLL_REPORT_TYPE_PREPARATEURS_CAISSE,
+                    },
                   ]}
                   value={selectedType}
                   onChange={(v) => {
@@ -195,8 +292,7 @@ export default function PayrollReportsList({
               sortable: true,
               render: (r) => (
                 <Text size="sm">
-                  {format(new Date(r.weekStart), 'd MMM', { locale: fr })} —{' '}
-                  {format(new Date(r.weekEnd), 'd MMM yyyy', { locale: fr })}
+                  {formatPayrollWeekRangeParis(new Date(r.weekStart), new Date(r.weekEnd))}
                 </Text>
               ),
             },
@@ -206,8 +302,7 @@ export default function PayrollReportsList({
               sortable: true,
               render: (r) => {
                 if (r.reportType === PAYROLL_REPORT_TYPE_PREPARATEURS_CAISSE) return '';
-                const result = r.resultJson;
-                return result?.global_stats?.total_patients_soignes ?? 0;
+                return r.summary?.totalPatientsSoignes ?? 0;
               },
             },
             {
@@ -216,8 +311,7 @@ export default function PayrollReportsList({
               sortable: true,
               render: (r) => {
                 if (r.reportType === PAYROLL_REPORT_TYPE_PREPARATEURS_CAISSE) return '';
-                const result = r.resultJson;
-                return result?.global_stats?.total_sherifs ?? 0;
+                return r.summary?.totalSherifs ?? 0;
               },
             },
             {
@@ -233,7 +327,7 @@ export default function PayrollReportsList({
                 <Group gap="xs" wrap="nowrap" justify="flex-end">
                   <Tooltip label="Voir">
                     <Link href={routes.employee.payrollDetail(r.id)}>
-                      <ActionIcon variant="subtle" aria-label="Voir">
+                      <ActionIcon variant="subtle" color="slate" aria-label="Voir">
                         <IconEye size={18} />
                       </ActionIcon>
                     </Link>
@@ -241,9 +335,10 @@ export default function PayrollReportsList({
                   {canDelete && (
                     <Tooltip label="Supprimer">
                       <ActionIcon
-                        color="red"
+                        color="danger"
                         variant="subtle"
                         aria-label="Supprimer"
+                        loading={deleteMutation.isPending}
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
@@ -260,7 +355,7 @@ export default function PayrollReportsList({
           ]}
           minHeight={200}
           noRecordsText={
-            searchQuery.trim()
+            searchQuery.trim() || selectedType || weekDateValue
               ? 'Aucun rapport ne correspond à ces critères'
               : 'Aucun rapport pour le moment'
           }
@@ -280,4 +375,3 @@ export default function PayrollReportsList({
     </>
   );
 }
-

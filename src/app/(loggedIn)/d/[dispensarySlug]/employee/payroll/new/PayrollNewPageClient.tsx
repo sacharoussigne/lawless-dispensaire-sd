@@ -1,6 +1,6 @@
 'use client';
 
-import { usePermissions, useTenantRoutes } from '@/app/_contexts/PermissionsContext';
+import { useTenantRoutes } from '@/app/_contexts/PermissionsContext';
 import {
   Alert,
   Box,
@@ -20,8 +20,7 @@ import {
 import { DateInput, DatesProvider } from '@mantine/dates';
 import { notifications } from '@mantine/notifications';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { format } from 'date-fns';
 import {
   IconArrowLeft,
@@ -31,10 +30,9 @@ import {
   IconTable,
 } from '@tabler/icons-react';
 import {
-  createPayrollReportFromForm,
-  listPayrollImportableActivityWeeks,
-} from '@/app/_actions/payrollReports';
-import { handleAction } from '@/lib/action';
+  useCreatePayrollReportMutation,
+  usePayrollImportableActivityWeeks,
+} from '../hooks/usePayrollQueries';
 import {
   PAYROLL_CAISSE_SALE_USD,
   PAYROLL_CAISSE_USD,
@@ -74,8 +72,7 @@ function SectionHeader({
 
 export default function PayrollNewPageClient() {
   const routes = useTenantRoutes();
-  const { dispensarySlug } = usePermissions();
-  const router = useRouter();
+  const createMutation = useCreatePayrollReportMutation();
   const [weekDate, setWeekDate] = useState<string | null>(format(new Date(), 'yyyy-MM-dd'));
   const [importWeeklyActivity, setImportWeeklyActivity] = useState(false);
   const [waWeekDate, setWaWeekDate] = useState<string | null>(format(new Date(), 'yyyy-MM-dd'));
@@ -87,28 +84,16 @@ export default function PayrollNewPageClient() {
     useState<number>(PAYROLL_OFFERED_ITEM_USD);
   const [tableHtml, setTableHtml] = useState('');
   const [reportType, setReportType] = useState<string>(PAYROLL_REPORT_TYPE_EMPLOYES);
-  const [submitting, setSubmitting] = useState(false);
-  const [knownWaWeeks, setKnownWaWeeks] = useState<{ value: string; label: string }[]>([]);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const res = await listPayrollImportableActivityWeeks(dispensarySlug!, );
-      if (cancelled || res.status !== 200 || !('data' in res)) return;
-      const w = (res as {
-        data: { weeks: { weekStart: string; periodStart: string; periodEnd: string }[] };
-      }).data.weeks;
-      setKnownWaWeeks(
-        w.map((row) => ({
-          value: row.weekStart,
-          label: `Semaine ${row.weekStart} → ${row.periodEnd.slice(0, 10)}`,
-        })),
-      );
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const { data: importableWeeks = [] } = usePayrollImportableActivityWeeks(importWeeklyActivity);
+  const knownWaWeeks = useMemo(
+    () =>
+      importableWeeks.map((row) => ({
+        value: row.weekStart,
+        label: `Semaine ${row.weekStart} → ${row.periodEnd.slice(0, 10)}`,
+      })),
+    [importableWeeks],
+  );
 
   const unitMarginUsd = useMemo(
     () =>
@@ -126,7 +111,7 @@ export default function PayrollNewPageClient() {
       notifications.show({
         title: 'Date requise',
         message: 'Choisissez une date dans la semaine.',
-        color: 'red',
+        color: 'danger',
       });
       return;
     }
@@ -134,7 +119,7 @@ export default function PayrollNewPageClient() {
       notifications.show({
         title: 'Données manquantes',
         message: 'Sans import weekly activity, collez le HTML du tableau des salaires.',
-        color: 'red',
+        color: 'danger',
       });
       return;
     }
@@ -142,7 +127,7 @@ export default function PayrollNewPageClient() {
       notifications.show({
         title: 'Montant reversé invalide',
         message: `Indiquez un montant entre 0,01 et ${MAX_CAISSE_PRICE_USD.toLocaleString('fr-FR')} $.`,
-        color: 'red',
+        color: 'danger',
       });
       return;
     }
@@ -150,7 +135,7 @@ export default function PayrollNewPageClient() {
       notifications.show({
         title: 'Prix de vente invalide',
         message: `Indiquez un montant entre 0,01 et ${MAX_CAISSE_PRICE_USD.toLocaleString('fr-FR')} $.`,
-        color: 'red',
+        color: 'danger',
       });
       return;
     }
@@ -162,7 +147,7 @@ export default function PayrollNewPageClient() {
       notifications.show({
         title: 'Prix par patient invalide',
         message: `Indiquez un montant entre 0,01 et ${MAX_CAISSE_PRICE_USD.toLocaleString('fr-FR')} $.`,
-        color: 'red',
+        color: 'danger',
       });
       return;
     }
@@ -174,49 +159,27 @@ export default function PayrollNewPageClient() {
       notifications.show({
         title: "Prix d'offre invalide",
         message: `Indiquez un montant entre 0,01 et ${MAX_CAISSE_PRICE_USD.toLocaleString('fr-FR')} $.`,
-        color: 'red',
+        color: 'danger',
       });
       return;
     }
 
-    setSubmitting(true);
-    try {
-      const fd = new FormData();
-      fd.set('weekStart', weekStart);
-      fd.set('tableHtml', tableHtml);
-      fd.set('caissePriceUsd', String(caissePriceUsd));
-      fd.set('caisseSalePriceUsd', String(caisseSalePriceUsd));
-      fd.set('patientCarePriceUsd', String(patientCarePriceUsd));
-      fd.set('offeredItemPriceUsd', String(offeredItemPriceUsd));
-      fd.set('reportType', reportType);
-      if (importWeeklyActivity) {
-        fd.set('importWeeklyActivity', '1');
-        fd.set('weeklyActivityWeekStart', waWeekDate ?? weekStart);
-      } else {
-        fd.set('importWeeklyActivity', '0');
-      }
-
-      const result = await createPayrollReportFromForm(dispensarySlug!, fd);
-      const data = handleAction(result);
-
-      notifications.show({
-        title: 'Rapport créé',
-        message: 'Analyse terminée.',
-        color: 'green',
-      });
-
-      const reportId = data?.report?.id ? String(data.report.id) : null;
-      router.push(reportId ? routes.employee.payrollDetail(reportId) : routes.employee.payroll);
-      router.refresh();
-    } catch (e: unknown) {
-      notifications.show({
-        title: 'Erreur',
-        message: e instanceof Error ? e.message : 'Erreur inconnue',
-        color: 'red',
-      });
-    } finally {
-      setSubmitting(false);
+    const fd = new FormData();
+    fd.set('weekStart', weekStart);
+    fd.set('tableHtml', tableHtml);
+    fd.set('caissePriceUsd', String(caissePriceUsd));
+    fd.set('caisseSalePriceUsd', String(caisseSalePriceUsd));
+    fd.set('patientCarePriceUsd', String(patientCarePriceUsd));
+    fd.set('offeredItemPriceUsd', String(offeredItemPriceUsd));
+    fd.set('reportType', reportType);
+    if (importWeeklyActivity) {
+      fd.set('importWeeklyActivity', '1');
+      fd.set('weeklyActivityWeekStart', waWeekDate ?? weekStart);
+    } else {
+      fd.set('importWeeklyActivity', '0');
     }
+
+    createMutation.mutate(fd);
   };
 
   return (
@@ -226,7 +189,7 @@ export default function PayrollNewPageClient() {
           component={Link}
           href={routes.employee.payroll}
           variant="subtle"
-          color="gray"
+          color="slate"
           size="sm"
           leftSection={<IconArrowLeft size={16} stroke={1.5} />}
           mb="sm"
@@ -382,7 +345,7 @@ export default function PayrollNewPageClient() {
               <Text span c="dimmed">
                 Marge unitaire (vente − reversé)&nbsp;:{' '}
               </Text>
-              <Text span fw={600} c={unitMarginUsd < 0 ? 'orange' : undefined}>
+              <Text span fw={600} c={unitMarginUsd < 0 ? 'amber' : undefined}>
                 {unitMarginUsd.toFixed(2)} $
               </Text>
             </Text>
@@ -390,7 +353,7 @@ export default function PayrollNewPageClient() {
 
           <Paper withBorder p={{ base: 'md', sm: 'lg' }} radius="md" shadow="xs">
             <SectionHeader icon={IconTable}>Tableau HTML</SectionHeader>
-            <Alert variant="light" color="gray" icon={<IconInfoCircle size={18} />} mb="md" radius="sm">
+            <Alert variant="light" color="slate" icon={<IconInfoCircle size={18} />} mb="md" radius="sm">
               {importWeeklyActivity ? (
                 <>
                   Colle la balise{' '}
@@ -435,11 +398,11 @@ export default function PayrollNewPageClient() {
                   variant="default"
                   component={Link}
                   href={routes.employee.payroll}
-                  disabled={submitting}
+                  disabled={createMutation.isPending}
                 >
                   Annuler
                 </Button>
-                <Button loading={submitting} onClick={handleSubmit}>
+                <Button loading={createMutation.isPending} onClick={handleSubmit}>
                   Enregistrer le rapport
                 </Button>
               </Group>
