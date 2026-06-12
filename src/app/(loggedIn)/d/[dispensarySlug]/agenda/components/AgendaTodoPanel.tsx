@@ -31,18 +31,8 @@ import {
 import { IconArchive, IconSearch, IconX } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import {
-  createAgendaTodoCategory,
-  createAgendaTodoList,
-  createAgendaTodoTask,
-  deleteAgendaTodoCategory,
-  deleteAgendaTodoList,
-  deleteAgendaTodoTask,
-  listAgendaTodoLists,
   moveAgendaTodoTask,
   reorderAgendaTodoCategories,
-  updateAgendaTodoCategory,
-  updateAgendaTodoList,
-  updateAgendaTodoTask,
 } from '@/app/_actions/agenda/todoLists';
 import { handleAction } from '@/lib/action';
 import { agendaMutationMeta } from '@/lib/agenda/realtime/mutationMeta';
@@ -50,6 +40,8 @@ import {
   readTodoCategoryFilterForList,
   writeTodoCategoryFilterForList,
 } from '@/lib/agenda/todoCategoryFilterPreference';
+import { useAgendaTodoLists } from '../hooks/useAgendaTodoLists';
+import { useAgendaTodoMutations } from '../hooks/useAgendaTodoMutations';
 import { canWriteAgenda, type AgendaTodoListDTO, type AgendaTodoTaskDTO } from '@/types/agenda';
 import type { AgendaAccessLevel } from '@prisma/client';
 import { SortableTodoCategory } from './SortableTodoCategory';
@@ -164,6 +156,7 @@ interface AgendaTodoPanelProps {
   agendaId: string | null;
   accessLevel: AgendaAccessLevel | null;
   initialLists: AgendaTodoListDTO[];
+  skipInitialFetch?: boolean;
   wideLayout?: boolean;
   clientId?: string;
   remoteTodosToken?: number;
@@ -185,33 +178,41 @@ export function AgendaTodoPanel({
   agendaId,
   accessLevel,
   initialLists,
+  skipInitialFetch = false,
   wideLayout = false,
   clientId,
   remoteTodosToken = 0,
 }: AgendaTodoPanelProps) {
-  const [lists, setLists] = useState<AgendaTodoListDTO[]>(initialLists);
-  const [selectedListId, setSelectedListId] = useState<string | null>(
-    initialLists[0]?.id ?? null,
-  );
-  const [syncedAgendaId, setSyncedAgendaId] = useState(agendaId);
   const [archivesOpen, setArchivesOpen] = useState(false);
   const [archiveLists, setArchiveLists] = useState<AgendaTodoListDTO[]>([]);
   const [categoryFilterIds, setCategoryFilterIds] = useState<Set<string>>(new Set());
   const [taskSearch, setTaskSearch] = useState('');
-  const [lastFilterListId, setLastFilterListId] = useState(selectedListId);
+  const [activeDrag, setActiveDrag] = useState<
+    | { type: 'task'; task: AgendaTodoTaskDTO }
+    | { type: 'category'; name: string }
+    | null
+  >(null);
   const canWrite = canWriteAgenda(accessLevel);
   const mutationMeta = agendaMutationMeta(clientId);
-  const pendingRemoteReloadRef = useRef(false);
 
-  if (agendaId !== syncedAgendaId) {
-    setSyncedAgendaId(agendaId);
-    if (!agendaId) {
-      setLists([]);
-      setSelectedListId(null);
-    }
-  }
+  const {
+    lists,
+    setLists,
+    selectedListId,
+    setSelectedListId,
+    selectedList,
+    reload,
+    applyLists,
+  } = useAgendaTodoLists({
+    dispensarySlug,
+    agendaId,
+    initialLists,
+    skipInitialFetch,
+    remoteTodosToken,
+    isDragging: activeDrag !== null,
+  });
 
-  const selectedList = lists.find((l) => l.id === selectedListId) ?? lists[0] ?? null;
+  const [lastFilterListId, setLastFilterListId] = useState(selectedListId);
 
   if (selectedListId !== lastFilterListId) {
     setLastFilterListId(selectedListId);
@@ -307,69 +308,40 @@ export function AgendaTodoPanel({
     persistCategoryFilter(next);
   };
 
-  const applyLists = useCallback((data: AgendaTodoListDTO[]) => {
-    setLists(data);
-    setSelectedListId((current) =>
-      current && data.some((list) => list.id === current)
-        ? current
-        : (data[0]?.id ?? null),
-    );
-  }, []);
-
-  const fetchTodoLists = useCallback(async () => {
-    if (!agendaId) return null;
-    const result = await listAgendaTodoLists(dispensarySlug, agendaId);
-    return handleAction(result) ?? null;
-  }, [agendaId, dispensarySlug]);
-
-  const reload = useCallback(async () => {
-    if (!agendaId) return;
-    try {
-      const data = await fetchTodoLists();
-      if (data) applyLists(data);
-    } catch (error: unknown) {
-      notifications.show({
-        title: 'Erreur',
-        message: error instanceof Error ? error.message : 'Chargement impossible',
-        color: 'danger',
-      });
-    }
-  }, [agendaId, applyLists, fetchTodoLists]);
-
-  useEffect(() => {
-    if (!agendaId) return;
-
-    let cancelled = false;
-
-    void fetchTodoLists()
-      .then((data) => {
-        if (cancelled || !data) return;
-        applyLists(data);
-      })
-      .catch((error: unknown) => {
-        if (cancelled) return;
-        notifications.show({
-          title: 'Erreur',
-          message: error instanceof Error ? error.message : 'Chargement impossible',
-          color: 'danger',
-        });
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [agendaId, applyLists, fetchTodoLists]);
+  const {
+    openArchives,
+    handleToggleTask,
+    handleRenameTask,
+    handleRenameList,
+    handleRenameCategory,
+    handleDeleteTask,
+    handleCreateList,
+    handleCreateCategory,
+    handleAddTask,
+    handleDeleteCategory,
+    handleDeleteList,
+  } = useAgendaTodoMutations({
+    dispensarySlug,
+    agendaId,
+    lists,
+    setLists,
+    setSelectedListId,
+    selectedListId,
+    selectedList,
+    mutationMeta,
+    archivesOpen,
+    setArchiveLists,
+    setArchivesOpen,
+    isCategoryFilterActive,
+    categoryFilterIds,
+    setCategoryFilterIds,
+    persistCategoryFilter,
+  });
 
   const sensors = useSensors(
     usePressHoldPointerSensor(),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
-
-  const [activeDrag, setActiveDrag] = useState<
-    | { type: 'task'; task: AgendaTodoTaskDTO }
-    | { type: 'category'; name: string }
-    | null
-  >(null);
 
   const taskDragCrossedRef = useRef(false);
   const taskDragStartRef = useRef<{ categoryId: string; index: number } | null>(null);
@@ -377,27 +349,6 @@ export function AgendaTodoPanel({
   const dragCategoriesRef = useRef<TodoCategories | null>(null);
   const lastDragOverKeyRef = useRef<string | null>(null);
   const todoPanelRef = useRef<HTMLDivElement>(null);
-  const activeDragRef = useRef(activeDrag);
-  activeDragRef.current = activeDrag;
-
-  useEffect(() => {
-    if (remoteTodosToken === 0) return;
-
-    if (activeDragRef.current) {
-      pendingRemoteReloadRef.current = true;
-      return;
-    }
-
-    void reload();
-  }, [remoteTodosToken, reload]);
-
-  useEffect(() => {
-    if (activeDrag || !pendingRemoteReloadRef.current) return;
-
-    pendingRemoteReloadRef.current = false;
-    void reload();
-  }, [activeDrag, reload]);
-
   useEffect(() => {
     const handleWheel = (event: WheelEvent) => {
       const panel = todoPanelRef.current;
@@ -422,7 +373,7 @@ export function AgendaTodoPanel({
         return;
       }
 
-      if (!activeDragRef.current) return;
+      if (!activeDrag) return;
 
       const nextScroll = Math.min(
         maxScroll,
@@ -701,186 +652,6 @@ export function AgendaTodoPanel({
       });
     } finally {
       resetTaskDragState();
-    }
-  };
-
-  const handleToggleTask = async (id: string, completed: boolean) => {
-    try {
-      await updateAgendaTodoTask(dispensarySlug, { id, completed }, mutationMeta);
-      await reload();
-    } catch (error: unknown) {
-      notifications.show({
-        title: 'Erreur',
-        message: error instanceof Error ? error.message : 'Mise à jour impossible',
-        color: 'danger',
-      });
-    }
-  };
-
-  const handleRenameTask = async (id: string, title: string) => {
-    try {
-      await updateAgendaTodoTask(dispensarySlug, { id, title }, mutationMeta);
-      await reload();
-    } catch (error: unknown) {
-      notifications.show({
-        title: 'Erreur',
-        message: error instanceof Error ? error.message : 'Renommage impossible',
-        color: 'danger',
-      });
-    }
-  };
-
-  const handleRenameList = async (id: string, name: string) => {
-    try {
-      await updateAgendaTodoList(dispensarySlug, { id, name }, mutationMeta);
-      await reload();
-    } catch (error: unknown) {
-      notifications.show({
-        title: 'Erreur',
-        message: error instanceof Error ? error.message : 'Renommage impossible',
-        color: 'danger',
-      });
-    }
-  };
-
-  const handleRenameCategory = async (id: string, name: string) => {
-    try {
-      await updateAgendaTodoCategory(dispensarySlug, { id, name }, mutationMeta);
-      await reload();
-    } catch (error: unknown) {
-      notifications.show({
-        title: 'Erreur',
-        message: error instanceof Error ? error.message : 'Renommage impossible',
-        color: 'danger',
-      });
-    }
-  };
-
-  const handleDeleteTask = async (id: string) => {
-    try {
-      await deleteAgendaTodoTask(dispensarySlug, id, mutationMeta);
-      await reload();
-      if (archivesOpen) {
-        await openArchives();
-      }
-    } catch (error: unknown) {
-      notifications.show({
-        title: 'Erreur',
-        message: error instanceof Error ? error.message : 'Suppression impossible',
-        color: 'danger',
-      });
-    }
-  };
-
-  const openArchives = async () => {
-    if (!agendaId) return;
-    try {
-      const result = await listAgendaTodoLists(dispensarySlug, agendaId, {
-        archives: true,
-      });
-      const data = handleAction(result);
-      if (data) {
-        setArchiveLists(data);
-        setArchivesOpen(true);
-      }
-    } catch (error: unknown) {
-      notifications.show({
-        title: 'Erreur',
-        message: error instanceof Error ? error.message : 'Chargement impossible',
-        color: 'danger',
-      });
-    }
-  };
-
-  const handleCreateList = async (name: string) => {
-    if (!agendaId) return;
-    try {
-      const result = await createAgendaTodoList(
-        dispensarySlug,
-        {
-          agendaId,
-          name,
-        },
-        mutationMeta,
-      );
-      const data = handleAction(result);
-      if (data) {
-        setSelectedListId(data.id);
-      }
-      await reload();
-    } catch (error: unknown) {
-      notifications.show({
-        title: 'Erreur',
-        message: error instanceof Error ? error.message : 'Création impossible',
-        color: 'danger',
-      });
-    }
-  };
-
-  const handleCreateCategory = async (name: string) => {
-    if (!selectedList) return;
-    try {
-      const result = await createAgendaTodoCategory(
-        dispensarySlug,
-        {
-          listId: selectedList.id,
-          name,
-        },
-        mutationMeta,
-      );
-      const category = handleAction(result);
-      if (category && isCategoryFilterActive) {
-        const next = new Set(categoryFilterIds);
-        next.add(category.id);
-        setCategoryFilterIds(next);
-        persistCategoryFilter(next);
-      }
-      await reload();
-    } catch (error: unknown) {
-      notifications.show({
-        title: 'Erreur',
-        message: error instanceof Error ? error.message : 'Création impossible',
-        color: 'danger',
-      });
-    }
-  };
-
-  const handleAddTask = async (categoryId: string, title: string) => {
-    try {
-      await createAgendaTodoTask(dispensarySlug, { categoryId, title }, mutationMeta);
-      await reload();
-    } catch (error: unknown) {
-      notifications.show({
-        title: 'Erreur',
-        message: error instanceof Error ? error.message : 'Ajout impossible',
-        color: 'danger',
-      });
-    }
-  };
-
-  const handleDeleteCategory = async (id: string) => {
-    try {
-      await deleteAgendaTodoCategory(dispensarySlug, id, mutationMeta);
-      await reload();
-    } catch (error: unknown) {
-      notifications.show({
-        title: 'Erreur',
-        message: error instanceof Error ? error.message : 'Suppression impossible',
-        color: 'danger',
-      });
-    }
-  };
-
-  const handleDeleteList = async (id: string) => {
-    try {
-      await deleteAgendaTodoList(dispensarySlug, id, mutationMeta);
-      await reload();
-    } catch (error: unknown) {
-      notifications.show({
-        title: 'Erreur',
-        message: error instanceof Error ? error.message : 'Suppression impossible',
-        color: 'danger',
-      });
     }
   };
 

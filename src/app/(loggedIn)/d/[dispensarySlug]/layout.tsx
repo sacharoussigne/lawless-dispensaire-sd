@@ -15,6 +15,7 @@ import {
 } from '@/lib/dispensary/context';
 import { notFound, redirect } from 'next/navigation';
 import { userHasAnyAgendaAccess, listAccessibleAgendaIds } from '@/lib/agenda/access';
+import { DispensaryRealtimeShell } from './DispensaryRealtimeShell';
 
 export default async function DispensaryLayout({
   children,
@@ -75,17 +76,19 @@ export default async function DispensaryLayout({
       agendaModuleAccess={agendaModuleAccess}
       accessibleAgendaIds={accessibleAgendaIds}
     >
-      <LoggedInShell>
-        <Header
-          session={session as AuthSession | null}
-          impersonatorDisplayName={impersonatorDisplayName}
-          dispensarySlug={dispensarySlug}
-        />
+      <DispensaryRealtimeShell>
+        <LoggedInShell>
+          <Header
+            session={session as AuthSession | null}
+            impersonatorDisplayName={impersonatorDisplayName}
+            dispensarySlug={dispensarySlug}
+          />
 
-        <div className="flex-1 w-full min-w-0 pb-[72px] sm:pb-0 min-h-0">
-          {children}
-        </div>
-      </LoggedInShell>
+          <div className="flex-1 w-full min-w-0 pb-[72px] sm:pb-0 min-h-0">
+            {children}
+          </div>
+        </LoggedInShell>
+      </DispensaryRealtimeShell>
     </PermissionsProvider>
   );
 }

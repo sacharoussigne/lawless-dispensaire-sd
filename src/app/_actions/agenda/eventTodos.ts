@@ -6,16 +6,64 @@ import {
   createEventTodoTaskSchema,
   updateEventTodoTaskSchema,
   deleteEventTodoTaskSchema,
-  reorderSchema,
 } from '@/app/_actions/agenda/schemas';
 import {
   getAgendaSessionContext,
+  guardAgendaRead,
   guardAgendaWrite,
   resolveAgendaIdFromEventId,
   resolveAgendaIdFromEventTodoTaskId,
 } from '@/app/_actions/agenda/internals';
 import { emitAgendaEventTodosChange } from '@/lib/agenda/realtime/broadcast';
 import type { AgendaMutationMeta } from '@/lib/agenda/realtime/mutationMeta';
+import { tenantWhere } from '@/lib/dispensary/tenantWhere';
+
+export async function listAgendaEventTodoTasks(
+  dispensarySlug: string,
+  eventId: string,
+) {
+  try {
+    const ctx = await getAgendaSessionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+
+    const event = await prisma.agendaEvent.findFirst({
+      where: {
+        id: eventId,
+        agenda: tenantWhere(ctx.tenant.dispensaryId),
+      },
+      select: {
+        agendaId: true,
+        participants: { where: { userId: ctx.session.user.id }, select: { id: true } },
+      },
+    });
+
+    if (!event) {
+      return { status: 404, error: 'Événement introuvable' };
+    }
+
+    const isParticipant = event.participants.length > 0;
+    if (!isParticipant) {
+      const guard = await guardAgendaRead(
+        ctx.tenant.dispensaryId,
+        event.agendaId,
+        ctx.session,
+        ctx.tenant.effectiveRole,
+      );
+      if (!guard.ok) {
+        return { status: guard.status, error: guard.error };
+      }
+    }
+
+    const tasks = await prisma.agendaEventTodoTask.findMany({
+      where: { eventId },
+      orderBy: { order: 'asc' },
+    });
+
+    return { status: 200, data: tasks };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors du chargement des tâches');
+  }
+}
 
 export async function createAgendaEventTodoTask(
   dispensarySlug: string,
@@ -187,67 +235,5 @@ export async function deleteAgendaEventTodoTask(
     return { status: 200 };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la suppression de la tâche');
-  }
-}
-
-export async function reorderAgendaEventTodoTasks(
-  dispensarySlug: string,
-  data: { items: { id: string; order: number }[] },
-  meta?: AgendaMutationMeta,
-) {
-  try {
-    const ctx = await getAgendaSessionContext(dispensarySlug);
-    if (!ctx.ok) return ctx.response;
-
-    const validated = reorderSchema.parse(data);
-    if (validated.items.length === 0) {
-      return { status: 200, data: { success: true } };
-    }
-
-    const agendaId = await resolveAgendaIdFromEventTodoTaskId(
-      ctx.tenant.dispensaryId,
-      validated.items[0].id,
-    );
-    if (!agendaId) {
-      return { status: 404, error: 'Tâche introuvable' };
-    }
-
-    const guard = await guardAgendaWrite(
-      ctx.tenant.dispensaryId,
-      agendaId,
-      ctx.session,
-      ctx.tenant.effectiveRole,
-    );
-    if (!guard.ok) {
-      return { status: guard.status, error: guard.error };
-    }
-
-    const firstTask = await prisma.agendaEventTodoTask.findUnique({
-      where: { id: validated.items[0].id },
-      select: { eventId: true },
-    });
-    if (!firstTask) {
-      return { status: 404, error: 'Tâche introuvable' };
-    }
-
-    await Promise.all(
-      validated.items.map(({ id, order }) =>
-        prisma.agendaEventTodoTask.update({
-          where: { id },
-          data: { order },
-        }),
-      ),
-    );
-
-    await emitAgendaEventTodosChange(
-      ctx.tenant.dispensaryId,
-      agendaId,
-      firstTask.eventId,
-      meta,
-    );
-
-    return { status: 200, data: { success: true } };
-  } catch (error) {
-    return actionErrorParser(error, 'Erreur lors du réordonnancement');
   }
 }

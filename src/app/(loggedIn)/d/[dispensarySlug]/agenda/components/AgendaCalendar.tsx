@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Calendar, type View } from 'react-big-calendar';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
@@ -32,6 +32,7 @@ interface AgendaCalendarProps {
   onEventsChange: (events: AgendaEventDTO[]) => void;
   canWrite: boolean;
   panelHeightPx: number;
+  skipInitialRangeFetch?: boolean;
   onSelectEvent: (event: AgendaEventDTO) => void;
   onSelectSlot: (start: Date, end: Date, view: View) => void;
 }
@@ -43,9 +44,11 @@ export function AgendaCalendar({
   onEventsChange,
   canWrite,
   panelHeightPx,
+  skipInitialRangeFetch = false,
   onSelectEvent,
   onSelectSlot,
 }: AgendaCalendarProps) {
+  const skipInitialRangeRef = useRef(skipInitialRangeFetch);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -159,6 +162,11 @@ export function AgendaCalendar({
 
   const handleRangeChange = useCallback(
     (range: Date[] | { start: Date; end: Date }) => {
+      if (skipInitialRangeRef.current) {
+        skipInitialRangeRef.current = false;
+        return;
+      }
+
       if (Array.isArray(range)) {
         if (range.length === 0) return;
         const start = range[0];

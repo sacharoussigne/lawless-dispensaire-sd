@@ -234,5 +234,3 @@ export async function validateDispensaryUserIds(
 
   return memberCount === memberRequiredIds.length;
 }
-
-export { resolveAgendaAccess };
