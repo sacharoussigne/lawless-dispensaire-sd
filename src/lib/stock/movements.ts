@@ -66,7 +66,6 @@ export type StockStatsItemRow = {
   itemName: string;
   categoryId: string;
   categoryName: string;
-  categoryColor: string | null;
   consumed: number;
   added: number;
   net: number;

@@ -1,8 +1,6 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
 import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import {
   Box,
   Checkbox,
@@ -17,37 +15,33 @@ import {
 } from '@mantine/core';
 import { DatePickerInput, DatesProvider } from '@mantine/dates';
 import { DataTable, type DataTableSortStatus } from 'mantine-datatable';
-import { getStockConsumptionStats } from '@/app/_actions/stock';
-import type { StockConsumptionStatsResult } from '@/app/_actions/stock/statistics';
-import { handleAction } from '@/lib/action';
-import { getMondayOfCurrentWeek, getTodayStart } from '@/lib/date';
 import {
   getDisplayModeLabel,
-  getDisplayValue,
   getStockStatsValueColor,
   type StockStatsDisplayMode,
   type StockStatsItemRowWithDisplay,
 } from '@/lib/stock/movements';
+import {
+  attachDisplayValues,
+  buildCategoryOptions,
+  filterStockStatsRows,
+  pickTopChartRows,
+  pickTopItem,
+  sortStockStatsRows,
+  sumDisplayValues,
+} from '@/lib/stock/statsClient';
+import {
+  getMondayOfCurrentWeek,
+  getTodayStart,
+  parsePickerDate,
+} from '@/lib/date';
+import { useStockConsumptionStats } from './hooks/useStockStatisticsQueries';
 import { StockStatsTopChart } from './StockStatsTopChart';
-import { DEFAULT_STALE_TIME_MS } from '@/lib/react-query/QueryProvider';
-
-const statsKeys = {
-  consumption: (slug: string, from: string, to: string) =>
-    ['stock-stats', slug, 'consumption', from, to] as const,
-};
 
 const PAGE_SIZE = 25;
 const TOP_N_OPTIONS = ['10', '15', '20'];
 
-function normalizeString(str: string): string {
-  return str
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
-}
-
 export default function StockStatisticsPageClient() {
-  const { dispensarySlug } = usePermissions();
   const defaultFrom = getMondayOfCurrentWeek();
   const defaultTo = getTodayStart();
 
@@ -64,121 +58,45 @@ export default function StockStatisticsPageClient() {
     direction: 'desc',
   });
 
-  const fromKey = dateRange[0]?.toISOString() ?? '';
-  const toKey = dateRange[1]?.toISOString() ?? '';
-
-  const { data: stats = null, isFetching: loading } = useQuery({
-    queryKey: statsKeys.consumption(dispensarySlug!, fromKey, toKey),
-    queryFn: async () => {
-      const [from, to] = dateRange;
-      if (!from || !to) throw new Error('Plage de dates invalide');
-      const result = await getStockConsumptionStats(dispensarySlug!, { from, to });
-      return handleAction(result) as StockConsumptionStatsResult;
-    },
-    enabled: Boolean(dispensarySlug && dateRange[0] && dateRange[1]),
-    staleTime: DEFAULT_STALE_TIME_MS,
-  });
+  const [from, to] = dateRange;
+  const { data: stats = null, isFetching: loading } = useStockConsumptionStats(from, to);
 
   useEffect(() => {
     setPage(1);
   }, [displayMode, searchQuery, categoryFilter, showZeroItems, dateRange]);
 
-  const categoryOptions = useMemo(() => {
-    if (!stats) return [];
-    const categories = new Map<string, string>();
-    stats.items.forEach((row) => {
-      categories.set(row.categoryId, row.categoryName);
-    });
-    return Array.from(categories.entries())
-      .map(([value, label]) => ({ value, label }))
-      .sort((a, b) => a.label.localeCompare(b.label, 'fr', { sensitivity: 'base' }));
-  }, [stats]);
-
-  const rowsWithDisplay = useMemo(() => {
-    if (!stats) return [];
-    return stats.items.map((row) => ({
-      ...row,
-      displayValue: getDisplayValue(row, displayMode),
-    }));
-  }, [stats, displayMode]);
+  const categoryOptions = useMemo(
+    () => (stats ? buildCategoryOptions(stats.items) : []),
+    [stats],
+  );
 
   const filteredRows = useMemo(() => {
-    let rows = rowsWithDisplay;
-
-    if (!showZeroItems) {
-      rows = rows.filter((row) => row.displayValue !== 0);
-    }
-
-    if (categoryFilter) {
-      rows = rows.filter((row) => row.categoryId === categoryFilter);
-    }
-
-    const q = searchQuery.trim();
-    if (q) {
-      const nq = normalizeString(q);
-      rows = rows.filter(
-        (row) =>
-          normalizeString(row.itemName).includes(nq) ||
-          normalizeString(row.categoryName).includes(nq),
-      );
-    }
-
-    const { columnAccessor, direction } = sortStatus;
-    const sorted = [...rows].sort((a, b) => {
-      const m = direction === 'asc' ? 1 : -1;
-      if (columnAccessor === 'itemName') {
-        return a.itemName.localeCompare(b.itemName, 'fr', { sensitivity: 'base' }) * m;
-      }
-      if (columnAccessor === 'categoryName') {
-        return a.categoryName.localeCompare(b.categoryName, 'fr', { sensitivity: 'base' }) * m;
-      }
-      if (columnAccessor === 'consumed') return (a.consumed - b.consumed) * m;
-      if (columnAccessor === 'added') return (a.added - b.added) * m;
-      if (columnAccessor === 'net') return (a.net - b.net) * m;
-      return (a.displayValue - b.displayValue) * m;
+    if (!stats) return [];
+    const withDisplay = attachDisplayValues(stats.items, displayMode);
+    const filtered = filterStockStatsRows(withDisplay, {
+      showZeroItems,
+      categoryFilter,
+      searchQuery,
     });
-
-    return sorted;
-  }, [rowsWithDisplay, showZeroItems, categoryFilter, searchQuery, sortStatus]);
+    return sortStockStatsRows(filtered, sortStatus);
+  }, [stats, displayMode, showZeroItems, categoryFilter, searchQuery, sortStatus]);
 
   const paginatedRows = useMemo(() => {
-    const from = (page - 1) * PAGE_SIZE;
-    return filteredRows.slice(from, from + PAGE_SIZE);
+    const start = (page - 1) * PAGE_SIZE;
+    return filteredRows.slice(start, start + PAGE_SIZE);
   }, [filteredRows, page]);
 
-  const modeTotal = useMemo(() => {
-    return filteredRows.reduce((sum, row) => sum + row.displayValue, 0);
-  }, [filteredRows]);
-
-  const topItem = useMemo(() => {
-    if (filteredRows.length === 0) return null;
-    if (displayMode === 'net') {
-      return filteredRows.reduce((best, row) =>
-        Math.abs(row.displayValue) > Math.abs(best.displayValue) ? row : best,
-      );
-    }
-    return filteredRows.reduce((best, row) =>
-      row.displayValue > best.displayValue ? row : best,
-    );
-  }, [filteredRows, displayMode]);
-
-  const chartRows = useMemo(() => {
-    const n = parseInt(topN, 10);
-    const sorted =
-      displayMode === 'net'
-        ? [...filteredRows].sort(
-            (a, b) => Math.abs(b.displayValue) - Math.abs(a.displayValue),
-          )
-        : [...filteredRows].sort((a, b) => b.displayValue - a.displayValue);
-    return sorted.slice(0, n).map((row) => ({
-      itemId: row.itemId,
-      itemName: row.itemName,
-      value: row.displayValue,
-    }));
-  }, [filteredRows, topN, displayMode]);
+  const modeTotal = useMemo(() => sumDisplayValues(filteredRows), [filteredRows]);
+  const topItem = useMemo(
+    () => pickTopItem(filteredRows, displayMode),
+    [filteredRows, displayMode],
+  );
+  const chartRows = useMemo(
+    () => pickTopChartRows(filteredRows, parseInt(topN, 10), displayMode),
+    [filteredRows, topN, displayMode],
+  );
 
   const modeLabel = getDisplayModeLabel(displayMode);
-  const valueColumnTitle = modeLabel;
 
   return (
     <DatesProvider settings={{ locale: 'fr' }}>
@@ -192,8 +110,11 @@ export default function StockStatisticsPageClient() {
                 placeholder="Choisir les dates"
                 value={dateRange}
                 onChange={(value) => {
-                  const [from, to] = value as [Date | null, Date | null];
-                  setDateRange([from, to]);
+                  const [rawFrom, rawTo] = (value ?? [null, null]) as [
+                    Date | string | null,
+                    Date | string | null,
+                  ];
+                  setDateRange([parsePickerDate(rawFrom), parsePickerDate(rawTo)]);
                 }}
                 valueFormat="D MMM YYYY"
                 clearable={false}
@@ -311,7 +232,7 @@ export default function StockStatisticsPageClient() {
               },
               {
                 accessor: 'displayValue',
-                title: valueColumnTitle,
+                title: modeLabel,
                 sortable: true,
                 textAlign: 'right',
                 render: (row) => (
@@ -362,8 +283,8 @@ export default function StockStatisticsPageClient() {
         {stats && (
           <Box>
             <Text size="xs" c="dimmed">
-              Totaux globaux sur la période (tous items) : consommé {stats.totals.consumed} · ajouté{' '}
-              {stats.totals.added} · net {stats.totals.net}
+              Totaux globaux sur la période (tous items, hors filtres) : consommé{' '}
+              {stats.totals.consumed} · ajouté {stats.totals.added} · net {stats.totals.net}
             </Text>
           </Box>
         )}
