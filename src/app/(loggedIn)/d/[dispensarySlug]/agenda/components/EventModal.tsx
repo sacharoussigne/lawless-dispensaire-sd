@@ -42,6 +42,8 @@ import {
 } from '@/lib/agenda/dates';
 import type { AgendaEventDTO } from '@/types/agenda';
 import dayjs from '@/lib/dayjs';
+import { InlineEditableText } from './InlineEditableText';
+import classes from '../agenda.module.scss';
 
 interface EventModalProps {
   opened: boolean;
@@ -283,6 +285,28 @@ export function EventModal({
     }
   };
 
+  const renameEventTodo = async (taskId: string, title: string) => {
+    try {
+      const result = await updateAgendaEventTodoTask(
+        dispensarySlug,
+        { id: taskId, title },
+        mutationMeta,
+      );
+      const data = handleAction(result);
+      if (data) {
+        setTodoTasks((prev) =>
+          prev.map((t) => (t.id === taskId ? { ...t, ...data } : t)),
+        );
+      }
+    } catch (error: unknown) {
+      notifications.show({
+        title: 'Erreur',
+        message: error instanceof Error ? error.message : 'Renommage impossible',
+        color: 'danger',
+      });
+    }
+  };
+
   const toggleEventTodo = async (taskId: string, completed: boolean) => {
     try {
       const result = await updateAgendaEventTodoTask(
@@ -447,15 +471,15 @@ export function EventModal({
                   disabled={readOnly}
                   mt={2}
                 />
-                <Text
-                  size="sm"
-                  style={{
-                    flex: 1,
-                    textDecoration: task.completed ? 'line-through' : undefined,
-                  }}
-                >
-                  {task.title}
-                </Text>
+                <InlineEditableText
+                  value={task.title}
+                  canEdit={canWrite}
+                  onSave={(title) => renameEventTodo(task.id, title)}
+                  textClassName={`${classes.todoTaskTitle} ${
+                    task.completed ? classes.todoTaskCompleted : ''
+                  }`}
+                  inputClassName={classes.todoTaskEditInput}
+                />
                 {canWrite && (
                   <ActionIcon
                     variant="subtle"
