@@ -72,7 +72,7 @@ export async function createCategoryItem(
   }
 }
 
-export async function getCategoryItems(dispensarySlug: string) {
+export async function getManagementCategoryItems(dispensarySlug: string) {
   try {
     const ctx = await requireTenantServerActionContext(dispensarySlug);
     if (!ctx.ok) return ctx.response;
@@ -80,16 +80,9 @@ export async function getCategoryItems(dispensarySlug: string) {
 
     const categoryItems = await prisma.categoryItem.findMany({
       where: tenantWhere(dispensaryId),
-      orderBy: {
-        order: 'asc',
-      },
+      orderBy: { order: 'asc' },
       include: {
-        items: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+        _count: { select: { items: true } },
       },
     });
 
@@ -172,7 +165,7 @@ export async function reorderCategoryItems(
 
     const validatedData = reorderCategoryItemsSchema.parse(data);
 
-    await Promise.all(
+    await prisma.$transaction(
       validatedData.items.map(({ id, order }) =>
         prisma.categoryItem.update({
           where: { id, ...tenantWhere(dispensaryId) },

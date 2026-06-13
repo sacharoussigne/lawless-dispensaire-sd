@@ -1,6 +1,5 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
 import { useState, useEffect, useMemo } from 'react';
 import {
   Modal,
@@ -17,39 +16,31 @@ import {
   ScrollArea,
 } from '@mantine/core';
 import { IconAlertCircle } from '@tabler/icons-react';
-import { transferMultipleStock } from '@/app/_actions/stock';
-import { getItemsWithStock } from '@/app/_actions/stock';
-import { handleAction } from '@/lib/action';
+import type { ChestListItem } from '@/types/chests';
+import { sortItems } from '@/lib/stock/sortItemsByCategory';
+import { useStockItems, useTransferMutation } from '../hooks/useStockQueries';
 import { notifications } from '@mantine/notifications';
-import type { ItemWithRelations } from '@/types/stock';
-import type { ChestWithStockHistory } from '@/types/chests';
 
 interface TransferModalProps {
   opened: boolean;
   onClose: () => void;
-  items: ItemWithRelations[];
-  chests: ChestWithStockHistory[];
-  initialSourceChestId?: string | null; // Pre-selected source chest from stock view
-  onTransfer: () => void; // Callback after successful transfer
+  chests: ChestListItem[];
+  initialSourceChestId?: string | null;
 }
 
 export default function TransferModal({
   opened,
   onClose,
-  items,
   chests,
   initialSourceChestId = null,
-  onTransfer,
 }: TransferModalProps) {
-  const { dispensarySlug } = usePermissions();
   const [sourceChestId, setSourceChestId] = useState<string | null>(initialSourceChestId);
   const [destinationChestId, setDestinationChestId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [itemsWithStock, setItemsWithStock] = useState<ItemWithRelations[]>(items);
-  const [loadingItems, setLoadingItems] = useState(false);
   const [quantitiesByItem, setQuantitiesByItem] = useState<Record<string, number | ''>>({});
 
-  // Update sourceChestId when initialSourceChestId changes
+  const { data: itemsWithStock = [], isFetching: loadingItems } = useStockItems(sourceChestId, []);
+  const transferMutation = useTransferMutation();
+
   useEffect(() => {
     if (opened && initialSourceChestId !== null) {
       setSourceChestId(initialSourceChestId);
@@ -58,44 +49,6 @@ export default function TransferModal({
     }
   }, [opened, initialSourceChestId]);
 
-  // Load items with stock from selected source chest
-  useEffect(() => {
-    if (opened && sourceChestId) {
-      const loadItemsForChest = async () => {
-        setLoadingItems(true);
-        try {
-          const result = await getItemsWithStock(dispensarySlug!, sourceChestId);
-          const data = handleAction(result);
-          if (data) {
-            setItemsWithStock(data);
-            // Reset quantities when source chest changes
-            const initialQuantities: Record<string, number | ''> = {};
-            data
-              .filter((item: ItemWithRelations) => item.stockToday !== null && item.stockToday > 0)
-              .forEach((item: ItemWithRelations) => {
-                initialQuantities[item.id] = '';
-              });
-            setQuantitiesByItem(initialQuantities);
-          }
-        } catch (error: any) {
-          notifications.show({
-            title: 'Erreur',
-            message: error.message || 'Erreur lors du chargement des stocks',
-            color: 'red',
-          });
-        } finally {
-          setLoadingItems(false);
-        }
-      };
-      loadItemsForChest();
-    } else if (opened && !sourceChestId) {
-      // If no source chest is selected, reset items and quantities
-      setItemsWithStock([]);
-      setQuantitiesByItem({});
-    }
-  }, [opened, sourceChestId]);
-
-  // Reset states when modal closes
   useEffect(() => {
     if (!opened) {
       setDestinationChestId(null);
@@ -103,36 +56,29 @@ export default function TransferModal({
     }
   }, [opened]);
 
-  // Filter chests to exclude source chest from destination list
+  useEffect(() => {
+    if (sourceChestId) {
+      const initialQuantities: Record<string, number | ''> = {};
+      itemsWithStock
+        .filter((item) => item.stockToday !== null && item.stockToday > 0)
+        .forEach((item) => {
+          initialQuantities[item.id] = '';
+        });
+      setQuantitiesByItem(initialQuantities);
+    } else {
+      setQuantitiesByItem({});
+    }
+  }, [sourceChestId, itemsWithStock]);
+
   const availableDestinationChests = chests.filter((chest) => chest.id !== sourceChestId);
 
-  // Items eligible for transfer (with available stock), sorted by category then by item order
   const transferableItems = useMemo(() => {
     const filtered = itemsWithStock.filter(
-      (item) => item.stockToday !== null && item.stockToday > 0
+      (item) => item.stockToday !== null && item.stockToday > 0,
     );
-    
-    return filtered.sort((a, b) => {
-      // Sort by category order
-      const categoryOrderA = a.category?.order ?? 0;
-      const categoryOrderB = b.category?.order ?? 0;
-      if (categoryOrderA !== categoryOrderB) {
-        return categoryOrderA - categoryOrderB;
-      }
-      
-      // If same category order, sort by item order
-      const itemOrderA = a.order ?? 0;
-      const itemOrderB = b.order ?? 0;
-      if (itemOrderA !== itemOrderB) {
-        return itemOrderA - itemOrderB;
-      }
-      
-      // If same order, alphabetical sort by name
-      return a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' });
-    });
+    return sortItems(filtered);
   }, [itemsWithStock]);
 
-  // Options for chests
   const sourceChestOptions = chests.map((chest) => ({
     value: chest.id,
     label: chest.name,
@@ -143,14 +89,10 @@ export default function TransferModal({
     label: chest.name,
   }));
 
-  // Build transfer list from entered quantities
   const transferItems = transferableItems
     .map((item) => {
       const quantity = quantitiesByItem[item.id];
-      return {
-        item,
-        quantity,
-      };
+      return { item, quantity };
     })
     .filter(({ quantity }) => typeof quantity === 'number' && quantity > 0);
 
@@ -168,7 +110,7 @@ export default function TransferModal({
       notifications.show({
         title: 'Erreur',
         message: 'Veuillez sélectionner un coffre source et un coffre destination',
-        color: 'red',
+        color: 'danger',
       });
       return;
     }
@@ -177,7 +119,7 @@ export default function TransferModal({
       notifications.show({
         title: 'Erreur',
         message: 'Veuillez saisir au moins une quantité à transférer',
-        color: 'red',
+        color: 'danger',
       });
       return;
     }
@@ -186,14 +128,13 @@ export default function TransferModal({
       notifications.show({
         title: 'Erreur',
         message: 'Certaines quantités saisies ne sont pas valides ou dépassent le stock disponible',
-        color: 'red',
+        color: 'danger',
       });
       return;
     }
 
     try {
-      setLoading(true);
-      const result = await transferMultipleStock(dispensarySlug!, {
+      await transferMutation.mutateAsync({
         sourceChestId,
         destinationChestId,
         items: transferItems.map(({ item, quantity }) => ({
@@ -201,32 +142,9 @@ export default function TransferModal({
           quantity: typeof quantity === 'number' ? quantity : 0,
         })),
       });
-
-      handleAction(result);
-
-      const sourceChestName = chests.find((c) => c.id === sourceChestId)?.name || 'le coffre source';
-      const destinationChestName = chests.find((c) => c.id === destinationChestId)?.name || 'le coffre destination';
-      const totalQuantity = transferItems.reduce(
-        (sum, { quantity }) => (typeof quantity === 'number' ? sum + quantity : sum),
-        0
-      );
-
-      notifications.show({
-        title: 'Succès',
-        message: `${totalQuantity} objet(s) transféré(s) de ${sourceChestName} vers ${destinationChestName}`,
-        color: 'green',
-      });
-
-      onTransfer();
       onClose();
-    } catch (error: any) {
-      notifications.show({
-        title: 'Erreur',
-        message: error.message || 'Erreur lors du transfert',
-        color: 'red',
-      });
-    } finally {
-      setLoading(false);
+    } catch {
+      // Notification handled in mutation hook
     }
   };
 
@@ -252,7 +170,7 @@ export default function TransferModal({
           color="denim"
           variant="light"
         >
-          Transférez des items d'un coffre source vers un coffre destination. Le stock sera automatiquement mis à jour dans les deux coffres.
+          Transférez des items d&apos;un coffre source vers un coffre destination. Le stock sera automatiquement mis à jour dans les deux coffres.
         </Alert>
 
         <Group grow align="flex-end">
@@ -278,7 +196,13 @@ export default function TransferModal({
           />
         </Group>
 
-        {sourceChestId && (
+        {sourceChestId && loadingItems && (
+          <Text c="dimmed" size="sm">
+            Chargement des stocks...
+          </Text>
+        )}
+
+        {sourceChestId && !loadingItems && (
           <>
             {transferableItems.length === 0 ? (
               <Text c="dimmed" size="sm">
@@ -314,7 +238,7 @@ export default function TransferModal({
                               <Text fw={500}>{item.name}</Text>
                             </Table.Td>
                             <Table.Td>
-                              <Badge color="blue" variant="light">
+                              <Badge color="denim" variant="light">
                                 {availableStock}
                               </Badge>
                             </Table.Td>
@@ -344,7 +268,7 @@ export default function TransferModal({
                       {transferItems.length} item(s) sélectionné(s) pour le transfert
                     </Text>
                     {hasInvalidQuantity && (
-                      <Text size="sm" c="red">
+                      <Text size="sm" c="danger">
                         Certaines quantités sont invalides ou dépassent le stock disponible
                       </Text>
                     )}
@@ -356,14 +280,14 @@ export default function TransferModal({
         )}
 
         <Group justify="flex-end" mt="md">
-          <Button variant="subtle" onClick={onClose}>
+          <Button variant="subtle" onClick={onClose} color="slate">
             Annuler
           </Button>
           <Button
             onClick={handleTransfer}
-            loading={loading}
+            loading={transferMutation.isPending}
             disabled={!canTransfer}
-            color="blue"
+            color="sage"
           >
             Transférer
           </Button>

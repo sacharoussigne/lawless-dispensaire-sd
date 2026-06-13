@@ -1,8 +1,4 @@
-export type AgendaRealtimeEventType =
-  | 'events'
-  | 'todos'
-  | 'eventTodos'
-  | 'agendaMeta';
+export type AgendaRealtimeEventType = 'events' | 'todos' | 'eventTodos';
 
 export type AgendaRealtimeEvent = {
   type: AgendaRealtimeEventType;

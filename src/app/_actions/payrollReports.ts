@@ -18,9 +18,15 @@ import { type ParsedPayrollTable, parsePayrollHtmlTable } from '@/lib/payroll/pa
 import { payrollReportResultSchema } from '@/lib/payroll/schema';
 import { weekRangeFromIsoDate } from '@/lib/payroll/week';
 import { recalculatePayrollResult } from '@/lib/payroll/recalculatePayrollResult';
+import type {
+  SerializedPayrollReportDetail,
+  SerializedPayrollReportListItem,
+} from '@/lib/payroll/apiRow';
+import { extractPayrollListSummary } from '@/lib/payroll/listSummary';
 
 const MAX_CAISSE_PRICE_USD = 1_000_000;
 const MAX_HTML_CHARS = 600_000;
+const PAYROLL_LIST_LIMIT = 100;
 
 const emptyGlobalStats = () => ({
   total_employees: 0,
@@ -34,7 +40,16 @@ const emptyGlobalStats = () => ({
   total_offered_retail_value_usd: 0,
 });
 
-const payrollGuardOptions = {
+const payrollViewGuardOptions = {
+  feature: 'payroll' as const,
+  permission: {
+    resource: 'payroll_reports' as const,
+    action: 'view',
+    message: 'Accès refusé',
+  },
+};
+
+const payrollCreateGuardOptions = {
   feature: 'payroll' as const,
   permission: {
     resource: 'payroll_reports' as const,
@@ -43,8 +58,69 @@ const payrollGuardOptions = {
   },
 };
 
+export async function listPayrollReports(dispensarySlug: string) {
+  const ctx = await requireTenantServerActionContext(dispensarySlug, payrollViewGuardOptions);
+  if (!ctx.ok) return ctx.response;
+  const { dispensaryId } = ctx.tenant;
+
+  const rows = await prisma.payrollWeeklyReport.findMany({
+    where: tenantWhere(dispensaryId),
+    orderBy: [{ weekStart: 'desc' }, { reportType: 'asc' }],
+    take: PAYROLL_LIST_LIMIT,
+    select: {
+      id: true,
+      weekStart: true,
+      weekEnd: true,
+      reportType: true,
+      createdAt: true,
+      createdBy: { select: { name: true, id: true } },
+      resultJson: true,
+    },
+  });
+
+  const reports: SerializedPayrollReportListItem[] = rows.map((r) => ({
+    id: r.id,
+    weekStart: r.weekStart.toISOString(),
+    weekEnd: r.weekEnd.toISOString(),
+    reportType: r.reportType,
+    createdAt: r.createdAt.toISOString(),
+    createdBy: r.createdBy,
+    summary: extractPayrollListSummary(r.resultJson),
+  }));
+
+  return { status: 200, data: { reports } };
+}
+
+export async function getPayrollReportById(dispensarySlug: string, id: string) {
+  const ctx = await requireTenantServerActionContext(dispensarySlug, payrollViewGuardOptions);
+  if (!ctx.ok) return ctx.response;
+  const { dispensaryId } = ctx.tenant;
+
+  const report = await prisma.payrollWeeklyReport.findFirst({
+    where: { id, ...tenantWhere(dispensaryId) },
+    include: { createdBy: { select: { name: true, email: true } } },
+  });
+
+  if (!report) {
+    return { status: 404, error: 'Not found' };
+  }
+
+  const serialized: SerializedPayrollReportDetail = {
+    id: report.id,
+    weekStart: report.weekStart.toISOString(),
+    weekEnd: report.weekEnd.toISOString(),
+    reportType: report.reportType,
+    resultJson: report.resultJson,
+    errorMessage: report.errorMessage,
+    createdAt: report.createdAt.toISOString(),
+    createdBy: report.createdBy,
+  };
+
+  return { status: 200, data: { report: serialized } };
+}
+
 export async function createPayrollReportFromForm(dispensarySlug: string, formData: FormData) {
-  const ctx = await requireTenantServerActionContext(dispensarySlug, payrollGuardOptions);
+  const ctx = await requireTenantServerActionContext(dispensarySlug, payrollCreateGuardOptions);
   if (!ctx.ok) return ctx.response;
   const { dispensaryId } = ctx.tenant;
 
@@ -190,17 +266,6 @@ export async function createPayrollReportFromForm(dispensarySlug: string, formDa
 
   const reportId = randomUUID();
 
-  await prisma.payrollWeeklyReport.create({
-    data: {
-      id: reportId,
-      dispensaryId,
-      weekStart,
-      weekEnd,
-      reportType,
-      createdById: ctx.session.user.id,
-    },
-  });
-
   try {
     const result = recalculatePayrollResult(
       payrollReportResultSchema.parse({
@@ -221,21 +286,30 @@ export async function createPayrollReportFromForm(dispensarySlug: string, formDa
       }),
     );
 
-    await prisma.payrollWeeklyReport.update({
-      where: { id: reportId },
+    await prisma.payrollWeeklyReport.create({
       data: {
+        id: reportId,
+        dispensaryId,
+        weekStart,
+        weekEnd,
+        reportType,
+        createdById: ctx.session.user.id,
         resultJson: result as object,
         errorMessage: null,
       },
     });
 
-    const report = await prisma.payrollWeeklyReport.findUniqueOrThrow({ where: { id: reportId } });
-    return { status: 200, data: { report } };
+    return { status: 200, data: { id: reportId } };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Unknown error';
-    await prisma.payrollWeeklyReport.update({
-      where: { id: reportId },
+    await prisma.payrollWeeklyReport.create({
       data: {
+        id: reportId,
+        dispensaryId,
+        weekStart,
+        weekEnd,
+        reportType,
+        createdById: ctx.session.user.id,
         errorMessage: msg,
       },
     });
@@ -248,7 +322,7 @@ export async function updatePayrollReportResultJson(
   id: string,
   resultJson: unknown,
 ) {
-  const ctx = await requireTenantServerActionContext(dispensarySlug, payrollGuardOptions);
+  const ctx = await requireTenantServerActionContext(dispensarySlug, payrollCreateGuardOptions);
   if (!ctx.ok) return ctx.response;
   const { dispensaryId } = ctx.tenant;
 
@@ -285,7 +359,7 @@ export async function updatePayrollReportResultJson(
 }
 
 export async function deletePayrollReport(dispensarySlug: string, id: string) {
-  const ctx = await requireTenantServerActionContext(dispensarySlug, payrollGuardOptions);
+  const ctx = await requireTenantServerActionContext(dispensarySlug, payrollCreateGuardOptions);
   if (!ctx.ok) return ctx.response;
   const { dispensaryId } = ctx.tenant;
 
@@ -304,7 +378,7 @@ export async function deletePayrollReport(dispensarySlug: string, id: string) {
 }
 
 export async function listPayrollImportableActivityWeeks(dispensarySlug: string) {
-  const ctx = await requireTenantServerActionContext(dispensarySlug, payrollGuardOptions);
+  const ctx = await requireTenantServerActionContext(dispensarySlug, payrollCreateGuardOptions);
   if (!ctx.ok) return ctx.response;
   const { dispensaryId } = ctx.tenant;
 

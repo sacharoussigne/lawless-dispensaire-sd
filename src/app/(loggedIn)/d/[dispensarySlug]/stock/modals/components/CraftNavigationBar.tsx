@@ -19,7 +19,7 @@ export function CraftNavigationBar(props: {
           Retour
         </Button>
         <Tooltip label="Réinitialiser la navigation">
-          <ActionIcon variant="subtle" color="red" onClick={onReset} aria-label="Réinitialiser la navigation">
+          <ActionIcon variant="subtle" color="danger" onClick={onReset} aria-label="Réinitialiser la navigation">
             <IconTrash size={16} />
           </ActionIcon>
         </Tooltip>

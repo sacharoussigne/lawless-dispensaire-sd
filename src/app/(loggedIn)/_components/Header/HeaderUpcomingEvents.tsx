@@ -3,7 +3,6 @@
 import { listAgendaEvents } from '@/app/_actions/agenda/events';
 import {
   buildAgendaDayViewHref,
-  withAgendaCalendarFocus,
 } from '@/lib/agenda/calendarNavigation';
 import { useAgendaRealtime } from '@/lib/agenda/realtime/useAgendaRealtime';
 import { isRelevantAgendaRealtimeEvent } from '@/lib/agenda/realtime/isRelevantAgendaEvent';
@@ -234,7 +233,7 @@ export function HeaderUpcomingEvents({
   const handleIndicatorClick = () => {
     if (loading) return;
     if (!hasEvents) {
-      router.push(withAgendaCalendarFocus(agendaHref));
+      router.push(agendaHref);
       return;
     }
     handlePopoverChange(!opened);
@@ -303,7 +302,7 @@ export function HeaderUpcomingEvents({
           />
           <Anchor
             component={Link}
-            href={withAgendaCalendarFocus(agendaHref)}
+            href={agendaHref}
             size="sm"
             onClick={() => setOpened(false)}
           >

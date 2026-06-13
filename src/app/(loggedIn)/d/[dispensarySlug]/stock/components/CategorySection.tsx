@@ -4,7 +4,6 @@ import { memo } from 'react';
 import { Badge, Group, Paper, Table, Text } from '@mantine/core';
 import type { CategoryWithItems } from '@/types/stock';
 import { StockRow } from './StockRow';
-import type { EvalResult } from '@/lib/stock/expression';
 import type { StockUiPreferences } from '@/types/stockUiPreferences';
 
 interface CategorySectionProps {
@@ -17,8 +16,6 @@ interface CategorySectionProps {
   getTextColor: (backgroundColor: string) => string;
   stockUiPreferences: StockUiPreferences;
   onCommitQuantity: (itemId: string, quantity: number | null) => void;
-  evaluateIntegerExpression: (expression: string) => EvalResult;
-  evaluateDecimalExpression: (expression: string) => EvalResult;
 }
 
 export const CategorySection = memo(function CategorySection({
@@ -31,8 +28,6 @@ export const CategorySection = memo(function CategorySection({
   getTextColor,
   stockUiPreferences,
   onCommitQuantity,
-  evaluateIntegerExpression,
-  evaluateDecimalExpression,
 }: CategorySectionProps) {
   const textColor = getTextColor(categoryData.category.color);
   const shouldShowMinimalQuantity = !(selectedChestId !== null && !isCategoryCheckEnabled(categoryData.category.id));
@@ -95,8 +90,6 @@ export const CategorySection = memo(function CategorySection({
               getTextColor={getTextColor}
               stockUiPreferences={stockUiPreferences}
               onCommitQuantity={onCommitQuantity}
-              evaluateIntegerExpression={evaluateIntegerExpression}
-              evaluateDecimalExpression={evaluateDecimalExpression}
             />
           ))}
         </Table.Tbody>

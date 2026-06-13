@@ -1,6 +1,6 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
+import { useRequiredDispensarySlug } from '@/app/_contexts/PermissionsContext';
 import { useState, useEffect } from 'react';
 import {
   Container,
@@ -17,28 +17,8 @@ import {
 import { getItemsWithDetailedStock } from '@/app/_actions/stock';
 import { handleAction } from '@/lib/action';
 import { notifications } from '@mantine/notifications';
-import type { ChestWithStockHistory } from '@/types/chests';
 import { apothecaryBooleanPills } from '@/lib/apothecaryPill';
-
-interface Item {
-  id: string;
-  name: string;
-  description: string | null;
-  minimalQuantity: number;
-  isCraftable: boolean;
-  canBeSold: boolean;
-  price: number | null;
-  category: {
-    id: string;
-    name: string;
-    color: string;
-    order: number;
-  } | null;
-  companyGroup: {
-    id: string;
-    name: string;
-  } | null;
-}
+import type { ItemWithRelations } from '@/types/items';
 
 interface ItemWithDetailedStock {
   id: string;
@@ -68,15 +48,13 @@ interface ItemWithDetailedStock {
 }
 
 interface SearchItemsPageClientProps {
-  initialItems: Item[];
-  initialChests: ChestWithStockHistory[];
+  initialItems: ItemWithRelations[];
 }
 
 export default function SearchItemsPageClient({
   initialItems,
-  initialChests,
 }: SearchItemsPageClientProps) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [itemsWithStock, setItemsWithStock] = useState<ItemWithDetailedStock[]>([]);
   const [loading, setLoading] = useState(false);
@@ -94,7 +72,7 @@ export default function SearchItemsPageClient({
 
     try {
       setLoading(true);
-      const result = await getItemsWithDetailedStock(dispensarySlug!, selectedItemIds);
+      const result = await getItemsWithDetailedStock(dispensarySlug, selectedItemIds);
       const data = handleAction(result);
       if (data) {
         setItemsWithStock(data);

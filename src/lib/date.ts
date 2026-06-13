@@ -57,6 +57,18 @@ export function formatDate(date: Date): string {
   return dayjs(date).tz().format('YYYY-MM-DD');
 }
 
+/** Stable cache key for date ranges (Paris day, avoids UTC toISOString drift). */
+export function toDateRangeKey(date: Date): string {
+  return formatDate(date);
+}
+
+/** Normalizes Mantine DatePicker values (Date or YYYY-MM-DD string) to start of day Paris. */
+export function parsePickerDate(value: Date | string | null): Date | null {
+  if (value == null) return null;
+  if (value instanceof Date) return getStartOfDay(value);
+  return dayjs(value).tz().startOf('day').toDate();
+}
+
 /**
  * Checks if a date is within a day range
  * Dates are compared by their day, not their UTC time

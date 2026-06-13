@@ -14,5 +14,6 @@ export interface CraftRecipeWithIngredients extends CraftRecipe {
   ingredients: CraftRecipeItemWithItem[];
 }
 
-export type { CategoryItem, CompanyGroup };
+export type { CategoryItem };
+export type CompanyGroupSelect = Pick<CompanyGroup, 'id' | 'name'>;
 

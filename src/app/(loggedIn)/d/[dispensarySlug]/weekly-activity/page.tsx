@@ -1,11 +1,16 @@
 import { listDispensaryWeeklyActivities } from '@/app/_actions/dispensaryWeeklyActivity';
 import { SuspenseLoader } from '@/app/_components/SuspenseLoader/SuspenseLoader';
-import WeeklyActivityPageClient from './WeeklyActivityPageClient';
 import { getAuthSession } from '@/lib/auth';
 import { checkRolePermission } from '@/lib/auth/permissions';
-import { getDiscordAccountIdForUser, resolveDiscordDisplayName } from '@/lib/dispensaryWeeklyActivity/resolveDisplayName';
+import { getBankWeekBounds } from '@/lib/bankWeek';
+import dayjs from '@/lib/dayjs';
+import {
+  getDiscordAccountIdForUser,
+  resolveDiscordDisplayName,
+} from '@/lib/dispensaryWeeklyActivity/resolveDisplayName';
 import prisma from '@/lib/prisma';
 import { getDataOrThrow } from '@/lib/response';
+import WeeklyActivityPageClient from './WeeklyActivityPageClient';
 
 async function WeeklyActivityContent({ dispensarySlug }: { dispensarySlug: string }) {
   const session = await getAuthSession();
@@ -13,7 +18,13 @@ async function WeeklyActivityContent({ dispensarySlug }: { dispensarySlug: strin
     return null;
   }
 
-  const result = await listDispensaryWeeklyActivities(dispensarySlug);
+  const week = getBankWeekBounds(dayjs().tz('Europe/Paris').startOf('day').toDate());
+  const initialWeekBounds = { periodStart: week.start, periodEnd: week.end };
+
+  const [result, viewerDiscordId] = await Promise.all([
+    listDispensaryWeeklyActivities(dispensarySlug, initialWeekBounds),
+    getDiscordAccountIdForUser(prisma, session.user.id),
+  ]);
   const rows = getDataOrThrow(result, 'Erreur lors du chargement de l’activité hebdomadaire');
 
   const canEditAll = checkRolePermission(session.user.role, 'weekly_dispensary_activity', 'edit_all');
@@ -21,13 +32,13 @@ async function WeeklyActivityContent({ dispensarySlug }: { dispensarySlug: strin
     canEditAll ||
     checkRolePermission(session.user.role, 'weekly_dispensary_activity', 'edit_own');
 
-  const viewerDiscordId = await getDiscordAccountIdForUser(prisma, session.user.id);
   const defaultDisplayName = viewerDiscordId
     ? await resolveDiscordDisplayName(prisma, viewerDiscordId)
     : session.user.name;
 
   return (
     <WeeklyActivityPageClient
+      initialWeekBounds={initialWeekBounds}
       initialRows={rows}
       canEditAll={canEditAll}
       canEdit={canEdit}
@@ -38,7 +49,11 @@ async function WeeklyActivityContent({ dispensarySlug }: { dispensarySlug: strin
   );
 }
 
-export default async function WeeklyActivityPage({ params }: { params: Promise<{ dispensarySlug: string }> }) {
+export default async function WeeklyActivityPage({
+  params,
+}: {
+  params: Promise<{ dispensarySlug: string }>;
+}) {
   const { dispensarySlug } = await params;
   return (
     <SuspenseLoader>

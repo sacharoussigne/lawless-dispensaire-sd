@@ -1,21 +1,27 @@
 'use client';
 
+import { useMemo } from 'react';
 import { Paper, TextInput, Select, Badge, Group, ActionIcon } from '@mantine/core';
 import { DataTable } from 'mantine-datatable';
 import { IconEdit, IconTrash, IconTools } from '@tabler/icons-react';
-import type { ItemWithRelations, CategoryItem, CompanyGroup } from '@/types/items';
+import type { ItemWithRelations, CompanyGroupSelect } from '@/types/items';
+import type { CategoryItemWithCount } from '@/types/categoryItems';
 import { apothecaryBooleanPills } from '@/lib/apothecaryPill';
+import { getContrastTextColor } from '@/lib/color/contrastTextColor';
+import {
+  toCategorySelectOptions,
+  toCompanyGroupSelectOptions,
+} from '@/lib/items/selectOptions';
 
 interface ItemsTableProps {
   items: ItemWithRelations[];
   loading: boolean;
-  categoryItems: CategoryItem[];
-  companyGroups: CompanyGroup[];
+  categoryItems: CategoryItemWithCount[];
+  companyGroups: CompanyGroupSelect[];
   categoryFilter: string | null;
   companyGroupFilter: string | null;
   craftableFilter: string | null;
   nameFilter: string;
-  descriptionFilter: string;
   page: number;
   pageSize: number;
   totalRecords: number;
@@ -23,33 +29,11 @@ interface ItemsTableProps {
   onCompanyGroupFilterChange: (value: string | null) => void;
   onCraftableFilterChange: (value: string | null) => void;
   onNameFilterChange: (value: string) => void;
-  onDescriptionFilterChange: (value: string) => void;
   onPageChange: (page: number) => void;
   onEdit: (item: ItemWithRelations) => void;
   onDelete: (item: ItemWithRelations) => void;
   onManageCraftRecipes: (item: ItemWithRelations) => void;
 }
-
-// Fonction pour calculer la luminosité d'une couleur hexadécimale
-const getLuminance = (hex: string): number => {
-  const r = parseInt(hex.slice(1, 3), 16) / 255;
-  const g = parseInt(hex.slice(3, 5), 16) / 255;
-  const b = parseInt(hex.slice(5, 7), 16) / 255;
-
-  const [rs, gs, bs] = [r, g, b].map((val) => {
-    return val <= 0.03928
-      ? val / 12.92
-      : Math.pow((val + 0.055) / 1.055, 2.4);
-  });
-
-  return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
-};
-
-// Fonction pour déterminer si le texte doit être blanc ou noir selon la couleur de fond
-const getTextColor = (backgroundColor: string): string => {
-  const luminance = getLuminance(backgroundColor);
-  return luminance > 0.5 ? '#000000' : '#ffffff';
-};
 
 export function ItemsTable({
   items,
@@ -60,7 +44,6 @@ export function ItemsTable({
   companyGroupFilter,
   craftableFilter,
   nameFilter,
-  descriptionFilter,
   page,
   pageSize,
   totalRecords,
@@ -68,42 +51,30 @@ export function ItemsTable({
   onCompanyGroupFilterChange,
   onCraftableFilterChange,
   onNameFilterChange,
-  onDescriptionFilterChange,
   onPageChange,
   onEdit,
   onDelete,
   onManageCraftRecipes,
 }: ItemsTableProps) {
-  const categoryOptions = [...categoryItems]
-    .sort((a, b) => {
-      if (a.order !== undefined && b.order !== undefined) {
-        return a.order - b.order;
-      }
-      if (a.order !== undefined) return -1;
-      if (b.order !== undefined) return 1;
-      return a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' });
-    })
-    .map((category) => ({
-      value: category.id,
-      label: category.name,
-    }));
+  const categoryOptions = useMemo(
+    () => toCategorySelectOptions(categoryItems),
+    [categoryItems],
+  );
 
-  const companyGroupOptions = [...companyGroups]
-    .sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }))
-    .map((group) => ({
-      value: group.id,
-      label: group.name,
-    }));
+  const companyGroupOptions = useMemo(
+    () => toCompanyGroupSelectOptions(companyGroups),
+    [companyGroups],
+  );
 
-  const categoryFilterOptions = [
-    { value: '', label: 'Toutes les catégories' },
-    ...categoryOptions,
-  ];
+  const categoryFilterOptions = useMemo(
+    () => [{ value: '', label: 'Toutes les catégories' }, ...categoryOptions],
+    [categoryOptions],
+  );
 
-  const companyGroupFilterOptions = [
-    { value: '', label: "Tous les groupes d'entreprises" },
-    ...companyGroupOptions,
-  ];
+  const companyGroupFilterOptions = useMemo(
+    () => [{ value: '', label: "Tous les groupes d'entreprises" }, ...companyGroupOptions],
+    [companyGroupOptions],
+  );
 
   return (
     <Paper shadow="sm" p="md" withBorder>
@@ -115,7 +86,7 @@ export function ItemsTable({
             title: 'Catégorie',
             render: (item: ItemWithRelations) => {
               if (!item.category) return '-';
-              const textColor = getTextColor(item.category.color);
+              const textColor = getContrastTextColor(item.category.color);
               return (
                 <Badge
                   style={{
@@ -231,7 +202,7 @@ export function ItemsTable({
           },
           {
             accessor: 'companyGroup.name',
-            title: "Groupe",
+            title: 'Groupe',
             render: (item: ItemWithRelations) => item.companyGroup?.name || '-',
             filter: (
               <Select
@@ -276,11 +247,7 @@ export function ItemsTable({
         ]}
         fetching={loading}
         noRecordsText={
-          categoryFilter ||
-          companyGroupFilter ||
-          craftableFilter ||
-          nameFilter ||
-          descriptionFilter
+          categoryFilter || companyGroupFilter || craftableFilter || nameFilter
             ? 'Aucun objet trouvé avec ces filtres'
             : 'Aucun objet trouvé'
         }
@@ -299,4 +266,3 @@ export function ItemsTable({
     </Paper>
   );
 }
-

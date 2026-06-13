@@ -31,6 +31,54 @@ export type ChestStockCheckConfigsResponse = {
   configsByChestId: Record<string, ChestStockCheckConfigDTO>;
 };
 
+export type ChestStockCheckFormResponse = {
+  categories: CategoryItemDTO[];
+  config: ChestStockCheckConfigDTO | null;
+};
+
+export async function getChestStockCheckForm(dispensarySlug: string, chestId: string) {
+  try {
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      permission: { resource: 'application', action: 'management' },
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
+
+    const [categories, configRow] = await Promise.all([
+      prisma.categoryItem.findMany({
+        where: tenantWhere(dispensaryId),
+        orderBy: [{ order: 'asc' }, { name: 'asc' }],
+        select: { id: true, name: true, color: true, order: true },
+      }),
+      prisma.chestStockCheckConfig.findFirst({
+        where: {
+          chestId,
+          chest: tenantWhere(dispensaryId),
+        },
+        select: {
+          chestId: true,
+          isEnabled: true,
+          categories: { select: { categoryId: true } },
+        },
+      }),
+    ]);
+
+    const config: ChestStockCheckConfigDTO | null = configRow
+      ? {
+          chestId: configRow.chestId,
+          isEnabled: configRow.isEnabled,
+          categoryIds: configRow.categories.map((x) => x.categoryId),
+        }
+      : null;
+
+    const payload: ChestStockCheckFormResponse = { categories, config };
+
+    return { status: 200, data: payload };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors du chargement de la configuration');
+  }
+}
+
 export async function getChestStockCheckConfigs(dispensarySlug: string) {
   try {
     const ctx = await requireTenantServerActionContext(dispensarySlug, {

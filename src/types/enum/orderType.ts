@@ -24,15 +24,6 @@ const orderTypePillPalettes: Record<OrderType, ApothecaryPalette> = {
   OUTGOING: leatherPalette,
 };
 
-/** @deprecated Prefer OrderTypeBadge or getOrderTypePillStyle */
-export function getOrderTypeColor(type: OrderType): string {
-  const colors: Record<OrderType, string> = {
-    INCOMING: 'denim',
-    OUTGOING: 'leather',
-  };
-  return colors[type];
-}
-
 export function getOrderTypePillStyle(type: OrderType): CSSProperties {
   return apothecaryPillStyle(orderTypePillPalettes[type]);
 }

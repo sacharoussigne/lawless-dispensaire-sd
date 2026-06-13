@@ -1,20 +1,18 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
 import { useState, useEffect } from 'react';
-import { Modal, Stack, Button, Group, Text, Select, Alert } from '@mantine/core';
-import { notifications } from '@mantine/notifications';
-import { deleteChest } from '@/app/_actions/chests';
-import { handleAction } from '@/lib/action';
+import { Stack, Button, Text, Select, Alert } from '@mantine/core';
 import { IconAlertCircle } from '@tabler/icons-react';
 import type { ChestWithStockHistory } from '@/types/chests';
+import { AppModal, AppModalFooter } from '@/app/_components/AppModal/AppModal';
+import type { useDeleteChestMutation } from '../hooks/useChestsQueries';
 
 interface DeleteChestModalProps {
   opened: boolean;
   onClose: () => void;
   chestToDelete: ChestWithStockHistory | null;
   allChests: ChestWithStockHistory[];
-  onSuccess: () => void;
+  deleteMutation: ReturnType<typeof useDeleteChestMutation>;
 }
 
 export function DeleteChestModal({
@@ -22,15 +20,12 @@ export function DeleteChestModal({
   onClose,
   chestToDelete,
   allChests,
-  onSuccess,
+  deleteMutation,
 }: DeleteChestModalProps) {
-  const { dispensarySlug } = usePermissions();
-  const [targetChestId, setTargetChestId] = useState<string>('');
+  const [targetChestId, setTargetChestId] = useState('');
 
-  // Réinitialiser le sélecteur quand le modal s'ouvre ou que le coffre change
   useEffect(() => {
     if (opened && chestToDelete) {
-      // Sélectionner automatiquement le premier autre coffre disponible
       const otherChests = allChests.filter((c) => c.id !== chestToDelete.id);
       if (otherChests.length > 0) {
         setTargetChestId(otherChests[0].id);
@@ -42,10 +37,8 @@ export function DeleteChestModal({
     }
   }, [opened, chestToDelete, allChests]);
 
-  // Vérifier s'il n'y a qu'un seul coffre
   const isLastChest = allChests.length <= 1;
 
-  // Obtenir les autres coffres (exclure celui à supprimer)
   const otherChests = chestToDelete
     ? allChests.filter((c) => c.id !== chestToDelete.id)
     : [];
@@ -54,24 +47,13 @@ export function DeleteChestModal({
     if (!chestToDelete || !targetChestId) return;
 
     try {
-      const result = await deleteChest(dispensarySlug!, {
+      await deleteMutation.mutateAsync({
         id: chestToDelete.id,
-        targetChestId: targetChestId,
-      });
-      handleAction(result);
-      notifications.show({
-        title: 'Succès',
-        message: 'Coffre supprimé avec succès. Les stocks ont été transférés.',
-        color: 'green',
+        targetChestId,
       });
       onClose();
-      onSuccess();
-    } catch (error: any) {
-      notifications.show({
-        title: 'Erreur',
-        message: error.message || 'Erreur lors de la suppression',
-        color: 'red',
-      });
+    } catch {
+      // Error notification handled by mutation
     }
   };
 
@@ -81,19 +63,30 @@ export function DeleteChestModal({
   }));
 
   return (
-    <Modal
+    <AppModal
       opened={opened}
       onClose={onClose}
       title="Confirmer la suppression"
       size="md"
+      footer={
+        <AppModalFooter>
+          <Button variant="subtle" color="slate" onClick={onClose}>
+            Annuler
+          </Button>
+          <Button
+            color="danger"
+            onClick={handleDelete}
+            loading={deleteMutation.isPending}
+            disabled={isLastChest || !targetChestId}
+          >
+            Supprimer
+          </Button>
+        </AppModalFooter>
+      }
     >
       <Stack>
         {isLastChest ? (
-          <Alert
-            icon={<IconAlertCircle size={16} />}
-            title="Impossible de supprimer"
-            color="red"
-          >
+          <Alert icon={<IconAlertCircle size={16} />} title="Impossible de supprimer" color="danger">
             Il doit y avoir au moins un coffre. Vous ne pouvez pas supprimer le dernier coffre.
           </Alert>
         ) : (
@@ -102,9 +95,9 @@ export function DeleteChestModal({
               Êtes-vous sûr de vouloir supprimer le coffre{' '}
               <strong>{chestToDelete?.name}</strong> ?
             </Text>
-            {chestToDelete && chestToDelete.stockHistory.length > 0 && (
-              <Text c="orange" size="sm" mt="xs">
-                Ce coffre contient {chestToDelete.stockHistory.length} enregistrement(s) de stock.
+            {chestToDelete && chestToDelete.stockHistoryCount > 0 && (
+              <Text c="amber" size="sm" mt="xs">
+                Ce coffre contient {chestToDelete.stockHistoryCount} enregistrement(s) de stock.
                 Tous les stocks seront transférés vers le coffre de destination.
               </Text>
             )}
@@ -120,19 +113,7 @@ export function DeleteChestModal({
             />
           </>
         )}
-        <Group justify="flex-end" mt="md">
-          <Button variant="subtle" onClick={onClose}>
-            Annuler
-          </Button>
-          <Button
-            color="red"
-            onClick={handleDelete}
-            disabled={isLastChest || !targetChestId}
-          >
-            Supprimer
-          </Button>
-        </Group>
       </Stack>
-    </Modal>
+    </AppModal>
   );
 }

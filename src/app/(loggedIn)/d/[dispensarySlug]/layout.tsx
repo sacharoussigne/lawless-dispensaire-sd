@@ -15,6 +15,8 @@ import {
 } from '@/lib/dispensary/context';
 import { notFound, redirect } from 'next/navigation';
 import { userHasAnyAgendaAccess, listAccessibleAgendaIds } from '@/lib/agenda/access';
+import { DispensaryRealtimeShell } from './DispensaryRealtimeShell';
+import { QueryProvider } from '@/lib/react-query/QueryProvider';
 
 export default async function DispensaryLayout({
   children,
@@ -31,7 +33,8 @@ export default async function DispensaryLayout({
     notFound();
   }
 
-  const canAccess = await userCanAccessDispensary(session as AuthSession | null, dispensary.id);
+  const authSession = session as AuthSession | null;
+  const canAccess = await userCanAccessDispensary(authSession, dispensary.id);
   if (!canAccess && session) {
     const target = await resolveDispensaryAccessDeniedRedirect(
       session,
@@ -40,11 +43,19 @@ export default async function DispensaryLayout({
     redirect(target);
   }
 
-  const impersonatorDisplayName = await getImpersonatorDisplayName(session?.session?.impersonatedBy);
-  const effectiveRole = await getEffectiveRoleForDispensary(session as AuthSession | null, dispensary.id);
+  const [
+    impersonatorDisplayName,
+    effectiveRole,
+    appSettings,
+    accessibleDispensaries,
+  ] = await Promise.all([
+    getImpersonatorDisplayName(session?.session?.impersonatedBy),
+    getEffectiveRoleForDispensary(authSession, dispensary.id),
+    getAppSettings(dispensary.id),
+    listAccessibleDispensaries(authSession),
+  ]);
+
   const permissions = calculatePermissions(effectiveRole);
-  const appSettings = await getAppSettings(dispensary.id);
-  const accessibleDispensaries = await listAccessibleDispensaries(session as AuthSession | null);
   const userId = session?.user?.id;
   const agendaModuleAccess = userId
     ? await userHasAnyAgendaAccess(
@@ -75,17 +86,21 @@ export default async function DispensaryLayout({
       agendaModuleAccess={agendaModuleAccess}
       accessibleAgendaIds={accessibleAgendaIds}
     >
-      <LoggedInShell>
-        <Header
-          session={session as AuthSession | null}
-          impersonatorDisplayName={impersonatorDisplayName}
-          dispensarySlug={dispensarySlug}
-        />
+      <DispensaryRealtimeShell>
+        <QueryProvider>
+          <LoggedInShell>
+          <Header
+            session={authSession}
+            impersonatorDisplayName={impersonatorDisplayName}
+            dispensarySlug={dispensarySlug}
+          />
 
-        <div className="flex-1 w-full min-w-0 pb-[72px] sm:pb-0 min-h-0">
-          {children}
-        </div>
-      </LoggedInShell>
+          <div className="flex-1 w-full min-w-0 pb-[72px] sm:pb-0 min-h-0">
+            {children}
+          </div>
+        </LoggedInShell>
+        </QueryProvider>
+      </DispensaryRealtimeShell>
     </PermissionsProvider>
   );
 }

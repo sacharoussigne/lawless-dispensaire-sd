@@ -1,14 +1,7 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
 import { useState, useEffect } from 'react';
-import {
-  Modal,
-  Stack,
-  Text,
-  Button,
-  Group,
-} from '@mantine/core';
+import { Stack, Text, Button } from '@mantine/core';
 import {
   DndContext,
   closestCenter,
@@ -16,7 +9,7 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  DragEndEvent,
+  type DragEndEvent,
 } from '@dnd-kit/core';
 import {
   arrayMove,
@@ -24,75 +17,52 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { notifications } from '@mantine/notifications';
-import { reorderChests } from '@/app/_actions/chests';
-import { handleAction } from '@/lib/action';
 import { SortableChestRow } from './SortableChestRow';
 import type { ChestWithStockHistory } from '@/types/chests';
+import { sortChests } from '@/lib/chests/sortChests';
+import { AppModal, AppModalFooter } from '@/app/_components/AppModal/AppModal';
+import type { useReorderChestsMutation } from '../hooks/useChestsQueries';
 
 interface ReorderChestsModalProps {
   opened: boolean;
   onClose: () => void;
   chests: ChestWithStockHistory[];
-  onSuccess: () => void;
+  reorderMutation: ReturnType<typeof useReorderChestsMutation>;
 }
 
 export function ReorderChestsModal({
   opened,
   onClose,
   chests,
-  onSuccess,
+  reorderMutation,
 }: ReorderChestsModalProps) {
-  const { dispensarySlug } = usePermissions();
   const [reorderItems, setReorderItems] = useState<ChestWithStockHistory[]>([]);
-  const [savingOrder, setSavingOrder] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
-    })
+    }),
   );
 
-  // Initialize reorder list with sorted chests when modal opens
   useEffect(() => {
     if (opened) {
-      const sortedChests = [...chests].sort((a, b) => {
-        if (a.order !== undefined && b.order !== undefined) {
-          return a.order - b.order;
-        }
-        return a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' });
-      });
-      setReorderItems([...sortedChests]);
+      setReorderItems(sortChests(chests));
     }
   }, [opened, chests]);
 
   const handleSaveReorder = async () => {
     try {
-      setSavingOrder(true);
-      const result = await reorderChests(dispensarySlug!, {
+      await reorderMutation.mutateAsync({
         items: reorderItems.map((item, index) => ({
           id: item.id,
           order: index,
         })),
       });
-      handleAction(result);
-      notifications.show({
-        title: 'Succès',
-        message: 'Ordre des coffres mis à jour',
-        color: 'green',
-      });
       onClose();
       setReorderItems([]);
-      onSuccess();
-    } catch (error: any) {
-      notifications.show({
-        title: 'Erreur',
-        message: error.message || 'Erreur lors de la mise à jour de l\'ordre',
-        color: 'red',
-      });
-    } finally {
-      setSavingOrder(false);
+    } catch {
+      // Error notification handled by mutation
     }
   };
 
@@ -114,11 +84,25 @@ export function ReorderChestsModal({
   };
 
   return (
-    <Modal
+    <AppModal
       opened={opened}
       onClose={handleClose}
       title="Réordonner les coffres"
       size="md"
+      footer={
+        <AppModalFooter>
+          <Button variant="subtle" color="slate" onClick={handleClose}>
+            Annuler
+          </Button>
+          <Button
+            onClick={handleSaveReorder}
+            loading={reorderMutation.isPending}
+            disabled={reorderItems.length === 0}
+          >
+            Valider
+          </Button>
+        </AppModalFooter>
+      }
     >
       <Stack>
         <Text size="sm" c="dimmed" mb="md">
@@ -140,19 +124,7 @@ export function ReorderChestsModal({
             </Stack>
           </SortableContext>
         </DndContext>
-        <Group justify="flex-end" mt="md">
-          <Button variant="subtle" onClick={handleClose}>
-            Annuler
-          </Button>
-          <Button
-            onClick={handleSaveReorder}
-            loading={savingOrder}
-            disabled={reorderItems.length === 0}
-          >
-            Valider
-          </Button>
-        </Group>
       </Stack>
-    </Modal>
+    </AppModal>
   );
 }

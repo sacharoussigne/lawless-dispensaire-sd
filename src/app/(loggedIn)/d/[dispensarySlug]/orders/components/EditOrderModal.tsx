@@ -1,100 +1,62 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
 import { useEffect, useState, useMemo } from 'react';
 import {
-  Modal,
   Stack,
   TextInput,
   Textarea,
   Select,
   Button,
-  Group,
   Text,
   NumberInput,
-  Table,
-  ActionIcon,
   Divider,
   SimpleGrid,
+  Loader,
 } from '@mantine/core';
-import { IconTrash } from '@tabler/icons-react';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
-import { updateOrder } from '@/app/_actions/orders';
-import { getItems } from '@/app/_actions/items';
-import { handleAction } from '@/lib/action';
+import {
+  orderStatusSelectOptions,
+  orderTypeSelectOptions,
+} from '@/lib/orders/orderSelectOptions';
 import {
   calculateOrderPriceFromItems,
   normalizeItemPrice,
 } from '@/lib/orders/calculateOrderPriceFromItems';
 import { calculateOrderWeightFromItems } from '@/lib/orders/calculateOrderWeightFromItems';
+import { getAvailableItemsForOrder } from '@/lib/orders/getAvailableItemsForOrder';
 import { handleApiZodError } from '@/lib/services/zod';
 import { ParsedZodError } from '@/lib/errors/ParsedZodError';
+import { OrderStatusEnum } from '@/types/enum/orderStatus';
+import { OrderTypeEnum } from '@/types/enum/orderType';
+import type { OrderItem } from '@/types/orders';
+import { AppModal, AppModalFooter } from '@/app/_components/AppModal/AppModal';
+import { OrderItemsTable } from './OrderItemsTable';
 import {
-  getOrderStatusLabel,
-  OrderStatusEnum,
-} from '@/types/enum/orderStatus';
-import {
-  getOrderTypeLabel,
-  OrderTypeEnum,
-} from '@/types/enum/orderType';
-import type { OrderWithRelations } from '@/types/orders';
-import type { ItemWithRelations } from '@/types/stock';
-
-interface OrderItem {
-  itemId: string;
-  quantity: number;
-  item: {
-    id: string;
-    name: string;
-    price: number | null;
-    weight?: number | null;
-  };
-}
+  useOrderDetail,
+  useOrderFormItems,
+  useUpdateOrderMutation,
+} from '../hooks/useOrdersQueries';
 
 interface EditOrderModalProps {
   opened: boolean;
   onClose: () => void;
-  editingOrder: OrderWithRelations | null;
-  onSuccess: () => void;
+  orderId: string | null;
 }
 
-const statusOptions: { value: string; label: string }[] = [
-  { value: OrderStatusEnum.DRAFT, label: getOrderStatusLabel(OrderStatusEnum.DRAFT) },
-  {
-    value: OrderStatusEnum.LETTER_SENT,
-    label: getOrderStatusLabel(OrderStatusEnum.LETTER_SENT),
-  },
-  {
-    value: OrderStatusEnum.PROCESSING,
-    label: getOrderStatusLabel(OrderStatusEnum.PROCESSING),
-  },
-  { value: OrderStatusEnum.READY, label: getOrderStatusLabel(OrderStatusEnum.READY) },
-  {
-    value: OrderStatusEnum.COMPLETED,
-    label: getOrderStatusLabel(OrderStatusEnum.COMPLETED),
-  },
-  {
-    value: OrderStatusEnum.CANCELLED,
-    label: getOrderStatusLabel(OrderStatusEnum.CANCELLED),
-  },
-];
+export function EditOrderModal({ opened, onClose, orderId }: EditOrderModalProps) {
+  const { data: editingOrder, isLoading: loadingOrder } = useOrderDetail(
+    orderId,
+    opened && Boolean(orderId),
+  );
+  const companyGroupId = editingOrder?.companyGroupId ?? null;
+  const { data: allItems = [], isLoading: loadingItems } = useOrderFormItems(
+    companyGroupId,
+    opened && Boolean(editingOrder),
+  );
+  const updateOrderMutation = useUpdateOrderMutation();
 
-const typeOptions: { value: string; label: string }[] = [
-  { value: OrderTypeEnum.INCOMING, label: getOrderTypeLabel(OrderTypeEnum.INCOMING) },
-  { value: OrderTypeEnum.OUTGOING, label: getOrderTypeLabel(OrderTypeEnum.OUTGOING) },
-];
-
-export function EditOrderModal({
-  opened,
-  onClose,
-  editingOrder,
-  onSuccess,
-}: EditOrderModalProps) {
-  const { dispensarySlug } = usePermissions();
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
-  const [allItems, setAllItems] = useState<ItemWithRelations[]>([]);
-  const [loadingItems, setLoadingItems] = useState(false);
   const [priceManuallyEdited, setPriceManuallyEdited] = useState(false);
 
   const form = useForm({
@@ -111,41 +73,10 @@ export function EditOrderModal({
   });
 
   useEffect(() => {
-    if (opened) {
-      const loadItems = async () => {
-        try {
-          setLoadingItems(true);
-          const itemsResult = await getItems(dispensarySlug!, );
-          const itemsData = handleAction(itemsResult);
-          if (itemsData) {
-            setAllItems(
-              itemsData.map((item: any) => ({
-                ...item,
-                stockToday: null,
-                stockYesterday: null,
-                price: normalizeItemPrice(item.price),
-                canBeSold: item.canBeSold ?? false,
-              }))
-            );
-          }
-        } catch (error: any) {
-          notifications.show({
-            title: 'Erreur',
-            message: error.message || 'Erreur lors du chargement des données',
-            color: 'red',
-          });
-        } finally {
-          setLoadingItems(false);
-        }
-      };
-      loadItems();
-    }
-  }, [opened]);
-
-  useEffect(() => {
     if (editingOrder) {
       setOrderItems(
         editingOrder.items.map((item) => ({
+          id: item.id,
           itemId: item.itemId,
           quantity: item.quantity,
           item: {
@@ -154,41 +85,8 @@ export function EditOrderModal({
             price: item.item.price,
             weight: item.item.weight ?? null,
           },
-        }))
+        })),
       );
-    }
-  }, [editingOrder, opened]);
-
-  const suggestedPrice = useMemo(
-    () =>
-      calculateOrderPriceFromItems(
-        orderItems.map((orderItem) => ({
-          quantity: orderItem.quantity,
-          price: orderItem.item.price,
-        }))
-      ),
-    [orderItems]
-  );
-
-  const totalWeight = useMemo(
-    () =>
-      calculateOrderWeightFromItems(
-        orderItems.map((orderItem) => ({
-          quantity: orderItem.quantity,
-          weight: orderItem.item.weight,
-        }))
-      ),
-    [orderItems]
-  );
-
-  useEffect(() => {
-    if (!priceManuallyEdited) {
-      form.setFieldValue('price', suggestedPrice ?? '');
-    }
-  }, [suggestedPrice, priceManuallyEdited]);
-
-  useEffect(() => {
-    if (editingOrder) {
       setPriceManuallyEdited(editingOrder.price != null);
       form.setValues({
         name: editingOrder.name,
@@ -200,47 +98,68 @@ export function EditOrderModal({
     }
   }, [editingOrder, opened]);
 
-  const getAvailableItems = () => {
-    const orderType = form.values.type || (editingOrder?.type as OrderTypeEnum);
-    
-    if (orderType === OrderTypeEnum.OUTGOING) {
-      // For outgoing orders, can choose items that can be sold
-      return allItems.filter((item) => {
-        const hasCanBeSold = item.canBeSold === true;
-        const price = normalizeItemPrice(item.price);
-        const hasPrice = price != null && price > 0;
-        const isNotCraftableWithPrice = !item.isCraftable && hasPrice;
-        
-        return hasCanBeSold || isNotCraftableWithPrice;
-      });
+  const suggestedPrice = useMemo(
+    () =>
+      calculateOrderPriceFromItems(
+        orderItems.map((orderItem) => ({
+          quantity: orderItem.quantity,
+          price: orderItem.item.price,
+        })),
+      ),
+    [orderItems],
+  );
+
+  const totalWeight = useMemo(
+    () =>
+      calculateOrderWeightFromItems(
+        orderItems.map((orderItem) => ({
+          quantity: orderItem.quantity,
+          weight: orderItem.item.weight,
+        })),
+      ),
+    [orderItems],
+  );
+
+  useEffect(() => {
+    if (!priceManuallyEdited) {
+      form.setFieldValue('price', suggestedPrice ?? '');
     }
-    
-    // For incoming orders, filter by company group
-    // Get company group from existing items
-    if (orderItems.length > 0) {
-      const firstItem = allItems.find((item) => item.id === orderItems[0].itemId);
-      const companyGroupId = firstItem?.companyGroupId;
-      
-      if (companyGroupId) {
-        return allItems.filter(
-          (item) => !item.isCraftable && item.companyGroupId === companyGroupId
-        );
-      }
-    }
-    
-    return [];
-  };
+  }, [suggestedPrice, priceManuallyEdited]);
+
+  const availableItems = useMemo(
+    () =>
+      getAvailableItemsForOrder({
+        orderType: form.values.type,
+        allItems,
+        companyGroupId,
+        firstOrderItemId: orderItems[0]?.itemId ?? null,
+      }),
+    [form.values.type, allItems, companyGroupId, orderItems],
+  );
+
+  const availableItemOptions = useMemo(
+    () =>
+      availableItems
+        .filter((item) => !orderItems.some((oi) => oi.itemId === item.id))
+        .map((item) => ({ value: item.id, label: item.name })),
+    [availableItems, orderItems],
+  );
 
   const handleRemoveItem = (itemId: string) => {
     setOrderItems(orderItems.filter((oi) => oi.itemId !== itemId));
   };
 
   const handleQuantityChange = (itemId: string, quantity: number | string) => {
-    const numQuantity = typeof quantity === 'number' ? quantity : (quantity === '' ? 1 : Number(quantity) || 1);
+    const numQuantity =
+      typeof quantity === 'number'
+        ? quantity
+        : quantity === ''
+          ? 1
+          : Number(quantity) || 1;
     setOrderItems(
       orderItems.map((oi) =>
-        oi.itemId === itemId ? { ...oi, quantity: numQuantity } : oi
-      )
+        oi.itemId === itemId ? { ...oi, quantity: numQuantity } : oi,
+      ),
     );
   };
 
@@ -270,13 +189,13 @@ export function EditOrderModal({
       notifications.show({
         title: 'Erreur',
         message: 'La commande doit contenir au moins un article',
-        color: 'red',
+        color: 'danger',
       });
       return;
     }
 
     try {
-      const result = await updateOrder(dispensarySlug!, {
+      await updateOrderMutation.mutateAsync({
         id: editingOrder.id,
         name: values.name,
         status: values.status,
@@ -288,35 +207,21 @@ export function EditOrderModal({
           quantity: oi.quantity,
         })),
       });
-
-      handleAction(result);
-
-      notifications.show({
-        title: 'Succès',
-        message: 'Commande modifiée avec succès',
-        color: 'green',
-      });
       onClose();
       form.reset();
       setOrderItems([]);
-      onSuccess();
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof ParsedZodError) {
         handleApiZodError(error.error, form);
-      } else {
-        notifications.show({
-          title: 'Erreur',
-          message: error.message || 'Erreur lors de la sauvegarde',
-          color: 'red',
-        });
       }
     }
   };
 
   const isCompleted = editingOrder?.status === OrderStatusEnum.COMPLETED;
+  const isLoading = loadingOrder || loadingItems;
 
   return (
-    <Modal
+    <AppModal
       opened={opened}
       onClose={() => {
         onClose();
@@ -324,174 +229,127 @@ export function EditOrderModal({
         setOrderItems([]);
         setPriceManuallyEdited(false);
       }}
-      title={editingOrder ? 'Modifier la commande' : 'Créer une commande'}
+      title="Modifier la commande"
       size="xl"
+      footer={
+        <AppModalFooter>
+          <Button
+            variant="subtle"
+            color="slate"
+            onClick={() => {
+              onClose();
+              form.reset();
+            }}
+          >
+            Annuler
+          </Button>
+          <Button
+            type="submit"
+            form="edit-order-form"
+            disabled={isCompleted || isLoading}
+            loading={updateOrderMutation.isPending}
+          >
+            Enregistrer
+          </Button>
+        </AppModalFooter>
+      }
     >
-      <form onSubmit={form.onSubmit(handleSubmit)}>
-        <Stack gap="md">
-          <Stack gap="sm">
-            <Text fw={600} size="xs" c="dimmed" tt="uppercase">
-              Informations générales
-            </Text>
-            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-              <TextInput
-                label="Nom"
-                placeholder="Nom de la commande"
-                required
-                {...form.getInputProps('name')}
-                disabled={isCompleted}
-              />
-              <Select
-                label="Type"
-                data={typeOptions}
-                required
-                value={form.values.type}
-                onChange={(value) => {
-                  form.setFieldValue('type', value as OrderTypeEnum);
-                  setPriceManuallyEdited(false);
-                }}
-                disabled={isCompleted}
-              />
-            </SimpleGrid>
-
-            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-              <Select
-                label="Statut"
-                data={statusOptions}
-                required
-                value={form.values.status}
-                onChange={(value) =>
-                  value && form.setFieldValue('status', value as OrderStatusEnum)
-                }
-                disabled={isCompleted}
-              />
-              <NumberInput
-                label="Prix (optionnel)"
-                placeholder="Prix de la commande"
-                min={0}
-                decimalScale={2}
-                fixedDecimalScale
-                prefix="$ "
-                value={form.values.price}
-                onChange={(value) => {
-                  setPriceManuallyEdited(true);
-                  form.setFieldValue('price', value === '' ? '' : Number(value));
-                }}
-                disabled={isCompleted}
-              />
-            </SimpleGrid>
-
-            <Textarea
-              label="Détails (optionnel)"
-              placeholder="Détails de la commande"
-              minRows={3}
-              {...form.getInputProps('details')}
-              disabled={isCompleted}
-            />
-
-            {totalWeight != null && (
-              <Text size="sm" c="dimmed">
-                Poids total :{' '}
-                <Text span fw={500} c="inherit">
-                  {totalWeight.toFixed(2)} kg
-                </Text>
-              </Text>
-            )}
-          </Stack>
-
-          <Divider />
-
-          <Stack gap="sm">
-            <Text fw={600} size="xs" c="dimmed" tt="uppercase">
-              Objets de la commande
-            </Text>
-          {orderItems.length > 0 ? (
-            <Table striped highlightOnHover>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Objet</Table.Th>
-                  <Table.Th>Quantité</Table.Th>
-                  <Table.Th>Prix unitaire</Table.Th>
-                  <Table.Th>Total</Table.Th>
-                  <Table.Th style={{ width: 50 }}></Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {orderItems.map((orderItem) => {
-                  const itemPrice = orderItem.item.price || 0;
-                  const itemTotal = itemPrice * orderItem.quantity;
-                  return (
-                    <Table.Tr key={orderItem.itemId}>
-                      <Table.Td>{orderItem.item.name}</Table.Td>
-                      <Table.Td>
-                        <NumberInput
-                          value={orderItem.quantity}
-                          onChange={(value) => handleQuantityChange(orderItem.itemId, value)}
-                          min={1}
-                          style={{ maxWidth: 120 }}
-                          disabled={isCompleted}
-                        />
-                      </Table.Td>
-                      <Table.Td>{itemPrice > 0 ? `${itemPrice.toFixed(2)} $` : '-'}</Table.Td>
-                      <Table.Td>{itemTotal > 0 ? `${itemTotal.toFixed(2)} $` : '-'}</Table.Td>
-                      <Table.Td>
-                        <ActionIcon
-                          color="red"
-                          variant="light"
-                          onClick={() => handleRemoveItem(orderItem.itemId)}
-                          disabled={isCompleted}
-                        >
-                          <IconTrash size={16} />
-                        </ActionIcon>
-                      </Table.Td>
-                    </Table.Tr>
-                  );
-                })}
-              </Table.Tbody>
-            </Table>
-          ) : (
-            <Text c="dimmed" ta="center" py="md">
-              Aucun objet dans la commande. Utilisez le champ ci-dessous pour ajouter un objet.
-            </Text>
-          )}
-
-          {!isCompleted && (
-            <Select
-              label="Ajouter un objet"
-              placeholder="Sélectionner un objet à ajouter"
-              data={getAvailableItems()
-                .filter((item) => !orderItems.some((oi) => oi.itemId === item.id))
-                .map((item) => ({ value: item.id, label: item.name }))}
-              disabled={loadingItems || getAvailableItems().length === 0}
-              onChange={(value) => {
-                if (value) {
-                  handleAddItem(value);
-                }
-              }}
-              searchable
-              clearable
-            />
-          )}
-
-          </Stack>
-
-          <Group justify="flex-end" mt="md">
-            <Button
-              variant="subtle"
-              onClick={() => {
-                onClose();
-                form.reset();
-              }}
-            >
-              Annuler
-            </Button>
-            <Button type="submit" disabled={isCompleted}>
-              Enregistrer
-            </Button>
-          </Group>
+      {isLoading && !editingOrder ? (
+        <Stack align="center" py="xl">
+          <Loader />
         </Stack>
-      </form>
-    </Modal>
+      ) : (
+        <form id="edit-order-form" onSubmit={form.onSubmit(handleSubmit)}>
+          <Stack gap="md">
+            <Stack gap="sm">
+              <Text fw={600} size="xs" c="dimmed" tt="uppercase">
+                Informations générales
+              </Text>
+              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+                <TextInput
+                  label="Nom"
+                  placeholder="Nom de la commande"
+                  required
+                  {...form.getInputProps('name')}
+                  disabled={isCompleted}
+                />
+                <Select
+                  label="Type"
+                  data={orderTypeSelectOptions}
+                  required
+                  value={form.values.type}
+                  onChange={(value) => {
+                    form.setFieldValue('type', value as OrderTypeEnum);
+                    setPriceManuallyEdited(false);
+                  }}
+                  disabled={isCompleted}
+                />
+              </SimpleGrid>
+
+              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+                <Select
+                  label="Statut"
+                  data={orderStatusSelectOptions}
+                  required
+                  value={form.values.status}
+                  onChange={(value) =>
+                    value && form.setFieldValue('status', value as OrderStatusEnum)
+                  }
+                  disabled={isCompleted}
+                />
+                <NumberInput
+                  label="Prix (optionnel)"
+                  placeholder="Prix de la commande"
+                  min={0}
+                  decimalScale={2}
+                  fixedDecimalScale
+                  prefix="$ "
+                  value={form.values.price}
+                  onChange={(value) => {
+                    setPriceManuallyEdited(true);
+                    form.setFieldValue('price', value === '' ? '' : Number(value));
+                  }}
+                  disabled={isCompleted}
+                />
+              </SimpleGrid>
+
+              <Textarea
+                label="Détails (optionnel)"
+                placeholder="Détails de la commande"
+                minRows={3}
+                {...form.getInputProps('details')}
+                disabled={isCompleted}
+              />
+
+              {totalWeight != null && (
+                <Text size="sm" c="dimmed">
+                  Poids total :{' '}
+                  <Text span fw={500} c="inherit">
+                    {totalWeight.toFixed(2)} kg
+                  </Text>
+                </Text>
+              )}
+            </Stack>
+
+            <Divider />
+
+            <Stack gap="sm">
+              <Text fw={600} size="xs" c="dimmed" tt="uppercase">
+                Objets de la commande
+              </Text>
+              <OrderItemsTable
+                orderItems={orderItems}
+                disabled={isCompleted}
+                loadingItems={loadingItems}
+                availableItemOptions={availableItemOptions}
+                onQuantityChange={handleQuantityChange}
+                onRemoveItem={handleRemoveItem}
+                onAddItem={handleAddItem}
+              />
+            </Stack>
+          </Stack>
+        </form>
+      )}
+    </AppModal>
   );
 }
-

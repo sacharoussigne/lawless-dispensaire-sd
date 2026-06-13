@@ -26,13 +26,13 @@ import {
 import {
   createAgendaEventTodoTask,
   deleteAgendaEventTodoTask,
+  listAgendaEventTodoTasks,
   updateAgendaEventTodoTask,
 } from '@/app/_actions/agenda/eventTodos';
 import { searchDispensaryUsersForAgenda } from '@/app/_actions/agenda/members';
 import { handleAction } from '@/lib/action';
 import { agendaMutationMeta } from '@/lib/agenda/realtime/mutationMeta';
-import { useAgendaRealtime } from '@/lib/agenda/realtime/useAgendaRealtime';
-import { isRelevantAgendaRealtimeEvent } from '@/lib/agenda/realtime/isRelevantAgendaEvent';
+import type { AgendaEventChange } from '@/lib/agenda/eventState';
 import {
   assertAgendaEventRangeValid,
   formatAgendaDateInput,
@@ -55,7 +55,8 @@ interface EventModalProps {
   slotEnd?: Date | null;
   canWrite: boolean;
   clientId?: string;
-  onSuccess: () => void;
+  remoteEventTodosToken?: number;
+  onSuccess: (change: AgendaEventChange) => void;
 }
 
 export function EventModal({
@@ -68,6 +69,7 @@ export function EventModal({
   slotEnd,
   canWrite,
   clientId,
+  remoteEventTodosToken = 0,
   onSuccess,
 }: EventModalProps) {
   const [title, setTitle] = useState('');
@@ -84,59 +86,15 @@ export function EventModal({
   const [submitting, setSubmitting] = useState(false);
   const mutationMeta = agendaMutationMeta(clientId);
   const eventIdRef = useRef(event?.id);
-  const agendaIdRef = useRef(agendaId);
 
   useEffect(() => {
     eventIdRef.current = event?.id;
   }, [event?.id]);
 
   useEffect(() => {
-    agendaIdRef.current = agendaId;
-  }, [agendaId]);
-
-  useAgendaRealtime({
-    dispensarySlug,
-    enabled: opened && !!event?.id,
-    onEventTodosChange: (payload) => {
-      const eventId = eventIdRef.current;
-      if (!eventId || payload.eventId !== eventId) return;
-      if (
-        !isRelevantAgendaRealtimeEvent(payload, {
-          selectedAgendaId: agendaIdRef.current,
-        })
-      ) {
-        return;
-      }
-
-      void getAgendaEvent(dispensarySlug, eventId).then((result) => {
-        const data = handleAction(result);
-        if (data) {
-          setTodoTasks(data.todoTasks);
-        }
-      });
-    },
-  });
-
-  useEffect(() => {
     if (!opened) return;
 
-    if (event) {
-      setTitle(event.title);
-      setDescription(event.description ?? '');
-      setAllDay(event.allDay);
-      setStartDate(new Date(event.startAt));
-      setEndDate(new Date(event.endAt));
-      setStartTime(formatAgendaTimeInput(new Date(event.startAt)));
-      setEndTime(formatAgendaTimeInput(new Date(event.endAt)));
-      setParticipantIds(event.participants.map((p) => p.userId));
-      setTodoTasks(event.todoTasks);
-      setUserOptions(
-        event.participants.map((p) => ({
-          value: p.userId,
-          label: p.user.name,
-        })),
-      );
-    } else {
+    if (!event) {
       const start = slotStart ?? new Date();
       const end = slotEnd ?? dayjs(start).add(1, 'hour').toDate();
       setTitle('');
@@ -149,9 +107,57 @@ export function EventModal({
       setParticipantIds([]);
       setUserOptions([]);
       setTodoTasks([]);
+      setNewTodoTitle('');
+      return;
     }
-    setNewTodoTitle('');
-  }, [opened, event, slotStart, slotEnd]);
+
+    let cancelled = false;
+
+    void getAgendaEvent(dispensarySlug, event.id).then((result) => {
+      if (cancelled) return;
+      const data = handleAction(result);
+      if (!data) return;
+
+      setTitle(data.title);
+      setDescription(data.description ?? '');
+      setAllDay(data.allDay);
+      setStartDate(new Date(data.startAt));
+      setEndDate(new Date(data.endAt));
+      setStartTime(formatAgendaTimeInput(new Date(data.startAt)));
+      setEndTime(formatAgendaTimeInput(new Date(data.endAt)));
+      setParticipantIds(data.participants.map((participant) => participant.userId));
+      setTodoTasks(data.todoTasks);
+      setUserOptions(
+        data.participants.map((participant) => ({
+          value: participant.userId,
+          label: participant.user.name,
+        })),
+      );
+      setNewTodoTitle('');
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [opened, event, slotStart, slotEnd, dispensarySlug]);
+
+  useEffect(() => {
+    if (!opened || !event?.id || remoteEventTodosToken === 0) return;
+
+    let cancelled = false;
+
+    void listAgendaEventTodoTasks(dispensarySlug, event.id).then((result) => {
+      if (cancelled) return;
+      const data = handleAction(result);
+      if (data) {
+        setTodoTasks(data);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dispensarySlug, event?.id, opened, remoteEventTodosToken]);
 
   const searchUsers = async (query: string) => {
     if (query.trim().length < 2) return;
@@ -222,13 +228,15 @@ export function EventModal({
           )
         : await createAgendaEvent(dispensarySlug, payload, mutationMeta);
 
-      handleAction(result);
+      const data = handleAction(result);
       notifications.show({
         title: 'Succès',
         message: event ? 'Événement mis à jour' : 'Événement créé',
         color: 'moss',
       });
-      onSuccess();
+      if (data) {
+        onSuccess({ type: 'upsert', event: data });
+      }
       onClose();
     } catch (error: unknown) {
       notifications.show({
@@ -247,7 +255,7 @@ export function EventModal({
     try {
       const result = await deleteAgendaEvent(dispensarySlug, event.id, mutationMeta);
       handleAction(result);
-      onSuccess();
+      onSuccess({ type: 'delete', id: event.id });
       onClose();
     } catch (error: unknown) {
       notifications.show({

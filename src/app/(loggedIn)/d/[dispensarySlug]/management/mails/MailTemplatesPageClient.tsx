@@ -1,116 +1,116 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Container, Title, Group, Button, Tabs, Stack } from '@mantine/core';
 import { IconPlus, IconTemplate, IconLink } from '@tabler/icons-react';
-import { getMailTemplates } from '@/app/_actions/mailTemplates';
-import { getOrderLetterTemplateAssignments } from '@/app/_actions/orderLetterTemplateAssignments';
-import { handleAction } from '@/lib/action';
-import { notifications } from '@mantine/notifications';
 import { MailTemplateModal } from './components/MailTemplateModal';
 import { DeleteMailTemplateModal } from './components/DeleteMailTemplateModal';
 import { OrderLetterTemplateAssignmentModal } from './components/OrderLetterTemplateAssignmentModal';
 import { DeleteOrderLetterTemplateAssignmentModal } from './components/DeleteOrderLetterTemplateAssignmentModal';
 import { ActiveFilters } from '@/app/_components/ActiveFilters/ActiveFilters';
-import { MailTemplatesTable } from './components/MailTemplatesTable';
+import { MailTemplatesTable } from '@/app/_components/mails/MailTemplatesTable';
 import { OrderLetterTemplateAssignmentsTable } from './components/OrderLetterTemplateAssignmentsTable';
-import type { MailTemplate } from '@/types/mailTemplates';
-import type { OrderMailTemplateAssignment } from '@prisma/client';
-import { ManagementSectionThemeProvider } from '../ManagementSectionThemeProvider';
-
-interface OrderMailTemplateAssignmentWithTemplate extends OrderMailTemplateAssignment {
-  mailTemplate: {
-    id: string;
-    name: string;
-  };
-}
+import type { MailTemplateListItem } from '@/types/mailTemplates';
+import { normalizeString } from '@/lib/string/normalizeString';
+import {
+  useManagementMailTemplates,
+  useOrderLetterTemplateAssignments,
+  useCreateMailTemplateMutation,
+  useUpdateMailTemplateMutation,
+  useDeleteMailTemplateMutation,
+  useCreateOrderLetterAssignmentMutation,
+  useUpdateOrderLetterAssignmentMutation,
+  useDeleteOrderLetterAssignmentMutation,
+  type OrderLetterTemplateAssignmentWithTemplate,
+} from './hooks/useMailTemplatesQueries';
 
 interface MailTemplatesPageClientProps {
-  initialMailTemplates: MailTemplate[];
-  initialAssignments: OrderMailTemplateAssignmentWithTemplate[];
+  initialMailTemplates: MailTemplateListItem[];
+  initialAssignments: OrderLetterTemplateAssignmentWithTemplate[];
 }
-
-const normalizeString = (str: string): string => {
-  return str
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
-};
 
 export default function MailTemplatesPageClient({
   initialMailTemplates,
   initialAssignments,
 }: MailTemplatesPageClientProps) {
-  const { dispensarySlug } = usePermissions();
-  const [mailTemplates, setMailTemplates] = useState<MailTemplate[]>(initialMailTemplates);
-  const [assignments, setAssignments] = useState<OrderMailTemplateAssignmentWithTemplate[]>(initialAssignments);
-  const [loading, setLoading] = useState(false);
-  const [assignmentsLoading, setAssignmentsLoading] = useState(false);
+  const { data: mailTemplates = [], isFetching } = useManagementMailTemplates(initialMailTemplates);
+  const { data: assignments = [], isFetching: assignmentsFetching } =
+    useOrderLetterTemplateAssignments(initialAssignments);
+
+  const createTemplateMutation = useCreateMailTemplateMutation();
+  const updateTemplateMutation = useUpdateMailTemplateMutation();
+  const deleteTemplateMutation = useDeleteMailTemplateMutation();
+  const createAssignmentMutation = useCreateOrderLetterAssignmentMutation();
+  const updateAssignmentMutation = useUpdateOrderLetterAssignmentMutation();
+  const deleteAssignmentMutation = useDeleteOrderLetterAssignmentMutation();
+
   const [modalOpened, setModalOpened] = useState(false);
-  const [editingMailTemplate, setEditingMailTemplate] = useState<MailTemplate | null>(null);
+  const [editingMailTemplate, setEditingMailTemplate] = useState<MailTemplateListItem | null>(null);
   const [deleteModalOpened, setDeleteModalOpened] = useState(false);
-  const [mailTemplateToDelete, setMailTemplateToDelete] = useState<MailTemplate | null>(null);
+  const [mailTemplateToDelete, setMailTemplateToDelete] = useState<MailTemplateListItem | null>(null);
   const [assignmentModalOpened, setAssignmentModalOpened] = useState(false);
-  const [editingAssignment, setEditingAssignment] = useState<OrderMailTemplateAssignmentWithTemplate | null>(null);
+  const [editingAssignment, setEditingAssignment] =
+    useState<OrderLetterTemplateAssignmentWithTemplate | null>(null);
   const [deleteAssignmentModalOpened, setDeleteAssignmentModalOpened] = useState(false);
-  const [assignmentToDelete, setAssignmentToDelete] = useState<OrderMailTemplateAssignmentWithTemplate | null>(null);
+  const [assignmentToDelete, setAssignmentToDelete] =
+    useState<OrderLetterTemplateAssignmentWithTemplate | null>(null);
 
-  const [nameFilter, setNameFilter] = useState<string>('');
+  const [nameFilter, setNameFilter] = useState('');
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(10);
+  const pageSize = 10;
 
-  const loadMailTemplates = async () => {
-    try {
-      setLoading(true);
-      const result = await getMailTemplates(dispensarySlug!, );
-      const data = handleAction(result);
-      if (data) {
-        setMailTemplates(data);
-      }
-    } catch (error: any) {
-      notifications.show({
-        title: 'Erreur',
-        message: error.message || 'Erreur lors du chargement des modèles de courriers',
-        color: 'red',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { paginatedMailTemplates, totalRecords } = useMemo(() => {
+    const filtered = mailTemplates.filter((mailTemplate) => {
+      if (!nameFilter) return true;
+      return normalizeString(mailTemplate.name).includes(normalizeString(nameFilter));
+    });
+    const sorted = [...filtered].sort((a, b) =>
+      a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }),
+    );
+    return {
+      paginatedMailTemplates: sorted.slice((page - 1) * pageSize, page * pageSize),
+      totalRecords: sorted.length,
+    };
+  }, [mailTemplates, nameFilter, page, pageSize]);
 
-  const loadAssignments = async () => {
-    try {
-      setAssignmentsLoading(true);
-      const result = await getOrderLetterTemplateAssignments(dispensarySlug!, );
-      const data = handleAction(result);
-      if (data) {
-        setAssignments(data);
-      }
-    } catch (error: any) {
-      notifications.show({
-        title: 'Erreur',
-        message: error.message || 'Erreur lors du chargement des assignations',
-        color: 'red',
-      });
-    } finally {
-      setAssignmentsLoading(false);
-    }
-  };
+  useEffect(() => {
+    setPage(1);
+  }, [nameFilter]);
 
-  const handleEdit = (mailTemplate: MailTemplate) => {
+  const handleEdit = useCallback((mailTemplate: MailTemplateListItem) => {
     setEditingMailTemplate(mailTemplate);
     setModalOpened(true);
-  };
+  }, []);
+
+  const handleDelete = useCallback((mailTemplate: MailTemplateListItem) => {
+    setMailTemplateToDelete(mailTemplate);
+    setDeleteModalOpened(true);
+  }, []);
+
+  const handleEditAssignment = useCallback((assignment: OrderLetterTemplateAssignmentWithTemplate) => {
+    setEditingAssignment(assignment);
+    setAssignmentModalOpened(true);
+  }, []);
+
+  const handleDeleteAssignment = useCallback(
+    (assignment: OrderLetterTemplateAssignmentWithTemplate) => {
+      setAssignmentToDelete(assignment);
+      setDeleteAssignmentModalOpened(true);
+    },
+    [],
+  );
+
+  const handleNameFilterChange = useCallback((value: string) => {
+    setNameFilter(value);
+  }, []);
+
+  const handlePageChange = useCallback((p: number) => {
+    setPage(p);
+  }, []);
 
   const openCreateModal = () => {
     setEditingMailTemplate(null);
     setModalOpened(true);
-  };
-
-  const handleEditAssignment = (assignment: OrderMailTemplateAssignmentWithTemplate) => {
-    setEditingAssignment(assignment);
-    setAssignmentModalOpened(true);
   };
 
   const openCreateAssignmentModal = () => {
@@ -118,30 +118,8 @@ export default function MailTemplatesPageClient({
     setAssignmentModalOpened(true);
   };
 
-  const filteredMailTemplates = mailTemplates.filter((mailTemplate) => {
-    const matchesName =
-      !nameFilter ||
-      normalizeString(mailTemplate.name).includes(normalizeString(nameFilter));
-    return matchesName;
-  });
-
-  const sortedMailTemplates = [...filteredMailTemplates].sort((a, b) =>
-    a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' })
-  );
-
-  const totalRecords = sortedMailTemplates.length;
-  const paginatedMailTemplates = sortedMailTemplates.slice(
-    (page - 1) * pageSize,
-    page * pageSize
-  );
-
-  useEffect(() => {
-    setPage(1);
-  }, [nameFilter]);
-
   return (
-    <ManagementSectionThemeProvider section="mails">
-      <Container size="xl" py="xl">
+    <Container size="xl" py="xl">
       <Title order={1} mb="xl">Courriers</Title>
 
       <Tabs defaultValue="templates">
@@ -175,18 +153,15 @@ export default function MailTemplatesPageClient({
 
             <MailTemplatesTable
               mailTemplates={paginatedMailTemplates}
-              loading={loading}
+              loading={isFetching}
               nameFilter={nameFilter}
               page={page}
               pageSize={pageSize}
               totalRecords={totalRecords}
-              onNameFilterChange={(value) => setNameFilter(value)}
-              onPageChange={(p) => setPage(p)}
+              onNameFilterChange={handleNameFilterChange}
+              onPageChange={handlePageChange}
               onEdit={handleEdit}
-              onDelete={(mailTemplate) => {
-                setMailTemplateToDelete(mailTemplate);
-                setDeleteModalOpened(true);
-              }}
+              onDelete={handleDelete}
             />
           </Stack>
         </Tabs.Panel>
@@ -202,12 +177,9 @@ export default function MailTemplatesPageClient({
 
             <OrderLetterTemplateAssignmentsTable
               assignments={assignments}
-              loading={assignmentsLoading}
+              loading={assignmentsFetching}
               onEdit={handleEditAssignment}
-              onDelete={(assignment) => {
-                setAssignmentToDelete(assignment);
-                setDeleteAssignmentModalOpened(true);
-              }}
+              onDelete={handleDeleteAssignment}
             />
           </Stack>
         </Tabs.Panel>
@@ -220,7 +192,8 @@ export default function MailTemplatesPageClient({
           setEditingMailTemplate(null);
         }}
         editingMailTemplate={editingMailTemplate}
-        onSuccess={loadMailTemplates}
+        createMutation={createTemplateMutation}
+        updateMutation={updateTemplateMutation}
       />
 
       <DeleteMailTemplateModal
@@ -230,7 +203,7 @@ export default function MailTemplatesPageClient({
           setMailTemplateToDelete(null);
         }}
         mailTemplateToDelete={mailTemplateToDelete}
-        onSuccess={loadMailTemplates}
+        deleteMutation={deleteTemplateMutation}
       />
 
       <OrderLetterTemplateAssignmentModal
@@ -241,7 +214,8 @@ export default function MailTemplatesPageClient({
         }}
         editingAssignment={editingAssignment}
         mailTemplates={mailTemplates}
-        onSuccess={loadAssignments}
+        createMutation={createAssignmentMutation}
+        updateMutation={updateAssignmentMutation}
       />
 
       <DeleteOrderLetterTemplateAssignmentModal
@@ -251,9 +225,8 @@ export default function MailTemplatesPageClient({
           setAssignmentToDelete(null);
         }}
         assignmentToDelete={assignmentToDelete}
-        onSuccess={loadAssignments}
+        deleteMutation={deleteAssignmentMutation}
       />
-      </Container>
-    </ManagementSectionThemeProvider>
+    </Container>
   );
 }

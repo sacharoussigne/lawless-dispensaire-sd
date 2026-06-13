@@ -90,11 +90,43 @@ export async function getChests(dispensarySlug: string, onlyEnabled: boolean = f
         { createdAt: 'desc' },
       ],
       include: {
-        stockHistory: {
-          select: {
-            id: true,
-          },
+        _count: {
+          select: { stockHistory: true },
         },
+      },
+    });
+
+    return {
+      status: 200,
+      data: chests.map(({ _count, ...chest }) => ({
+        ...chest,
+        stockHistoryCount: _count.stockHistory,
+      })),
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de la récupération des coffres');
+  }
+}
+
+export async function getChestsList(dispensarySlug: string, onlyEnabled: boolean = false) {
+  try {
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
+
+    const chests = await prisma.chest.findMany({
+      where: {
+        ...tenantWhere(dispensaryId),
+        ...(onlyEnabled && { isEnabled: true }),
+      },
+      orderBy: [
+        { order: 'asc' },
+        { createdAt: 'desc' },
+      ],
+      select: {
+        id: true,
+        name: true,
+        order: true,
       },
     });
 
@@ -172,12 +204,15 @@ export async function deleteChest(
       };
     }
 
-    const targetChest = await prisma.chest.findFirst({
+    const chests = await prisma.chest.findMany({
       where: {
-        id: validatedData.targetChestId,
+        id: { in: [validatedData.id, validatedData.targetChestId] },
         ...tenantWhere(dispensaryId),
       },
     });
+
+    const chestToDelete = chests.find((c) => c.id === validatedData.id);
+    const targetChest = chests.find((c) => c.id === validatedData.targetChestId);
 
     if (!targetChest) {
       return {
@@ -185,13 +220,6 @@ export async function deleteChest(
         error: 'Le coffre de destination n\'existe pas.',
       };
     }
-
-    const chestToDelete = await prisma.chest.findFirst({
-      where: {
-        id: validatedData.id,
-        ...tenantWhere(dispensaryId),
-      },
-    });
 
     if (!chestToDelete) {
       return {
@@ -239,7 +267,7 @@ export async function reorderChests(
 
     const validatedData = reorderChestsSchema.parse(data);
 
-    await Promise.all(
+    await prisma.$transaction(
       validatedData.items.map(({ id, order }) =>
         prisma.chest.update({
           where: { id, ...tenantWhere(dispensaryId) },

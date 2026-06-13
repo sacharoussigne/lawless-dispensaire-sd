@@ -40,21 +40,6 @@ const comboboxOption = {
   borderRadius: 'var(--mantine-radius-sm)',
   marginBottom: '0.2rem',
   color: c.ink,
-  '& span': {
-    lineHeight: 1.25,
-    position: 'relative',
-    top: 1,
-  },
-  '&:hover:not([data-combobox-selected]):not([data-combobox-disabled])': {
-    backgroundColor: 'var(--mantine-color-sage-0)',
-  },
-  '&[data-combobox-selected]': {
-    backgroundColor: 'var(--mantine-color-sage-0)',
-    color: c.sage,
-  },
-  '&[data-combobox-active]': {
-    backgroundColor: 'var(--mantine-color-sage-0)',
-  },
 };
 
 const theme = createTheme({
@@ -156,11 +141,6 @@ const theme = createTheme({
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
-          '&:disabled:not([data-loading]), &[data-disabled]:not([data-loading])': {
-            backgroundColor: c.tableHeader,
-            color: c.inkMuted,
-            borderColor: 'transparent',
-          },
         },
         inner: {
           display: 'flex',
@@ -292,10 +272,6 @@ const theme = createTheme({
         },
         item: {
           color: c.ink,
-          '&[data-hovered]': {
-            backgroundColor: 'var(--mantine-color-sage-0)',
-            color: c.sage,
-          },
         },
         label: {
           color: c.inkMuted,
@@ -411,9 +387,6 @@ const theme = createTheme({
         control: {
           backgroundColor: c.tableHeader,
           color: c.ink,
-          '&:hover': {
-            backgroundColor: 'var(--mantine-color-sage-0)',
-          },
         },
         item: {
           borderColor: c.surfaceBorder,
@@ -453,14 +426,6 @@ const theme = createTheme({
         },
         tab: {
           color: c.inkMuted,
-          '&[data-active]': {
-            color: c.sage,
-            borderColor: c.sage,
-            backgroundColor: c.surface,
-          },
-          '&:hover:not([data-disabled]):not(:disabled)': {
-            color: c.sage,
-          },
         },
       },
     },

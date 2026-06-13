@@ -127,6 +127,22 @@ export async function createItem(
         companyGroupId: validatedData.companyGroupId,
         order: newOrder,
       },
+      include: {
+        category: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+            order: true,
+          },
+        },
+        companyGroup: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
     });
 
     return {
@@ -141,14 +157,22 @@ export async function createItem(
   }
 }
 
-export async function getItems(dispensarySlug: string) {
+export async function getItems(
+  dispensarySlug: string,
+  options?: { companyGroupId?: string | null },
+) {
   try {
     const ctx = await requireTenantServerActionContext(dispensarySlug);
     if (!ctx.ok) return ctx.response;
     const { dispensaryId } = ctx.tenant;
 
     const items = await prisma.item.findMany({
-      where: tenantWhere(dispensaryId),
+      where: {
+        ...tenantWhere(dispensaryId),
+        ...(options?.companyGroupId
+          ? { companyGroupId: options.companyGroupId }
+          : {}),
+      },
       orderBy: [
         {
           category: {
@@ -241,6 +265,22 @@ export async function updateItem(
         categoryId: validatedData.categoryId,
         companyGroupId: validatedData.companyGroupId,
       },
+      include: {
+        category: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+            order: true,
+          },
+        },
+        companyGroup: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
     });
 
     return {
@@ -290,7 +330,7 @@ export async function reorderItems(
 
     const validatedData = reorderItemsSchema.parse(data);
 
-    await Promise.all(
+    await prisma.$transaction(
       validatedData.items.map(({ id, order }) =>
         prisma.item.update({
           where: { id, ...tenantWhere(dispensaryId) },

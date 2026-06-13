@@ -80,12 +80,17 @@ export function AgendaFormModal({
         description: description.trim() || null,
       };
 
-      const result = agenda?.id
-        ? await updateAgenda(dispensarySlug, { id: agenda.id, ...payload })
-        : await createAgenda(dispensarySlug, {
-            ...payload,
-            ownerUserId: ownerUserId!,
-          });
+      let result;
+      if (agenda?.id) {
+        result = await updateAgenda(dispensarySlug, { id: agenda.id, ...payload });
+      } else if (ownerUserId) {
+        result = await createAgenda(dispensarySlug, {
+          ...payload,
+          ownerUserId,
+        });
+      } else {
+        return;
+      }
 
       handleAction(result);
       notifications.show({

@@ -1,7 +1,7 @@
 'use client';
 
-import { usePermissions, useTenantRoutes } from '@/app/_contexts/PermissionsContext';
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useTenantRoutes, useRequiredDispensarySlug } from '@/app/_contexts/PermissionsContext';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Container,
@@ -11,10 +11,6 @@ import {
   Button,
   Group,
   Select,
-  Paper,
-  Text,
-  Textarea,
-  ScrollArea,
   Grid,
 } from '@mantine/core';
 import { IconArrowLeft, IconCopy, IconCheck, IconRefresh } from '@tabler/icons-react';
@@ -24,32 +20,33 @@ import { createMail } from '@/app/_actions/mails';
 import { handleAction } from '@/lib/action';
 import { handleApiZodError } from '@/lib/services/zod';
 import { ParsedZodError } from '@/lib/errors/ParsedZodError';
-import type { MailTemplate } from '@/types/mailTemplates';
+import type { MailTemplateOption } from '@/types/mails';
 import { TemplateEditor } from '../components/TemplateEditor';
 import {
-  TemplateFormGenerator,
-  type TemplateFormGeneratorHandle,
-} from '../components/TemplateFormGenerator';
-import { renderTemplate, RenderContext } from '@/lib/mailTemplate/renderer';
-import { extractInputs } from '@/lib/mailTemplate/parser';
+  TemplatePreviewWithForm,
+  useTemplatePreviewActions,
+} from '../components/TemplatePreviewPanel';
+import { useUserMailTemplateDetail, useUserMailTemplateOptions } from '../hooks/useMailsQueries';
 
 interface NewMailPageClientProps {
-  initialMailTemplates: MailTemplate[];
+  initialTemplateOptions: MailTemplateOption[];
 }
 
 export default function NewMailPageClient({
-  initialMailTemplates,
+  initialTemplateOptions,
 }: NewMailPageClientProps) {
   const routes = useTenantRoutes();
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const router = useRouter();
-  const formRef = useRef<TemplateFormGeneratorHandle>(null);
-  const [mailTemplates] = useState<MailTemplate[]>(initialMailTemplates);
+  const { data: templateOptions = initialTemplateOptions } =
+    useUserMailTemplateOptions(initialTemplateOptions);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
-  const [formContent, setFormContent] = useState('');
-  const [editedContent, setEditedContent] = useState<string | null>(null);
+  const { data: selectedTemplate } = useUserMailTemplateDetail(
+    selectedTemplateId,
+    Boolean(selectedTemplateId),
+  );
+  const preview = useTemplatePreviewActions(selectedTemplate?.content ?? '');
   const [loading, setLoading] = useState(false);
-  const [copied, setCopied] = useState(false);
 
   const form = useForm({
     initialValues: {
@@ -64,94 +61,43 @@ export default function NewMailPageClient({
     },
   });
 
-  const selectedTemplate = useMemo(() => {
-    if (!selectedTemplateId) return null;
-    return mailTemplates.find((t) => t.id === selectedTemplateId) || null;
-  }, [selectedTemplateId, mailTemplates]);
-
-  const hasInputs = useMemo(() => {
-    if (!selectedTemplate) return false;
-    return extractInputs(selectedTemplate.content).length > 0;
-  }, [selectedTemplate?.content]);
-
-  const staticContent = useMemo(() => {
-    if (!selectedTemplate || hasInputs) return '';
-    const context: RenderContext = { inputs: {} };
-    return renderTemplate(selectedTemplate.content, context);
-  }, [selectedTemplate?.content, hasInputs]);
-
-  const autoContent = hasInputs ? formContent : staticContent;
-  const resultContent = editedContent ?? autoContent;
-  const isManuallyEdited = editedContent !== null;
-
   useEffect(() => {
-    if (selectedTemplate && (hasInputs || staticContent)) {
-      form.setFieldValue('content', resultContent);
+    if (selectedTemplate && (preview.hasInputs || preview.resultContent)) {
+      form.setFieldValue('content', preview.resultContent);
     } else if (!selectedTemplate) {
       form.setFieldValue('content', '');
     }
-  }, [resultContent, selectedTemplate, hasInputs, staticContent]);
+  }, [preview.resultContent, selectedTemplate, preview.hasInputs]);
+
+  useEffect(() => {
+    if (selectedTemplate) {
+      form.setFieldValue('name', selectedTemplate.defaultMailName ?? '');
+    }
+  }, [selectedTemplate?.id]);
 
   const handleTemplateChange = (templateId: string | null) => {
     setSelectedTemplateId(templateId);
-    setFormContent('');
-    setEditedContent(null);
-    formRef.current?.reset();
+    preview.resetTemplateForm();
 
-    if (templateId) {
-      const t = mailTemplates.find((tpl) => tpl.id === templateId);
-      form.setFieldValue('name', t?.defaultMailName ?? '');
-    } else {
+    if (!templateId) {
       form.setFieldValue('content', '');
+      form.setFieldValue('name', '');
     }
-  };
-
-  const handleFormChange = (content: string) => {
-    setFormContent(content);
   };
 
   const handleResultChange = (value: string) => {
-    setEditedContent(value);
+    preview.setEditedContent(value);
     form.setFieldValue('content', value);
   };
 
-  const handleRegenerate = () => {
-    setEditedContent(null);
-  };
-
-  const handleResetTemplateForm = () => {
-    formRef.current?.reset();
-    setEditedContent(null);
-  };
-
-  const handleCopy = async () => {
-    const contentToCopy = resultContent || form.values.content;
-    if (!contentToCopy) return;
-
-    try {
-      await navigator.clipboard.writeText(contentToCopy);
-      setCopied(true);
-      notifications.show({
-        title: 'Succès',
-        message: 'Courrier copié dans le presse-papiers',
-        color: 'green',
-      });
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      notifications.show({
-        title: 'Erreur',
-        message: 'Impossible de copier le courrier',
-        color: 'red',
-      });
-    }
-  };
-
   const handleSubmit = async (values: typeof form.values) => {
-    const content = editedContent ?? (hasInputs ? formContent : values.content);
+    const content =
+      preview.editedContent ??
+      (preview.hasInputs ? preview.formContent : values.content);
 
     try {
       setLoading(true);
-      const result = await createMail(dispensarySlug!, {
+      const result = await createMail(dispensarySlug, {
         name: values.name,
         receiver: values.receiver,
         content,
@@ -161,7 +107,7 @@ export default function NewMailPageClient({
       notifications.show({
         title: 'Succès',
         message: 'Courrier créé avec succès',
-        color: 'green',
+        color: 'moss',
       });
       router.push(routes.employee.mails);
     } catch (error: unknown) {
@@ -174,7 +120,7 @@ export default function NewMailPageClient({
             error instanceof Error
               ? error.message
               : 'Erreur lors de la sauvegarde',
-          color: 'red',
+          color: 'danger',
         });
       }
     } finally {
@@ -194,23 +140,27 @@ export default function NewMailPageClient({
             Retour
           </Button>
           <Group>
-            {selectedTemplate && hasInputs && (
+            {selectedTemplate && preview.hasInputs && (
               <Button
                 variant="subtle"
                 leftSection={<IconRefresh size={16} />}
-                onClick={handleResetTemplateForm}
+                onClick={preview.resetTemplateForm}
               >
                 Réinitialiser
               </Button>
             )}
-            {(resultContent || form.values.content) && (
+            {(preview.resultContent || form.values.content) && (
               <Button
-                leftSection={copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
-                onClick={handleCopy}
-                variant={copied ? 'light' : 'default'}
-                color={copied ? 'green' : undefined}
+                leftSection={
+                  preview.copied ? <IconCheck size={16} /> : <IconCopy size={16} />
+                }
+                onClick={() =>
+                  preview.handleCopy(preview.resultContent || form.values.content)
+                }
+                variant={preview.copied ? 'light' : 'default'}
+                color={preview.copied ? 'moss' : undefined}
               >
-                {copied ? 'Copiée !' : 'Copier le courrier'}
+                {preview.copied ? 'Copiée !' : 'Copier le courrier'}
               </Button>
             )}
             <Button type="submit" loading={loading} form="mail-form">
@@ -228,7 +178,7 @@ export default function NewMailPageClient({
                 <Select
                   label="Template (optionnel)"
                   placeholder="Sélectionner un template ou laisser vide pour créer manuellement"
-                  data={mailTemplates.map((t) => ({ value: t.id, label: t.name }))}
+                  data={templateOptions.map((t) => ({ value: t.id, label: t.name }))}
                   value={selectedTemplateId}
                   onChange={handleTemplateChange}
                   clearable
@@ -252,54 +202,16 @@ export default function NewMailPageClient({
               </Grid.Col>
             </Grid>
 
-            {selectedTemplate && hasInputs ? (
-              <Grid gutter="xl">
-                <Grid.Col span={5}>
-                  <Stack gap="md">
-                    <Text size="sm" fw={600}>
-                      Formulaire
-                    </Text>
-                    <Paper p="md" withBorder>
-                      <ScrollArea h={600} scrollbars="y" type="auto">
-                        <TemplateFormGenerator
-                          ref={formRef}
-                          template={selectedTemplate.content}
-                          onChange={handleFormChange}
-                        />
-                      </ScrollArea>
-                    </Paper>
-                  </Stack>
-                </Grid.Col>
-                <Grid.Col span={7}>
-                  <Stack gap="md">
-                    <Group justify="space-between">
-                      <Text size="sm" fw={600}>
-                        Aperçu
-                      </Text>
-                      {isManuallyEdited && (
-                        <Button variant="subtle" size="xs" onClick={handleRegenerate}>
-                          Réappliquer le formulaire
-                        </Button>
-                      )}
-                    </Group>
-                    <Paper p="md" withBorder>
-                      <Textarea
-                        value={resultContent}
-                        onChange={(e) => handleResultChange(e.currentTarget.value)}
-                        placeholder="Remplissez le formulaire pour générer le résultat…"
-                        minRows={24}
-                        autosize
-                        styles={{
-                          input: {
-                            fontFamily: 'inherit',
-                            lineHeight: 1.5,
-                          },
-                        }}
-                      />
-                    </Paper>
-                  </Stack>
-                </Grid.Col>
-              </Grid>
+            {selectedTemplate && preview.hasInputs ? (
+              <TemplatePreviewWithForm
+                templateContent={selectedTemplate.content}
+                formRef={preview.formRef}
+                onFormChange={preview.setFormContent}
+                resultContent={preview.resultContent}
+                onResultChange={handleResultChange}
+                isManuallyEdited={preview.isManuallyEdited}
+                onRegenerate={preview.handleRegenerate}
+              />
             ) : (
               <TemplateEditor
                 label="Contenu"
@@ -307,13 +219,13 @@ export default function NewMailPageClient({
                 required
                 minRows={15}
                 value={
-                  selectedTemplate && !hasInputs
-                    ? resultContent
+                  selectedTemplate && !preview.hasInputs
+                    ? preview.resultContent
                     : form.values.content
                 }
                 onChange={(value) => {
-                  if (selectedTemplate && !hasInputs) {
-                    setEditedContent(value);
+                  if (selectedTemplate && !preview.hasInputs) {
+                    preview.setEditedContent(value);
                   }
                   form.setFieldValue('content', value);
                 }}

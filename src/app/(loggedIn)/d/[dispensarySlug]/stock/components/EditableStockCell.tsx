@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActionIcon, Button, Group, Popover, Stack, Text, TextInput, Tooltip } from '@mantine/core';
 import { IconCheck, IconEdit, IconScale } from '@tabler/icons-react';
 import type { ItemWithRelations } from '@/types/stock';
-import type { EvalResult } from '@/lib/stock/expression';
+import { evaluateDecimalExpression, evaluateIntegerExpression } from '@/lib/stock/expression';
 
 interface EditableStockCellProps {
   item: ItemWithRelations;
@@ -12,8 +12,6 @@ interface EditableStockCellProps {
   initialValue: number | null;
   disabled?: boolean;
   onCommitQuantity: (itemId: string, quantity: number | null) => void;
-  evaluateIntegerExpression: (expression: string) => EvalResult;
-  evaluateDecimalExpression: (expression: string) => EvalResult;
 }
 
 export const EditableStockCell = ({
@@ -22,8 +20,6 @@ export const EditableStockCell = ({
   initialValue,
   disabled = false,
   onCommitQuantity,
-  evaluateIntegerExpression,
-  evaluateDecimalExpression,
 }: EditableStockCellProps) => {
   const initialString = useMemo(() => (initialValue !== null ? String(initialValue) : ''), [initialValue]);
   const [inputValue, setInputValue] = useState<string>(initialString);

@@ -1,49 +1,28 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
-import { Modal, Text, Button, Group, Stack } from '@mantine/core';
-import { notifications } from '@mantine/notifications';
-import { deleteMail } from '@/app/_actions/mails';
-import { handleAction } from '@/lib/action';
-import type { Mail } from '@prisma/client';
+import { Modal, Stack, Button, Group, Text } from '@mantine/core';
+import type { MailListItem } from '@/types/mails';
+import { useDeleteMailMutation } from '../hooks/useMailsQueries';
 
 interface DeleteMailModalProps {
   opened: boolean;
   onClose: () => void;
-  mailToDelete: Mail | null;
-  onSuccess: () => void;
+  mailToDelete: MailListItem | null;
 }
 
 export function DeleteMailModal({
   opened,
   onClose,
   mailToDelete,
-  onSuccess,
 }: DeleteMailModalProps) {
-  const { dispensarySlug } = usePermissions();
+  const deleteMutation = useDeleteMailMutation();
+
   const handleDelete = async () => {
     if (!mailToDelete) return;
 
-    try {
-      const result = await deleteMail(dispensarySlug!, { id: mailToDelete.id });
-      handleAction(result);
-      notifications.show({
-        title: 'Succès',
-        message: 'Courrier supprimé avec succès',
-        color: 'green',
-      });
-      onClose();
-      onSuccess();
-    } catch (error: any) {
-      notifications.show({
-        title: 'Erreur',
-        message: error.message || 'Erreur lors de la suppression',
-        color: 'red',
-      });
-    }
+    await deleteMutation.mutateAsync({ id: mailToDelete.id });
+    onClose();
   };
-
-  if (!mailToDelete) return null;
 
   return (
     <Modal
@@ -54,7 +33,7 @@ export function DeleteMailModal({
     >
       <Stack gap="md">
         <Text>
-          Êtes-vous sûr de vouloir supprimer le courrier &quot;{mailToDelete.name}&quot; ?
+          Êtes-vous sûr de vouloir supprimer le courrier &quot;{mailToDelete?.name}&quot; ?
         </Text>
         <Text size="sm" c="dimmed">
           Cette action est irréversible.
@@ -63,7 +42,11 @@ export function DeleteMailModal({
           <Button variant="subtle" onClick={onClose}>
             Annuler
           </Button>
-          <Button color="red" onClick={handleDelete}>
+          <Button
+            color="danger"
+            onClick={handleDelete}
+            loading={deleteMutation.isPending}
+          >
             Supprimer
           </Button>
         </Group>

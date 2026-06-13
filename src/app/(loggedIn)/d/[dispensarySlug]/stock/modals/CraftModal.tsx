@@ -1,7 +1,8 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useQueries } from '@tanstack/react-query';
+import { useRequiredDispensarySlug } from '@/app/_contexts/PermissionsContext';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Modal,
   Stack,
@@ -17,11 +18,14 @@ import {
 } from '@mantine/core';
 import { IconAlertCircle } from '@tabler/icons-react';
 import { getCraftRecipesByItemId } from '@/app/_actions/craftRecipes';
-import { getItemsWithStock } from '@/app/_actions/stock';
 import { handleAction } from '@/lib/action';
 import { notifications } from '@mantine/notifications';
 import type { ItemWithRelations } from '@/types/stock';
-import type { ChestWithStockHistory } from '@/types/chests';
+import type { CraftRecipeWithIngredients } from '@/types/items';
+import type { ChestListItem } from '@/types/chests';
+import { stockKeys } from '@/lib/stock/queryKeys';
+import { DEFAULT_STALE_TIME_MS } from '@/lib/react-query/QueryProvider';
+import { useStockItems } from '../hooks/useStockQueries';
 import {
   type CraftContextV1,
   loadCraftNavStack,
@@ -34,27 +38,9 @@ import {
 import { CraftNavigationBar } from './components/CraftNavigationBar';
 import { CraftIngredientsTable, type CraftIngredientRow } from './components/CraftIngredientsTable';
 
-interface CraftRecipeWithIngredients {
-  id: string;
-  name: string;
-  description: string | null;
-  craftedItemId: string;
-  quantity: number;
-  ingredients: {
-    id: string;
-    usedItemId: string;
-    quantity: number;
-    usedItem: {
-      id: string;
-      name: string;
-    };
-  }[];
-}
-
 interface CraftModalProps {
   opened: boolean;
   onClose: () => void;
-  items: ItemWithRelations[];
   canCraft?: boolean;
   onCraft: (
     itemId: string,
@@ -65,19 +51,24 @@ interface CraftModalProps {
     destinationChestId: string | null
   ) => Promise<{ ok: true; quantityProduced?: number } | { ok: false }>;
   initialChestId?: string | null;
-  chests?: ChestWithStockHistory[];
+  chests?: ChestListItem[];
+}
+
+async function fetchStockItemsForChest(dispensarySlug: string, chestId: string) {
+  const { getItemsWithStock } = await import('@/app/_actions/stock');
+  const result = await getItemsWithStock(dispensarySlug, chestId);
+  return handleAction(result) as ItemWithRelations[];
 }
 
 export default function CraftModal({
   opened,
   onClose,
-  items,
   canCraft = true,
   onCraft,
   initialChestId = null,
   chests = [],
 }: CraftModalProps) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const [selectedCraftItem, setSelectedCraftItem] = useState<string | null>(null);
   const [craftQuantity, setCraftQuantity] = useState<number>(1);
   const [selectedRecipe, setSelectedRecipe] = useState<string | null>(null);
@@ -86,61 +77,47 @@ export default function CraftModal({
   const [sourceChestId, setSourceChestId] = useState<string | null>(initialChestId);
   const [destinationChestId, setDestinationChestId] = useState<string | null>(initialChestId);
   const [ingredientChests, setIngredientChests] = useState<Record<string, string>>({});
-  const [itemsWithStockByChest, setItemsWithStockByChest] = useState<Record<string, ItemWithRelations[]>>({});
-  const [loadingItems, setLoadingItems] = useState(false);
   const [navStack, setNavStack] = useState<CraftContextV1[]>([]);
-  const cacheRef = useRef<Record<string, ItemWithRelations[]>>({});
-  const loadingChestsRef = useRef<Set<string>>(new Set());
 
-  const loadChestItemsIfNeeded = useCallback(async (chestId: string | null, opts?: { force?: boolean }) => {
-    if (!chestId) {
-      return;
+  const { data: sourceChestItems = [], isFetching: loadingSourceItems } = useStockItems(
+    sourceChestId,
+    [],
+  );
+
+  const trackedChestIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (sourceChestId) ids.add(sourceChestId);
+    if (destinationChestId) ids.add(destinationChestId);
+    Object.values(ingredientChests).forEach((id) => ids.add(id));
+    return Array.from(ids);
+  }, [sourceChestId, destinationChestId, ingredientChests]);
+
+  const extraChestQueries = useQueries({
+    queries: trackedChestIds
+      .filter((id) => id !== sourceChestId)
+      .map((chestId) => ({
+        queryKey: stockKeys.items(dispensarySlug, chestId),
+        queryFn: () => fetchStockItemsForChest(dispensarySlug, chestId),
+        enabled: opened && Boolean(dispensarySlug && chestId),
+        staleTime: DEFAULT_STALE_TIME_MS,
+      })),
+  });
+
+  const itemsWithStockByChest = useMemo(() => {
+    const map: Record<string, ItemWithRelations[]> = {};
+    if (sourceChestId) {
+      map[sourceChestId] = sourceChestItems;
     }
-
-    const force = opts?.force ?? false;
-
-    if (!force && cacheRef.current[chestId]) {
-      return;
-    }
-
-    if (loadingChestsRef.current.has(chestId)) {
-      return;
-    }
-
-    loadingChestsRef.current.add(chestId);
-    setLoadingItems(true);
-    
-    try {
-      const result = await getItemsWithStock(dispensarySlug!, chestId);
-      const data = handleAction(result);
-      if (data) {
-        cacheRef.current[chestId] = data;
-        setItemsWithStockByChest((prev) => ({
-          ...prev,
-          [chestId]: data,
-        }));
-      }
-    } catch (error: any) {
-      notifications.show({
-        title: 'Erreur',
-        message: error.message || 'Erreur lors du chargement des stocks',
-        color: 'red',
+    trackedChestIds
+      .filter((id) => id !== sourceChestId)
+      .forEach((chestId, index) => {
+        const data = extraChestQueries[index]?.data;
+        if (data) map[chestId] = data;
       });
-    } finally {
-      loadingChestsRef.current.delete(chestId);
-      setLoadingItems(false);
-    }
-  }, []);
+    return map;
+  }, [sourceChestId, sourceChestItems, trackedChestIds, extraChestQueries]);
 
-  const refreshChests = useCallback(async (chestIds: Array<string | null | undefined>) => {
-    const unique = Array.from(new Set(chestIds.filter(Boolean))) as string[];
-    if (unique.length === 0) return;
-    await Promise.all(unique.map((id) => loadChestItemsIfNeeded(id, { force: true })));
-  }, [loadChestItemsIfNeeded]);
-
-  useEffect(() => {
-    cacheRef.current = itemsWithStockByChest;
-  }, [itemsWithStockByChest]);
+  const loadingItems = loadingSourceItems || extraChestQueries.some((q) => q.isFetching);
 
   useEffect(() => {
     if (opened && initialChestId !== null) {
@@ -158,14 +135,6 @@ export default function CraftModal({
   }, [opened]);
 
   useEffect(() => {
-    if (opened && sourceChestId) {
-      loadChestItemsIfNeeded(sourceChestId);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [opened, sourceChestId]);
-
-  // Reset states when modal closes
-  useEffect(() => {
     if (!opened) {
       setSelectedCraftItem(null);
       setCraftQuantity(1);
@@ -180,26 +149,9 @@ export default function CraftModal({
   useEffect(() => {
     if (sourceChestId && (!destinationChestId || destinationChestId === sourceChestId)) {
       setDestinationChestId(sourceChestId);
-      loadChestItemsIfNeeded(sourceChestId);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourceChestId]);
+  }, [sourceChestId, destinationChestId]);
 
-  // Reset ingredient chests when base source chest changes
-  useEffect(() => {
-    if (sourceChestId) {
-      setIngredientChests((prev) => {
-        const updated: Record<string, string> = {};
-        // Keep existing values but reset those that haven't been modified
-        Object.keys(prev).forEach((ingredientId) => {
-          updated[ingredientId] = prev[ingredientId];
-        });
-        return updated;
-      });
-    }
-  }, [sourceChestId]);
-
-  // Reset ingredient chests when recipe changes
   useEffect(() => {
     if (selectedRecipe) {
       setIngredientChests({});
@@ -209,13 +161,13 @@ export default function CraftModal({
   const loadRecipesForItem = useCallback(async (itemId: string) => {
     setLoadingRecipes(true);
     try {
-      const result = await getCraftRecipesByItemId(dispensarySlug!, itemId, true);
+      const result = await getCraftRecipesByItemId(dispensarySlug, itemId, true);
       const data = handleAction(result);
       return (data ?? []) as CraftRecipeWithIngredients[];
     } finally {
       setLoadingRecipes(false);
     }
-  }, []);
+  }, [dispensarySlug]);
 
   const handleItemChange = async (value: string | null, opts?: { preselectRecipeId?: string | null }) => {
     setSelectedCraftItem(value);
@@ -247,7 +199,7 @@ export default function CraftModal({
         notifications.show({
           title: 'Erreur',
           message: error.message || 'Erreur lors du chargement des recettes',
-          color: 'red',
+          color: 'danger',
         });
       } finally {
       }
@@ -294,10 +246,8 @@ export default function CraftModal({
     setNavStack([]);
   }, []);
 
-  const handleIngredientChestChange = useCallback(async (ingredientId: string, chestId: string | null) => {
+  const handleIngredientChestChange = useCallback((ingredientId: string, chestId: string | null) => {
     if (chestId) {
-      await loadChestItemsIfNeeded(chestId);
-      
       setIngredientChests((prev) => ({
         ...prev,
         [ingredientId]: chestId,
@@ -309,7 +259,7 @@ export default function CraftModal({
         return updated;
       });
     }
-  }, [loadChestItemsIfNeeded]);
+  }, []);
 
   const handleCraft = async () => {
     if (!selectedCraftItem || !selectedRecipe || !sourceChestId || !destinationChestId) return;
@@ -335,12 +285,6 @@ export default function CraftModal({
     if (!result.ok) {
       return;
     }
-
-    await refreshChests([
-      sourceChestId,
-      destinationChestId,
-      ...ingredientChestsArray.map((c) => c.chestId),
-    ]);
 
     if (navStack.length > 0) {
       await handleBack();
@@ -371,11 +315,6 @@ export default function CraftModal({
   };
 
   const chestOptions = chests.map((chest) => ({
-    value: chest.id,
-    label: chest.name,
-  }));
-
-  const destinationChestOptions = chests.map((chest) => ({
     value: chest.id,
     label: chest.name,
   }));
@@ -462,7 +401,7 @@ export default function CraftModal({
       notifications.show({
         title: 'Impossible',
         message: 'Aucune recette disponible pour cet ingrédient',
-        color: 'yellow',
+        color: 'amber',
       });
       return;
     }
@@ -476,15 +415,6 @@ export default function CraftModal({
     const missing = Math.max(0, requiredQuantity - available);
     const yieldPerCraft = Math.max(1, recipe.quantity);
     const timesNeeded = Math.max(1, Math.ceil(missing / yieldPerCraft));
-
-    const nextCtx: CraftContextV1 = {
-      craftedItemId: ingredientItemId,
-      recipeId: recipe.id,
-      times: timesNeeded,
-      sourceChestId,
-      destinationChestId,
-      ingredientChests: {},
-    };
 
     const currentCtx = getCurrentContext();
     const nextStack = pushCraftNavStack(currentCtx);
@@ -527,7 +457,7 @@ export default function CraftModal({
             <Select
               label="Coffre de destination"
               placeholder="Sélectionner le coffre destination"
-              data={destinationChestOptions}
+              data={chestOptions}
               value={destinationChestId}
               onChange={(value) => setDestinationChestId(value)}
               required
@@ -543,7 +473,7 @@ export default function CraftModal({
           <Select
             label="Objet à craft"
             placeholder="Sélectionner un objet craftable"
-            data={items
+            data={sourceChestItems
               .filter((item) => item.isCraftable)
               .sort((a, b) => {
                 if (a.order !== undefined && b.order !== undefined) {
@@ -694,7 +624,7 @@ export default function CraftModal({
           <Button variant="subtle" onClick={handleClose}>
             Annuler
           </Button>
-          <Button onClick={handleCraft} disabled={isCraftButtonDisabled} color="blue">
+          <Button onClick={handleCraft} disabled={isCraftButtonDisabled} color="sage">
             Craft
           </Button>
         </Group>

@@ -7,7 +7,17 @@ import { requireTenantServerActionContext } from '@/lib/serverActionAuth';
 import { tenantWhere } from '@/lib/dispensary/tenantWhere';
 import { getTodayStart, getTomorrowStart, getYesterdayStart, getStartOfDay } from '@/lib/date';
 import { getDefaultChestId } from '@/app/_actions/stock/internals';
-import { buildManualMovements } from '@/lib/stock/movements';
+import { buildManualMovements, type ManualStockMovementInput } from '@/lib/stock/movements';
+
+function latestStockByItem<T extends { itemId: string; timestamp: Date }>(rows: T[]): Map<string, T> {
+  const map = new Map<string, T>();
+  for (const row of rows) {
+    if (!map.has(row.itemId)) {
+      map.set(row.itemId, row);
+    }
+  }
+  return map;
+}
 
 export async function updateStock(
   dispensarySlug: string,
@@ -28,6 +38,10 @@ export async function updateStock(
     const { dispensaryId } = ctx.tenant;
     const { session } = ctx;
 
+    if (data.length === 0) {
+      return { status: 200, data: [] };
+    }
+
     const today = getTodayStart();
     const tomorrow = getTomorrowStart();
     const yesterday = getYesterdayStart();
@@ -46,62 +60,60 @@ export async function updateStock(
       }
     }
 
+    if (!targetChestId) {
+      return {
+        status: 404,
+        error: 'Coffre cible introuvable',
+      };
+    }
+
+    const resolvedChestId = targetChestId;
+
+    const itemIds = data.map((d) => d.itemId);
+
     const results = await prisma.$transaction(async (tx) => {
-      const movementInputs: {
-        itemId: string;
-        newQty: number;
-        stockToday: number | null;
-        stockYesterday: number | null;
-      }[] = [];
+      const [todayRows, yesterdayRows] = await Promise.all([
+        tx.stockHistory.findMany({
+          where: {
+            itemId: { in: itemIds },
+            chestId: resolvedChestId,
+            timestamp: { gte: today, lt: tomorrow },
+          },
+          orderBy: { timestamp: 'desc' },
+        }),
+        tx.stockHistory.findMany({
+          where: {
+            itemId: { in: itemIds },
+            chestId: resolvedChestId,
+            timestamp: { gte: yesterday, lt: today },
+          },
+          orderBy: { timestamp: 'desc' },
+        }),
+      ]);
+
+      const todayByItem = latestStockByItem(todayRows);
+      const yesterdayByItem = latestStockByItem(yesterdayRows);
+
+      const movementInputs: ManualStockMovementInput[] = data.map(({ itemId, quantity }) => ({
+        itemId,
+        newQty: quantity,
+        stockToday: todayByItem.get(itemId)?.quantity ?? null,
+        stockYesterday: yesterdayByItem.get(itemId)?.quantity ?? null,
+      }));
 
       const stockResults = await Promise.all(
         data.map(async ({ itemId, quantity }) => {
-          const existingStock = await tx.stockHistory.findFirst({
-            where: {
-              itemId,
-              chestId: targetChestId!,
-              timestamp: {
-                gte: today,
-                lt: tomorrow,
-              },
-            },
-            orderBy: {
-              timestamp: 'desc',
-            },
-          });
-
-          const yesterdayStock = await tx.stockHistory.findFirst({
-            where: {
-              itemId,
-              chestId: targetChestId!,
-              timestamp: {
-                gte: yesterday,
-                lt: today,
-              },
-            },
-            orderBy: {
-              timestamp: 'desc',
-            },
-          });
-
-          movementInputs.push({
-            itemId,
-            newQty: quantity,
-            stockToday: existingStock?.quantity ?? null,
-            stockYesterday: yesterdayStock?.quantity ?? null,
-          });
-
+          const existingStock = todayByItem.get(itemId);
           if (existingStock) {
             return tx.stockHistory.update({
               where: { id: existingStock.id },
               data: { quantity },
             });
           }
-
           return tx.stockHistory.create({
             data: {
               itemId,
-              chestId: targetChestId!,
+              chestId: resolvedChestId,
               quantity,
             },
           });
@@ -160,21 +172,15 @@ export async function craftItem(
 
     const recipe = await prisma.craftRecipe.findFirst({
       where: { id: data.recipeId, ...tenantWhere(dispensaryId) },
-      include: {
-        ingredients: true,
-      },
+      include: { ingredients: true },
     });
 
     if (!recipe) {
-      return {
-        status: 404,
-        error: 'Recette non trouvée',
-      };
+      return { status: 404, error: 'Recette non trouvée' };
     }
 
     const today = getTodayStart();
     const tomorrow = getTomorrowStart();
-
     const totalQuantityProduced = recipe.quantity * data.times;
 
     const ingredientChestMap = new Map<string, string>();
@@ -182,61 +188,76 @@ export async function craftItem(
       ingredientChestMap.set(ingredientId, chestId);
     });
 
-    const ingredientChecks = await Promise.all(
-      recipe.ingredients.map(async (ingredient) => {
-        const requiredQuantity = ingredient.quantity * data.times;
+    const ingredientRequirements = recipe.ingredients.map((ingredient) => {
+      const sourceChestId = ingredientChestMap.get(ingredient.id) || data.sourceChestId;
+      return {
+        ingredient,
+        requiredQuantity: ingredient.quantity * data.times,
+        sourceChestId,
+      };
+    });
 
-        const sourceChestId = ingredientChestMap.get(ingredient.id) || data.sourceChestId;
+    const missingChest = ingredientRequirements.find((r) => !r.sourceChestId);
+    if (missingChest) {
+      return {
+        status: 400,
+        error: 'Stock insuffisant pour certains ingrédients',
+        data: [{
+          itemId: missingChest.ingredient.usedItemId,
+          ingredientId: missingChest.ingredient.id,
+          available: 0,
+          required: missingChest.requiredQuantity,
+          hasEnough: false,
+          error: 'Aucun coffre source sélectionné',
+        }],
+      };
+    }
 
-        if (!sourceChestId) {
-          return {
-            itemId: ingredient.usedItemId,
-            ingredientId: ingredient.id,
-            available: 0,
-            required: requiredQuantity,
-            hasEnough: false,
-            error: 'Aucun coffre source sélectionné',
-          };
-        }
+    const stockLookups = ingredientRequirements.map((r) => {
+      const chestId = r.sourceChestId;
+      if (!chestId) throw new Error('Unexpected missing sourceChestId');
+      return {
+        itemId: r.ingredient.usedItemId,
+        chestId,
+      };
+    });
+    stockLookups.push({ itemId: data.craftedItemId, chestId: destinationChestId });
 
-        const stockToday = await prisma.stockHistory.findFirst({
-          where: {
-            itemId: ingredient.usedItemId,
-            chestId: sourceChestId,
-            timestamp: {
-              gte: today,
-              lt: tomorrow,
-            },
-          },
-          orderBy: {
-            timestamp: 'desc',
-          },
-        });
+    const stockRows = await prisma.stockHistory.findMany({
+      where: {
+        OR: stockLookups.map(({ itemId, chestId }) => ({
+          itemId,
+          chestId,
+          timestamp: { gte: today, lt: tomorrow },
+        })),
+      },
+      orderBy: { timestamp: 'desc' },
+    });
 
-        const availableStock = stockToday?.quantity ?? 0;
+    const stockKey = (itemId: string, chestId: string) => `${itemId}:${chestId}`;
+    const latestStock = new Map<string, (typeof stockRows)[0]>();
+    for (const row of stockRows) {
+      const key = stockKey(row.itemId, row.chestId);
+      if (!latestStock.has(key)) {
+        latestStock.set(key, row);
+      }
+    }
 
-        if (availableStock < requiredQuantity) {
-          return {
-            itemId: ingredient.usedItemId,
-            ingredientId: ingredient.id,
-            available: availableStock,
-            required: requiredQuantity,
-            hasEnough: false,
-          };
-        }
+    const ingredientChecks = ingredientRequirements.map(({ ingredient, requiredQuantity, sourceChestId }) => {
+      if (!sourceChestId) {
+        throw new Error('Unexpected missing sourceChestId');
+      }
+      const availableStock = latestStock.get(stockKey(ingredient.usedItemId, sourceChestId))?.quantity ?? 0;
+      return {
+        itemId: ingredient.usedItemId,
+        ingredientId: ingredient.id,
+        available: availableStock,
+        required: requiredQuantity,
+        hasEnough: availableStock >= requiredQuantity,
+      };
+    });
 
-        return {
-          itemId: ingredient.usedItemId,
-          ingredientId: ingredient.id,
-          available: availableStock,
-          required: requiredQuantity,
-          hasEnough: true,
-        };
-      }),
-    );
-
-    const allHaveEnough = ingredientChecks.every((check) => check.hasEnough);
-    if (!allHaveEnough) {
+    if (!ingredientChecks.every((check) => check.hasEnough)) {
       return {
         status: 400,
         error: 'Stock insuffisant pour certains ingrédients',
@@ -247,26 +268,11 @@ export async function craftItem(
     const userId = session.user.id;
 
     await prisma.$transaction(async (tx) => {
-      const existingCraftedStock = await tx.stockHistory.findFirst({
-        where: {
-          itemId: data.craftedItemId,
-          chestId: destinationChestId,
-          timestamp: {
-            gte: today,
-            lt: tomorrow,
-          },
-        },
-        orderBy: {
-          timestamp: 'desc',
-        },
-      });
-
-      if (existingCraftedStock) {
+      const craftedStock = latestStock.get(stockKey(data.craftedItemId, destinationChestId));
+      if (craftedStock) {
         await tx.stockHistory.update({
-          where: { id: existingCraftedStock.id },
-          data: {
-            quantity: existingCraftedStock.quantity + totalQuantityProduced,
-          },
+          where: { id: craftedStock.id },
+          data: { quantity: craftedStock.quantity + totalQuantityProduced },
         });
       } else {
         await tx.stockHistory.create({
@@ -278,36 +284,15 @@ export async function craftItem(
         });
       }
 
-      for (const ingredient of recipe.ingredients) {
-        const requiredQuantity = ingredient.quantity * data.times;
-
-        const sourceChestId = ingredientChestMap.get(ingredient.id) || data.sourceChestId;
-
+      for (const { ingredient, requiredQuantity, sourceChestId } of ingredientRequirements) {
         if (!sourceChestId) {
-          throw new Error(`Aucun coffre source pour l'ingrédient ${ingredient.id}`);
+          throw new Error('Unexpected missing sourceChestId');
         }
-
-        const existingIngredientStock = await tx.stockHistory.findFirst({
-          where: {
-            itemId: ingredient.usedItemId,
-            chestId: sourceChestId,
-            timestamp: {
-              gte: today,
-              lt: tomorrow,
-            },
-          },
-          orderBy: {
-            timestamp: 'desc',
-          },
-        });
-
+        const existingIngredientStock = latestStock.get(stockKey(ingredient.usedItemId, sourceChestId));
         if (existingIngredientStock) {
-          const newQuantity = existingIngredientStock.quantity - requiredQuantity;
           await tx.stockHistory.update({
             where: { id: existingIngredientStock.id },
-            data: {
-              quantity: newQuantity,
-            },
+            data: { quantity: existingIngredientStock.quantity - requiredQuantity },
           });
         } else {
           await tx.stockHistory.create({
@@ -320,26 +305,22 @@ export async function craftItem(
         }
       }
 
-      await tx.stockItemMovement.create({
-        data: {
-          itemId: data.craftedItemId,
-          quantity: totalQuantityProduced,
-          kind: StockMovementKind.CRAFT_PRODUCE,
-          userId,
-        },
-      });
-
-      for (const ingredient of recipe.ingredients) {
-        const requiredQuantity = ingredient.quantity * data.times;
-        await tx.stockItemMovement.create({
-          data: {
+      await tx.stockItemMovement.createMany({
+        data: [
+          {
+            itemId: data.craftedItemId,
+            quantity: totalQuantityProduced,
+            kind: StockMovementKind.CRAFT_PRODUCE,
+            userId,
+          },
+          ...ingredientRequirements.map(({ ingredient, requiredQuantity }) => ({
             itemId: ingredient.usedItemId,
             quantity: -requiredQuantity,
             kind: StockMovementKind.CRAFT_CONSUME,
             userId,
-          },
-        });
-      }
+          })),
+        ],
+      });
     });
 
     return {
@@ -371,35 +352,33 @@ export async function overwriteStockForDate(
     dayEnd.setDate(dayEnd.getDate() + 1);
 
     const targetChestId = data.chestId || await getDefaultChestId(dispensaryId);
-
-    await prisma.stockHistory.deleteMany({
-      where: {
-        timestamp: {
-          gte: dayStart,
-          lt: dayEnd,
-        },
-        chestId: targetChestId,
-      },
-    });
-
-    const results = await Promise.all(
-      data.stocks
-        .filter((stock) => stock.quantity !== null && stock.quantity !== undefined)
-        .map(async ({ itemId, quantity }) => {
-          return prisma.stockHistory.create({
-            data: {
-              itemId,
-              chestId: targetChestId,
-              quantity,
-              timestamp: dayStart,
-            },
-          });
-        }),
+    const stocksToWrite = data.stocks.filter(
+      (stock) => stock.quantity !== null && stock.quantity !== undefined,
     );
+
+    await prisma.$transaction(async (tx) => {
+      await tx.stockHistory.deleteMany({
+        where: {
+          timestamp: { gte: dayStart, lt: dayEnd },
+          chestId: targetChestId,
+        },
+      });
+
+      if (stocksToWrite.length > 0) {
+        await tx.stockHistory.createMany({
+          data: stocksToWrite.map(({ itemId, quantity }) => ({
+            itemId,
+            chestId: targetChestId,
+            quantity,
+            timestamp: dayStart,
+          })),
+        });
+      }
+    });
 
     return {
       status: 200,
-      data: results,
+      data: { count: stocksToWrite.length },
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de l\'écrasement des stocks');

@@ -1,4 +1,4 @@
-import {UseFormReturnType} from "@mantine/form";
+import {type UseFormReturnType} from "@mantine/form";
 import {ZodError} from "zod";
 
 export function handleApiZodError<T>(

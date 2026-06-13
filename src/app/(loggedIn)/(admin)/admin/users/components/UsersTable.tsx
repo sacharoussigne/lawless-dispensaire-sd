@@ -5,7 +5,6 @@ import { DataTable } from 'mantine-datatable';
 import { IconEdit, IconTrash, IconKey, IconUser, IconDots } from '@tabler/icons-react';
 import { Role, rolesAsString } from '@/types/enum/roles';
 import type { User } from '@/types/users';
-import { hasRole } from '@/lib/auth/permissions';
 
 interface UsersTableProps {
   users: User[];

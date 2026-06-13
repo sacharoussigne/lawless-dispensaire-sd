@@ -1,65 +1,64 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Container, Button } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
-import { getCompanies } from '@/app/_actions/companies';
-import { handleAction } from '@/lib/action';
-import { notifications } from '@mantine/notifications';
 import { CompanyModal } from './components/CompanyModal';
 import { DeleteCompanyModal } from './components/DeleteCompanyModal';
 import { ActiveFilters } from '@/app/_components/ActiveFilters/ActiveFilters';
 import { PageHeader } from '@/app/_components/PageHeader/PageHeader';
 import { CompaniesTable } from './components/CompaniesTable';
 import type { CompanyWithRelations } from '@/types/companies';
-import { ManagementSectionThemeProvider } from '../ManagementSectionThemeProvider';
+import type { CompanyGroupSelect } from '@/types/items';
+import { normalizeString } from '@/lib/string/normalizeString';
+import { sortCompanies } from '@/lib/companies/sortCompanies';
+import { useCompanyGroupsForSelect } from '../companygroups/hooks/useCompanyGroupsQueries';
+import {
+  useManagementCompanies,
+  useCreateCompanyMutation,
+  useUpdateCompanyMutation,
+  useDeleteCompanyMutation,
+} from './hooks/useCompaniesQueries';
 
 interface CompaniesPageClientProps {
   initialCompanies: CompanyWithRelations[];
+  initialCompanyGroups: CompanyGroupSelect[];
 }
-
-// Fonction pour normaliser les chaînes (enlever les accents et mettre en minuscule)
-const normalizeString = (str: string): string => {
-  return str
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
-};
 
 export default function CompaniesPageClient({
   initialCompanies,
+  initialCompanyGroups,
 }: CompaniesPageClientProps) {
-  const { dispensarySlug } = usePermissions();
-  const [companies, setCompanies] = useState<CompanyWithRelations[]>(initialCompanies);
-  const [loading, setLoading] = useState(false);
+  const { data: companies = [], isFetching } = useManagementCompanies(initialCompanies);
+  const { data: companyGroups = [] } = useCompanyGroupsForSelect(initialCompanyGroups);
+  const createMutation = useCreateCompanyMutation();
+  const updateMutation = useUpdateCompanyMutation();
+  const deleteMutation = useDeleteCompanyMutation();
+
   const [modalOpened, setModalOpened] = useState(false);
   const [editingCompany, setEditingCompany] = useState<CompanyWithRelations | null>(null);
   const [deleteModalOpened, setDeleteModalOpened] = useState(false);
   const [companyToDelete, setCompanyToDelete] = useState<CompanyWithRelations | null>(null);
 
-  const [nameFilter, setNameFilter] = useState<string>('');
+  const [nameFilter, setNameFilter] = useState('');
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(10);
+  const pageSize = 10;
 
-  const loadCompanies = async () => {
-    try {
-      setLoading(true);
-      const result = await getCompanies(dispensarySlug!, );
-      const data = handleAction(result);
-      if (data) {
-        setCompanies(data);
-      }
-    } catch (error: any) {
-      notifications.show({
-        title: 'Erreur',
-        message: error.message || 'Erreur lors du chargement des entreprises',
-        color: 'red',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { paginatedCompanies, totalRecords } = useMemo(() => {
+    const filtered = companies.filter((company) => {
+      if (!nameFilter) return true;
+      return normalizeString(company.name).includes(normalizeString(nameFilter));
+    });
+    const sorted = sortCompanies(filtered);
+    return {
+      paginatedCompanies: sorted.slice((page - 1) * pageSize, page * pageSize),
+      totalRecords: sorted.length,
+    };
+  }, [companies, nameFilter, page, pageSize]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [nameFilter]);
 
   const handleEdit = (company: CompanyWithRelations) => {
     setEditingCompany(company);
@@ -71,34 +70,8 @@ export default function CompaniesPageClient({
     setModalOpened(true);
   };
 
-  // Filtrer les entreprises par nom
-  const filteredCompanies = companies.filter((company) => {
-    const matchesName =
-      !nameFilter ||
-      normalizeString(company.name).includes(normalizeString(nameFilter));
-    return matchesName;
-  });
-
-  // Trier par nom
-  const sortedCompanies = [...filteredCompanies].sort((a, b) =>
-    a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' })
-  );
-
-  // Calculer la pagination
-  const totalRecords = sortedCompanies.length;
-  const paginatedCompanies = sortedCompanies.slice(
-    (page - 1) * pageSize,
-    page * pageSize
-  );
-
-  // Réinitialiser la page quand les filtres changent
-  useEffect(() => {
-    setPage(1);
-  }, [nameFilter]);
-
   return (
-    <ManagementSectionThemeProvider section="companies">
-      <Container size="xl" py="xl">
+    <Container size="xl" py="xl">
       <PageHeader
         title="Entreprises"
         description="Référentiel des entreprises liées aux groupes et aux objets."
@@ -121,7 +94,7 @@ export default function CompaniesPageClient({
 
       <CompaniesTable
         companies={paginatedCompanies}
-        loading={loading}
+        loading={isFetching}
         nameFilter={nameFilter}
         page={page}
         pageSize={pageSize}
@@ -142,7 +115,9 @@ export default function CompaniesPageClient({
           setEditingCompany(null);
         }}
         editingCompany={editingCompany}
-        onSuccess={loadCompanies}
+        companyGroups={companyGroups}
+        createMutation={createMutation}
+        updateMutation={updateMutation}
       />
 
       <DeleteCompanyModal
@@ -152,10 +127,8 @@ export default function CompaniesPageClient({
           setCompanyToDelete(null);
         }}
         companyToDelete={companyToDelete}
-        onSuccess={loadCompanies}
+        deleteMutation={deleteMutation}
       />
-      </Container>
-    </ManagementSectionThemeProvider>
+    </Container>
   );
 }
-

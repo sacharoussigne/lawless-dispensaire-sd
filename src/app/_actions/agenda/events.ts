@@ -26,7 +26,12 @@ import {
 import { emitAgendaEventsChange } from '@/lib/agenda/realtime/broadcast';
 import type { AgendaMutationMeta } from '@/lib/agenda/realtime/mutationMeta';
 
-const eventInclude = {
+const eventListInclude = {
+  agenda: { select: { name: true } },
+  participants: { select: { userId: true } },
+};
+
+const eventDetailInclude = {
   participants: {
     include: {
       user: { select: { id: true, name: true, email: true, image: true } },
@@ -36,34 +41,57 @@ const eventInclude = {
   agenda: { select: { name: true } },
 };
 
-function mapEvent(
-  event: {
+type EventBaseRow = {
+  id: string;
+  agendaId: string;
+  title: string;
+  description: string | null;
+  startAt: Date;
+  endAt: Date;
+  allDay: boolean;
+  createdById: string | null;
+  agenda: { name: string };
+};
+
+type EventListRow = EventBaseRow & {
+  participants: { userId: string }[];
+};
+
+type EventDetailRow = EventBaseRow & {
+  participants: {
     id: string;
-    agendaId: string;
+    userId: string;
+    user: { id: string; name: string; email: string; image: string | null };
+  }[];
+  todoTasks: {
+    id: string;
+    eventId: string;
     title: string;
     description: string | null;
-    startAt: Date;
-    endAt: Date;
-    allDay: boolean;
-    createdById: string | null;
-    participants: {
-      id: string;
-      userId: string;
-      user: { id: string; name: string; email: string; image: string | null };
-    }[];
-    todoTasks: {
-      id: string;
-      eventId: string;
-      title: string;
-      description: string | null;
-      completed: boolean;
-      completedAt: Date | null;
-      order: number;
-    }[];
-    agenda: { name: string };
-  },
-  currentUserId: string,
-): AgendaEventDTO {
+    completed: boolean;
+    completedAt: Date | null;
+    order: number;
+  }[];
+};
+
+function mapListEvent(event: EventListRow, currentUserId: string): AgendaEventDTO {
+  return {
+    id: event.id,
+    agendaId: event.agendaId,
+    title: event.title,
+    description: event.description,
+    startAt: event.startAt,
+    endAt: event.endAt,
+    allDay: event.allDay,
+    createdById: event.createdById,
+    participants: [],
+    todoTasks: [],
+    isParticipant: event.participants.some((p) => p.userId === currentUserId),
+    agendaName: event.agenda.name,
+  };
+}
+
+function mapDetailEvent(event: EventDetailRow, currentUserId: string): AgendaEventDTO {
   return {
     id: event.id,
     agendaId: event.agendaId,
@@ -129,7 +157,7 @@ export async function listAgendaEvents(
               startAt: { lte: rangeEnd },
               endAt: { gte: rangeStart },
             },
-            include: eventInclude,
+            include: eventListInclude,
           })
         : Promise.resolve([]),
       prisma.agendaEvent.findMany({
@@ -139,13 +167,13 @@ export async function listAgendaEvents(
           endAt: { gte: rangeStart },
           participants: { some: { userId: ctx.session.user.id } },
         },
-        include: eventInclude,
+        include: eventListInclude,
       }),
     ]);
 
     const byId = new Map<string, AgendaEventDTO>();
     for (const event of [...agendaEvents, ...participantEvents]) {
-      byId.set(event.id, mapEvent(event, ctx.session.user.id));
+      byId.set(event.id, mapListEvent(event, ctx.session.user.id));
     }
 
     return { status: 200, data: Array.from(byId.values()) };
@@ -164,7 +192,7 @@ export async function getAgendaEvent(dispensarySlug: string, eventId: string) {
         id: eventId,
         agenda: tenantWhere(ctx.tenant.dispensaryId),
       },
-      include: eventInclude,
+      include: eventDetailInclude,
     });
 
     if (!event) {
@@ -187,7 +215,7 @@ export async function getAgendaEvent(dispensarySlug: string, eventId: string) {
       }
     }
 
-    return { status: 200, data: mapEvent(event, ctx.session.user.id) };
+    return { status: 200, data: mapDetailEvent(event, ctx.session.user.id) };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors du chargement de l\'événement');
   }
@@ -265,12 +293,12 @@ export async function createAgendaEvent(
           create: validated.participantUserIds.map((userId) => ({ userId })),
         },
       },
-      include: eventInclude,
+      include: eventDetailInclude,
     });
 
     await emitAgendaEventsChange(ctx.tenant.dispensaryId, validated.agendaId, meta);
 
-    return { status: 201, data: mapEvent(event, ctx.session.user.id) };
+    return { status: 201, data: mapDetailEvent(event, ctx.session.user.id) };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la création de l\'événement');
   }
@@ -303,7 +331,10 @@ export async function updateAgendaEvent(
         id: validated.id,
         agenda: tenantWhere(ctx.tenant.dispensaryId),
       },
-      select: { agendaId: true },
+      select: {
+        agendaId: true,
+        participants: { select: { userId: true } },
+      },
     });
 
     if (!existing) {
@@ -348,12 +379,19 @@ export async function updateAgendaEvent(
       };
     }
 
-    const event = await prisma.$transaction(async (tx) => {
-      await tx.agendaEventParticipant.deleteMany({
-        where: { eventId: validated.id },
-      });
+    const existingParticipantIds = new Set(
+      existing.participants.map((participant) => participant.userId),
+    );
+    const nextParticipantIds = new Set(validated.participantUserIds);
+    const participantIdsToRemove = [...existingParticipantIds].filter(
+      (userId) => !nextParticipantIds.has(userId),
+    );
+    const participantIdsToAdd = validated.participantUserIds.filter(
+      (userId) => !existingParticipantIds.has(userId),
+    );
 
-      return tx.agendaEvent.update({
+    const event = await prisma.$transaction(async (tx) => {
+      await tx.agendaEvent.update({
         where: { id: validated.id },
         data: {
           title: validated.title,
@@ -361,17 +399,36 @@ export async function updateAgendaEvent(
           startAt,
           endAt,
           allDay: validated.allDay,
-          participants: {
-            create: validated.participantUserIds.map((userId) => ({ userId })),
-          },
         },
-        include: eventInclude,
+      });
+
+      if (participantIdsToRemove.length > 0) {
+        await tx.agendaEventParticipant.deleteMany({
+          where: {
+            eventId: validated.id,
+            userId: { in: participantIdsToRemove },
+          },
+        });
+      }
+
+      if (participantIdsToAdd.length > 0) {
+        await tx.agendaEventParticipant.createMany({
+          data: participantIdsToAdd.map((userId) => ({
+            eventId: validated.id,
+            userId,
+          })),
+        });
+      }
+
+      return tx.agendaEvent.findFirstOrThrow({
+        where: { id: validated.id },
+        include: eventDetailInclude,
       });
     });
 
     await emitAgendaEventsChange(ctx.tenant.dispensaryId, existing.agendaId, meta);
 
-    return { status: 200, data: mapEvent(event, ctx.session.user.id) };
+    return { status: 200, data: mapDetailEvent(event, ctx.session.user.id) };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la mise à jour de l\'événement');
   }

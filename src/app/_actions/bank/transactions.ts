@@ -251,9 +251,10 @@ export async function updateTransaction(
         });
 
         if (validatedData.order !== undefined) {
-          updateData.order = validatedData.order;
+          const newOrder = validatedData.order;
+          updateData.order = newOrder;
 
-          const transactionsToShift = sameDateTransactions.filter((t) => t.order >= validatedData.order!);
+          const transactionsToShift = sameDateTransactions.filter((t) => t.order >= newOrder);
           if (transactionsToShift.length > 0) {
             await prisma.bankTransaction.updateMany({
               where: {

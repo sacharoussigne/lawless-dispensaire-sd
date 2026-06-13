@@ -1,4 +1,4 @@
-import { Metadata } from 'next';
+import { type Metadata } from 'next';
 import { Container, Title, Text, Button, Group } from '@mantine/core';
 import { routes } from '@/types/routes';
 import Link from 'next/link';

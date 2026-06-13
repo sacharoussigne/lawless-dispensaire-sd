@@ -1,46 +1,27 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
 import { Modal, Stack, Button, Group, Text } from '@mantine/core';
-import { notifications } from '@mantine/notifications';
-import { deleteUserMailTemplate } from '@/app/_actions/mailTemplates';
-import { handleAction } from '@/lib/action';
-import type { MailTemplate } from '@/types/mailTemplates';
+import type { MailTemplateListItem } from '@/types/mails';
+import { useDeleteUserMailTemplateMutation } from '../hooks/useMailsQueries';
 
 interface DeleteMailTemplateModalProps {
   opened: boolean;
   onClose: () => void;
-  mailTemplateToDelete: MailTemplate | null;
-  onSuccess: () => void;
+  mailTemplateToDelete: MailTemplateListItem | null;
 }
 
 export function DeleteMailTemplateModal({
   opened,
   onClose,
   mailTemplateToDelete,
-  onSuccess,
 }: DeleteMailTemplateModalProps) {
-  const { dispensarySlug } = usePermissions();
+  const deleteMutation = useDeleteUserMailTemplateMutation();
+
   const handleDelete = async () => {
     if (!mailTemplateToDelete) return;
 
-    try {
-      const result = await deleteUserMailTemplate(dispensarySlug!, { id: mailTemplateToDelete.id });
-      handleAction(result);
-      notifications.show({
-        title: 'Succès',
-        message: 'Template supprimé avec succès',
-        color: 'green',
-      });
-      onClose();
-      onSuccess();
-    } catch (error: any) {
-      notifications.show({
-        title: 'Erreur',
-        message: error.message || 'Erreur lors de la suppression',
-        color: 'red',
-      });
-    }
+    await deleteMutation.mutateAsync({ id: mailTemplateToDelete.id });
+    onClose();
   };
 
   return (
@@ -59,7 +40,11 @@ export function DeleteMailTemplateModal({
           <Button variant="subtle" onClick={onClose}>
             Annuler
           </Button>
-          <Button color="red" onClick={handleDelete}>
+          <Button
+            color="danger"
+            onClick={handleDelete}
+            loading={deleteMutation.isPending}
+          >
             Supprimer
           </Button>
         </Group>

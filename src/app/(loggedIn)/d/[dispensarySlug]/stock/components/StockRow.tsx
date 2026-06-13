@@ -6,7 +6,6 @@ import { IconClipboardCheck } from '@tabler/icons-react';
 import type { ItemWithRelations } from '@/types/stock';
 import { apothecaryBooleanPills } from '@/lib/apothecaryPill';
 import { EditableStockCell } from './EditableStockCell';
-import type { EvalResult } from '@/lib/stock/expression';
 import type { StockUiPreferences } from '@/types/stockUiPreferences';
 
 interface StockRowProps {
@@ -19,8 +18,6 @@ interface StockRowProps {
   getTextColor: (backgroundColor: string) => string;
   stockUiPreferences: StockUiPreferences;
   onCommitQuantity: (itemId: string, quantity: number | null) => void;
-  evaluateIntegerExpression: (expression: string) => EvalResult;
-  evaluateDecimalExpression: (expression: string) => EvalResult;
 }
 
 export const StockRow = memo(function StockRow({
@@ -33,8 +30,6 @@ export const StockRow = memo(function StockRow({
   getTextColor,
   stockUiPreferences,
   onCommitQuantity,
-  evaluateIntegerExpression,
-  evaluateDecimalExpression,
 }: StockRowProps) {
   const hasStockToday = item.stockToday !== null;
 
@@ -112,8 +107,6 @@ export const StockRow = memo(function StockRow({
             hasStockToday={hasStockToday}
             initialValue={editedQuantity}
             onCommitQuantity={onCommitQuantity}
-            evaluateIntegerExpression={evaluateIntegerExpression}
-            evaluateDecimalExpression={evaluateDecimalExpression}
           />
         </Table.Td>
       )}

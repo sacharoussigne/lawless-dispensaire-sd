@@ -4,10 +4,10 @@ import { Paper, TextInput } from '@mantine/core';
 import { DataTable } from 'mantine-datatable';
 import { IconEdit, IconTrash, IconEye } from '@tabler/icons-react';
 import { Group, ActionIcon } from '@mantine/core';
-import type { Mail } from '@prisma/client';
+import type { MailListItem } from '@/types/mails';
 
 interface MailsTableProps {
-  mails: Mail[];
+  mails: MailListItem[];
   loading: boolean;
   nameFilter: string;
   receiverFilter: string;
@@ -17,9 +17,9 @@ interface MailsTableProps {
   onNameFilterChange: (value: string) => void;
   onReceiverFilterChange: (value: string) => void;
   onPageChange: (page: number) => void;
-  onEdit: (mail: Mail) => void;
-  onDelete: (mail: Mail) => void;
-  onView: (mail: Mail) => void;
+  onEdit: (mail: MailListItem) => void;
+  onDelete: (mail: MailListItem) => void;
+  onView: (mail: MailListItem) => void;
 }
 
 export function MailsTable({
@@ -67,19 +67,14 @@ export function MailsTable({
             ),
           },
           {
-            accessor: 'content',
+            accessor: 'contentPreview',
             title: 'Contenu',
-            render: (mail: Mail) => {
-              const preview = mail.content.length > 100
-                ? mail.content.substring(0, 100) + '...'
-                : mail.content;
-              return <span title={mail.content}>{preview}</span>;
-            },
+            render: (mail: MailListItem) => <span>{mail.contentPreview}</span>,
           },
           {
             accessor: 'createdAt',
             title: 'Date',
-            render: (mail: Mail) => {
+            render: (mail: MailListItem) => {
               return new Date(mail.createdAt).toLocaleDateString('fr-FR', {
                 year: 'numeric',
                 month: 'short',
@@ -92,7 +87,7 @@ export function MailsTable({
           {
             accessor: 'actions',
             title: 'Actions',
-            render: (mail: Mail) => (
+            render: (mail: MailListItem) => (
               <Group gap="xs" wrap="nowrap" justify="flex-end">
                 <ActionIcon
                   variant="light"

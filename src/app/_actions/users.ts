@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { z as zv3 } from 'zod/v3';
 import prisma from '@/lib/prisma';
 import { checkRolePermission } from '@/lib/auth/permissions';
-import { Role } from '@/types/enum/roles';
+import { type Role } from '@/types/enum/roles';
 import { actionErrorParser } from '@/lib/action';
 import { requirePlatformAdminContext } from '@/lib/dispensary/serverActionContext';
 

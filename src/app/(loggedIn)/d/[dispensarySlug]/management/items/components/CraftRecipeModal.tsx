@@ -1,9 +1,7 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import {
-  Modal,
   Stack,
   TextInput,
   Textarea,
@@ -17,15 +15,15 @@ import {
 } from '@mantine/core';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
 import { useForm } from '@mantine/form';
-import { notifications } from '@mantine/notifications';
-import { createCraftRecipe, updateCraftRecipe } from '@/app/_actions/craftRecipes';
-import { handleAction } from '@/lib/action';
 import { handleApiZodError } from '@/lib/services/zod';
 import { ParsedZodError } from '@/lib/errors/ParsedZodError';
+import type { ItemWithRelations, CraftRecipeWithIngredients } from '@/types/items';
+import { sortItems } from '@/lib/stock/sortItemsByCategory';
+import { AppModal, AppModalFooter } from '@/app/_components/AppModal/AppModal';
 import type {
-  ItemWithRelations,
-  CraftRecipeWithIngredients,
-} from '@/types/items';
+  useCreateCraftRecipeMutation,
+  useUpdateCraftRecipeMutation,
+} from '../hooks/useItemsQueries';
 
 interface CraftRecipeModalProps {
   opened: boolean;
@@ -33,7 +31,8 @@ interface CraftRecipeModalProps {
   editingRecipe: CraftRecipeWithIngredients | null;
   selectedItem: ItemWithRelations | null;
   items: ItemWithRelations[];
-  onSuccess: () => void;
+  createMutation: ReturnType<typeof useCreateCraftRecipeMutation>;
+  updateMutation: ReturnType<typeof useUpdateCraftRecipeMutation>;
 }
 
 export function CraftRecipeModal({
@@ -42,9 +41,9 @@ export function CraftRecipeModal({
   editingRecipe,
   selectedItem,
   items,
-  onSuccess,
+  createMutation,
+  updateMutation,
 }: CraftRecipeModalProps) {
-  const { dispensarySlug } = usePermissions();
   const craftRecipeForm = useForm({
     initialValues: {
       name: '',
@@ -86,13 +85,26 @@ export function CraftRecipeModal({
     }
   }, [editingRecipe, opened]);
 
+  const itemOptions = useMemo(
+    () =>
+      sortItems(items.filter((item) => item.id !== selectedItem?.id)).map((item) => ({
+        value: item.id,
+        label: item.name,
+      })),
+    [items, selectedItem?.id],
+  );
+
+  const handleClose = () => {
+    onClose();
+    craftRecipeForm.reset();
+  };
+
   const handleSubmit = async (values: typeof craftRecipeForm.values) => {
     if (!selectedItem) return;
 
     try {
-      let result;
       if (editingRecipe) {
-        result = await updateCraftRecipe(dispensarySlug!, {
+        await updateMutation.mutateAsync({
           id: editingRecipe.id,
           name: values.name,
           description: values.description || undefined,
@@ -101,7 +113,7 @@ export function CraftRecipeModal({
           ingredients: values.ingredients,
         });
       } else {
-        result = await createCraftRecipe(dispensarySlug!, {
+        await createMutation.mutateAsync({
           name: values.name,
           description: values.description || undefined,
           craftedItemId: selectedItem.id,
@@ -111,26 +123,10 @@ export function CraftRecipeModal({
         });
       }
 
-      handleAction(result);
-      notifications.show({
-        title: 'Succès',
-        message: editingRecipe
-          ? 'Recette de craft modifiée avec succès'
-          : 'Recette de craft créée avec succès',
-        color: 'green',
-      });
-      onClose();
-      craftRecipeForm.reset();
-      onSuccess();
-    } catch (error: any) {
+      handleClose();
+    } catch (error: unknown) {
       if (error instanceof ParsedZodError) {
         handleApiZodError(error.error, craftRecipeForm);
-      } else {
-        notifications.show({
-          title: 'Erreur',
-          message: error.message || 'Erreur lors de la sauvegarde',
-          color: 'red',
-        });
       }
     }
   };
@@ -146,36 +142,30 @@ export function CraftRecipeModal({
     craftRecipeForm.removeListItem('ingredients', index);
   };
 
-  const itemOptions = items
-    .filter((item) => item.id !== selectedItem?.id)
-    .sort((a, b) => {
-      if (a.order !== undefined && b.order !== undefined) {
-        return a.order - b.order;
-      }
-      if (a.order !== undefined) return -1;
-      if (b.order !== undefined) return 1;
-      return a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' });
-    })
-    .map((item) => ({
-      value: item.id,
-      label: item.name,
-    }));
+  const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <Modal
+    <AppModal
       opened={opened}
-      onClose={() => {
-        onClose();
-        craftRecipeForm.reset();
-      }}
+      onClose={handleClose}
       title={
         editingRecipe
           ? 'Modifier la recette de craft'
           : 'Créer une recette de craft'
       }
       size="lg"
+      footer={
+        <AppModalFooter>
+          <Button variant="subtle" color="slate" onClick={handleClose}>
+            Annuler
+          </Button>
+          <Button type="submit" form="craft-recipe-modal-form" loading={isPending}>
+            {editingRecipe ? 'Modifier' : 'Créer'}
+          </Button>
+        </AppModalFooter>
+      }
     >
-      <form onSubmit={craftRecipeForm.onSubmit(handleSubmit)}>
+      <form id="craft-recipe-modal-form" onSubmit={craftRecipeForm.onSubmit(handleSubmit)}>
         <Stack>
           <TextInput
             label="Nom de la recette"
@@ -202,7 +192,7 @@ export function CraftRecipeModal({
             {...craftRecipeForm.getInputProps('isEnabled', { type: 'checkbox' })}
           />
           <Divider label="Ingrédients" labelPosition="left" />
-          {craftRecipeForm.values.ingredients.map((ingredient, index) => (
+          {craftRecipeForm.values.ingredients.map((_, index) => (
             <Group key={index} align="flex-end" gap="xs">
               <Select
                 label={`Ingrédient ${index + 1}`}
@@ -211,9 +201,7 @@ export function CraftRecipeModal({
                 required
                 searchable
                 style={{ flex: 1 }}
-                {...craftRecipeForm.getInputProps(
-                  `ingredients.${index}.usedItemId`
-                )}
+                {...craftRecipeForm.getInputProps(`ingredients.${index}.usedItemId`)}
               />
               <NumberInput
                 label="Quantité"
@@ -221,12 +209,10 @@ export function CraftRecipeModal({
                 required
                 min={1}
                 style={{ width: 120 }}
-                {...craftRecipeForm.getInputProps(
-                  `ingredients.${index}.quantity`
-                )}
+                {...craftRecipeForm.getInputProps(`ingredients.${index}.quantity`)}
               />
               <ActionIcon
-                color="red"
+                color="danger"
                 variant="light"
                 onClick={() => removeIngredient(index)}
                 disabled={craftRecipeForm.values.ingredients.length === 1}
@@ -242,23 +228,8 @@ export function CraftRecipeModal({
           >
             Ajouter un ingrédient
           </Button>
-          <Group justify="flex-end" mt="md">
-            <Button
-              variant="subtle"
-              onClick={() => {
-                onClose();
-                craftRecipeForm.reset();
-              }}
-            >
-              Annuler
-            </Button>
-            <Button type="submit">
-              {editingRecipe ? 'Modifier' : 'Créer'}
-            </Button>
-          </Group>
         </Stack>
       </form>
-    </Modal>
+    </AppModal>
   );
 }
-

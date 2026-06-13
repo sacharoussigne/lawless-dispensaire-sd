@@ -1,7 +1,6 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Modal,
   Stack,
@@ -16,7 +15,7 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  DragEndEvent,
+  type DragEndEvent,
 } from '@dnd-kit/core';
 import {
   arrayMove,
@@ -24,75 +23,53 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { notifications } from '@mantine/notifications';
-import { reorderCategoryItems } from '@/app/_actions/categoryItems';
-import { handleAction } from '@/lib/action';
 import { SortableCategoryItemRow } from './SortableCategoryItemRow';
-import type { CategoryItemWithItems } from '@/types/categoryItems';
+import type { CategoryItemWithCount } from '@/types/categoryItems';
+import { sortCategoryItems } from '@/lib/categoryItems/sortCategoryItems';
+import type { useReorderCategoryItemsMutation } from '../hooks/useCategoryItemsQueries';
 
 interface ReorderCategoryItemsModalProps {
   opened: boolean;
   onClose: () => void;
-  categoryItems: CategoryItemWithItems[];
-  onSuccess: () => void;
+  categoryItems: CategoryItemWithCount[];
+  reorderMutation: ReturnType<typeof useReorderCategoryItemsMutation>;
 }
 
 export function ReorderCategoryItemsModal({
   opened,
   onClose,
   categoryItems,
-  onSuccess,
+  reorderMutation,
 }: ReorderCategoryItemsModalProps) {
-  const { dispensarySlug } = usePermissions();
-  const [reorderItems, setReorderItems] = useState<CategoryItemWithItems[]>([]);
-  const [savingOrder, setSavingOrder] = useState(false);
+  const [reorderItems, setReorderItems] = useState<CategoryItemWithCount[]>([]);
+  const snapshotRef = useRef<CategoryItemWithCount[]>([]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
-    })
+    }),
   );
 
-  // Initialiser la liste de réordonnancement avec les catégories triées quand la modal s'ouvre
   useEffect(() => {
     if (opened) {
-      const sortedCategoryItems = [...categoryItems].sort((a, b) => {
-        if (a.order !== undefined && b.order !== undefined) {
-          return a.order - b.order;
-        }
-        return a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' });
-      });
-      setReorderItems([...sortedCategoryItems]);
+      snapshotRef.current = sortCategoryItems(categoryItems);
+      setReorderItems(snapshotRef.current);
     }
-  }, [opened, categoryItems]);
+  }, [opened]);
 
   const handleSaveReorder = async () => {
     try {
-      setSavingOrder(true);
-      const result = await reorderCategoryItems(dispensarySlug!, {
+      await reorderMutation.mutateAsync({
         items: reorderItems.map((item, index) => ({
           id: item.id,
           order: index,
         })),
       });
-      handleAction(result);
-      notifications.show({
-        title: 'Succès',
-        message: 'Ordre des catégories mis à jour',
-        color: 'green',
-      });
       onClose();
       setReorderItems([]);
-      onSuccess();
-    } catch (error: any) {
-      notifications.show({
-        title: 'Erreur',
-        message: error.message || 'Erreur lors de la mise à jour de l\'ordre',
-        color: 'red',
-      });
-    } finally {
-      setSavingOrder(false);
+    } catch {
+      // Error notification handled by mutation
     }
   };
 
@@ -141,12 +118,12 @@ export function ReorderCategoryItemsModal({
           </SortableContext>
         </DndContext>
         <Group justify="flex-end" mt="md">
-          <Button variant="subtle" onClick={handleClose}>
+          <Button variant="subtle" color="slate" onClick={handleClose}>
             Annuler
           </Button>
           <Button
             onClick={handleSaveReorder}
-            loading={savingOrder}
+            loading={reorderMutation.isPending}
             disabled={reorderItems.length === 0}
           >
             Valider
@@ -156,4 +133,3 @@ export function ReorderCategoryItemsModal({
     </Modal>
   );
 }
-

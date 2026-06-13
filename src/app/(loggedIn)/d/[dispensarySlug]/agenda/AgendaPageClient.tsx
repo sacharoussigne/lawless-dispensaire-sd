@@ -15,6 +15,11 @@ import {
 } from '@/lib/agenda/calendarNavigation';
 import { useAgendaRealtime } from '@/lib/agenda/realtime/useAgendaRealtime';
 import { isRelevantAgendaRealtimeEvent } from '@/lib/agenda/realtime/isRelevantAgendaEvent';
+import {
+  removeCalendarEvent,
+  upsertCalendarEvent,
+  type AgendaEventChange,
+} from '@/lib/agenda/eventState';
 import { notifyUpcomingEventsLocalRefresh } from '@/lib/agenda/upcomingEventsLocalRefresh';
 import { PageHeader } from '@/app/_components/PageHeader/PageHeader';
 import {
@@ -43,6 +48,7 @@ import classes from './agenda.module.scss';
 interface AgendaPageClientProps {
   dispensarySlug: string;
   agendas: AgendaSummaryDTO[];
+  initialAgendaId: string | null;
   initialEvents: AgendaEventDTO[];
   initialTodoLists: AgendaTodoListDTO[];
   isAdmin: boolean;
@@ -51,6 +57,7 @@ interface AgendaPageClientProps {
 export function AgendaPageClient({
   dispensarySlug,
   agendas: initialAgendas,
+  initialAgendaId,
   initialEvents,
   initialTodoLists,
   isAdmin,
@@ -69,6 +76,7 @@ export function AgendaPageClient({
   const [slotStart, setSlotStart] = useState<Date | null>(null);
   const [slotEnd, setSlotEnd] = useState<Date | null>(null);
   const [remoteTodosToken, setRemoteTodosToken] = useState(0);
+  const [remoteEventTodosToken, setRemoteEventTodosToken] = useState(0);
 
   const participantOnly = agendas.length === 0 && events.length > 0;
 
@@ -144,6 +152,7 @@ export function AgendaPageClient({
 
   const fetchEventsRef = useRef<() => Promise<void>>(async () => {});
   const selectedAgendaIdRef = useRef(selectedAgendaId);
+  const openEventIdRef = useRef<string | null>(null);
 
   const fetchEvents = useCallback(
     async (agendaId: string | null = selectedAgendaId) => {
@@ -163,6 +172,10 @@ export function AgendaPageClient({
   useEffect(() => {
     selectedAgendaIdRef.current = selectedAgendaId;
   }, [selectedAgendaId]);
+
+  useEffect(() => {
+    openEventIdRef.current = selectedEvent?.id ?? null;
+  }, [selectedEvent?.id]);
 
   useEffect(() => {
     fetchEventsRef.current = () => fetchEvents();
@@ -190,10 +203,22 @@ export function AgendaPageClient({
       }
       setRemoteTodosToken((token) => token + 1);
     },
+    onEventTodosChange: (payload) => {
+      const openEventId = openEventIdRef.current;
+      if (!openEventId || payload.eventId !== openEventId) return;
+      if (
+        !isRelevantAgendaRealtimeEvent(payload, {
+          selectedAgendaId: selectedAgendaIdRef.current,
+        })
+      ) {
+        return;
+      }
+      setRemoteEventTodosToken((token) => token + 1);
+    },
   });
 
   useEffect(() => {
-    if (!urlAgendaId) return;
+    if (!urlAgendaId || urlAgendaId === initialAgendaId) return;
 
     let cancelled = false;
 
@@ -213,7 +238,7 @@ export function AgendaPageClient({
     return () => {
       cancelled = true;
     };
-  }, [dispensarySlug, urlAgendaId]);
+  }, [dispensarySlug, urlAgendaId, initialAgendaId]);
 
   const handleAgendaChange = useCallback(
     (agendaId: string) => {
@@ -230,10 +255,14 @@ export function AgendaPageClient({
     [fetchEvents, pathname, router, searchParams],
   );
 
-  const refreshCalendar = useCallback(() => {
-    void fetchEvents();
+  const handleEventChange = useCallback((change: AgendaEventChange) => {
+    setEvents((current) =>
+      change.type === 'delete'
+        ? removeCalendarEvent(current, change.id)
+        : upsertCalendarEvent(current, change.event),
+    );
     notifyUpcomingEventsLocalRefresh();
-  }, [fetchEvents]);
+  }, []);
 
   const handleSelectEvent = async (event: AgendaEventDTO) => {
     setSelectedEvent(event);
@@ -356,6 +385,7 @@ export function AgendaPageClient({
             onEventsChange={setEvents}
             canWrite={canWrite && !participantOnly}
             panelHeightPx={panelHeightPx}
+            skipInitialRangeFetch
             onSelectEvent={handleSelectEvent}
             onSelectSlot={handleSelectSlot}
           />
@@ -367,8 +397,9 @@ export function AgendaPageClient({
             agendaId={selectedAgendaId}
             accessLevel={selectedAgenda?.accessLevel ?? null}
             initialLists={
-              selectedAgendaId === initialAgendas[0]?.id ? initialTodoLists : []
+              selectedAgendaId === initialAgendaId ? initialTodoLists : []
             }
+            skipInitialFetch={selectedAgendaId === initialAgendaId && initialTodoLists.length > 0}
             wideLayout={!renderCalendar}
             clientId={clientId}
             remoteTodosToken={remoteTodosToken}
@@ -387,7 +418,8 @@ export function AgendaPageClient({
           slotEnd={slotEnd}
           canWrite={canWrite && !participantOnly}
           clientId={clientId}
-          onSuccess={refreshCalendar}
+          remoteEventTodosToken={remoteEventTodosToken}
+          onSuccess={handleEventChange}
         />
       )}
     </Container>

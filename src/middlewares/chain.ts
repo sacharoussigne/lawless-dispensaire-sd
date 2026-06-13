@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import type { AppMiddleware, AppMiddlewareSession } from '@/types/middlewareSession';
 
 export const chain = (...middlewares: AppMiddleware[]) => {

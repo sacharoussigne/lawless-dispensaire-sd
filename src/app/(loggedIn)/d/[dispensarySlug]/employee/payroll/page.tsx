@@ -1,13 +1,14 @@
 import { Container, Group, Text, Title } from '@mantine/core';
 import { redirect } from 'next/navigation';
+import { listPayrollReports } from '@/app/_actions/payrollReports';
 import { getAuthSession } from '@/lib/auth';
-import prisma from '@/lib/prisma';
 import { checkRolePermission } from '@/lib/auth/permissions';
 import { getEffectiveRoleForDispensary, requireDispensaryFromSlug } from '@/lib/dispensary/context';
+import { getDataOrThrow } from '@/lib/response';
 import type { AuthSession } from '@/types/session';
 import { routes } from '@/types/routes';
 import PayrollNewReportButton from './PayrollNewReportButton';
-import PayrollReportsList from './PayrollReportsList';
+import PayrollReportsPageClient from './PayrollReportsPageClient';
 
 export default async function PayrollReportsPage({ params }: { params: Promise<{ dispensarySlug: string }> }) {
   const { dispensarySlug } = await params;
@@ -24,29 +25,8 @@ export default async function PayrollReportsPage({ params }: { params: Promise<{
 
   const canCreate = checkRolePermission(effectiveRole, 'payroll_reports', 'create');
 
-  const rows = await prisma.payrollWeeklyReport.findMany({
-    orderBy: [{ weekStart: 'desc' }, { reportType: 'asc' }],
-    take: 100,
-    select: {
-      id: true,
-      weekStart: true,
-      weekEnd: true,
-      reportType: true,
-      createdAt: true,
-      createdBy: { select: { name: true, id: true } },
-      resultJson: true,
-    },
-  });
-
-  const reports = rows.map((r) => ({
-    id: r.id,
-    weekStart: r.weekStart.toISOString(),
-    weekEnd: r.weekEnd.toISOString(),
-    reportType: r.reportType,
-    createdAt: r.createdAt.toISOString(),
-    createdBy: r.createdBy,
-    resultJson: r.resultJson,
-  }));
+  const result = await listPayrollReports(dispensarySlug);
+  const { reports } = getDataOrThrow(result, 'Erreur lors du chargement des rapports salaires');
 
   return (
     <Container size="xl" py="xl">
@@ -59,8 +39,7 @@ export default async function PayrollReportsPage({ params }: { params: Promise<{
         </div>
         {canCreate && <PayrollNewReportButton />}
       </Group>
-      <PayrollReportsList reports={reports} canDelete={canCreate} />
+      <PayrollReportsPageClient initialReports={reports} canDelete={canCreate} />
     </Container>
   );
 }
-

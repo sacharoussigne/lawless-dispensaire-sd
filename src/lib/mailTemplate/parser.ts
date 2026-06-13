@@ -186,8 +186,8 @@ export function parseTemplateParameters(content: string): TemplateParameter[] {
 export function extractInputs(content: string): TemplateInput[] {
   const parameters = parseTemplateParameters(content);
   return parameters
-    .filter((p) => p.type === 'input' && p.input)
-    .map((p) => p.input!)
+    .filter((p): p is typeof p & { input: NonNullable<(typeof p)['input']> } => p.type === 'input' && p.input != null)
+    .map((p) => p.input)
     .filter(
       (input, index, self) =>
         index === self.findIndex((i) => i.name === input.name)
@@ -219,6 +219,6 @@ export function extractFormSections(content: string): FormSection[] {
 export function extractJsCode(content: string): string[] {
   const parameters = parseTemplateParameters(content);
   return parameters
-    .filter((p) => p.type === 'js' && p.jsCode)
-    .map((p) => p.jsCode!);
+    .filter((p): p is typeof p & { jsCode: string } => p.type === 'js' && p.jsCode != null)
+    .map((p) => p.jsCode);
 }

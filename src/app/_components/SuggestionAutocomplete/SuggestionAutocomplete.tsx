@@ -56,7 +56,7 @@ export function SuggestionAutocomplete({
               <ActionIcon
                 size="xs"
                 variant="subtle"
-                color="red"
+                color="danger"
                 onMouseDown={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -98,7 +98,7 @@ export function SuggestionAutocomplete({
                   </Button>
                   <Button
                     size="xs"
-                    color="red"
+                    color="danger"
                     onMouseDown={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
