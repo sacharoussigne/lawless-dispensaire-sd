@@ -3,25 +3,47 @@
 import { useMemo } from 'react';
 import { Stack, Text, Group, Badge, Code } from '@mantine/core';
 import { IconCode, IconForms } from '@tabler/icons-react';
-import {
-  parseTemplateParameters,
-  extractInputs,
-  extractJsCode,
-  extractFormSections,
-} from '@/lib/mailTemplate/parser';
+import { parseTemplateParameters } from '@/lib/mailTemplate/parser';
 
 interface DetectedParametersProps {
   content: string;
 }
 
 export function DetectedParameters({ content }: DetectedParametersProps) {
-  const parameters = useMemo(
-    () => parseTemplateParameters(content),
-    [content]
-  );
-  const inputs = useMemo(() => extractInputs(content), [content]);
-  const jsCodes = useMemo(() => extractJsCode(content), [content]);
-  const formSections = useMemo(() => extractFormSections(content), [content]);
+  const parsed = useMemo(() => {
+    const parameters = parseTemplateParameters(content);
+    const inputs = parameters
+      .filter((p) => p.type === 'input' && p.input)
+      .map((p) => p.input!);
+    const jsCodes = parameters
+      .filter((p) => p.type === 'js' && p.jsCode)
+      .map((p) => p.jsCode!);
+
+    const formSections: { title?: string; inputs: typeof inputs }[] = [
+      { inputs: [] },
+    ];
+    const seenInputNames = new Set<string>();
+
+    for (const param of parameters) {
+      if (param.type === 'category') {
+        formSections.push({ title: param.categoryTitle, inputs: [] });
+        continue;
+      }
+      if (param.type !== 'input' || !param.input) continue;
+      if (param.input.dependsOn) continue;
+      if (seenInputNames.has(param.input.name)) continue;
+      seenInputNames.add(param.input.name);
+      formSections[formSections.length - 1].inputs.push(param.input);
+    }
+
+    const sections = formSections.filter(
+      (section) => section.title || section.inputs.length > 0,
+    );
+
+    return { parameters, inputs, jsCodes, formSections: sections };
+  }, [content]);
+
+  const { parameters, inputs, jsCodes, formSections } = parsed;
   const hasCategories = formSections.some((section) => section.title);
 
   if (parameters.length === 0) {
@@ -69,13 +91,13 @@ export function DetectedParameters({ content }: DetectedParametersProps) {
                 {section.inputs.map((input) => (
                   <Stack key={input.name} gap="xs">
                     <Group gap="xs">
-                      <Badge variant="light" color="blue">
+                      <Badge variant="light" color="denim">
                         {input.name}
                       </Badge>
                       <Text size="xs" c="dimmed">
                         {input.label} ({input.type})
                         {input.required && (
-                          <Badge size="xs" color="red" variant="dot" ml="xs">
+                          <Badge size="xs" color="danger" variant="dot" ml="xs">
                             Requis
                           </Badge>
                         )}
@@ -105,7 +127,7 @@ export function DetectedParameters({ content }: DetectedParametersProps) {
                   </Stack>
                 ))}
               </Stack>
-            )
+            ),
           )}
         </Stack>
       )}

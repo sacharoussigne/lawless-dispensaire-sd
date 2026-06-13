@@ -61,7 +61,7 @@ export default function EditMailPageClient({
       notifications.show({
         title: 'Succès',
         message: 'Courrier modifié avec succès',
-        color: 'green',
+        color: 'moss',
       });
       router.push(routes.employee.mails);
     } catch (error: any) {
@@ -71,7 +71,7 @@ export default function EditMailPageClient({
         notifications.show({
           title: 'Erreur',
           message: error.message || 'Erreur lors de la sauvegarde',
-          color: 'red',
+          color: 'danger',
         });
       }
     } finally {

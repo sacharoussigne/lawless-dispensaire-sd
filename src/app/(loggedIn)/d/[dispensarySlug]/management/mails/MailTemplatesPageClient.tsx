@@ -13,7 +13,7 @@ import { DeleteMailTemplateModal } from './components/DeleteMailTemplateModal';
 import { OrderLetterTemplateAssignmentModal } from './components/OrderLetterTemplateAssignmentModal';
 import { DeleteOrderLetterTemplateAssignmentModal } from './components/DeleteOrderLetterTemplateAssignmentModal';
 import { ActiveFilters } from '@/app/_components/ActiveFilters/ActiveFilters';
-import { MailTemplatesTable } from './components/MailTemplatesTable';
+import { MailTemplatesTable } from '@/app/_components/mails/MailTemplatesTable';
 import { OrderLetterTemplateAssignmentsTable } from './components/OrderLetterTemplateAssignmentsTable';
 import type { MailTemplate } from '@/types/mailTemplates';
 import type { OrderMailTemplateAssignment } from '@prisma/client';

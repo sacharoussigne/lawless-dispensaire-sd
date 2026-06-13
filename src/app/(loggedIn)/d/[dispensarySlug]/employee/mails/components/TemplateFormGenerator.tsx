@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { useDebouncedValue } from '@mantine/hooks';
 import {
   Stack,
   TextInput,
@@ -94,6 +95,8 @@ export const TemplateFormGenerator = forwardRef<
     reset: () => form.reset(),
   }));
 
+  const [debouncedValues] = useDebouncedValue(form.values, 200);
+
   const renderContent = (values: FormValues) => {
     const context: RenderContext = {
       inputs: Object.entries(values).reduce(
@@ -120,9 +123,9 @@ export const TemplateFormGenerator = forwardRef<
 
   useEffect(() => {
     if (onChange) {
-      onChange(renderContent(form.values));
+      onChange(renderContent(debouncedValues));
     }
-  }, [form.values, template]);
+  }, [debouncedValues, template]);
 
   const renderInput = (input: TemplateInput) => {
     const commonProps = {
@@ -306,7 +309,7 @@ export const TemplateFormGenerator = forwardRef<
               fw={700}
               tt="uppercase"
               lts="0.05em"
-              c="blue.7"
+              c="denim.7"
               style={{ flexShrink: 0 }}
             >
               {section.title}

@@ -4,10 +4,15 @@ import { Paper, TextInput, Text } from '@mantine/core';
 import { DataTable } from 'mantine-datatable';
 import { IconEdit, IconTrash, IconFlask } from '@tabler/icons-react';
 import { Group, ActionIcon } from '@mantine/core';
-import type { MailTemplate } from '@/types/mailTemplates';
 
-interface MailTemplatesTableProps {
-  mailTemplates: MailTemplate[];
+export type MailTemplateTableRow = {
+  id: string;
+  name: string;
+  description?: string | null;
+};
+
+interface MailTemplatesTableProps<T extends MailTemplateTableRow> {
+  mailTemplates: T[];
   loading: boolean;
   nameFilter: string;
   page: number;
@@ -15,12 +20,12 @@ interface MailTemplatesTableProps {
   totalRecords: number;
   onNameFilterChange: (value: string) => void;
   onPageChange: (page: number) => void;
-  onEdit: (mailTemplate: MailTemplate) => void;
-  onDelete: (mailTemplate: MailTemplate) => void;
-  onTest?: (mailTemplate: MailTemplate) => void;
+  onEdit: (mailTemplate: T) => void;
+  onDelete: (mailTemplate: T) => void;
+  onTest?: (mailTemplate: T) => void;
 }
 
-export function MailTemplatesTable({
+export function MailTemplatesTable<T extends MailTemplateTableRow>({
   mailTemplates,
   loading,
   nameFilter,
@@ -32,7 +37,7 @@ export function MailTemplatesTable({
   onEdit,
   onDelete,
   onTest,
-}: MailTemplatesTableProps) {
+}: MailTemplatesTableProps<T>) {
   return (
     <Paper shadow="sm" p="md" withBorder w="100%">
       <DataTable
@@ -53,7 +58,7 @@ export function MailTemplatesTable({
           {
             accessor: 'description',
             title: 'Description',
-            render: (mailTemplate: MailTemplate) => {
+            render: (mailTemplate: T) => {
               if (!mailTemplate.description) {
                 return (
                   <Text c="dimmed" span>
@@ -61,17 +66,18 @@ export function MailTemplatesTable({
                   </Text>
                 );
               }
-              const preview = mailTemplate.description.length > 100
-                ? mailTemplate.description.substring(0, 100) + '...'
-                : mailTemplate.description;
-              return <span title={mailTemplate.description}>{preview}</span>;
+              const preview =
+                mailTemplate.description.length > 100
+                  ? `${mailTemplate.description.substring(0, 100)}...`
+                  : mailTemplate.description;
+              return <span>{preview}</span>;
             },
           },
           {
             accessor: 'actions',
             title: 'Actions',
             width: 120,
-            render: (mailTemplate: MailTemplate) => (
+            render: (mailTemplate: T) => (
               <Group gap="xs" wrap="nowrap" justify="flex-end">
                 {onTest && (
                   <ActionIcon

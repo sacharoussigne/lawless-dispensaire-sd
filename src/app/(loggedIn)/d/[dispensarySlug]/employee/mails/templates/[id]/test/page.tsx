@@ -1,4 +1,4 @@
-import { getUserMailTemplates } from '@/app/_actions/mailTemplates';
+import { getUserMailTemplateById } from '@/app/_actions/mailTemplates';
 import TestTemplatePageClient from './TestTemplatePageClient';
 import { SuspenseLoader } from '@/app/_components/SuspenseLoader/SuspenseLoader';
 import { getDataOrThrow } from '@/lib/response';
@@ -12,14 +12,18 @@ async function TestTemplateContent({
   dispensarySlug: string;
   templateId: string;
 }) {
-  const mailTemplatesResult = await getUserMailTemplates(dispensarySlug);
-  const mailTemplates = getDataOrThrow(mailTemplatesResult, 'Erreur lors du chargement des templates');
+  const templateResult = await getUserMailTemplateById(dispensarySlug, {
+    id: templateId,
+  });
 
-  const template = mailTemplates.find((t) => t.id === templateId);
-
-  if (!template) {
+  if (templateResult.status === 404) {
     redirect(tenantRoutes(dispensarySlug).employee.mails);
   }
+
+  const template = getDataOrThrow(
+    templateResult,
+    'Erreur lors du chargement du template',
+  );
 
   return <TestTemplatePageClient template={template} />;
 }
