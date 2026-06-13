@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { DEFAULT_DISPENSARY_SLUG } from '@/lib/dispensary/constants';
 
 export function dispensaryBase(slug: string): string {

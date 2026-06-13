@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { routes } from '@/types/routes';
 import { isPlatformAdmin } from '@/lib/dispensary/platformAdmin';
 import type { AppMiddlewareSession } from '@/types/middlewareSession';

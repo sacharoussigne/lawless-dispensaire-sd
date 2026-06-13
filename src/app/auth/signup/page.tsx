@@ -1,6 +1,6 @@
 import { getAuthSession } from '@/lib/auth';
 import Signup from '@/app/pages/signup';
-import { Metadata } from 'next';
+import { type Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { routes } from '@/types/routes';
 

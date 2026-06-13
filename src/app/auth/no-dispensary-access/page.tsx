@@ -1,4 +1,4 @@
-import { Metadata } from 'next';
+import { type Metadata } from 'next';
 import { Container, Title, Text } from '@mantine/core';
 import { redirect } from 'next/navigation';
 import { getAuthSession } from '@/lib/auth';

@@ -16,9 +16,9 @@ import { handleApiZodError } from '@/lib/services/zod';
 import { ParsedZodError } from '@/lib/errors/ParsedZodError';
 import type { MailTemplateListItem } from '@/types/mailTemplates';
 import {
-  useCreateMailTemplateMutation,
+  type useCreateMailTemplateMutation,
   useManagementMailTemplateDetail,
-  useUpdateMailTemplateMutation,
+  type useUpdateMailTemplateMutation,
 } from '../hooks/useMailTemplatesQueries';
 
 interface MailTemplateModalProps {

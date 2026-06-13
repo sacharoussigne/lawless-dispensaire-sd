@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 import type { Permissions, PermissionsContextType, AccessibleDispensary } from '@/types/permissions';
 import type { AppSettingsDTO } from '@/lib/appSettingsShared';
 import { APP_SETTINGS_DEFAULTS } from '@/lib/appSettingsShared';

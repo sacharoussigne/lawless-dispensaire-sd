@@ -21,7 +21,7 @@ import {
 } from '@/app/_actions/dispensaryMembers';
 import {
   DISPENSARY_MEMBER_ROLES,
-  DispensaryMemberRole,
+  type DispensaryMemberRole,
   Role,
   parseRoleList,
   rolesAsString,

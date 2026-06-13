@@ -15,7 +15,7 @@ import { authClient } from '@/lib/client';
 import { useRouter, usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { notifications } from '@mantine/notifications';
-import { AuthSession } from '@/types/session';
+import { type AuthSession } from '@/types/session';
 import { routes, tenantRoutes } from '@/types/routes';
 import Link from 'next/link';
 import Image from 'next/image';
