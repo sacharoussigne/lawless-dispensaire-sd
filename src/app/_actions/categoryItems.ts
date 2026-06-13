@@ -102,6 +102,29 @@ export async function getCategoryItems(dispensarySlug: string) {
   }
 }
 
+export async function getManagementCategoryItems(dispensarySlug: string) {
+  try {
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
+
+    const categoryItems = await prisma.categoryItem.findMany({
+      where: tenantWhere(dispensaryId),
+      orderBy: { order: 'asc' },
+      include: {
+        _count: { select: { items: true } },
+      },
+    });
+
+    return {
+      status: 200,
+      data: categoryItems,
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de la récupération des catégories d\'objets');
+  }
+}
+
 export async function updateCategoryItem(
   dispensarySlug: string,
   data: {
@@ -172,7 +195,7 @@ export async function reorderCategoryItems(
 
     const validatedData = reorderCategoryItemsSchema.parse(data);
 
-    await Promise.all(
+    await prisma.$transaction(
       validatedData.items.map(({ id, order }) =>
         prisma.categoryItem.update({
           where: { id, ...tenantWhere(dispensaryId) },

@@ -1,6 +1,5 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
 import { useEffect } from 'react';
 import {
   Modal,
@@ -11,27 +10,29 @@ import {
   Group,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { notifications } from '@mantine/notifications';
-import { createCategoryItem, updateCategoryItem } from '@/app/_actions/categoryItems';
-import { handleAction } from '@/lib/action';
 import { handleApiZodError } from '@/lib/services/zod';
 import { ParsedZodError } from '@/lib/errors/ParsedZodError';
-import type { CategoryItemWithItems } from '@/types/categoryItems';
+import type { CategoryItemWithCount } from '@/types/categoryItems';
+import type {
+  useCreateCategoryItemMutation,
+  useUpdateCategoryItemMutation,
+} from '../hooks/useCategoryItemsQueries';
 
 interface CategoryItemModalProps {
   opened: boolean;
   onClose: () => void;
-  editingCategoryItem: CategoryItemWithItems | null;
-  onSuccess: () => void;
+  editingCategoryItem: CategoryItemWithCount | null;
+  createMutation: ReturnType<typeof useCreateCategoryItemMutation>;
+  updateMutation: ReturnType<typeof useUpdateCategoryItemMutation>;
 }
 
 export function CategoryItemModal({
   opened,
   onClose,
   editingCategoryItem,
-  onSuccess,
+  createMutation,
+  updateMutation,
 }: CategoryItemModalProps) {
-  const { dispensarySlug } = usePermissions();
   const form = useForm({
     initialValues: {
       name: '',
@@ -43,7 +44,6 @@ export function CategoryItemModal({
     },
   });
 
-  // Initialiser le formulaire quand la catégorie change
   useEffect(() => {
     if (editingCategoryItem) {
       form.setValues({
@@ -57,43 +57,28 @@ export function CategoryItemModal({
 
   const handleSubmit = async (values: typeof form.values) => {
     try {
-      let result;
       if (editingCategoryItem) {
-        result = await updateCategoryItem(dispensarySlug!, {
+        await updateMutation.mutateAsync({
           id: editingCategoryItem.id,
           name: values.name,
           color: values.color || '#ffffff',
         });
       } else {
-        result = await createCategoryItem(dispensarySlug!, {
+        await createMutation.mutateAsync({
           name: values.name,
           color: values.color || '#ffffff',
         });
       }
-
-      handleAction(result);
-      notifications.show({
-        title: 'Succès',
-        message: editingCategoryItem
-          ? 'Catégorie d\'objet modifiée avec succès'
-          : 'Catégorie d\'objet créée avec succès',
-        color: 'green',
-      });
       onClose();
       form.reset();
-      onSuccess();
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof ParsedZodError) {
         handleApiZodError(error.error, form);
-      } else {
-        notifications.show({
-          title: 'Erreur',
-          message: error.message || 'Erreur lors de la sauvegarde',
-          color: 'red',
-        });
       }
     }
   };
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
     <Modal
@@ -123,6 +108,7 @@ export function CategoryItemModal({
           <Group justify="flex-end" mt="md">
             <Button
               variant="subtle"
+              color="slate"
               onClick={() => {
                 onClose();
                 form.reset();
@@ -130,7 +116,7 @@ export function CategoryItemModal({
             >
               Annuler
             </Button>
-            <Button type="submit">
+            <Button type="submit" loading={isPending}>
               {editingCategoryItem ? 'Modifier' : 'Créer'}
             </Button>
           </Group>
@@ -139,4 +125,3 @@ export function CategoryItemModal({
     </Modal>
   );
 }
-

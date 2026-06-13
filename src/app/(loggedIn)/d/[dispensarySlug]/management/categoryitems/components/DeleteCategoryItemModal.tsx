@@ -1,45 +1,30 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
 import { Modal, Stack, Button, Group, Text } from '@mantine/core';
-import { notifications } from '@mantine/notifications';
-import { deleteCategoryItem } from '@/app/_actions/categoryItems';
-import { handleAction } from '@/lib/action';
-import type { CategoryItemWithItems } from '@/types/categoryItems';
+import type { CategoryItemWithCount } from '@/types/categoryItems';
+import type { useDeleteCategoryItemMutation } from '../hooks/useCategoryItemsQueries';
 
 interface DeleteCategoryItemModalProps {
   opened: boolean;
   onClose: () => void;
-  categoryItemToDelete: CategoryItemWithItems | null;
-  onSuccess: () => void;
+  categoryItemToDelete: CategoryItemWithCount | null;
+  deleteMutation: ReturnType<typeof useDeleteCategoryItemMutation>;
 }
 
 export function DeleteCategoryItemModal({
   opened,
   onClose,
   categoryItemToDelete,
-  onSuccess,
+  deleteMutation,
 }: DeleteCategoryItemModalProps) {
-  const { dispensarySlug } = usePermissions();
   const handleDelete = async () => {
     if (!categoryItemToDelete) return;
 
     try {
-      const result = await deleteCategoryItem(dispensarySlug!, { id: categoryItemToDelete.id });
-      handleAction(result);
-      notifications.show({
-        title: 'Succès',
-        message: 'Catégorie d\'objet supprimée avec succès',
-        color: 'green',
-      });
+      await deleteMutation.mutateAsync({ id: categoryItemToDelete.id });
       onClose();
-      onSuccess();
-    } catch (error: any) {
-      notifications.show({
-        title: 'Erreur',
-        message: error.message || 'Erreur lors de la suppression',
-        color: 'red',
-      });
+    } catch {
+      // Error notification handled by mutation
     }
   };
 
@@ -52,19 +37,19 @@ export function DeleteCategoryItemModal({
     >
       <Stack>
         <Text>
-          Êtes-vous sûr de vouloir supprimer la catégorie d'objet{' '}
+          Êtes-vous sûr de vouloir supprimer la catégorie d&apos;objet{' '}
           <strong>{categoryItemToDelete?.name}</strong> ?
-          {categoryItemToDelete && categoryItemToDelete.items.length > 0 && (
-            <Text c="red" size="sm" mt="xs">
-              Attention : Cette catégorie contient {categoryItemToDelete.items.length} objet(s).
+          {categoryItemToDelete && categoryItemToDelete._count.items > 0 && (
+            <Text c="danger" size="sm" mt="xs">
+              Attention : Cette catégorie contient {categoryItemToDelete._count.items} objet(s).
             </Text>
           )}
         </Text>
         <Group justify="flex-end" mt="md">
-          <Button variant="subtle" onClick={onClose}>
+          <Button variant="subtle" color="slate" onClick={onClose}>
             Annuler
           </Button>
-          <Button color="red" onClick={handleDelete}>
+          <Button color="danger" onClick={handleDelete} loading={deleteMutation.isPending}>
             Supprimer
           </Button>
         </Group>
@@ -72,4 +57,3 @@ export function DeleteCategoryItemModal({
     </Modal>
   );
 }
-

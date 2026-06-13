@@ -1,6 +1,5 @@
 import type { CategoryItem } from '@prisma/client';
 
-export interface CategoryItemWithItems extends CategoryItem {
-  items: { id: string; name: string }[];
+export interface CategoryItemWithCount extends CategoryItem {
+  _count: { items: number };
 }
-
