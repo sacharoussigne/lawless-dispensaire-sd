@@ -1,9 +1,7 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
-  Modal,
   Stack,
   Text,
   Button,
@@ -11,24 +9,27 @@ import {
   Group,
   ActionIcon,
   Badge,
+  Loader,
+  Center,
 } from '@mantine/core';
 import { IconPlus, IconEdit, IconTrash } from '@tabler/icons-react';
-import { getCraftRecipesByItemId } from '@/app/_actions/craftRecipes';
-import { handleAction } from '@/lib/action';
-import { notifications } from '@mantine/notifications';
 import { CraftRecipeModal } from './CraftRecipeModal';
 import { DeleteCraftRecipeModal } from './DeleteCraftRecipeModal';
-import type {
-  ItemWithRelations,
-  CraftRecipeWithIngredients,
-} from '@/types/items';
+import type { ItemWithRelations, CraftRecipeWithIngredients } from '@/types/items';
+import { apothecaryBooleanPills } from '@/lib/apothecaryPill';
+import { AppModal } from '@/app/_components/AppModal/AppModal';
+import {
+  useCraftRecipesQuery,
+  useCreateCraftRecipeMutation,
+  useUpdateCraftRecipeMutation,
+  useDeleteCraftRecipeMutation,
+} from '../hooks/useItemsQueries';
 
 interface CraftRecipesModalProps {
   opened: boolean;
   onClose: () => void;
   selectedItem: ItemWithRelations | null;
   items: ItemWithRelations[];
-  onSuccess: () => void;
 }
 
 export function CraftRecipesModal({
@@ -36,43 +37,17 @@ export function CraftRecipesModal({
   onClose,
   selectedItem,
   items,
-  onSuccess,
 }: CraftRecipesModalProps) {
-  const { dispensarySlug } = usePermissions();
-  const [craftRecipes, setCraftRecipes] = useState<CraftRecipeWithIngredients[]>([]);
-  const [loadingCraftRecipes, setLoadingCraftRecipes] = useState(false);
+  const itemId = selectedItem?.id ?? '';
+  const { data: craftRecipes = [], isFetching } = useCraftRecipesQuery(itemId, opened);
+  const createMutation = useCreateCraftRecipeMutation(itemId);
+  const updateMutation = useUpdateCraftRecipeMutation(itemId);
+  const deleteMutation = useDeleteCraftRecipeMutation(itemId);
+
   const [craftRecipeModalOpened, setCraftRecipeModalOpened] = useState(false);
   const [editingCraftRecipe, setEditingCraftRecipe] = useState<CraftRecipeWithIngredients | null>(null);
   const [deleteCraftRecipeModalOpened, setDeleteCraftRecipeModalOpened] = useState(false);
   const [craftRecipeToDelete, setCraftRecipeToDelete] = useState<CraftRecipeWithIngredients | null>(null);
-
-  const loadCraftRecipes = async (itemId: string) => {
-    try {
-      setLoadingCraftRecipes(true);
-      const result = await getCraftRecipesByItemId(dispensarySlug!, itemId);
-      const data = handleAction(result);
-      if (data) {
-        setCraftRecipes(data);
-      }
-    } catch (error: any) {
-      notifications.show({
-        title: 'Erreur',
-        message:
-          error.message || 'Erreur lors du chargement des recettes de craft',
-        color: 'red',
-      });
-    } finally {
-      setLoadingCraftRecipes(false);
-    }
-  };
-
-  useEffect(() => {
-    if (opened && selectedItem) {
-      loadCraftRecipes(selectedItem.id);
-    } else {
-      setCraftRecipes([]);
-    }
-  }, [opened, selectedItem]);
 
   const handleOpenCraftRecipeModal = (recipe?: CraftRecipeWithIngredients) => {
     setEditingCraftRecipe(recipe || null);
@@ -81,15 +56,14 @@ export function CraftRecipesModal({
 
   const handleClose = () => {
     onClose();
-    setCraftRecipes([]);
   };
 
   return (
     <>
-      <Modal
+      <AppModal
         opened={opened}
         onClose={handleClose}
-        title={`Recettes de craft - ${selectedItem?.name}`}
+        title={`Recettes de craft - ${selectedItem?.name ?? ''}`}
         size="xl"
       >
         <Stack>
@@ -103,8 +77,10 @@ export function CraftRecipesModal({
             </Button>
           </Group>
 
-          {loadingCraftRecipes ? (
-            <Text>Chargement...</Text>
+          {isFetching ? (
+            <Center py="md">
+              <Loader size="sm" />
+            </Center>
           ) : craftRecipes.length === 0 ? (
             <Text c="dimmed">Aucune recette de craft pour cet objet</Text>
           ) : (
@@ -127,8 +103,8 @@ export function CraftRecipesModal({
                     <Table.Td>{recipe.quantity}</Table.Td>
                     <Table.Td>
                       <Stack gap="xs">
-                        {recipe.ingredients.map((ing, idx) => (
-                          <Text key={idx} size="sm">
+                        {recipe.ingredients.map((ing) => (
+                          <Text key={ing.id} size="sm">
                             {ing.quantity}x {ing.usedItem.name}
                           </Text>
                         ))}
@@ -136,11 +112,11 @@ export function CraftRecipesModal({
                     </Table.Td>
                     <Table.Td>
                       {recipe.isEnabled ? (
-                        <Badge color="green" variant="light">
+                        <Badge variant="outline" radius="sm" style={apothecaryBooleanPills.yes}>
                           Oui
                         </Badge>
                       ) : (
-                        <Badge color="red" variant="light">
+                        <Badge variant="outline" radius="sm" style={apothecaryBooleanPills.noAlert}>
                           Non
                         </Badge>
                       )}
@@ -149,18 +125,20 @@ export function CraftRecipesModal({
                       <Group gap="xs" wrap="nowrap">
                         <ActionIcon
                           variant="light"
-                          color="blue"
+                          color="slate"
                           onClick={() => handleOpenCraftRecipeModal(recipe)}
+                          title="Modifier"
                         >
                           <IconEdit size={16} />
                         </ActionIcon>
                         <ActionIcon
                           variant="light"
-                          color="red"
+                          color="danger"
                           onClick={() => {
                             setCraftRecipeToDelete(recipe);
                             setDeleteCraftRecipeModalOpened(true);
                           }}
+                          title="Supprimer"
                         >
                           <IconTrash size={16} />
                         </ActionIcon>
@@ -172,7 +150,7 @@ export function CraftRecipesModal({
             </Table>
           )}
         </Stack>
-      </Modal>
+      </AppModal>
 
       <CraftRecipeModal
         opened={craftRecipeModalOpened}
@@ -183,11 +161,8 @@ export function CraftRecipesModal({
         editingRecipe={editingCraftRecipe}
         selectedItem={selectedItem}
         items={items}
-        onSuccess={() => {
-          if (selectedItem) {
-            loadCraftRecipes(selectedItem.id);
-          }
-        }}
+        createMutation={createMutation}
+        updateMutation={updateMutation}
       />
 
       <DeleteCraftRecipeModal
@@ -197,14 +172,8 @@ export function CraftRecipesModal({
           setCraftRecipeToDelete(null);
         }}
         craftRecipeToDelete={craftRecipeToDelete}
-        selectedItem={selectedItem}
-        onSuccess={() => {
-          if (selectedItem) {
-            loadCraftRecipes(selectedItem.id);
-          }
-        }}
+        deleteMutation={deleteMutation}
       />
     </>
   );
 }
-

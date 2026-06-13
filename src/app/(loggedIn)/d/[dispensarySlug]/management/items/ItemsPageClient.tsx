@@ -1,44 +1,44 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Container, Group, Button } from '@mantine/core';
 import { PageHeader } from '@/app/_components/PageHeader/PageHeader';
 import { IconPlus } from '@tabler/icons-react';
-import { getItems } from '@/app/_actions/items';
-import { handleAction } from '@/lib/action';
-import { notifications } from '@mantine/notifications';
 import { ItemModal } from './components/ItemModal';
 import { DeleteItemModal } from './components/DeleteItemModal';
 import { ActiveFilters } from '@/app/_components/ActiveFilters/ActiveFilters';
 import { ItemsTable } from './components/ItemsTable';
 import { ReorderModal } from './components/ReorderModal';
 import { CraftRecipesModal } from './components/CraftRecipesModal';
-import type { ItemWithRelations, CategoryItem, CompanyGroup } from '@/types/items';
-import { ManagementSectionThemeProvider } from '../ManagementSectionThemeProvider';
+import type { ItemWithRelations, CompanyGroupSelect } from '@/types/items';
+import type { CategoryItemWithCount } from '@/types/categoryItems';
+import { normalizeString } from '@/lib/string/normalizeString';
+import { sortItems } from '@/lib/stock/sortItemsByCategory';
+import {
+  useManagementItems,
+  useCreateItemMutation,
+  useUpdateItemMutation,
+  useDeleteItemMutation,
+  useReorderItemsMutation,
+} from './hooks/useItemsQueries';
 
 interface ItemsPageClientProps {
   initialItems: ItemWithRelations[];
-  categoryItems: CategoryItem[];
-  companyGroups: CompanyGroup[];
+  categoryItems: CategoryItemWithCount[];
+  companyGroups: CompanyGroupSelect[];
 }
-
-// Fonction pour normaliser les chaînes (enlever les accents et mettre en minuscule)
-const normalizeString = (str: string): string => {
-  return str
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
-};
 
 export default function ItemsPageClient({
   initialItems,
   categoryItems,
   companyGroups,
 }: ItemsPageClientProps) {
-  const { dispensarySlug } = usePermissions();
-  const [items, setItems] = useState<ItemWithRelations[]>(initialItems);
-  const [loading, setLoading] = useState(false);
+  const { data: items = [], isFetching } = useManagementItems(initialItems);
+  const createMutation = useCreateItemMutation();
+  const updateMutation = useUpdateItemMutation();
+  const deleteMutation = useDeleteItemMutation();
+  const reorderMutation = useReorderItemsMutation();
+
   const [modalOpened, setModalOpened] = useState(false);
   const [editingItem, setEditingItem] = useState<ItemWithRelations | null>(null);
   const [deleteModalOpened, setDeleteModalOpened] = useState(false);
@@ -50,29 +50,35 @@ export default function ItemsPageClient({
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [companyGroupFilter, setCompanyGroupFilter] = useState<string | null>(null);
   const [craftableFilter, setCraftableFilter] = useState<string | null>(null);
-  const [nameFilter, setNameFilter] = useState<string>('');
-  const [descriptionFilter, setDescriptionFilter] = useState<string>('');
+  const [nameFilter, setNameFilter] = useState('');
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(10);
+  const pageSize = 10;
 
-  const loadItems = async () => {
-    try {
-      setLoading(true);
-      const result = await getItems(dispensarySlug!, );
-      const data = handleAction(result);
-      if (data) {
-        setItems(data);
-      }
-    } catch (error: any) {
-      notifications.show({
-        title: 'Erreur',
-        message: error.message || 'Erreur lors du chargement des objets',
-        color: 'red',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { paginatedItems, totalRecords } = useMemo(() => {
+    const filtered = items.filter((item) => {
+      const matchesName =
+        !nameFilter ||
+        normalizeString(item.name).includes(normalizeString(nameFilter));
+      const matchesCategory =
+        !categoryFilter || item.categoryId === categoryFilter;
+      const matchesCompanyGroup =
+        !companyGroupFilter || item.companyGroupId === companyGroupFilter;
+      const matchesCraftable =
+        craftableFilter === null ||
+        (craftableFilter === 'true' && item.isCraftable) ||
+        (craftableFilter === 'false' && !item.isCraftable);
+      return matchesName && matchesCategory && matchesCompanyGroup && matchesCraftable;
+    });
+    const sorted = sortItems(filtered);
+    return {
+      paginatedItems: sorted.slice((page - 1) * pageSize, page * pageSize),
+      totalRecords: sorted.length,
+    };
+  }, [items, nameFilter, categoryFilter, companyGroupFilter, craftableFilter, page, pageSize]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [categoryFilter, companyGroupFilter, craftableFilter, nameFilter]);
 
   const handleEdit = (item: ItemWithRelations) => {
     setEditingItem(item);
@@ -84,60 +90,8 @@ export default function ItemsPageClient({
     setModalOpened(true);
   };
 
-  // Filtrer les items
-  const filteredItems = items.filter((item) => {
-    const matchesName =
-      !nameFilter ||
-      normalizeString(item.name).includes(normalizeString(nameFilter));
-    const matchesDescription =
-      !descriptionFilter ||
-      (item.description &&
-        normalizeString(item.description).includes(
-          normalizeString(descriptionFilter)
-        ));
-    const matchesCategory =
-      !categoryFilter || item.categoryId === categoryFilter;
-    const matchesCompanyGroup =
-      !companyGroupFilter || item.companyGroupId === companyGroupFilter;
-    const matchesCraftable =
-      craftableFilter === null ||
-      (craftableFilter === 'true' && item.isCraftable) ||
-      (craftableFilter === 'false' && !item.isCraftable);
-    return (
-      matchesName &&
-      matchesDescription &&
-      matchesCategory &&
-      matchesCompanyGroup &&
-      matchesCraftable
-    );
-  });
-
-  // Trier par nom
-  const sortedItems = [...filteredItems].sort((a, b) =>
-    a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' })
-  );
-
-  // Calculer la pagination
-  const totalRecords = sortedItems.length;
-  const paginatedItems = sortedItems.slice(
-    (page - 1) * pageSize,
-    page * pageSize
-  );
-
-  // Réinitialiser la page quand les filtres changent
-  useEffect(() => {
-    setPage(1);
-  }, [
-    categoryFilter,
-    companyGroupFilter,
-    craftableFilter,
-    nameFilter,
-    descriptionFilter,
-  ]);
-
   return (
-    <ManagementSectionThemeProvider section="items">
-      <Container size="xl" py="xl">
+    <Container size="xl" py="xl">
       <PageHeader
         title="Objets"
         description="Catalogue des objets du dispensaire, catégories et paramètres de stock."
@@ -186,33 +140,26 @@ export default function ItemsPageClient({
             value: nameFilter,
             onRemove: () => setNameFilter(''),
           },
-          {
-            label: 'Description',
-            value: descriptionFilter,
-            onRemove: () => setDescriptionFilter(''),
-          },
         ]}
       />
 
       <ItemsTable
         items={paginatedItems}
-        loading={loading}
+        loading={isFetching}
         categoryItems={categoryItems}
         companyGroups={companyGroups}
         categoryFilter={categoryFilter}
         companyGroupFilter={companyGroupFilter}
         craftableFilter={craftableFilter}
         nameFilter={nameFilter}
-        descriptionFilter={descriptionFilter}
         page={page}
         pageSize={pageSize}
         totalRecords={totalRecords}
-        onCategoryFilterChange={(value) => setCategoryFilter(value)}
-        onCompanyGroupFilterChange={(value) => setCompanyGroupFilter(value)}
-        onCraftableFilterChange={(value) => setCraftableFilter(value)}
-        onNameFilterChange={(value) => setNameFilter(value)}
-        onDescriptionFilterChange={(value) => setDescriptionFilter(value)}
-        onPageChange={(p) => setPage(p)}
+        onCategoryFilterChange={setCategoryFilter}
+        onCompanyGroupFilterChange={setCompanyGroupFilter}
+        onCraftableFilterChange={setCraftableFilter}
+        onNameFilterChange={setNameFilter}
+        onPageChange={setPage}
         onEdit={handleEdit}
         onDelete={(item) => {
           setItemToDelete(item);
@@ -233,7 +180,8 @@ export default function ItemsPageClient({
         editingItem={editingItem}
         categoryItems={categoryItems}
         companyGroups={companyGroups}
-        onSuccess={loadItems}
+        createMutation={createMutation}
+        updateMutation={updateMutation}
       />
 
       <DeleteItemModal
@@ -243,7 +191,7 @@ export default function ItemsPageClient({
           setItemToDelete(null);
         }}
         itemToDelete={itemToDelete}
-        onSuccess={loadItems}
+        deleteMutation={deleteMutation}
       />
 
       <CraftRecipesModal
@@ -254,7 +202,6 @@ export default function ItemsPageClient({
         }}
         selectedItem={selectedItemForCraft}
         items={items}
-        onSuccess={loadItems}
       />
 
       <ReorderModal
@@ -262,9 +209,8 @@ export default function ItemsPageClient({
         onClose={() => setReorderModalOpened(false)}
         items={items}
         categoryItems={categoryItems}
-        onSuccess={loadItems}
+        reorderMutation={reorderMutation}
       />
-      </Container>
-    </ManagementSectionThemeProvider>
+    </Container>
   );
 }

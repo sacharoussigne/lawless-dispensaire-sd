@@ -102,6 +102,32 @@ export async function createCompanyGroup(
   }
 }
 
+export async function getCompanyGroupsForSelect(dispensarySlug: string) {
+  try {
+    const ctx = await requireTenantServerActionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
+
+    const companyGroups = await prisma.companyGroup.findMany({
+      where: tenantWhere(dispensaryId),
+      select: {
+        id: true,
+        name: true,
+      },
+      orderBy: {
+        name: 'asc',
+      },
+    });
+
+    return {
+      status: 200,
+      data: companyGroups,
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de la récupération des groupes d\'entreprises');
+  }
+}
+
 export async function getCompanyGroups(dispensarySlug: string) {
   try {
     const ctx = await requireTenantServerActionContext(dispensarySlug);

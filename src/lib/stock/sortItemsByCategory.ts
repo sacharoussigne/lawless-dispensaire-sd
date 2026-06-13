@@ -14,7 +14,13 @@ function compareByOrderThenName(
   return nameA.localeCompare(nameB, 'fr', { sensitivity: 'base' });
 }
 
-export function sortItems(items: ItemWithRelations[]): ItemWithRelations[] {
+type SortableItem = {
+  name: string;
+  order: number;
+  category: { order?: number } | null;
+};
+
+export function sortItems<T extends SortableItem>(items: T[]): T[] {
   return [...items].sort((a, b) => {
     const categoryOrderA = a.category?.order ?? 0;
     const categoryOrderB = b.category?.order ?? 0;
