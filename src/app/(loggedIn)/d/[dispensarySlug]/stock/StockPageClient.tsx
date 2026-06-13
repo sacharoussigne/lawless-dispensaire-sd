@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
-import dynamic from 'next/dynamic';
 import { Container, Text, Stack, Center, Loader } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
+import CraftModal from './modals/CraftModal';
 import TransferModal from './modals/TransferModal';
 import type { ItemWithRelations } from '@/types/stock';
 import { usePermissions } from '@/app/_contexts/PermissionsContext';
@@ -22,8 +22,6 @@ import {
   useCraftMutation,
   getChangedStockEntries,
 } from './hooks/useStockQueries';
-
-const CraftModal = dynamic(() => import('./modals/CraftModal'), { ssr: false });
 
 interface StockPageClientProps {
   initialItems: ItemWithRelations[];
@@ -226,14 +224,13 @@ export default function StockPageClient({
         </Stack>
       )}
 
-      {craftModalOpened && (
-        <CraftModal
-          opened={craftModalOpened}
-          onClose={() => setCraftModalOpened(false)}
-          canCraft={permissions?.stock.craftWrite ?? false}
-          initialChestId={selectedChestId}
-          chests={chests}
-          onCraft={async (itemId, recipeId, times, sourceChestId, ingredientChests, destinationChestId) => {
+      <CraftModal
+        opened={craftModalOpened}
+        onClose={() => setCraftModalOpened(false)}
+        canCraft={permissions?.stock.craftWrite ?? false}
+        initialChestId={selectedChestId}
+        chests={chests}
+        onCraft={async (itemId, recipeId, times, sourceChestId, ingredientChests, destinationChestId) => {
             if (!permissions?.stock.craftWrite) {
               notifications.show({
                 title: 'Permission refusée',
@@ -272,17 +269,14 @@ export default function StockPageClient({
               return { ok: false as const };
             }
           }}
-        />
-      )}
+      />
 
-      {transferModalOpened && (
-        <TransferModal
-          opened={transferModalOpened}
-          onClose={() => setTransferModalOpened(false)}
-          chests={chests}
-          initialSourceChestId={selectedChestId}
-        />
-      )}
+      <TransferModal
+        opened={transferModalOpened}
+        onClose={() => setTransferModalOpened(false)}
+        chests={chests}
+        initialSourceChestId={selectedChestId}
+      />
     </Container>
   );
 }
