@@ -1,45 +1,30 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
 import { Modal, Stack, Button, Group, Text } from '@mantine/core';
-import { notifications } from '@mantine/notifications';
-import { deleteMailTemplate } from '@/app/_actions/mailTemplates';
-import { handleAction } from '@/lib/action';
-import type { MailTemplate } from '@/types/mailTemplates';
+import type { MailTemplateListItem } from '@/types/mailTemplates';
+import type { useDeleteMailTemplateMutation } from '../hooks/useMailTemplatesQueries';
 
 interface DeleteMailTemplateModalProps {
   opened: boolean;
   onClose: () => void;
-  mailTemplateToDelete: MailTemplate | null;
-  onSuccess: () => void;
+  mailTemplateToDelete: MailTemplateListItem | null;
+  deleteMutation: ReturnType<typeof useDeleteMailTemplateMutation>;
 }
 
 export function DeleteMailTemplateModal({
   opened,
   onClose,
   mailTemplateToDelete,
-  onSuccess,
+  deleteMutation,
 }: DeleteMailTemplateModalProps) {
-  const { dispensarySlug } = usePermissions();
   const handleDelete = async () => {
     if (!mailTemplateToDelete) return;
 
     try {
-      const result = await deleteMailTemplate(dispensarySlug!, { id: mailTemplateToDelete.id });
-      handleAction(result);
-      notifications.show({
-        title: 'Succès',
-        message: 'Template supprimé avec succès',
-        color: 'green',
-      });
+      await deleteMutation.mutateAsync({ id: mailTemplateToDelete.id });
       onClose();
-      onSuccess();
-    } catch (error: any) {
-      notifications.show({
-        title: 'Erreur',
-        message: error.message || 'Erreur lors de la suppression',
-        color: 'red',
-      });
+    } catch {
+      // Error notification handled by mutation
     }
   };
 
@@ -56,10 +41,10 @@ export function DeleteMailTemplateModal({
           <strong>{mailTemplateToDelete?.name}</strong> ?
         </Text>
         <Group justify="flex-end" mt="md">
-          <Button variant="subtle" onClick={onClose}>
+          <Button variant="subtle" color="slate" onClick={onClose}>
             Annuler
           </Button>
-          <Button color="red" onClick={handleDelete}>
+          <Button color="danger" onClick={handleDelete} loading={deleteMutation.isPending}>
             Supprimer
           </Button>
         </Group>

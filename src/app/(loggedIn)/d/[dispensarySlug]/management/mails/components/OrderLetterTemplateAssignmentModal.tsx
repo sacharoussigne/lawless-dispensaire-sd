@@ -1,35 +1,27 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
 import { useEffect } from 'react';
 import { useForm } from '@mantine/form';
 import { Modal, Stack, Select, Button, Group } from '@mantine/core';
-import {
-  createOrderLetterTemplateAssignment,
-  updateOrderLetterTemplateAssignment,
-} from '@/app/_actions/orderLetterTemplateAssignments';
-import { handleAction } from '@/lib/action';
-import { notifications } from '@mantine/notifications';
-import type { OrderMailTemplateAssignment, OrderType, OrderStatus } from '@prisma/client';
-import type { MailTemplate } from '@/types/mailTemplates';
+import type { OrderType, OrderStatus } from '@prisma/client';
+import type { MailTemplateListItem } from '@/types/mailTemplates';
 import {
   orderStatusSelectOptions,
   orderTypeSelectOptions,
 } from '@/lib/orders/orderSelectOptions';
-
-interface OrderMailTemplateAssignmentWithTemplate extends OrderMailTemplateAssignment {
-  mailTemplate: {
-    id: string;
-    name: string;
-  };
-}
+import type {
+  OrderLetterTemplateAssignmentWithTemplate,
+  useCreateOrderLetterAssignmentMutation,
+  useUpdateOrderLetterAssignmentMutation,
+} from '../hooks/useMailTemplatesQueries';
 
 interface OrderLetterTemplateAssignmentModalProps {
   opened: boolean;
   onClose: () => void;
-  editingAssignment: OrderMailTemplateAssignmentWithTemplate | null;
-  mailTemplates: MailTemplate[];
-  onSuccess: () => void;
+  editingAssignment: OrderLetterTemplateAssignmentWithTemplate | null;
+  mailTemplates: MailTemplateListItem[];
+  createMutation: ReturnType<typeof useCreateOrderLetterAssignmentMutation>;
+  updateMutation: ReturnType<typeof useUpdateOrderLetterAssignmentMutation>;
 }
 
 export function OrderLetterTemplateAssignmentModal({
@@ -37,9 +29,9 @@ export function OrderLetterTemplateAssignmentModal({
   onClose,
   editingAssignment,
   mailTemplates,
-  onSuccess,
+  createMutation,
+  updateMutation,
 }: OrderLetterTemplateAssignmentModalProps) {
-  const { dispensarySlug } = usePermissions();
   const form = useForm({
     initialValues: {
       orderType: '' as OrderType | '',
@@ -65,41 +57,26 @@ export function OrderLetterTemplateAssignmentModal({
     }
   }, [editingAssignment, opened]);
 
+  const isPending = createMutation.isPending || updateMutation.isPending;
+
   const handleSubmit = async (values: typeof form.values) => {
     try {
-      let result;
       if (editingAssignment) {
-        result = await updateOrderLetterTemplateAssignment(dispensarySlug!, {
+        await updateMutation.mutateAsync({
           id: editingAssignment.id,
           mailTemplateId: values.mailTemplateId,
         });
       } else {
-        result = await createOrderLetterTemplateAssignment(dispensarySlug!, {
+        await createMutation.mutateAsync({
           orderType: values.orderType as OrderType,
           orderStatus: values.orderStatus as OrderStatus,
           mailTemplateId: values.mailTemplateId,
         });
       }
-
-      const data = handleAction(result);
-      if (data) {
-        notifications.show({
-          title: 'Succès',
-          message: editingAssignment
-            ? 'Assignation modifiée avec succès'
-            : 'Assignation créée avec succès',
-          color: 'moss',
-        });
-        onSuccess();
-        onClose();
-        form.reset();
-      }
-    } catch (error: any) {
-      notifications.show({
-        title: 'Erreur',
-        message: error.message || 'Erreur lors de la sauvegarde de l\'assignation',
-        color: 'danger',
-      });
+      onClose();
+      form.reset();
+    } catch {
+      // Error notification handled by mutation
     }
   };
 
@@ -147,6 +124,7 @@ export function OrderLetterTemplateAssignmentModal({
           <Group justify="flex-end" mt="md">
             <Button
               variant="subtle"
+              color="slate"
               onClick={() => {
                 onClose();
                 form.reset();
@@ -154,7 +132,7 @@ export function OrderLetterTemplateAssignmentModal({
             >
               Annuler
             </Button>
-            <Button type="submit">
+            <Button type="submit" loading={isPending}>
               {editingAssignment ? 'Modifier' : 'Créer'}
             </Button>
           </Group>

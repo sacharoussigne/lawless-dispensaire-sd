@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Container, Button, Group } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
 import { ChestModal } from './components/ChestModal';
@@ -64,15 +64,28 @@ export default function ChestsPageClient({ initialChests }: ChestsPageClientProp
     setPage(1);
   }, [nameFilter]);
 
-  const handleEdit = (chest: ChestWithStockHistory) => {
+  const handleEdit = useCallback((chest: ChestWithStockHistory) => {
     setEditingChest(chest);
     setModalOpened(true);
-  };
+  }, []);
 
-  const handleConfigureStockChecks = (chest: ChestWithStockHistory) => {
+  const handleConfigureStockChecks = useCallback((chest: ChestWithStockHistory) => {
     setChestForStockChecks(chest);
     setStockChecksModalOpened(true);
-  };
+  }, []);
+
+  const handleDelete = useCallback((chest: ChestWithStockHistory) => {
+    setChestToDelete(chest);
+    setDeleteModalOpened(true);
+  }, []);
+
+  const handleNameFilterChange = useCallback((value: string) => {
+    setNameFilter(value);
+  }, []);
+
+  const handlePageChange = useCallback((p: number) => {
+    setPage(p);
+  }, []);
 
   const openCreateModal = () => {
     setEditingChest(null);
@@ -118,14 +131,11 @@ export default function ChestsPageClient({ initialChests }: ChestsPageClientProp
         pageSize={pageSize}
         totalRecords={totalRecords}
         totalChests={chests.length}
-        onNameFilterChange={(value) => setNameFilter(value)}
-        onPageChange={(p) => setPage(p)}
+        onNameFilterChange={handleNameFilterChange}
+        onPageChange={handlePageChange}
         onEdit={handleEdit}
         onConfigureStockChecks={handleConfigureStockChecks}
-        onDelete={(chest) => {
-          setChestToDelete(chest);
-          setDeleteModalOpened(true);
-        }}
+        onDelete={handleDelete}
       />
 
       <ChestModal

@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { Paper, TextInput, Group, ActionIcon, Badge, Tooltip, Text } from '@mantine/core';
 import { DataTable } from 'mantine-datatable';
 import { IconEdit, IconTrash, IconChecklist } from '@tabler/icons-react';
@@ -36,85 +37,91 @@ export function ChestsTable({
   onConfigureStockChecks,
 }: ChestsTableProps) {
   const isLastChest = totalChests <= 1;
+
+  const columns = useMemo(
+    () => [
+      {
+        accessor: 'name',
+        title: 'Nom',
+        filter: (
+          <TextInput
+            placeholder="Rechercher un nom..."
+            value={nameFilter}
+            onChange={(e) => onNameFilterChange(e.currentTarget.value)}
+            style={{ minWidth: 200 }}
+          />
+        ),
+      },
+      {
+        accessor: 'description',
+        title: 'Description',
+        render: (chest: ChestWithStockHistory) =>
+          chest.description ? (
+            <Text size="sm">{chest.description}</Text>
+          ) : (
+            <Text size="sm" c="dimmed">
+              Aucune description
+            </Text>
+          ),
+      },
+      {
+        accessor: 'isEnabled',
+        title: 'État',
+        render: (chest: ChestWithStockHistory) =>
+          chest.isEnabled ? (
+            <Badge variant="outline" radius="sm" style={apothecaryBooleanPills.yes}>
+              Activé
+            </Badge>
+          ) : (
+            <Badge variant="outline" radius="sm" style={apothecaryBooleanPills.noAlert}>
+              Désactivé
+            </Badge>
+          ),
+      },
+      {
+        accessor: 'stockHistoryCount',
+        title: "Nombre d'enregistrements de stock",
+        render: (chest: ChestWithStockHistory) => chest.stockHistoryCount,
+      },
+      {
+        accessor: 'actions',
+        title: 'Actions',
+        render: (chest: ChestWithStockHistory) => (
+          <Group gap="xs" wrap="nowrap" justify="flex-end">
+            <Tooltip label="Vérifications de stock">
+              <ActionIcon
+                variant="light"
+                color="moss"
+                onClick={() => onConfigureStockChecks(chest)}
+                title="Vérifications de stock"
+              >
+                <IconChecklist size={16} />
+              </ActionIcon>
+            </Tooltip>
+            <ActionIcon variant="light" color="slate" onClick={() => onEdit(chest)} title="Modifier">
+              <IconEdit size={16} />
+            </ActionIcon>
+            <ActionIcon
+              variant="light"
+              color="danger"
+              onClick={() => onDelete(chest)}
+              disabled={isLastChest}
+              title={isLastChest ? 'Impossible de supprimer le dernier coffre' : 'Supprimer'}
+            >
+              <IconTrash size={16} />
+            </ActionIcon>
+          </Group>
+        ),
+      },
+    ],
+    [nameFilter, isLastChest, onNameFilterChange, onEdit, onDelete, onConfigureStockChecks],
+  );
+
   return (
     <Paper shadow="sm" p="md" withBorder>
       <DataTable
         records={items}
-        columns={[
-          {
-            accessor: 'name',
-            title: 'Nom',
-            filter: (
-              <TextInput
-                placeholder="Rechercher un nom..."
-                value={nameFilter}
-                onChange={(e) => onNameFilterChange(e.currentTarget.value)}
-                style={{ minWidth: 200 }}
-              />
-            ),
-          },
-          {
-            accessor: 'description',
-            title: 'Description',
-            render: (chest: ChestWithStockHistory) =>
-              chest.description ? (
-                <Text size="sm">{chest.description}</Text>
-              ) : (
-                <Text size="sm" c="dimmed">
-                  Aucune description
-                </Text>
-              ),
-          },
-          {
-            accessor: 'isEnabled',
-            title: 'État',
-            render: (chest: ChestWithStockHistory) =>
-              chest.isEnabled ? (
-                <Badge variant="outline" radius="sm" style={apothecaryBooleanPills.yes}>
-                  Activé
-                </Badge>
-              ) : (
-                <Badge variant="outline" radius="sm" style={apothecaryBooleanPills.noAlert}>
-                  Désactivé
-                </Badge>
-              ),
-          },
-          {
-            accessor: 'stockHistoryCount',
-            title: "Nombre d'enregistrements de stock",
-            render: (chest: ChestWithStockHistory) => chest.stockHistoryCount,
-          },
-          {
-            accessor: 'actions',
-            title: 'Actions',
-            render: (chest: ChestWithStockHistory) => (
-              <Group gap="xs" wrap="nowrap" justify="flex-end">
-                <Tooltip label="Vérifications de stock">
-                  <ActionIcon
-                    variant="light"
-                    color="moss"
-                    onClick={() => onConfigureStockChecks(chest)}
-                    title="Vérifications de stock"
-                  >
-                    <IconChecklist size={16} />
-                  </ActionIcon>
-                </Tooltip>
-                <ActionIcon variant="light" color="slate" onClick={() => onEdit(chest)} title="Modifier">
-                  <IconEdit size={16} />
-                </ActionIcon>
-                <ActionIcon
-                  variant="light"
-                  color="danger"
-                  onClick={() => onDelete(chest)}
-                  disabled={isLastChest}
-                  title={isLastChest ? 'Impossible de supprimer le dernier coffre' : 'Supprimer'}
-                >
-                  <IconTrash size={16} />
-                </ActionIcon>
-              </Group>
-            ),
-          },
-        ]}
+        columns={columns}
         fetching={loading}
         noRecordsText={
           nameFilter

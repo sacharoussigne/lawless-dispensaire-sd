@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import {
   Container,
   Button,
@@ -16,7 +17,6 @@ import { OrderDetailsModal } from './components/OrderDetailsModal';
 import { OrderLetterPreviewModal } from './components/OrderLetterPreviewModal';
 import { ActiveFilters } from '@/app/_components/ActiveFilters/ActiveFilters';
 import { OrdersTable } from './components/OrdersTable';
-import CreateOrderModal from './components/CreateOrderModal';
 import { PageHeader } from '@/app/_components/PageHeader/PageHeader';
 import { usePermissions } from '@/app/_contexts/PermissionsContext';
 import type { OrderSummary, OrdersPageResult } from '@/types/orders';
@@ -27,6 +27,10 @@ import {
   useOrdersPage,
 } from './hooks/useOrdersQueries';
 import type { OrdersPageFilters } from '@/lib/orders/queryKeys';
+
+const CreateOrderModal = dynamic(() => import('./components/CreateOrderModal'), {
+  ssr: false,
+});
 
 interface OrdersPageClientProps {
   initialOrdersPage: OrdersPageResult;
@@ -217,11 +221,13 @@ export default function OrdersPageClient({
         orderId={orderForLetterPreviewId}
       />
 
-      <CreateOrderModal
-        opened={createModalOpened}
-        onClose={() => setCreateModalOpened(false)}
-        prefillItemsNeedingRestock={false}
-      />
+      {createModalOpened && (
+        <CreateOrderModal
+          opened={createModalOpened}
+          onClose={() => setCreateModalOpened(false)}
+          prefillItemsNeedingRestock={false}
+        />
+      )}
     </Container>
   );
 }

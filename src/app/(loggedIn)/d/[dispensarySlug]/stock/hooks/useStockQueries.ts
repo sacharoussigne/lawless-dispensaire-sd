@@ -2,12 +2,9 @@
 
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { usePermissions } from '@/app/_contexts/PermissionsContext';
-import {
-  getItemsWithStock,
-  updateStock,
-  craftItem,
-  transferMultipleStock,
-} from '@/app/_actions/stock';
+import { getItemsWithStock } from '@/app/_actions/stock/queries';
+import { updateStock, craftItem } from '@/app/_actions/stock/mutations';
+import { transferMultipleStock } from '@/app/_actions/stock/transfer';
 import { getStockChecksSummary } from '@/app/_actions/stockChecks';
 import { handleAction } from '@/lib/action';
 import { stockKeys } from '@/lib/stock/queryKeys';

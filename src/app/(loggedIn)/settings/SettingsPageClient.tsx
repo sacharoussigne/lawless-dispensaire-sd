@@ -384,7 +384,7 @@ export default function SettingsPageClient(props: {
                 stockUiForm.values.lowStockCraftableBg !== STOCK_UI_DEFAULTS.lowStockCraftableBg ? (
                   <ActionIcon
                     variant="subtle"
-                    color="gray"
+                    color="slate"
                     aria-label="Réinitialiser"
                     onClick={() =>
                       stockUiForm.setFieldValue('lowStockCraftableBg', STOCK_UI_DEFAULTS.lowStockCraftableBg)
@@ -406,7 +406,7 @@ export default function SettingsPageClient(props: {
                 stockUiForm.values.lowStockNormalBg !== STOCK_UI_DEFAULTS.lowStockNormalBg ? (
                   <ActionIcon
                     variant="subtle"
-                    color="gray"
+                    color="slate"
                     aria-label="Réinitialiser"
                     onClick={() => stockUiForm.setFieldValue('lowStockNormalBg', STOCK_UI_DEFAULTS.lowStockNormalBg)}
                   >
@@ -426,7 +426,7 @@ export default function SettingsPageClient(props: {
                 stockUiForm.values.okStockBg ? (
                   <ActionIcon
                     variant="subtle"
-                    color="gray"
+                    color="slate"
                     aria-label="Effacer"
                     onClick={() => stockUiForm.setFieldValue('okStockBg', '')}
                   >
@@ -446,7 +446,7 @@ export default function SettingsPageClient(props: {
                 stockUiForm.values.unknownStockBg ? (
                   <ActionIcon
                     variant="subtle"
-                    color="gray"
+                    color="slate"
                     aria-label="Effacer"
                     onClick={() => stockUiForm.setFieldValue('unknownStockBg', '')}
                   >
@@ -466,7 +466,7 @@ export default function SettingsPageClient(props: {
                 stockUiForm.values.doneTodayBadgeBg ? (
                   <ActionIcon
                     variant="subtle"
-                    color="gray"
+                    color="slate"
                     aria-label="Effacer"
                     onClick={() => stockUiForm.setFieldValue('doneTodayBadgeBg', '')}
                   >

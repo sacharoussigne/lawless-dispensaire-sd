@@ -276,7 +276,7 @@ export default function Header({
                 </Menu>
                 {isImpersonating && (
                   <Button
-                    color="orange"
+                    color="amber"
                     variant="light"
                     leftSection={<IconArrowBackUp size={18} />}
                     loading={stoppingImpersonation}

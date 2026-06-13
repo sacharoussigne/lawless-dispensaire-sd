@@ -12,10 +12,11 @@ export const mailsKeys = {
 
 export const mailTemplatesKeys = {
   all: (slug: string) => ['mailTemplates', slug] as const,
-  page: (slug: string, filters: MailTemplatesPageFilters) =>
-    [...mailTemplatesKeys.all(slug), 'page', filters] as const,
+  management: (slug: string) => [...mailTemplatesKeys.all(slug), 'management'] as const,
   detail: (slug: string, templateId: string) =>
     [...mailTemplatesKeys.all(slug), 'detail', templateId] as const,
+  page: (slug: string, filters: MailTemplatesPageFilters) =>
+    [...mailTemplatesKeys.all(slug), 'page', filters] as const,
   options: (slug: string) =>
     [...mailTemplatesKeys.all(slug), 'options'] as const,
 };

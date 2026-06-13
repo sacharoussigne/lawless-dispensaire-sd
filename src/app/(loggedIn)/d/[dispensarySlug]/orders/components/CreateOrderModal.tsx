@@ -603,7 +603,7 @@ export default function CreateOrderModal({
               <Alert
                 icon={<IconAlertTriangle size={16} />}
                 title="Commande en cours"
-                color="yellow"
+                color="amber"
               >
                 <Text size="sm">
                   Une ou plusieurs commandes en cours pour ce groupe d'entreprises contiennent déjà certains articles que vous souhaitez commander :
@@ -710,7 +710,7 @@ export default function CreateOrderModal({
                         </Table.Td>
                         <Table.Td>
                           <ActionIcon
-                            color="red"
+                            color="danger"
                             variant="light"
                             onClick={() => handleRemoveItem(orderItem.itemId)}
                           >

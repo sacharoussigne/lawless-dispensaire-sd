@@ -192,34 +192,6 @@ export async function getMailById(
   }
 }
 
-/** @deprecated Use getMailsPage or getMailById */
-export async function getMails(dispensarySlug: string) {
-  try {
-    const ctx = await requireTenantServerActionContext(dispensarySlug, {
-      feature: 'mails',
-    });
-    if (!ctx.ok) return ctx.response;
-    const { dispensaryId } = ctx.tenant;
-
-    const mails = await prisma.mail.findMany({
-      where: {
-        senderId: ctx.session.user.id,
-        ...tenantWhere(dispensaryId),
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-
-    return {
-      status: 200,
-      data: mails,
-    };
-  } catch (error) {
-    return actionErrorParser(error, 'Erreur lors de la récupération des courriers');
-  }
-}
-
 export async function updateMail(
   dispensarySlug: string,
   data: {

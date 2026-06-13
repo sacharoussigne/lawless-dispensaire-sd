@@ -107,7 +107,7 @@ export default function Login() {
             </Anchor>
           </Group>
           {authError && (
-            <Text color="red" size="sm" mt="md">
+            <Text c="danger" size="sm" mt="md">
               {authError}
             </Text>
           )}

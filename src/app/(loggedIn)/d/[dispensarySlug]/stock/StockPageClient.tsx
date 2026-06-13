@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { Container, Text, Stack, Center, Loader } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import CraftModal from './modals/CraftModal';
 import TransferModal from './modals/TransferModal';
 import type { ItemWithRelations } from '@/types/stock';
 import { usePermissions } from '@/app/_contexts/PermissionsContext';
@@ -22,6 +22,8 @@ import {
   useCraftMutation,
   getChangedStockEntries,
 } from './hooks/useStockQueries';
+
+const CraftModal = dynamic(() => import('./modals/CraftModal'), { ssr: false });
 
 interface StockPageClientProps {
   initialItems: ItemWithRelations[];

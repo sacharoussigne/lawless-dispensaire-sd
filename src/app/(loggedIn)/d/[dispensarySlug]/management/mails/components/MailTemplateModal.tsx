@@ -1,6 +1,5 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
 import { useEffect } from 'react';
 import {
   Modal,
@@ -9,29 +8,37 @@ import {
   Textarea,
   Button,
   Group,
+  Loader,
+  Center,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { notifications } from '@mantine/notifications';
-import { createMailTemplate, updateMailTemplate } from '@/app/_actions/mailTemplates';
-import { handleAction } from '@/lib/action';
 import { handleApiZodError } from '@/lib/services/zod';
 import { ParsedZodError } from '@/lib/errors/ParsedZodError';
-import type { MailTemplate } from '@/types/mailTemplates';
+import type { MailTemplateListItem } from '@/types/mailTemplates';
+import {
+  useCreateMailTemplateMutation,
+  useManagementMailTemplateDetail,
+  useUpdateMailTemplateMutation,
+} from '../hooks/useMailTemplatesQueries';
 
 interface MailTemplateModalProps {
   opened: boolean;
   onClose: () => void;
-  editingMailTemplate: MailTemplate | null;
-  onSuccess: () => void;
+  editingMailTemplate: MailTemplateListItem | null;
+  createMutation: ReturnType<typeof useCreateMailTemplateMutation>;
+  updateMutation: ReturnType<typeof useUpdateMailTemplateMutation>;
 }
 
 export function MailTemplateModal({
   opened,
   onClose,
   editingMailTemplate,
-  onSuccess,
+  createMutation,
+  updateMutation,
 }: MailTemplateModalProps) {
-  const { dispensarySlug } = usePermissions();
+  const { data: editingDetail, isFetching: isLoadingDetail } =
+    useManagementMailTemplateDetail(editingMailTemplate?.id ?? null, opened && Boolean(editingMailTemplate));
+
   const form = useForm({
     initialValues: {
       name: '',
@@ -46,58 +53,42 @@ export function MailTemplateModal({
   });
 
   useEffect(() => {
-    if (editingMailTemplate) {
+    if (!opened) return;
+
+    if (editingMailTemplate && editingDetail) {
       form.setValues({
-        name: editingMailTemplate.name,
-        description: editingMailTemplate.description || '',
-        defaultMailName: editingMailTemplate.defaultMailName || '',
-        content: editingMailTemplate.content,
+        name: editingDetail.name,
+        description: editingDetail.description || '',
+        defaultMailName: editingDetail.defaultMailName || '',
+        content: editingDetail.content,
       });
-    } else {
+    } else if (!editingMailTemplate) {
       form.reset();
     }
-  }, [editingMailTemplate, opened]);
+  }, [editingMailTemplate, editingDetail, opened]);
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
+  const isEditLoading = Boolean(editingMailTemplate) && isLoadingDetail && !editingDetail;
 
   const handleSubmit = async (values: typeof form.values) => {
     try {
-      let result;
-      if (editingMailTemplate) {
-        result = await updateMailTemplate(dispensarySlug!, {
-          id: editingMailTemplate.id,
-          name: values.name,
-          description: values.description || undefined,
-          content: values.content,
-          defaultMailName: values.defaultMailName || undefined,
-        });
-      } else {
-        result = await createMailTemplate(dispensarySlug!, {
-          name: values.name,
-          description: values.description || undefined,
-          content: values.content,
-          defaultMailName: values.defaultMailName || undefined,
-        });
-      }
+      const payload = {
+        name: values.name,
+        description: values.description || undefined,
+        content: values.content,
+        defaultMailName: values.defaultMailName || undefined,
+      };
 
-      handleAction(result);
-      notifications.show({
-        title: 'Succès',
-        message: editingMailTemplate
-          ? 'Template modifié avec succès'
-          : 'Template créé avec succès',
-        color: 'green',
-      });
+      if (editingMailTemplate) {
+        await updateMutation.mutateAsync({ id: editingMailTemplate.id, ...payload });
+      } else {
+        await createMutation.mutateAsync(payload);
+      }
       onClose();
       form.reset();
-      onSuccess();
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof ParsedZodError) {
         handleApiZodError(error.error, form);
-      } else {
-        notifications.show({
-          title: 'Erreur',
-          message: error.message || 'Erreur lors de la sauvegarde',
-          color: 'red',
-        });
       }
     }
   };
@@ -112,50 +103,57 @@ export function MailTemplateModal({
       title={editingMailTemplate ? 'Modifier le modèle' : 'Créer un modèle'}
       size="lg"
     >
-      <form onSubmit={form.onSubmit(handleSubmit)}>
-        <Stack>
-          <TextInput
-            label="Nom"
-            placeholder="Nom du template"
-            required
-            {...form.getInputProps('name')}
-          />
-          <TextInput
-            label="Nom du courrier par défaut"
-            placeholder="Préremplit le champ « Nom » à la création d’un courrier (optionnel)"
-            {...form.getInputProps('defaultMailName')}
-          />
-          <Textarea
-            label="Description"
-            placeholder="Description du template (optionnel)"
-            minRows={3}
-            autosize
-            {...form.getInputProps('description')}
-          />
-          <Textarea
-            label="Contenu"
-            placeholder="Contenu du modèle de courrier"
-            required
-            minRows={10}
-            autosize
-            {...form.getInputProps('content')}
-          />
-          <Group justify="flex-end" mt="md">
-            <Button
-              variant="subtle"
-              onClick={() => {
-                onClose();
-                form.reset();
-              }}
-            >
-              Annuler
-            </Button>
-            <Button type="submit">
-              {editingMailTemplate ? 'Modifier' : 'Créer'}
-            </Button>
-          </Group>
-        </Stack>
-      </form>
+      {isEditLoading ? (
+        <Center py="xl">
+          <Loader color="sage" />
+        </Center>
+      ) : (
+        <form onSubmit={form.onSubmit(handleSubmit)}>
+          <Stack>
+            <TextInput
+              label="Nom"
+              placeholder="Nom du template"
+              required
+              {...form.getInputProps('name')}
+            />
+            <TextInput
+              label="Nom du courrier par défaut"
+              placeholder="Préremplit le champ « Nom » à la création d’un courrier (optionnel)"
+              {...form.getInputProps('defaultMailName')}
+            />
+            <Textarea
+              label="Description"
+              placeholder="Description du template (optionnel)"
+              minRows={3}
+              autosize
+              {...form.getInputProps('description')}
+            />
+            <Textarea
+              label="Contenu"
+              placeholder="Contenu du modèle de courrier"
+              required
+              minRows={10}
+              autosize
+              {...form.getInputProps('content')}
+            />
+            <Group justify="flex-end" mt="md">
+              <Button
+                variant="subtle"
+                color="slate"
+                onClick={() => {
+                  onClose();
+                  form.reset();
+                }}
+              >
+                Annuler
+              </Button>
+              <Button type="submit" loading={isPending}>
+                {editingMailTemplate ? 'Modifier' : 'Créer'}
+              </Button>
+            </Group>
+          </Stack>
+        </form>
+      )}
     </Modal>
   );
 }

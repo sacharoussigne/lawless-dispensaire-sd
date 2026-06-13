@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { usePermissions } from '@/app/_contexts/PermissionsContext';
-import { getStockConsumptionStats } from '@/app/_actions/stock';
+import { getStockConsumptionStats } from '@/app/_actions/stock/statistics';
 import type { StockConsumptionStatsResult } from '@/app/_actions/stock/statistics';
 import { handleAction } from '@/lib/action';
 import { toDateRangeKey } from '@/lib/date';

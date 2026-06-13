@@ -33,7 +33,8 @@ export default async function DispensaryLayout({
     notFound();
   }
 
-  const canAccess = await userCanAccessDispensary(session as AuthSession | null, dispensary.id);
+  const authSession = session as AuthSession | null;
+  const canAccess = await userCanAccessDispensary(authSession, dispensary.id);
   if (!canAccess && session) {
     const target = await resolveDispensaryAccessDeniedRedirect(
       session,
@@ -42,11 +43,19 @@ export default async function DispensaryLayout({
     redirect(target);
   }
 
-  const impersonatorDisplayName = await getImpersonatorDisplayName(session?.session?.impersonatedBy);
-  const effectiveRole = await getEffectiveRoleForDispensary(session as AuthSession | null, dispensary.id);
+  const [
+    impersonatorDisplayName,
+    effectiveRole,
+    appSettings,
+    accessibleDispensaries,
+  ] = await Promise.all([
+    getImpersonatorDisplayName(session?.session?.impersonatedBy),
+    getEffectiveRoleForDispensary(authSession, dispensary.id),
+    getAppSettings(dispensary.id),
+    listAccessibleDispensaries(authSession),
+  ]);
+
   const permissions = calculatePermissions(effectiveRole);
-  const appSettings = await getAppSettings(dispensary.id);
-  const accessibleDispensaries = await listAccessibleDispensaries(session as AuthSession | null);
   const userId = session?.user?.id;
   const agendaModuleAccess = userId
     ? await userHasAnyAgendaAccess(
@@ -81,7 +90,7 @@ export default async function DispensaryLayout({
         <QueryProvider>
           <LoggedInShell>
           <Header
-            session={session as AuthSession | null}
+            session={authSession}
             impersonatorDisplayName={impersonatorDisplayName}
             dispensarySlug={dispensarySlug}
           />

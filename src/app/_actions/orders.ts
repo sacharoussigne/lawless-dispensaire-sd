@@ -534,28 +534,6 @@ export async function getActiveOrdersForCompanyGroup(
   }
 }
 
-/** @deprecated Use getOrdersPage or getOrderById */
-export async function getOrders(dispensarySlug: string) {
-  try {
-    const ctx = await requireOrdersViewContext(dispensarySlug);
-    if (!ctx.ok) return ctx.response;
-    const { dispensaryId } = ctx.tenant;
-
-    const orders = await prisma.order.findMany({
-      where: tenantWhere(dispensaryId),
-      orderBy: { createdAt: 'desc' },
-      include: ORDER_DETAIL_INCLUDE,
-    });
-
-    return {
-      status: 200,
-      data: orders.map((order) => serializeOrderForClient(order)),
-    };
-  } catch (error) {
-    return actionErrorParser(error, 'Erreur lors de la récupération des commandes');
-  }
-}
-
 export async function updateOrder(
   dispensarySlug: string,
   data: {

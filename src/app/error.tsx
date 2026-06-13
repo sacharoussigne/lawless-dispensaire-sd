@@ -26,7 +26,7 @@ export default function Error({ error, reset }: ErrorProps) {
   return (
     <Container size="lg" py="xl">
       <Stack align="center" gap="md">
-        <IconAlertCircle size={64} color="red" />
+        <IconAlertCircle size={64} color="var(--disp-danger)" />
         <Title order={2}>Une erreur est survenue</Title>
         <Text c="dimmed" ta="center" maw={600}>
           {error.message || 'Une erreur inattendue s\'est produite. Veuillez réessayer.'}

@@ -45,6 +45,17 @@ const getUserMailTemplateByIdSchema = z.object({
   id: z.string().uuid('ID invalide'),
 });
 
+const MANAGEMENT_MAIL_TEMPLATE_LIST_SELECT = {
+  id: true,
+  name: true,
+  description: true,
+  defaultMailName: true,
+  createdAt: true,
+  updatedAt: true,
+  dispensaryId: true,
+  userId: true,
+} as const;
+
 export async function createMailTemplate(
   dispensarySlug: string,
   data: {
@@ -99,6 +110,7 @@ export async function getMailTemplates(dispensarySlug: string) {
       orderBy: {
         createdAt: 'desc',
       },
+      select: MANAGEMENT_MAIL_TEMPLATE_LIST_SELECT,
     });
 
     return {
@@ -107,6 +119,43 @@ export async function getMailTemplates(dispensarySlug: string) {
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la récupération des modèles de courriers');
+  }
+}
+
+export async function getManagementMailTemplateById(
+  dispensarySlug: string,
+  data: { id: string },
+) {
+  try {
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'mails',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
+
+    const { id } = getUserMailTemplateByIdSchema.parse(data);
+
+    const mailTemplate = await prisma.mailTemplate.findFirst({
+      where: {
+        id,
+        userId: null,
+        ...tenantWhere(dispensaryId),
+      },
+    });
+
+    if (!mailTemplate) {
+      return {
+        status: 404,
+        error: 'Template introuvable',
+      };
+    }
+
+    return {
+      status: 200,
+      data: mailTemplate,
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de la récupération du modèle de courrier');
   }
 }
 
@@ -505,34 +554,6 @@ export async function getUserMailTemplateOptions(dispensarySlug: string) {
     return {
       status: 200,
       data: options,
-    };
-  } catch (error) {
-    return actionErrorParser(error, 'Erreur lors de la récupération des modèles de courriers');
-  }
-}
-
-/** @deprecated Use getUserMailTemplatesPage or getUserMailTemplateById */
-export async function getUserMailTemplates(dispensarySlug: string) {
-  try {
-    const ctx = await requireTenantServerActionContext(dispensarySlug, {
-      feature: 'mails',
-    });
-    if (!ctx.ok) return ctx.response;
-    const { dispensaryId } = ctx.tenant;
-
-    const mailTemplates = await prisma.mailTemplate.findMany({
-      where: {
-        userId: ctx.session.user.id,
-        ...tenantWhere(dispensaryId),
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-
-    return {
-      status: 200,
-      data: mailTemplates,
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la récupération des modèles de courriers');
