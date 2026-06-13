@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Stack, Text, Button, Group, Loader, Paper } from '@mantine/core';
+import { Stack, Text, Button, Loader, Paper } from '@mantine/core';
 import { IconCopy, IconCheck } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { generateOrderMailPreview } from '@/app/_actions/mailTemplates';
 import { handleAction } from '@/lib/action';
 import { AppModal, AppModalFooter } from '@/app/_components/AppModal/AppModal';
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
+import { useRequiredDispensarySlug } from '@/app/_contexts/PermissionsContext';
 import { useOrderDetail } from '../hooks/useOrdersQueries';
 
 interface OrderLetterPreviewModalProps {
@@ -21,7 +21,7 @@ export function OrderLetterPreviewModal({
   onClose,
   orderId,
 }: OrderLetterPreviewModalProps) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const { data: order, isLoading: loadingOrder } = useOrderDetail(
     orderId,
     opened && Boolean(orderId),
@@ -41,7 +41,7 @@ export function OrderLetterPreviewModal({
   const loadPreview = async (orderData: NonNullable<typeof order>) => {
     try {
       setLoading(true);
-      const result = await generateOrderMailPreview(dispensarySlug!, {
+      const result = await generateOrderMailPreview(dispensarySlug, {
         order: {
           type: orderData.type,
           status: orderData.status,

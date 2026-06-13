@@ -1,6 +1,6 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
+import { useRequiredDispensarySlug } from '@/app/_contexts/PermissionsContext';
 import { Modal, Stack, TextInput, Button, Group } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
@@ -20,7 +20,7 @@ export function CreateBankAccountModal({
   onClose,
   onSuccess,
 }: CreateBankAccountModalProps) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const form = useForm({
     initialValues: {
       name: '',
@@ -32,7 +32,7 @@ export function CreateBankAccountModal({
 
   const handleSubmit = async (values: typeof form.values) => {
     try {
-      const result = await createBankAccount(dispensarySlug!, {
+      const result = await createBankAccount(dispensarySlug, {
         name: values.name,
       });
 

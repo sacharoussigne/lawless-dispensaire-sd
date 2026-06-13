@@ -1,6 +1,6 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
+import { useRequiredDispensarySlug } from '@/app/_contexts/PermissionsContext';
 import { useEffect, useState, useMemo } from 'react';
 import {
   Container,
@@ -80,9 +80,9 @@ const getPatientTypeOptions = (existingTypes: string[] = []) => {
 export default function PrivatePracticePageClient({
   initialWeek,
 }: PrivatePracticePageClientProps) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const [week, setWeek] = useState<SerializedPrivatePracticeWeek>(initialWeek);
-  const [weeks, setWeeks] = useState<SerializedPrivatePracticeWeek[]>([]);
+  const [, setWeeks] = useState<SerializedPrivatePracticeWeek[]>([]);
   const [loading, setLoading] = useState(false);
   const [weekDateValue, setWeekDateValue] = useState<Date | null>(new Date(initialWeek.weekStart));
   const [editingPatient, setEditingPatient] = useState<string | null>(null);
@@ -138,13 +138,6 @@ export default function PrivatePracticePageClient({
     return Array.from(identities).sort();
   }, [week.patients]);
 
-  const identityFilterOptions = useMemo(() => {
-    return existingIdentities.map((identity) => ({
-      value: identity,
-      label: identity,
-    }));
-  }, [existingIdentities]);
-
   useEffect(() => {
     loadWeeks();
     loadIdentitySuggestions();
@@ -152,12 +145,12 @@ export default function PrivatePracticePageClient({
 
   const loadIdentitySuggestions = async () => {
     try {
-      const result = await getIdentitySuggestions(dispensarySlug!);
+      const result = await getIdentitySuggestions(dispensarySlug);
       const data = handleAction(result);
       if (data) {
         setIdentitySuggestions(data);
       }
-    } catch (error) {
+    } catch (_error) {
       // Error handled by handleAction
     }
   };
@@ -166,7 +159,7 @@ export default function PrivatePracticePageClient({
     if (!value || value.trim().length === 0) return;
 
     try {
-      const result = await addIdentitySuggestion(dispensarySlug!, { value });
+      const result = await addIdentitySuggestion(dispensarySlug, { value });
       const data = handleAction(result);
       if (data) {
         setIdentitySuggestions([...identitySuggestions, data]);
@@ -190,7 +183,7 @@ export default function PrivatePracticePageClient({
     if (!value || value.trim().length === 0) return;
 
     try {
-      const result = await deleteIdentitySuggestion(dispensarySlug!, { value });
+      const result = await deleteIdentitySuggestion(dispensarySlug, { value });
       const data = handleAction(result);
       if (data) {
         setIdentitySuggestions(identitySuggestions.filter(s => s.toLowerCase() !== value.toLowerCase().trim()));
@@ -211,12 +204,12 @@ export default function PrivatePracticePageClient({
 
   const loadWeeks = async () => {
     try {
-      const result = await getWeeks(dispensarySlug!);
+      const result = await getWeeks(dispensarySlug);
       const data = handleAction(result);
       if (data) {
         setWeeks(data);
       }
-    } catch (error) {
+    } catch (_error) {
       // Error handled by handleAction
     }
   };
@@ -224,7 +217,7 @@ export default function PrivatePracticePageClient({
   const loadWeek = async (date: Date) => {
     try {
       setLoading(true);
-      const result = await getOrCreateWeek(dispensarySlug!, date);
+      const result = await getOrCreateWeek(dispensarySlug, date);
       const data = handleAction(result);
       if (data) {
         setWeek(data);
@@ -353,7 +346,7 @@ export default function PrivatePracticePageClient({
     try {
       setLoading(true);
       if (patient.id) {
-        const result = await updatePatient(dispensarySlug!, {
+        const result = await updatePatient(dispensarySlug, {
           id: patient.id,
           date: patient.date,
           type: patient.type,
@@ -388,11 +381,11 @@ export default function PrivatePracticePageClient({
           return;
         }
 
-        const result = await createPatient(dispensarySlug!, {
+        const result = await createPatient(dispensarySlug, {
           weekId: week.id,
           date: patient.date as Date | string,
-          type: patient.type!,
-          identity: patient.identity!,
+          type: patient.type,
+          identity: patient.identity,
           description: patient.description || undefined,
           consultationPrice: patient.consultationPrice || 0,
           otherPrice: patient.otherPrice || 0,
@@ -429,7 +422,7 @@ export default function PrivatePracticePageClient({
   const handleDeletePatient = async (id: string) => {
     try {
       setLoading(true);
-      const result = await deletePatient(dispensarySlug!, { id });
+      const result = await deletePatient(dispensarySlug, { id });
       const data = handleAction(result);
       if (data) {
         notifications.show({
@@ -490,7 +483,7 @@ export default function PrivatePracticePageClient({
       const targetPatient = sortedSameDate[targetIndex];
       const newOrder = targetPatient.order;
 
-      const result = await updatePatient(dispensarySlug!, {
+      const result = await updatePatient(dispensarySlug, {
         id: patientId,
         order: newOrder,
       });

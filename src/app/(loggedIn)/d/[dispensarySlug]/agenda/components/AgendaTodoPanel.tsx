@@ -83,11 +83,12 @@ function insertTaskAtVisibleIndex(
   }));
 
   if (!task) return categories;
+  const movedTask = task;
 
   return withoutTask.map((category) => {
     if (category.id !== targetCategoryId) return category;
     const tasks = [...category.tasks];
-    tasks.splice(visibleInsertIndex, 0, { ...task!, categoryId: targetCategoryId });
+    tasks.splice(visibleInsertIndex, 0, { ...movedTask, categoryId: targetCategoryId });
     return { ...category, tasks };
   });
 }
@@ -202,7 +203,6 @@ export function AgendaTodoPanel({
     setSelectedListId,
     selectedList,
     reload,
-    applyLists,
   } = useAgendaTodoLists({
     dispensarySlug,
     agendaId,

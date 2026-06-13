@@ -13,11 +13,11 @@ export function DetectedParameters({ content }: DetectedParametersProps) {
   const parsed = useMemo(() => {
     const parameters = parseTemplateParameters(content);
     const inputs = parameters
-      .filter((p) => p.type === 'input' && p.input)
-      .map((p) => p.input!);
+      .filter((p): p is typeof p & { input: NonNullable<(typeof p)['input']> } => p.type === 'input' && p.input != null)
+      .map((p) => p.input);
     const jsCodes = parameters
-      .filter((p) => p.type === 'js' && p.jsCode)
-      .map((p) => p.jsCode!);
+      .filter((p): p is typeof p & { jsCode: string } => p.type === 'js' && p.jsCode != null)
+      .map((p) => p.jsCode);
 
     const formSections: { title?: string; inputs: typeof inputs }[] = [
       { inputs: [] },

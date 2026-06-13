@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { notifications } from '@mantine/notifications';
 import { useRouter } from 'next/navigation';
-import { usePermissions, useTenantRoutes } from '@/app/_contexts/PermissionsContext';
+import { useTenantRoutes, useRequiredDispensarySlug } from '@/app/_contexts/PermissionsContext';
 import {
   createPayrollReportFromForm,
   deletePayrollReport,
@@ -57,11 +57,11 @@ async function fetchPayrollImportableActivityWeeks(
 }
 
 export function usePayrollReports(initialReports?: PayrollReportListItem[]) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return useQuery({
-    queryKey: payrollKeys.list(dispensarySlug!),
-    queryFn: () => fetchPayrollReports(dispensarySlug!),
+    queryKey: payrollKeys.list(dispensarySlug),
+    queryFn: () => fetchPayrollReports(dispensarySlug),
     initialData: initialReports,
     enabled: Boolean(dispensarySlug),
     staleTime: DEFAULT_STALE_TIME_MS,
@@ -72,11 +72,11 @@ export function usePayrollReportDetail(
   reportId: string,
   initialReport?: PayrollReportDetail,
 ) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return useQuery({
-    queryKey: payrollKeys.detail(dispensarySlug!, reportId),
-    queryFn: () => fetchPayrollReportDetail(dispensarySlug!, reportId),
+    queryKey: payrollKeys.detail(dispensarySlug, reportId),
+    queryFn: () => fetchPayrollReportDetail(dispensarySlug, reportId),
     initialData: initialReport,
     enabled: Boolean(dispensarySlug && reportId),
     staleTime: DEFAULT_STALE_TIME_MS,
@@ -84,11 +84,11 @@ export function usePayrollReportDetail(
 }
 
 export function usePayrollImportableActivityWeeks(enabled: boolean) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return useQuery({
-    queryKey: payrollKeys.importableActivityWeeks(dispensarySlug!),
-    queryFn: () => fetchPayrollImportableActivityWeeks(dispensarySlug!),
+    queryKey: payrollKeys.importableActivityWeeks(dispensarySlug),
+    queryFn: () => fetchPayrollImportableActivityWeeks(dispensarySlug),
     enabled: Boolean(dispensarySlug && enabled),
     staleTime: DEFAULT_STALE_TIME_MS,
   });
@@ -96,32 +96,32 @@ export function usePayrollImportableActivityWeeks(enabled: boolean) {
 
 export function useInvalidatePayroll() {
   const queryClient = useQueryClient();
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return {
     invalidateList: () => {
-      void queryClient.invalidateQueries({ queryKey: payrollKeys.list(dispensarySlug!) });
+      void queryClient.invalidateQueries({ queryKey: payrollKeys.list(dispensarySlug) });
     },
     invalidateDetail: (reportId: string) => {
       void queryClient.invalidateQueries({
-        queryKey: payrollKeys.detail(dispensarySlug!, reportId),
+        queryKey: payrollKeys.detail(dispensarySlug, reportId),
       });
     },
     invalidateAll: () => {
-      void queryClient.invalidateQueries({ queryKey: payrollKeys.all(dispensarySlug!) });
+      void queryClient.invalidateQueries({ queryKey: payrollKeys.all(dispensarySlug) });
     },
   };
 }
 
 export function useCreatePayrollReportMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const routes = useTenantRoutes();
   const router = useRouter();
   const { invalidateList } = useInvalidatePayroll();
 
   return useMutation({
     mutationFn: async (formData: FormData) => {
-      const result = await createPayrollReportFromForm(dispensarySlug!, formData);
+      const result = await createPayrollReportFromForm(dispensarySlug, formData);
       const data = handleAction(result) as { id?: string } | undefined;
       return data?.id ?? null;
     },
@@ -143,19 +143,19 @@ export function useCreatePayrollReportMutation() {
 }
 
 export function useUpdatePayrollReportMutation(reportId: string) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const queryClient = useQueryClient();
   const { invalidateList } = useInvalidatePayroll();
 
   return useMutation({
     mutationFn: async (resultJson: PayrollReportResult) => {
-      const result = await updatePayrollReportResultJson(dispensarySlug!, reportId, resultJson);
+      const result = await updatePayrollReportResultJson(dispensarySlug, reportId, resultJson);
       const data = handleAction(result) as { resultJson?: PayrollReportResult } | undefined;
       return data?.resultJson ?? resultJson;
     },
     onSuccess: (resultJson) => {
       queryClient.setQueryData<PayrollReportDetail>(
-        payrollKeys.detail(dispensarySlug!, reportId),
+        payrollKeys.detail(dispensarySlug, reportId),
         (prev) => (prev ? { ...prev, resultJson } : prev),
       );
       invalidateList();
@@ -172,14 +172,14 @@ export function useUpdatePayrollReportMutation(reportId: string) {
 }
 
 export function useDeletePayrollReportMutation(options?: { redirectToList?: boolean }) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const routes = useTenantRoutes();
   const router = useRouter();
   const { invalidateList } = useInvalidatePayroll();
 
   return useMutation({
     mutationFn: async (reportId: string) => {
-      const result = await deletePayrollReport(dispensarySlug!, reportId);
+      const result = await deletePayrollReport(dispensarySlug, reportId);
       handleAction(result);
       return reportId;
     },

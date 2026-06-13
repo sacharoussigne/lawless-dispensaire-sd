@@ -21,11 +21,11 @@ import { useForm } from '@mantine/form';
 import {
   extractInputs,
   extractFormSections,
-  TemplateInput,
+  type TemplateInput,
 } from '@/lib/mailTemplate/parser';
 import {
   renderTemplate,
-  RenderContext,
+  type RenderContext,
   resolveJsValue,
 } from '@/lib/mailTemplate/renderer';
 

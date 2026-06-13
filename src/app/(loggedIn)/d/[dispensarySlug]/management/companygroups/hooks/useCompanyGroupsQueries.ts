@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { notifications } from '@mantine/notifications';
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
+import { useRequiredDispensarySlug } from '@/app/_contexts/PermissionsContext';
 import {
   createCompanyGroup,
   getCompanyGroups,
@@ -36,11 +36,11 @@ async function fetchCompanyGroupsForOrders(dispensarySlug: string) {
 }
 
 export function useManagementCompanyGroups(initialData: CompanyGroupWithRelations[]) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return useQuery({
-    queryKey: companyGroupsKeys.management(dispensarySlug!),
-    queryFn: () => fetchManagementCompanyGroups(dispensarySlug!),
+    queryKey: companyGroupsKeys.management(dispensarySlug),
+    queryFn: () => fetchManagementCompanyGroups(dispensarySlug),
     initialData,
     placeholderData: (previous) => previous,
     enabled: Boolean(dispensarySlug),
@@ -49,11 +49,11 @@ export function useManagementCompanyGroups(initialData: CompanyGroupWithRelation
 }
 
 export function useCompanyGroupsForSelect(initialData?: CompanyGroupSelect[]) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return useQuery({
-    queryKey: companyGroupsKeys.select(dispensarySlug!),
-    queryFn: () => fetchCompanyGroupsForSelect(dispensarySlug!),
+    queryKey: companyGroupsKeys.select(dispensarySlug),
+    queryFn: () => fetchCompanyGroupsForSelect(dispensarySlug),
     initialData,
     placeholderData: (previous) => previous,
     enabled: Boolean(dispensarySlug),
@@ -62,11 +62,11 @@ export function useCompanyGroupsForSelect(initialData?: CompanyGroupSelect[]) {
 }
 
 export function useCompanyGroupsForOrders(enabled: boolean) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return useQuery({
-    queryKey: companyGroupsKeys.forOrders(dispensarySlug!),
-    queryFn: () => fetchCompanyGroupsForOrders(dispensarySlug!),
+    queryKey: companyGroupsKeys.forOrders(dispensarySlug),
+    queryFn: () => fetchCompanyGroupsForOrders(dispensarySlug),
     enabled: Boolean(dispensarySlug) && enabled,
     staleTime: DEFAULT_STALE_TIME_MS,
   });
@@ -74,9 +74,9 @@ export function useCompanyGroupsForOrders(enabled: boolean) {
 
 function useManagementCompanyGroupsCache() {
   const queryClient = useQueryClient();
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
-  const queryKey = companyGroupsKeys.management(dispensarySlug!);
+  const queryKey = companyGroupsKeys.management(dispensarySlug);
 
   const updateCache = (
     updater: (companyGroups: CompanyGroupWithRelations[]) => CompanyGroupWithRelations[],
@@ -88,22 +88,22 @@ function useManagementCompanyGroupsCache() {
   };
 
   const invalidateForOrders = () => {
-    queryClient.invalidateQueries({ queryKey: companyGroupsKeys.forOrders(dispensarySlug!) });
+    queryClient.invalidateQueries({ queryKey: companyGroupsKeys.forOrders(dispensarySlug) });
   };
 
   const invalidateCompaniesManagement = () => {
-    queryClient.invalidateQueries({ queryKey: companiesKeys.management(dispensarySlug!) });
+    queryClient.invalidateQueries({ queryKey: companiesKeys.management(dispensarySlug) });
   };
 
   const invalidateSelect = () => {
-    queryClient.invalidateQueries({ queryKey: companyGroupsKeys.select(dispensarySlug!) });
+    queryClient.invalidateQueries({ queryKey: companyGroupsKeys.select(dispensarySlug) });
   };
 
   return { updateCache, invalidateForOrders, invalidateCompaniesManagement, invalidateSelect };
 }
 
 export function useCreateCompanyGroupMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const { updateCache, invalidateForOrders, invalidateCompaniesManagement, invalidateSelect } =
     useManagementCompanyGroupsCache();
 
@@ -113,7 +113,7 @@ export function useCreateCompanyGroupMutation() {
       description?: string;
       companyIds?: string[];
     }) => {
-      const result = await createCompanyGroup(dispensarySlug!, vars);
+      const result = await createCompanyGroup(dispensarySlug, vars);
       return handleAction(result) as CompanyGroupWithRelations;
     },
     onSuccess: (created) => {
@@ -139,7 +139,7 @@ export function useCreateCompanyGroupMutation() {
 }
 
 export function useUpdateCompanyGroupMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const { updateCache, invalidateForOrders, invalidateCompaniesManagement } =
     useManagementCompanyGroupsCache();
 
@@ -150,7 +150,7 @@ export function useUpdateCompanyGroupMutation() {
       description?: string;
       companyIds?: string[];
     }) => {
-      const result = await updateCompanyGroup(dispensarySlug!, vars);
+      const result = await updateCompanyGroup(dispensarySlug, vars);
       return handleAction(result) as CompanyGroupWithRelations;
     },
     onSuccess: (updated) => {
@@ -179,13 +179,13 @@ export function useUpdateCompanyGroupMutation() {
 }
 
 export function useDeleteCompanyGroupMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const { updateCache, invalidateForOrders, invalidateCompaniesManagement, invalidateSelect } =
     useManagementCompanyGroupsCache();
 
   return useMutation({
     mutationFn: async (vars: { id: string }) => {
-      const result = await deleteCompanyGroup(dispensarySlug!, vars);
+      const result = await deleteCompanyGroup(dispensarySlug, vars);
       handleAction(result);
       return vars;
     },

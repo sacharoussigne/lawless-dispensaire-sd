@@ -3,6 +3,9 @@ import type { DispensaryWeeklyActivity } from '@prisma/client';
 import { mergeHtmlAndWeeklyActivity, mergeScheduleOr, payrollNameKey } from '@/lib/payroll/mergeWeeklyActivity';
 import type { ParsedPayrollTable } from '@/lib/payroll/parsePayrollHtmlTable';
 import { PAYROLL_DAYS } from '@/lib/payroll/parsePayrollHtmlTable';
+import type { PayrollReportResult } from '@/lib/payroll/schema';
+
+type EmployeeSchedule = PayrollReportResult['employees'][number]['schedule'];
 
 const emptyDay = { caisse: null as string | null, presence: null as string | null };
 
@@ -127,9 +130,9 @@ describe('mergeHtmlAndWeeklyActivity', () => {
 
 describe('mergeScheduleOr', () => {
   it('ORs caisse and presence flags', () => {
-    const a = Object.fromEntries(PAYROLL_DAYS.map((d) => [d, { ...emptyDay }])) as import('@/lib/payroll/schema').PayrollReportResult['employees'][number]['schedule'];
+    const a = Object.fromEntries(PAYROLL_DAYS.map((d) => [d, { ...emptyDay }])) as EmployeeSchedule;
     a.lundi = { caisse: 'X', presence: null };
-    const b = Object.fromEntries(PAYROLL_DAYS.map((d) => [d, { ...emptyDay }])) as import('@/lib/payroll/schema').PayrollReportResult['employees'][number]['schedule'];
+    const b = Object.fromEntries(PAYROLL_DAYS.map((d) => [d, { ...emptyDay }])) as EmployeeSchedule;
     b.lundi = { caisse: null, presence: 'P' };
     const m = mergeScheduleOr(a, b);
     expect(m.lundi.caisse).toBe('X');

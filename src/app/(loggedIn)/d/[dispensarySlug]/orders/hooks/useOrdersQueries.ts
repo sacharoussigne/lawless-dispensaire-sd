@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { notifications } from '@mantine/notifications';
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
+import { useRequiredDispensarySlug } from '@/app/_contexts/PermissionsContext';
 import {
   createOrder,
   deleteOrder,
@@ -108,11 +108,11 @@ export function useOrdersPage(
   filters: OrdersPageFilters,
   initialData?: OrdersPageResult,
 ) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return useQuery({
-    queryKey: ordersKeys.page(dispensarySlug!, filters),
-    queryFn: () => fetchOrdersPage(dispensarySlug!, filters),
+    queryKey: ordersKeys.page(dispensarySlug, filters),
+    queryFn: () => fetchOrdersPage(dispensarySlug, filters),
     initialData:
       initialData && isDefaultInitialPage(filters) ? initialData : undefined,
     placeholderData: (previous) => previous,
@@ -122,24 +122,29 @@ export function useOrdersPage(
 }
 
 export function useOrderDetail(orderId: string | null, enabled: boolean) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return useQuery({
-    queryKey: ordersKeys.detail(dispensarySlug!, orderId!),
-    queryFn: () => fetchOrderById(dispensarySlug!, orderId!),
-    enabled: Boolean(dispensarySlug && orderId && enabled),
+    queryKey: ordersKeys.detail(dispensarySlug, orderId ?? ''),
+    queryFn: () => {
+      if (!orderId) throw new Error('orderId is required');
+      return fetchOrderById(dispensarySlug, orderId);
+    },
+    enabled: Boolean(orderId && enabled),
     staleTime: DEFAULT_STALE_TIME_MS,
   });
 }
 
 export function useActiveOrdersForGroup(companyGroupId: string | null) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return useQuery({
-    queryKey: ordersKeys.activeByGroup(dispensarySlug!, companyGroupId!),
-    queryFn: () =>
-      fetchActiveOrdersForGroup(dispensarySlug!, companyGroupId!),
-    enabled: Boolean(dispensarySlug && companyGroupId),
+    queryKey: ordersKeys.activeByGroup(dispensarySlug, companyGroupId ?? ''),
+    queryFn: () => {
+      if (!companyGroupId) throw new Error('companyGroupId is required');
+      return fetchActiveOrdersForGroup(dispensarySlug, companyGroupId);
+    },
+    enabled: Boolean(companyGroupId),
     staleTime: DEFAULT_STALE_TIME_MS,
   });
 }
@@ -147,11 +152,11 @@ export function useActiveOrdersForGroup(companyGroupId: string | null) {
 export function useOrderLetterAssignments(
   initialData?: OrderMailTemplateAssignment[],
 ) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return useQuery({
-    queryKey: ordersKeys.letterAssignments(dispensarySlug!),
-    queryFn: () => fetchOrderLetterAssignments(dispensarySlug!),
+    queryKey: ordersKeys.letterAssignments(dispensarySlug),
+    queryFn: () => fetchOrderLetterAssignments(dispensarySlug),
     initialData,
     enabled: Boolean(dispensarySlug),
     staleTime: DEFAULT_STALE_TIME_MS,
@@ -159,11 +164,11 @@ export function useOrderLetterAssignments(
 }
 
 export function useOrderFormItems(companyGroupId: string | null, enabled: boolean) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return useQuery({
-    queryKey: ordersKeys.formItems(dispensarySlug!, companyGroupId),
-    queryFn: () => fetchOrderFormItems(dispensarySlug!, companyGroupId),
+    queryKey: ordersKeys.formItems(dispensarySlug, companyGroupId),
+    queryFn: () => fetchOrderFormItems(dispensarySlug, companyGroupId),
     enabled: Boolean(dispensarySlug && enabled),
     staleTime: DEFAULT_STALE_TIME_MS,
   });
@@ -171,22 +176,22 @@ export function useOrderFormItems(companyGroupId: string | null, enabled: boolea
 
 export function useInvalidateOrders() {
   const queryClient = useQueryClient();
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return () => {
     void queryClient.invalidateQueries({
-      queryKey: ordersKeys.all(dispensarySlug!),
+      queryKey: ordersKeys.all(dispensarySlug),
     });
   };
 }
 
 export function useCreateOrderMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const invalidateOrders = useInvalidateOrders();
 
   return useMutation({
     mutationFn: async (vars: Parameters<typeof createOrder>[1]) => {
-      const result = await createOrder(dispensarySlug!, vars);
+      const result = await createOrder(dispensarySlug, vars);
       handleAction(result);
       return vars;
     },
@@ -209,12 +214,12 @@ export function useCreateOrderMutation() {
 }
 
 export function useUpdateOrderMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const invalidateOrders = useInvalidateOrders();
 
   return useMutation({
     mutationFn: async (vars: Parameters<typeof updateOrder>[1]) => {
-      const result = await updateOrder(dispensarySlug!, vars);
+      const result = await updateOrder(dispensarySlug, vars);
       handleAction(result);
       return vars;
     },
@@ -237,12 +242,12 @@ export function useUpdateOrderMutation() {
 }
 
 export function useDeleteOrderMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const invalidateOrders = useInvalidateOrders();
 
   return useMutation({
     mutationFn: async (vars: { id: string }) => {
-      const result = await deleteOrder(dispensarySlug!, vars);
+      const result = await deleteOrder(dispensarySlug, vars);
       handleAction(result);
       return vars;
     },

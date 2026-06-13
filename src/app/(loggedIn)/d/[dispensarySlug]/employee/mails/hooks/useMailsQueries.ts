@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { notifications } from '@mantine/notifications';
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
+import { useRequiredDispensarySlug } from '@/app/_contexts/PermissionsContext';
 import {
   deleteMail,
   getMailById,
@@ -103,11 +103,11 @@ export function useMailsPage(
   filters: MailsPageFilters,
   options?: { initialData?: MailsPageResult; enabled?: boolean },
 ) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return useQuery({
-    queryKey: mailsKeys.page(dispensarySlug!, filters),
-    queryFn: () => fetchMailsPage(dispensarySlug!, filters),
+    queryKey: mailsKeys.page(dispensarySlug, filters),
+    queryFn: () => fetchMailsPage(dispensarySlug, filters),
     initialData:
       options?.initialData && isDefaultMailsPage(filters)
         ? options.initialData
@@ -122,11 +122,11 @@ export function useUserMailTemplatesPage(
   filters: MailTemplatesPageFilters,
   options?: { initialData?: MailTemplatesPageResult; enabled?: boolean },
 ) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return useQuery({
-    queryKey: mailTemplatesKeys.page(dispensarySlug!, filters),
-    queryFn: () => fetchMailTemplatesPage(dispensarySlug!, filters),
+    queryKey: mailTemplatesKeys.page(dispensarySlug, filters),
+    queryFn: () => fetchMailTemplatesPage(dispensarySlug, filters),
     initialData:
       options?.initialData && isDefaultMailTemplatesPage(filters)
         ? options.initialData
@@ -138,12 +138,15 @@ export function useUserMailTemplatesPage(
 }
 
 export function useMailDetail(mailId: string | null, enabled: boolean) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return useQuery({
-    queryKey: mailsKeys.detail(dispensarySlug!, mailId!),
-    queryFn: () => fetchMailById(dispensarySlug!, mailId!),
-    enabled: Boolean(dispensarySlug && mailId && enabled),
+    queryKey: mailsKeys.detail(dispensarySlug, mailId ?? ''),
+    queryFn: () => {
+      if (!mailId) throw new Error('mailId is required');
+      return fetchMailById(dispensarySlug, mailId);
+    },
+    enabled: Boolean(mailId && enabled),
     staleTime: DEFAULT_STALE_TIME_MS,
   });
 }
@@ -152,12 +155,15 @@ export function useUserMailTemplateDetail(
   templateId: string | null,
   enabled: boolean,
 ) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return useQuery({
-    queryKey: mailTemplatesKeys.detail(dispensarySlug!, templateId!),
-    queryFn: () => fetchUserMailTemplateById(dispensarySlug!, templateId!),
-    enabled: Boolean(dispensarySlug && templateId && enabled),
+    queryKey: mailTemplatesKeys.detail(dispensarySlug, templateId ?? ''),
+    queryFn: () => {
+      if (!templateId) throw new Error('templateId is required');
+      return fetchUserMailTemplateById(dispensarySlug, templateId);
+    },
+    enabled: Boolean(templateId && enabled),
     staleTime: DEFAULT_STALE_TIME_MS,
   });
 }
@@ -165,11 +171,11 @@ export function useUserMailTemplateDetail(
 export function useUserMailTemplateOptions(
   initialData?: MailTemplateOption[],
 ) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return useQuery({
-    queryKey: mailTemplatesKeys.options(dispensarySlug!),
-    queryFn: () => fetchUserMailTemplateOptions(dispensarySlug!),
+    queryKey: mailTemplatesKeys.options(dispensarySlug),
+    queryFn: () => fetchUserMailTemplateOptions(dispensarySlug),
     initialData,
     enabled: Boolean(dispensarySlug),
     staleTime: DEFAULT_STALE_TIME_MS,
@@ -178,33 +184,33 @@ export function useUserMailTemplateOptions(
 
 export function useInvalidateMails() {
   const queryClient = useQueryClient();
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return () => {
     void queryClient.invalidateQueries({
-      queryKey: mailsKeys.all(dispensarySlug!),
+      queryKey: mailsKeys.all(dispensarySlug),
     });
   };
 }
 
 export function useInvalidateMailTemplates() {
   const queryClient = useQueryClient();
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return () => {
     void queryClient.invalidateQueries({
-      queryKey: mailTemplatesKeys.all(dispensarySlug!),
+      queryKey: mailTemplatesKeys.all(dispensarySlug),
     });
   };
 }
 
 export function useDeleteMailMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const invalidateMails = useInvalidateMails();
 
   return useMutation({
     mutationFn: async (vars: { id: string }) => {
-      const result = await deleteMail(dispensarySlug!, vars);
+      const result = await deleteMail(dispensarySlug, vars);
       handleAction(result);
       return vars;
     },
@@ -227,12 +233,12 @@ export function useDeleteMailMutation() {
 }
 
 export function useDeleteUserMailTemplateMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const invalidateMailTemplates = useInvalidateMailTemplates();
 
   return useMutation({
     mutationFn: async (vars: { id: string }) => {
-      const result = await deleteUserMailTemplate(dispensarySlug!, vars);
+      const result = await deleteUserMailTemplate(dispensarySlug, vars);
       handleAction(result);
       return vars;
     },

@@ -266,7 +266,10 @@ export async function updateDispensaryWeeklyActivityWithHistory(
 
     const data: Prisma.DispensaryWeeklyActivityUpdateInput = {};
     if (input.periodStart !== undefined || input.periodEnd !== undefined) {
-      const anchor = (input.periodStart ?? input.periodEnd)!;
+      const anchor = input.periodStart ?? input.periodEnd;
+      if (!anchor) {
+        throw new Error('periodStart or periodEnd is required');
+      }
       const normalized = normalizeParisWeekBounds(anchor);
       data.periodStart = normalized.periodStart;
       data.periodEnd = normalized.periodEnd;

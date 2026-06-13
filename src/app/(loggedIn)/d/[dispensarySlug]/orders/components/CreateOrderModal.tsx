@@ -1,6 +1,6 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
+import { useRequiredDispensarySlug } from '@/app/_contexts/PermissionsContext';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Modal,
@@ -74,7 +74,7 @@ export default function CreateOrderModal({
   prefillItemsNeedingRestock = true,
 }: CreateOrderModalProps) {
   const items = itemsProp ?? EMPTY_ITEMS;
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const createOrderMutation = useCreateOrderMutation();
   const { data: fetchedItems } = useOrderFormItems(null, opened && items.length === 0);
   const { data: allCompanyGroups = [], isFetching: loadingCompanyGroups } =
@@ -106,7 +106,7 @@ export default function CreateOrderModal({
     const loadIndividualCustomers = async () => {
       try {
         setLoadingData(true);
-        const individualsResult = await getIndividualCustomers(dispensarySlug!);
+        const individualsResult = await getIndividualCustomers(dispensarySlug);
         const individualsData = handleAction(individualsResult);
         if (individualsData) {
           setIndividualCustomers(individualsData);
@@ -372,7 +372,7 @@ export default function CreateOrderModal({
     const trimmed = value.trim();
     if (!trimmed) return;
     try {
-      const result = await createIndividualCustomer(dispensarySlug!, { name: trimmed });
+      const result = await createIndividualCustomer(dispensarySlug, { name: trimmed });
       const data = handleAction(result);
       if (data) {
         setIndividualCustomers((prev) =>
@@ -405,7 +405,7 @@ export default function CreateOrderModal({
       (c) => c.name.trim().toLowerCase() === trimmed.toLowerCase()
     );
     try {
-      const result = await deleteIndividualCustomerByName(dispensarySlug!, { name: trimmed });
+      const result = await deleteIndividualCustomerByName(dispensarySlug, { name: trimmed });
       handleAction(result);
       setIndividualCustomers((prev) =>
         prev.filter((c) => c.name.trim().toLowerCase() !== trimmed.toLowerCase())
@@ -470,14 +470,23 @@ export default function CreateOrderModal({
 
     try {
       setLoading(true);
+      const clientPayload =
+        orderType === OrderTypeEnum.INCOMING || clientMode === 'company'
+          ? selectedCompanyId
+            ? { companyId: selectedCompanyId }
+            : null
+          : selectedIndividualCustomerId
+            ? { individualCustomerId: selectedIndividualCustomerId }
+            : null;
+
+      if (!clientPayload) return;
+
       await createOrderMutation.mutateAsync({
         type: orderType,
         details: orderDetails || undefined,
         price: orderPrice !== '' ? Number(orderPrice) : undefined,
         ...(selectedCompanyGroupId ? { companyGroupId: selectedCompanyGroupId } : {}),
-        ...(orderType === OrderTypeEnum.INCOMING || clientMode === 'company'
-          ? { companyId: selectedCompanyId! }
-          : { individualCustomerId: selectedIndividualCustomerId! }),
+        ...clientPayload,
         items: orderItems.map((oi) => ({
           itemId: oi.itemId,
           quantity: oi.quantity,

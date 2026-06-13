@@ -1,6 +1,6 @@
 'use client';
 
-import { usePermissions, useTenantRoutes } from '@/app/_contexts/PermissionsContext';
+import { useTenantRoutes, useRequiredDispensarySlug } from '@/app/_contexts/PermissionsContext';
 import { useEffect, useState } from 'react';
 import { Container, Group, Button, Paper, Stack, Text } from '@mantine/core';
 import { PageHeader } from '@/app/_components/PageHeader/PageHeader';
@@ -26,7 +26,7 @@ export default function BankPageClient({
   initialAccounts,
 }: BankPageClientProps) {
   const routes = useTenantRoutes();
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const router = useRouter();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<BankAccountWithRelations[]>(initialAccounts);
@@ -50,7 +50,7 @@ export default function BankPageClient({
   const loadAccounts = async () => {
     try {
       setLoading(true);
-      const result = await getBankAccounts(dispensarySlug!, );
+      const result = await getBankAccounts(dispensarySlug, );
       const data = handleAction(result);
       if (data) {
         setAccounts(data);

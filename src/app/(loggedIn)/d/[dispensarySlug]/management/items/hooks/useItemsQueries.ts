@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { notifications } from '@mantine/notifications';
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
+import { useRequiredDispensarySlug } from '@/app/_contexts/PermissionsContext';
 import {
   createItem,
   getItems,
@@ -32,11 +32,11 @@ async function fetchManagementItems(dispensarySlug: string) {
 }
 
 export function useManagementItems(initialData: ItemWithRelations[]) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return useQuery({
-    queryKey: itemsKeys.management(dispensarySlug!),
-    queryFn: () => fetchManagementItems(dispensarySlug!),
+    queryKey: itemsKeys.management(dispensarySlug),
+    queryFn: () => fetchManagementItems(dispensarySlug),
     initialData,
     placeholderData: (previous) => previous,
     enabled: Boolean(dispensarySlug),
@@ -46,9 +46,9 @@ export function useManagementItems(initialData: ItemWithRelations[]) {
 
 function useManagementItemsCache() {
   const queryClient = useQueryClient();
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
-  const queryKey = itemsKeys.management(dispensarySlug!);
+  const queryKey = itemsKeys.management(dispensarySlug);
 
   const updateCache = (updater: (items: ItemWithRelations[]) => ItemWithRelations[]) => {
     queryClient.setQueryData<ItemWithRelations[]>(queryKey, (current) => {
@@ -61,12 +61,12 @@ function useManagementItemsCache() {
 }
 
 export function useCreateItemMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const { updateCache } = useManagementItemsCache();
 
   return useMutation({
     mutationFn: async (vars: Parameters<typeof createItem>[1]) => {
-      const result = await createItem(dispensarySlug!, vars);
+      const result = await createItem(dispensarySlug, vars);
       return handleAction(result) as ItemWithRelations;
     },
     onSuccess: (created) => {
@@ -89,12 +89,12 @@ export function useCreateItemMutation() {
 }
 
 export function useUpdateItemMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const { updateCache } = useManagementItemsCache();
 
   return useMutation({
     mutationFn: async (vars: Parameters<typeof updateItem>[1]) => {
-      const result = await updateItem(dispensarySlug!, vars);
+      const result = await updateItem(dispensarySlug, vars);
       return handleAction(result) as ItemWithRelations;
     },
     onSuccess: (updated) => {
@@ -119,12 +119,12 @@ export function useUpdateItemMutation() {
 }
 
 export function useDeleteItemMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const { updateCache } = useManagementItemsCache();
 
   return useMutation({
     mutationFn: async (vars: { id: string }) => {
-      const result = await deleteItem(dispensarySlug!, vars);
+      const result = await deleteItem(dispensarySlug, vars);
       handleAction(result);
       return vars;
     },
@@ -147,12 +147,12 @@ export function useDeleteItemMutation() {
 }
 
 export function useReorderItemsMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const { updateCache } = useManagementItemsCache();
 
   return useMutation({
     mutationFn: async (vars: { items: { id: string; order: number }[] }) => {
-      const result = await reorderItems(dispensarySlug!, vars);
+      const result = await reorderItems(dispensarySlug, vars);
       handleAction(result);
       return vars;
     },
@@ -181,12 +181,13 @@ export function useReorderItemsMutation() {
 }
 
 export function useCraftRecipesQuery(itemId: string | null, enabled: boolean) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return useQuery({
-    queryKey: itemsKeys.craftRecipes(dispensarySlug!, itemId ?? ''),
+    queryKey: itemsKeys.craftRecipes(dispensarySlug, itemId ?? ''),
     queryFn: async () => {
-      const result = await getCraftRecipesByItemId(dispensarySlug!, itemId!);
+      if (!itemId) throw new Error('itemId is required');
+      const result = await getCraftRecipesByItemId(dispensarySlug, itemId);
       return handleAction(result) as CraftRecipeWithIngredients[];
     },
     enabled: Boolean(dispensarySlug && itemId && enabled),
@@ -196,9 +197,9 @@ export function useCraftRecipesQuery(itemId: string | null, enabled: boolean) {
 
 function useCraftRecipesCache(itemId: string) {
   const queryClient = useQueryClient();
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
-  const queryKey = itemsKeys.craftRecipes(dispensarySlug!, itemId);
+  const queryKey = itemsKeys.craftRecipes(dispensarySlug, itemId);
 
   const updateCache = (
     updater: (recipes: CraftRecipeWithIngredients[]) => CraftRecipeWithIngredients[],
@@ -213,12 +214,12 @@ function useCraftRecipesCache(itemId: string) {
 }
 
 export function useCreateCraftRecipeMutation(itemId: string) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const { updateCache } = useCraftRecipesCache(itemId);
 
   return useMutation({
     mutationFn: async (vars: Parameters<typeof createCraftRecipe>[1]) => {
-      const result = await createCraftRecipe(dispensarySlug!, vars);
+      const result = await createCraftRecipe(dispensarySlug, vars);
       return handleAction(result) as CraftRecipeWithIngredients;
     },
     onSuccess: (created) => {
@@ -241,12 +242,12 @@ export function useCreateCraftRecipeMutation(itemId: string) {
 }
 
 export function useUpdateCraftRecipeMutation(itemId: string) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const { updateCache } = useCraftRecipesCache(itemId);
 
   return useMutation({
     mutationFn: async (vars: Parameters<typeof updateCraftRecipe>[1]) => {
-      const result = await updateCraftRecipe(dispensarySlug!, vars);
+      const result = await updateCraftRecipe(dispensarySlug, vars);
       return handleAction(result) as CraftRecipeWithIngredients;
     },
     onSuccess: (updated) => {
@@ -271,12 +272,12 @@ export function useUpdateCraftRecipeMutation(itemId: string) {
 }
 
 export function useDeleteCraftRecipeMutation(itemId: string) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const { updateCache } = useCraftRecipesCache(itemId);
 
   return useMutation({
     mutationFn: async (vars: { id: string }) => {
-      const result = await deleteCraftRecipe(dispensarySlug!, vars);
+      const result = await deleteCraftRecipe(dispensarySlug, vars);
       handleAction(result);
       return vars;
     },

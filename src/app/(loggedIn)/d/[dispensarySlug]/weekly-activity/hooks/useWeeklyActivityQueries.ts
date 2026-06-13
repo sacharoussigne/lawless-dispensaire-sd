@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { notifications } from '@mantine/notifications';
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
+import { useRequiredDispensarySlug } from '@/app/_contexts/PermissionsContext';
 import {
   createDispensaryWeeklyActivity,
   deleteDispensaryWeeklyActivity,
@@ -80,12 +80,15 @@ export function useWeeklyActivities(
     rows: WeeklyActivityListItem[];
   },
 ) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const weekKey = weekBounds ? weeklyActivityWeekKey(weekBounds) : '';
 
   return useQuery({
-    queryKey: weeklyActivityKeys.list(dispensarySlug!, weekKey),
-    queryFn: () => fetchWeeklyActivities(dispensarySlug!, weekBounds!),
+    queryKey: weeklyActivityKeys.list(dispensarySlug, weekKey),
+    queryFn: () => {
+      if (!weekBounds) throw new Error('weekBounds is required');
+      return fetchWeeklyActivities(dispensarySlug, weekBounds);
+    },
     initialData:
       initialData &&
       weekBounds &&
@@ -99,22 +102,25 @@ export function useWeeklyActivities(
 }
 
 export function useWeeklyActivityHistory(activityId: string | null, enabled: boolean) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return useQuery({
-    queryKey: weeklyActivityKeys.history(dispensarySlug!, activityId!),
-    queryFn: () => fetchWeeklyActivityHistory(dispensarySlug!, activityId!),
-    enabled: Boolean(dispensarySlug && activityId && enabled),
+    queryKey: weeklyActivityKeys.history(dispensarySlug, activityId ?? ''),
+    queryFn: () => {
+      if (!activityId) throw new Error('activityId is required');
+      return fetchWeeklyActivityHistory(dispensarySlug, activityId);
+    },
+    enabled: Boolean(activityId && enabled),
     staleTime: DEFAULT_STALE_TIME_MS,
   });
 }
 
 export function useWeeklyActivityTargets(enabled: boolean) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return useQuery({
-    queryKey: weeklyActivityKeys.targets(dispensarySlug!),
-    queryFn: () => fetchWeeklyActivityTargets(dispensarySlug!),
+    queryKey: weeklyActivityKeys.targets(dispensarySlug),
+    queryFn: () => fetchWeeklyActivityTargets(dispensarySlug),
     enabled: Boolean(dispensarySlug && enabled),
     staleTime: DEFAULT_STALE_TIME_MS,
   });
@@ -122,26 +128,26 @@ export function useWeeklyActivityTargets(enabled: boolean) {
 
 export function useInvalidateWeeklyActivities() {
   const queryClient = useQueryClient();
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return (bounds?: WeeklyActivityWeekBounds) => {
     if (bounds) {
       void queryClient.invalidateQueries({
         queryKey: weeklyActivityKeys.list(
-          dispensarySlug!,
+          dispensarySlug,
           weeklyActivityWeekKey(bounds),
         ),
       });
       return;
     }
     void queryClient.invalidateQueries({
-      queryKey: weeklyActivityKeys.all(dispensarySlug!),
+      queryKey: weeklyActivityKeys.all(dispensarySlug),
     });
   };
 }
 
 export function useCreateWeeklyActivityMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const invalidate = useInvalidateWeeklyActivities();
 
   return useMutation({
@@ -149,7 +155,7 @@ export function useCreateWeeklyActivityMutation() {
       payload: Parameters<typeof createDispensaryWeeklyActivity>[1];
       weekBounds: WeeklyActivityWeekBounds;
     }) => {
-      const result = await createDispensaryWeeklyActivity(dispensarySlug!, vars.payload);
+      const result = await createDispensaryWeeklyActivity(dispensarySlug, vars.payload);
       handleAction(result);
       return vars;
     },
@@ -169,7 +175,7 @@ export function useCreateWeeklyActivityMutation() {
 }
 
 export function useUpdateWeeklyActivityMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const invalidate = useInvalidateWeeklyActivities();
 
   return useMutation({
@@ -177,7 +183,7 @@ export function useUpdateWeeklyActivityMutation() {
       payload: Parameters<typeof updateDispensaryWeeklyActivity>[1];
       weekBounds: WeeklyActivityWeekBounds;
     }) => {
-      const result = await updateDispensaryWeeklyActivity(dispensarySlug!, vars.payload);
+      const result = await updateDispensaryWeeklyActivity(dispensarySlug, vars.payload);
       handleAction(result);
       return vars;
     },
@@ -196,12 +202,12 @@ export function useUpdateWeeklyActivityMutation() {
 }
 
 export function useDeleteWeeklyActivityMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const invalidate = useInvalidateWeeklyActivities();
 
   return useMutation({
     mutationFn: async (vars: { id: string; weekBounds: WeeklyActivityWeekBounds }) => {
-      const result = await deleteDispensaryWeeklyActivity(dispensarySlug!, { id: vars.id });
+      const result = await deleteDispensaryWeeklyActivity(dispensarySlug, { id: vars.id });
       handleAction(result);
       return vars;
     },

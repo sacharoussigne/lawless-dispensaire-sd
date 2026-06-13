@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { notifications } from '@mantine/notifications';
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
+import { useRequiredDispensarySlug } from '@/app/_contexts/PermissionsContext';
 import {
   createCategoryItem,
   getManagementCategoryItems,
@@ -24,11 +24,11 @@ async function fetchManagementCategoryItems(dispensarySlug: string) {
 }
 
 export function useManagementCategoryItems(initialData: CategoryItemWithCount[]) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return useQuery({
-    queryKey: categoryItemsKeys.management(dispensarySlug!),
-    queryFn: () => fetchManagementCategoryItems(dispensarySlug!),
+    queryKey: categoryItemsKeys.management(dispensarySlug),
+    queryFn: () => fetchManagementCategoryItems(dispensarySlug),
     initialData,
     placeholderData: (previous) => previous,
     enabled: Boolean(dispensarySlug),
@@ -38,9 +38,9 @@ export function useManagementCategoryItems(initialData: CategoryItemWithCount[])
 
 function useManagementCategoryItemsCache() {
   const queryClient = useQueryClient();
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
-  const queryKey = categoryItemsKeys.management(dispensarySlug!);
+  const queryKey = categoryItemsKeys.management(dispensarySlug);
 
   const updateCache = (updater: (items: CategoryItemWithCount[]) => CategoryItemWithCount[]) => {
     queryClient.setQueryData<CategoryItemWithCount[]>(queryKey, (current) => {
@@ -53,12 +53,12 @@ function useManagementCategoryItemsCache() {
 }
 
 export function useCreateCategoryItemMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const { updateCache } = useManagementCategoryItemsCache();
 
   return useMutation({
     mutationFn: async (vars: { name: string; color?: string }) => {
-      const result = await createCategoryItem(dispensarySlug!, vars);
+      const result = await createCategoryItem(dispensarySlug, vars);
       return handleAction(result) as CategoryItem;
     },
     onSuccess: (created) => {
@@ -84,12 +84,12 @@ export function useCreateCategoryItemMutation() {
 }
 
 export function useUpdateCategoryItemMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const { updateCache } = useManagementCategoryItemsCache();
 
   return useMutation({
     mutationFn: async (vars: { id: string; name: string; color?: string }) => {
-      const result = await updateCategoryItem(dispensarySlug!, vars);
+      const result = await updateCategoryItem(dispensarySlug, vars);
       return handleAction(result) as CategoryItem;
     },
     onSuccess: (updated) => {
@@ -118,12 +118,12 @@ export function useUpdateCategoryItemMutation() {
 }
 
 export function useDeleteCategoryItemMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const { updateCache } = useManagementCategoryItemsCache();
 
   return useMutation({
     mutationFn: async (vars: { id: string }) => {
-      const result = await deleteCategoryItem(dispensarySlug!, vars);
+      const result = await deleteCategoryItem(dispensarySlug, vars);
       handleAction(result);
       return vars;
     },
@@ -146,12 +146,12 @@ export function useDeleteCategoryItemMutation() {
 }
 
 export function useReorderCategoryItemsMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const { updateCache } = useManagementCategoryItemsCache();
 
   return useMutation({
     mutationFn: async (vars: { items: { id: string; order: number }[] }) => {
-      const result = await reorderCategoryItems(dispensarySlug!, vars);
+      const result = await reorderCategoryItems(dispensarySlug, vars);
       handleAction(result);
       return vars;
     },

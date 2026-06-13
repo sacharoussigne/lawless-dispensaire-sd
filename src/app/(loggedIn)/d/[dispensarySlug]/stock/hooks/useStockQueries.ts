@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
+import { useRequiredDispensarySlug } from '@/app/_contexts/PermissionsContext';
 import { getItemsWithStock } from '@/app/_actions/stock/queries';
 import { updateStock, craftItem } from '@/app/_actions/stock/mutations';
 import { transferMultipleStock } from '@/app/_actions/stock/transfer';
@@ -28,11 +28,11 @@ export function useStockItems(
   chestId: string | null,
   initialData: ItemWithRelations[],
 ) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return useQuery({
-    queryKey: stockKeys.items(dispensarySlug!, chestId),
-    queryFn: () => fetchStockItems(dispensarySlug!, chestId),
+    queryKey: stockKeys.items(dispensarySlug, chestId),
+    queryFn: () => fetchStockItems(dispensarySlug, chestId),
     initialData: chestId === null ? initialData : undefined,
     placeholderData: (previous) => previous,
     enabled: Boolean(dispensarySlug),
@@ -41,11 +41,11 @@ export function useStockItems(
 }
 
 export function useStockChecksSummary(initialData: StockChecksSummary | null) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return useQuery({
-    queryKey: stockKeys.checksSummary(dispensarySlug!),
-    queryFn: () => fetchStockChecksSummary(dispensarySlug!),
+    queryKey: stockKeys.checksSummary(dispensarySlug),
+    queryFn: () => fetchStockChecksSummary(dispensarySlug),
     initialData: initialData ?? undefined,
     enabled: Boolean(dispensarySlug),
     staleTime: DEFAULT_STALE_TIME_MS,
@@ -54,20 +54,20 @@ export function useStockChecksSummary(initialData: StockChecksSummary | null) {
 
 export function useInvalidateStockItems() {
   const queryClient = useQueryClient();
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return (chestIds: Array<string | null>) => {
     const unique = Array.from(new Set(chestIds));
     for (const chestId of unique) {
       void queryClient.invalidateQueries({
-        queryKey: stockKeys.items(dispensarySlug!, chestId),
+        queryKey: stockKeys.items(dispensarySlug, chestId),
       });
     }
   };
 }
 
 export function useUpdateStockMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const invalidateStock = useInvalidateStockItems();
 
   return useMutation({
@@ -78,7 +78,7 @@ export function useUpdateStockMutation() {
       chestName: string;
     }) => {
       const result = await updateStock(
-        dispensarySlug!,
+        dispensarySlug,
         vars.stockData,
         vars.targetChestId,
         { skipHistory: vars.skipHistory },
@@ -105,7 +105,7 @@ export function useUpdateStockMutation() {
 }
 
 export function useCraftMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const invalidateStock = useInvalidateStockItems();
 
   return useMutation({
@@ -118,7 +118,7 @@ export function useCraftMutation() {
       destinationChestId: string | null;
       affectedChestIds: Array<string | null>;
     }) => {
-      const result = await craftItem(dispensarySlug!, {
+      const result = await craftItem(dispensarySlug, {
         craftedItemId: vars.itemId,
         recipeId: vars.recipeId,
         times: vars.times,
@@ -143,7 +143,7 @@ export function useCraftMutation() {
 }
 
 export function useTransferMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const invalidateStock = useInvalidateStockItems();
 
   return useMutation({
@@ -152,7 +152,7 @@ export function useTransferMutation() {
       destinationChestId: string;
       items: { itemId: string; quantity: number }[];
     }) => {
-      const result = await transferMultipleStock(dispensarySlug!, vars);
+      const result = await transferMultipleStock(dispensarySlug, vars);
       handleAction(result);
       return vars;
     },

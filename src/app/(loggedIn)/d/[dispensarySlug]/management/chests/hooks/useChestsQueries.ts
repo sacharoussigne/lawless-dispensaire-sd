@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { notifications } from '@mantine/notifications';
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
+import { useRequiredDispensarySlug } from '@/app/_contexts/PermissionsContext';
 import {
   createChest,
   getChests,
@@ -34,11 +34,11 @@ async function fetchChestStockCheckForm(dispensarySlug: string, chestId: string)
 }
 
 export function useManagementChests(initialData: ChestWithStockHistory[]) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return useQuery({
-    queryKey: chestsKeys.management(dispensarySlug!),
-    queryFn: () => fetchManagementChests(dispensarySlug!),
+    queryKey: chestsKeys.management(dispensarySlug),
+    queryFn: () => fetchManagementChests(dispensarySlug),
     initialData,
     placeholderData: (previous) => previous,
     enabled: Boolean(dispensarySlug),
@@ -47,21 +47,24 @@ export function useManagementChests(initialData: ChestWithStockHistory[]) {
 }
 
 export function useChestStockCheckForm(chestId: string | null, opened: boolean) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return useQuery({
-    queryKey: chestsKeys.stockCheckForm(dispensarySlug!, chestId!),
-    queryFn: () => fetchChestStockCheckForm(dispensarySlug!, chestId!),
-    enabled: Boolean(dispensarySlug) && Boolean(chestId) && opened,
+    queryKey: chestsKeys.stockCheckForm(dispensarySlug, chestId ?? ''),
+    queryFn: () => {
+      if (!chestId) throw new Error('chestId is required');
+      return fetchChestStockCheckForm(dispensarySlug, chestId);
+    },
+    enabled: Boolean(chestId) && opened,
     staleTime: DEFAULT_STALE_TIME_MS,
   });
 }
 
 function useManagementChestsCache() {
   const queryClient = useQueryClient();
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
-  const queryKey = chestsKeys.management(dispensarySlug!);
+  const queryKey = chestsKeys.management(dispensarySlug);
 
   const updateCache = (updater: (chests: ChestWithStockHistory[]) => ChestWithStockHistory[]) => {
     queryClient.setQueryData<ChestWithStockHistory[]>(queryKey, (current) => {
@@ -71,16 +74,16 @@ function useManagementChestsCache() {
   };
 
   const invalidateManagement = () => {
-    queryClient.invalidateQueries({ queryKey: chestsKeys.management(dispensarySlug!) });
+    queryClient.invalidateQueries({ queryKey: chestsKeys.management(dispensarySlug) });
   };
 
   const invalidateStockChecksSummary = () => {
-    queryClient.invalidateQueries({ queryKey: stockKeys.checksSummary(dispensarySlug!) });
+    queryClient.invalidateQueries({ queryKey: stockKeys.checksSummary(dispensarySlug) });
   };
 
   const invalidateStockCheckForm = (chestId: string) => {
     queryClient.invalidateQueries({
-      queryKey: chestsKeys.stockCheckForm(dispensarySlug!, chestId),
+      queryKey: chestsKeys.stockCheckForm(dispensarySlug, chestId),
     });
   };
 
@@ -93,7 +96,7 @@ function useManagementChestsCache() {
 }
 
 export function useCreateChestMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const { updateCache } = useManagementChestsCache();
 
   return useMutation({
@@ -102,7 +105,7 @@ export function useCreateChestMutation() {
       description?: string;
       isEnabled?: boolean;
     }) => {
-      const result = await createChest(dispensarySlug!, vars);
+      const result = await createChest(dispensarySlug, vars);
       return handleAction(result);
     },
     onSuccess: (created) => {
@@ -129,7 +132,7 @@ export function useCreateChestMutation() {
 }
 
 export function useUpdateChestMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const { updateCache } = useManagementChestsCache();
 
   return useMutation({
@@ -139,7 +142,7 @@ export function useUpdateChestMutation() {
       description?: string;
       isEnabled?: boolean;
     }) => {
-      const result = await updateChest(dispensarySlug!, vars);
+      const result = await updateChest(dispensarySlug, vars);
       return handleAction(result);
     },
     onSuccess: (updated) => {
@@ -169,12 +172,12 @@ export function useUpdateChestMutation() {
 }
 
 export function useDeleteChestMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const { invalidateManagement } = useManagementChestsCache();
 
   return useMutation({
     mutationFn: async (vars: { id: string; targetChestId: string }) => {
-      const result = await deleteChest(dispensarySlug!, vars);
+      const result = await deleteChest(dispensarySlug, vars);
       handleAction(result);
       return vars;
     },
@@ -197,12 +200,12 @@ export function useDeleteChestMutation() {
 }
 
 export function useReorderChestsMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const { updateCache } = useManagementChestsCache();
 
   return useMutation({
     mutationFn: async (vars: { items: { id: string; order: number }[] }) => {
-      const result = await reorderChests(dispensarySlug!, vars);
+      const result = await reorderChests(dispensarySlug, vars);
       handleAction(result);
       return vars.items;
     },
@@ -231,7 +234,7 @@ export function useReorderChestsMutation() {
 }
 
 export function useUpsertChestStockCheckConfigMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const { invalidateStockChecksSummary, invalidateStockCheckForm } =
     useManagementChestsCache();
 
@@ -241,7 +244,7 @@ export function useUpsertChestStockCheckConfigMutation() {
       isEnabled: boolean;
       categoryIds: string[];
     }) => {
-      const result = await upsertChestStockCheckConfig(dispensarySlug!, vars);
+      const result = await upsertChestStockCheckConfig(dispensarySlug, vars);
       handleAction(result);
       return vars;
     },

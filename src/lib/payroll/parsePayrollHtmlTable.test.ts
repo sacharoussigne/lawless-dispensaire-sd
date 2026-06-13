@@ -29,7 +29,8 @@ describe('parsePayrollHtmlTable', () => {
     expect(out.employees.length).toBeGreaterThanOrEqual(1);
     const owen = out.employees.find((e) => e.name === 'Owen Clark');
     expect(owen).toBeDefined();
-    expect(owen!.role).toBe('Médecin');
+    if (!owen) return;
+    expect(owen.role).toBe('Médecin');
   });
 
   it('parses caisse-only table (one column per day, no Médecin role)', () => {

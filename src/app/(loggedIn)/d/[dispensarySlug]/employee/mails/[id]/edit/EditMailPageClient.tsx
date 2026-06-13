@@ -1,6 +1,6 @@
 'use client';
 
-import { usePermissions, useTenantRoutes } from '@/app/_contexts/PermissionsContext';
+import { useTenantRoutes, useRequiredDispensarySlug } from '@/app/_contexts/PermissionsContext';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -30,7 +30,7 @@ export default function EditMailPageClient({
   mail,
 }: EditMailPageClientProps) {
   const routes = useTenantRoutes();
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
@@ -50,7 +50,7 @@ export default function EditMailPageClient({
   const handleSubmit = async (values: typeof form.values) => {
     try {
       setLoading(true);
-      const result = await updateMail(dispensarySlug!, {
+      const result = await updateMail(dispensarySlug, {
         id: mail.id,
         name: values.name,
         receiver: values.receiver,

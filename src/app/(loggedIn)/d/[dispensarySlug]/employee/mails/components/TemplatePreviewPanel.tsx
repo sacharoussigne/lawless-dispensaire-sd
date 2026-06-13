@@ -16,7 +16,7 @@ import {
   TemplateFormGenerator,
   type TemplateFormGeneratorHandle,
 } from './TemplateFormGenerator';
-import { renderTemplate, RenderContext } from '@/lib/mailTemplate/renderer';
+import { renderTemplate, type RenderContext } from '@/lib/mailTemplate/renderer';
 import { extractInputs } from '@/lib/mailTemplate/parser';
 
 export function useTemplatePreviewActions(templateContent: string) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
+import { useRequiredDispensarySlug } from '@/app/_contexts/PermissionsContext';
 import { Modal, Stack, Text, Button, Group } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { deleteBankAccount } from '@/app/_actions/bankAccounts';
@@ -20,12 +20,12 @@ export function DeleteBankAccountModal({
   accountToDelete,
   onSuccess,
 }: DeleteBankAccountModalProps) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const handleDelete = async () => {
     if (!accountToDelete) return;
 
     try {
-      const result = await deleteBankAccount(dispensarySlug!, {
+      const result = await deleteBankAccount(dispensarySlug, {
         id: accountToDelete.id,
       });
 

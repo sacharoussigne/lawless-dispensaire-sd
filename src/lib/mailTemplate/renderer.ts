@@ -1,8 +1,8 @@
 import {
   extractInputs,
   parseTemplateParameters,
-  TemplateInput,
-  TemplateParameter,
+  type TemplateInput,
+  type TemplateParameter,
 } from './parser';
 
 export interface RenderContext {
