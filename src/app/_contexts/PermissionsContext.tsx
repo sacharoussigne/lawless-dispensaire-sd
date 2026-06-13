@@ -75,3 +75,11 @@ export function useTenantRoutes() {
   }
   return tenantRoutes(dispensarySlug);
 }
+
+export function useRequiredDispensarySlug(): string {
+  const { dispensarySlug } = usePermissions();
+  if (!dispensarySlug) {
+    throw new Error('useRequiredDispensarySlug requires an active dispensary context');
+  }
+  return dispensarySlug;
+}

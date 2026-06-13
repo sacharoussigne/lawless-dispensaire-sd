@@ -60,6 +60,15 @@ export async function updateStock(
       }
     }
 
+    if (!targetChestId) {
+      return {
+        status: 404,
+        error: 'Coffre cible introuvable',
+      };
+    }
+
+    const resolvedChestId = targetChestId;
+
     const itemIds = data.map((d) => d.itemId);
 
     const results = await prisma.$transaction(async (tx) => {
@@ -67,7 +76,7 @@ export async function updateStock(
         tx.stockHistory.findMany({
           where: {
             itemId: { in: itemIds },
-            chestId: targetChestId!,
+            chestId: resolvedChestId,
             timestamp: { gte: today, lt: tomorrow },
           },
           orderBy: { timestamp: 'desc' },
@@ -75,7 +84,7 @@ export async function updateStock(
         tx.stockHistory.findMany({
           where: {
             itemId: { in: itemIds },
-            chestId: targetChestId!,
+            chestId: resolvedChestId,
             timestamp: { gte: yesterday, lt: today },
           },
           orderBy: { timestamp: 'desc' },
@@ -104,7 +113,7 @@ export async function updateStock(
           return tx.stockHistory.create({
             data: {
               itemId,
-              chestId: targetChestId!,
+              chestId: resolvedChestId,
               quantity,
             },
           });
@@ -204,10 +213,14 @@ export async function craftItem(
       };
     }
 
-    const stockLookups = ingredientRequirements.map((r) => ({
-      itemId: r.ingredient.usedItemId,
-      chestId: r.sourceChestId!,
-    }));
+    const stockLookups = ingredientRequirements.map((r) => {
+      const chestId = r.sourceChestId;
+      if (!chestId) throw new Error('Unexpected missing sourceChestId');
+      return {
+        itemId: r.ingredient.usedItemId,
+        chestId,
+      };
+    });
     stockLookups.push({ itemId: data.craftedItemId, chestId: destinationChestId });
 
     const stockRows = await prisma.stockHistory.findMany({
@@ -231,7 +244,10 @@ export async function craftItem(
     }
 
     const ingredientChecks = ingredientRequirements.map(({ ingredient, requiredQuantity, sourceChestId }) => {
-      const availableStock = latestStock.get(stockKey(ingredient.usedItemId, sourceChestId!))?.quantity ?? 0;
+      if (!sourceChestId) {
+        throw new Error('Unexpected missing sourceChestId');
+      }
+      const availableStock = latestStock.get(stockKey(ingredient.usedItemId, sourceChestId))?.quantity ?? 0;
       return {
         itemId: ingredient.usedItemId,
         ingredientId: ingredient.id,
@@ -269,7 +285,10 @@ export async function craftItem(
       }
 
       for (const { ingredient, requiredQuantity, sourceChestId } of ingredientRequirements) {
-        const existingIngredientStock = latestStock.get(stockKey(ingredient.usedItemId, sourceChestId!));
+        if (!sourceChestId) {
+          throw new Error('Unexpected missing sourceChestId');
+        }
+        const existingIngredientStock = latestStock.get(stockKey(ingredient.usedItemId, sourceChestId));
         if (existingIngredientStock) {
           await tx.stockHistory.update({
             where: { id: existingIngredientStock.id },
@@ -279,7 +298,7 @@ export async function craftItem(
           await tx.stockHistory.create({
             data: {
               itemId: ingredient.usedItemId,
-              chestId: sourceChestId!,
+              chestId: sourceChestId,
               quantity: -requiredQuantity,
             },
           });

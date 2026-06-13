@@ -1,6 +1,6 @@
 'use client';
 
-import { usePermissions, useTenantRoutes } from '@/app/_contexts/PermissionsContext';
+import { useTenantRoutes, useRequiredDispensarySlug } from '@/app/_contexts/PermissionsContext';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -36,7 +36,7 @@ export default function NewMailPageClient({
   initialTemplateOptions,
 }: NewMailPageClientProps) {
   const routes = useTenantRoutes();
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const router = useRouter();
   const { data: templateOptions = initialTemplateOptions } =
     useUserMailTemplateOptions(initialTemplateOptions);
@@ -97,7 +97,7 @@ export default function NewMailPageClient({
 
     try {
       setLoading(true);
-      const result = await createMail(dispensarySlug!, {
+      const result = await createMail(dispensarySlug, {
         name: values.name,
         receiver: values.receiver,
         content,

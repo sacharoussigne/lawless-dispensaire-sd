@@ -48,7 +48,6 @@ const PRIMARY_SLOT_COUNT = 4;
 
 function isItemVisible(item: EmployeeNavItem, ctx: EmployeeNavContext): boolean {
   const { appSettings, permissions, userRole } = ctx;
-  const { t } = ctx;
 
   switch (item.id) {
     case 'stock':

@@ -69,7 +69,7 @@ export default function SettingsPageClient(props: {
     },
     validate: {
       name: (value) => (value.trim().length < 1 ? 'Le nom est requis' : null),
-      imageUrl: (value, values) => {
+      imageUrl: (value, _values) => {
         if (imageMode !== 'url') return null;
         if (!value) return null;
         try {

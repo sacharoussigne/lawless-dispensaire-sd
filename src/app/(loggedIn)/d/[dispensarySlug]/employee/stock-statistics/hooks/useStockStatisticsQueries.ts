@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
+import { useRequiredDispensarySlug } from '@/app/_contexts/PermissionsContext';
 import { getStockConsumptionStats } from '@/app/_actions/stock/statistics';
 import type { StockConsumptionStatsResult } from '@/app/_actions/stock/statistics';
 import { handleAction } from '@/lib/action';
@@ -19,13 +19,16 @@ async function fetchStockConsumptionStats(
 }
 
 export function useStockConsumptionStats(from: Date | null, to: Date | null) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const fromKey = from ? toDateRangeKey(from) : '';
   const toKey = to ? toDateRangeKey(to) : '';
 
   return useQuery({
-    queryKey: stockKeys.statsConsumption(dispensarySlug!, fromKey, toKey),
-    queryFn: () => fetchStockConsumptionStats(dispensarySlug!, from!, to!),
+    queryKey: stockKeys.statsConsumption(dispensarySlug, fromKey, toKey),
+    queryFn: () => {
+      if (!from || !to) throw new Error('from and to are required');
+      return fetchStockConsumptionStats(dispensarySlug, from, to);
+    },
     enabled: Boolean(dispensarySlug && from && to),
     placeholderData: (previous) => previous,
     staleTime: DEFAULT_STALE_TIME_MS,

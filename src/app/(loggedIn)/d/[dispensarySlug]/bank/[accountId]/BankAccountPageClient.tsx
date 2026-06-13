@@ -1,6 +1,6 @@
 'use client';
 
-import { usePermissions, useTenantRoutes } from '@/app/_contexts/PermissionsContext';
+import { useTenantRoutes, useRequiredDispensarySlug } from '@/app/_contexts/PermissionsContext';
 import { useEffect, useState, useMemo } from 'react';
 import {
   Container,
@@ -104,7 +104,7 @@ export default function BankAccountPageClient({
   initialWeek,
 }: BankAccountPageClientProps) {
   const routes = useTenantRoutes();
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const router = useRouter();
   const [week, setWeek] = useState<SerializedBankAccountWeek>(() => normalizeSerializedWeek(initialWeek));
   const [weeks, setWeeks] = useState<SerializedBankAccountWeek[]>([]);
@@ -143,14 +143,14 @@ export default function BankAccountPageClient({
   const loadSuggestions = async () => {
     try {
       const [nameResult, descResult] = await Promise.all([
-        getNameSuggestions(dispensarySlug!),
-        getDescriptionSuggestions(dispensarySlug!),
+        getNameSuggestions(dispensarySlug),
+        getDescriptionSuggestions(dispensarySlug),
       ]);
       const nameData = handleAction(nameResult);
       const descData = handleAction(descResult);
       if (nameData) setNameSuggestions(nameData);
       if (descData) setDescriptionSuggestions(descData);
-    } catch (error) {
+    } catch (_error) {
       // Error handled by handleAction
     }
   };
@@ -159,7 +159,7 @@ export default function BankAccountPageClient({
     if (!value || value.trim().length === 0) return;
     
     try {
-      const result = await addNameSuggestion(dispensarySlug!,{ value });
+      const result = await addNameSuggestion(dispensarySlug,{ value });
       const data = handleAction(result);
       if (data) {
         setNameSuggestions([...nameSuggestions, data]);
@@ -182,7 +182,7 @@ export default function BankAccountPageClient({
     if (!value || value.trim().length === 0) return;
     
     try {
-      const result = await addDescriptionSuggestion(dispensarySlug!,{ value });
+      const result = await addDescriptionSuggestion(dispensarySlug,{ value });
       const data = handleAction(result);
       if (data) {
         setDescriptionSuggestions([...descriptionSuggestions, data]);
@@ -206,7 +206,7 @@ export default function BankAccountPageClient({
     if (!value || value.trim().length === 0) return;
     
     try {
-      const result = await deleteNameSuggestion(dispensarySlug!,{ value });
+      const result = await deleteNameSuggestion(dispensarySlug,{ value });
       const data = handleAction(result);
       if (data) {
         setNameSuggestions(nameSuggestions.filter(s => s.toLowerCase() !== value.toLowerCase().trim()));
@@ -230,7 +230,7 @@ export default function BankAccountPageClient({
     if (!value || value.trim().length === 0) return;
     
     try {
-      const result = await deleteDescriptionSuggestion(dispensarySlug!,{ value });
+      const result = await deleteDescriptionSuggestion(dispensarySlug,{ value });
       const data = handleAction(result);
       if (data) {
         setDescriptionSuggestions(descriptionSuggestions.filter(s => s.toLowerCase() !== value.toLowerCase().trim()));
@@ -251,12 +251,12 @@ export default function BankAccountPageClient({
 
   const loadWeeks = async () => {
     try {
-      const result = await getAccountWeeks(dispensarySlug!, account.id);
+      const result = await getAccountWeeks(dispensarySlug, account.id);
       const data = handleAction(result);
       if (data) {
         setWeeks(data.map(normalizeSerializedWeek));
       }
-    } catch (error) {
+    } catch (_error) {
       // Error handled by handleAction
     }
   };
@@ -264,7 +264,7 @@ export default function BankAccountPageClient({
   const loadWeek = async (date: Date) => {
     try {
       setLoading(true);
-      const result = await getOrCreateWeek(dispensarySlug!, account.id, date);
+      const result = await getOrCreateWeek(dispensarySlug, account.id, date);
       const data = handleAction(result);
       if (data) {
         const normalized = normalizeSerializedWeek(data);
@@ -411,7 +411,7 @@ export default function BankAccountPageClient({
     try {
       setLoading(true);
       if (transaction.id) {
-        const result = await updateTransaction(dispensarySlug!, {
+        const result = await updateTransaction(dispensarySlug, {
           id: transaction.id,
           date: transaction.date,
           type: transaction.type as any,
@@ -432,7 +432,7 @@ export default function BankAccountPageClient({
           setEditingTransaction(null);
         }
       } else {
-        if (!transaction.date || !transaction.type || !transaction.name) {
+        if (!transaction.date || !transaction.type || !transaction.name || transaction.amount == null) {
           notifications.show({
             title: 'Erreur',
             message: 'Veuillez remplir tous les champs requis',
@@ -441,13 +441,13 @@ export default function BankAccountPageClient({
           return;
         }
 
-        const result = await createTransaction(dispensarySlug!, {
+        const result = await createTransaction(dispensarySlug, {
           weekId: week.id,
           date: transaction.date as Date | string,
           type: transaction.type as any,
-          name: transaction.name!,
+          name: transaction.name,
           description: transaction.description || undefined,
-          amount: transaction.amount!,
+          amount: transaction.amount,
           order: transaction.order || 0,
         });
         const data = handleAction(result);
@@ -477,7 +477,7 @@ export default function BankAccountPageClient({
   const handleDeleteTransaction = async (id: string) => {
     try {
       setLoading(true);
-      const result = await deleteTransaction(dispensarySlug!, { id });
+      const result = await deleteTransaction(dispensarySlug, { id });
       const data = handleAction(result);
       if (data) {
         notifications.show({
@@ -549,7 +549,7 @@ export default function BankAccountPageClient({
       const newOrder = targetTransaction.order;
 
       // Mettre à jour l'ordre de la transaction
-      const result = await updateTransaction(dispensarySlug!, {
+      const result = await updateTransaction(dispensarySlug, {
         id: transactionId,
         order: newOrder,
       });

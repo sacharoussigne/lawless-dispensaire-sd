@@ -1,6 +1,6 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
+import { useRequiredDispensarySlug } from '@/app/_contexts/PermissionsContext';
 import { useState, useMemo } from 'react';
 import {
   Container,
@@ -34,7 +34,7 @@ export default function OverwriteStockPageClient({
   initialDate,
   initialChests,
 }: OverwriteStockPageClientProps) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const chests = initialChests;
   const [selectedDate, setSelectedDate] = useState<string>(initialDate);
   const [selectedChestId, setSelectedChestId] = useState<string | null>(null);
@@ -77,7 +77,7 @@ export default function OverwriteStockPageClient({
       .filter((stock) => stock.quantity !== null && stock.quantity !== undefined);
 
     const chestName = chests.find((c) => c.id === selectedChestId)?.name || 'le coffre sélectionné';
-    const queryKey = overwriteStockKeys.items(dispensarySlug!, selectedDate, selectedChestId);
+    const queryKey = overwriteStockKeys.items(dispensarySlug, selectedDate, selectedChestId);
 
     try {
       await overwriteMutation.mutateAsync({

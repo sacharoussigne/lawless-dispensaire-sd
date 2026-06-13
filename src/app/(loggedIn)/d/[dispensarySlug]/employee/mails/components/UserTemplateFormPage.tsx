@@ -9,7 +9,7 @@ import {
   createUserMailTemplate,
   updateUserMailTemplate,
 } from '@/app/_actions/mailTemplates';
-import { usePermissions, useTenantRoutes } from '@/app/_contexts/PermissionsContext';
+import { useTenantRoutes, useRequiredDispensarySlug } from '@/app/_contexts/PermissionsContext';
 import { handleAction } from '@/lib/action';
 import { handleApiZodError } from '@/lib/services/zod';
 import { ParsedZodError } from '@/lib/errors/ParsedZodError';
@@ -24,7 +24,7 @@ interface UserTemplateFormPageProps {
 
 export function UserTemplateFormPage({ mode, template }: UserTemplateFormPageProps) {
   const routes = useTenantRoutes();
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -75,11 +75,15 @@ export function UserTemplateFormPage({ mode, template }: UserTemplateFormPagePro
 
       const result =
         mode === 'create'
-          ? await createUserMailTemplate(dispensarySlug!, payload)
-          : await updateUserMailTemplate(dispensarySlug!, {
-              id: template!.id,
-              ...payload,
-            });
+          ? await createUserMailTemplate(dispensarySlug, payload)
+          : template
+            ? await updateUserMailTemplate(dispensarySlug, {
+                id: template.id,
+                ...payload,
+              })
+            : null;
+
+      if (!result) return;
 
       handleAction(result);
       notifications.show({
@@ -124,7 +128,7 @@ export function UserTemplateFormPage({ mode, template }: UserTemplateFormPagePro
         <Title order={1}>
           {mode === 'create'
             ? 'Créer un modèle'
-            : `Modifier le modèle "${template!.name}"`}
+            : `Modifier le modèle "${template?.name ?? ''}"`}
         </Title>
 
         <form id="template-form" onSubmit={form.onSubmit(handleSubmit)}>

@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { notifications } from '@mantine/notifications';
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
+import { useRequiredDispensarySlug } from '@/app/_contexts/PermissionsContext';
 import {
   createMailTemplate,
   deleteMailTemplate,
@@ -60,11 +60,11 @@ async function fetchOrderLetterAssignments(dispensarySlug: string) {
 }
 
 export function useManagementMailTemplates(initialData: MailTemplateListItem[]) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return useQuery({
-    queryKey: mailTemplatesKeys.management(dispensarySlug!),
-    queryFn: () => fetchManagementMailTemplates(dispensarySlug!),
+    queryKey: mailTemplatesKeys.management(dispensarySlug),
+    queryFn: () => fetchManagementMailTemplates(dispensarySlug),
     initialData,
     placeholderData: (previous) => previous,
     enabled: Boolean(dispensarySlug),
@@ -73,12 +73,15 @@ export function useManagementMailTemplates(initialData: MailTemplateListItem[]) 
 }
 
 export function useManagementMailTemplateDetail(templateId: string | null, enabled: boolean) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return useQuery({
-    queryKey: mailTemplatesKeys.detail(dispensarySlug!, templateId!),
-    queryFn: () => fetchManagementMailTemplateById(dispensarySlug!, templateId!),
-    enabled: Boolean(dispensarySlug && templateId && enabled),
+    queryKey: mailTemplatesKeys.detail(dispensarySlug, templateId ?? ''),
+    queryFn: () => {
+      if (!templateId) throw new Error('templateId is required');
+      return fetchManagementMailTemplateById(dispensarySlug, templateId);
+    },
+    enabled: Boolean(templateId && enabled),
     staleTime: DEFAULT_STALE_TIME_MS,
   });
 }
@@ -86,11 +89,11 @@ export function useManagementMailTemplateDetail(templateId: string | null, enabl
 export function useOrderLetterTemplateAssignments(
   initialData: OrderLetterTemplateAssignmentWithTemplate[],
 ) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
 
   return useQuery({
-    queryKey: ordersKeys.letterAssignments(dispensarySlug!),
-    queryFn: () => fetchOrderLetterAssignments(dispensarySlug!),
+    queryKey: ordersKeys.letterAssignments(dispensarySlug),
+    queryFn: () => fetchOrderLetterAssignments(dispensarySlug),
     initialData,
     placeholderData: (previous) => previous,
     enabled: Boolean(dispensarySlug),
@@ -100,8 +103,8 @@ export function useOrderLetterTemplateAssignments(
 
 function useManagementMailTemplatesCache() {
   const queryClient = useQueryClient();
-  const { dispensarySlug } = usePermissions();
-  const queryKey = mailTemplatesKeys.management(dispensarySlug!);
+  const dispensarySlug = useRequiredDispensarySlug();
+  const queryKey = mailTemplatesKeys.management(dispensarySlug);
 
   const updateCache = (updater: (templates: MailTemplateListItem[]) => MailTemplateListItem[]) => {
     queryClient.setQueryData<MailTemplateListItem[]>(queryKey, (current) => {
@@ -113,18 +116,18 @@ function useManagementMailTemplatesCache() {
   };
 
   const invalidateManagement = () => {
-    void queryClient.invalidateQueries({ queryKey: mailTemplatesKeys.management(dispensarySlug!) });
+    void queryClient.invalidateQueries({ queryKey: mailTemplatesKeys.management(dispensarySlug) });
   };
 
   const invalidateAssignments = () => {
-    void queryClient.invalidateQueries({ queryKey: ordersKeys.letterAssignments(dispensarySlug!) });
+    void queryClient.invalidateQueries({ queryKey: ordersKeys.letterAssignments(dispensarySlug) });
   };
 
   return { updateCache, invalidateManagement, invalidateAssignments };
 }
 
 export function useCreateMailTemplateMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const { updateCache } = useManagementMailTemplatesCache();
 
   return useMutation({
@@ -134,7 +137,7 @@ export function useCreateMailTemplateMutation() {
       content: string;
       defaultMailName?: string;
     }) => {
-      const result = await createMailTemplate(dispensarySlug!, vars);
+      const result = await createMailTemplate(dispensarySlug, vars);
       return handleAction(result) as MailTemplate;
     },
     onSuccess: (created) => {
@@ -157,7 +160,7 @@ export function useCreateMailTemplateMutation() {
 }
 
 export function useUpdateMailTemplateMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const { updateCache } = useManagementMailTemplatesCache();
 
   return useMutation({
@@ -168,7 +171,7 @@ export function useUpdateMailTemplateMutation() {
       content: string;
       defaultMailName?: string;
     }) => {
-      const result = await updateMailTemplate(dispensarySlug!, vars);
+      const result = await updateMailTemplate(dispensarySlug, vars);
       return handleAction(result) as MailTemplate;
     },
     onSuccess: (updated) => {
@@ -194,12 +197,12 @@ export function useUpdateMailTemplateMutation() {
 }
 
 export function useDeleteMailTemplateMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const { updateCache } = useManagementMailTemplatesCache();
 
   return useMutation({
     mutationFn: async (vars: { id: string }) => {
-      const result = await deleteMailTemplate(dispensarySlug!, vars);
+      const result = await deleteMailTemplate(dispensarySlug, vars);
       handleAction(result);
       return vars.id;
     },
@@ -222,7 +225,7 @@ export function useDeleteMailTemplateMutation() {
 }
 
 export function useCreateOrderLetterAssignmentMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const { invalidateAssignments } = useManagementMailTemplatesCache();
 
   return useMutation({
@@ -231,7 +234,7 @@ export function useCreateOrderLetterAssignmentMutation() {
       orderStatus: OrderStatus;
       mailTemplateId: string;
     }) => {
-      const result = await createOrderLetterTemplateAssignment(dispensarySlug!, vars);
+      const result = await createOrderLetterTemplateAssignment(dispensarySlug, vars);
       return handleAction(result) as OrderLetterTemplateAssignmentWithTemplate;
     },
     onSuccess: () => {
@@ -253,12 +256,12 @@ export function useCreateOrderLetterAssignmentMutation() {
 }
 
 export function useUpdateOrderLetterAssignmentMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const { invalidateAssignments } = useManagementMailTemplatesCache();
 
   return useMutation({
     mutationFn: async (vars: { id: string; mailTemplateId: string }) => {
-      const result = await updateOrderLetterTemplateAssignment(dispensarySlug!, vars);
+      const result = await updateOrderLetterTemplateAssignment(dispensarySlug, vars);
       return handleAction(result) as OrderLetterTemplateAssignmentWithTemplate;
     },
     onSuccess: () => {
@@ -280,12 +283,12 @@ export function useUpdateOrderLetterAssignmentMutation() {
 }
 
 export function useDeleteOrderLetterAssignmentMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const { invalidateAssignments } = useManagementMailTemplatesCache();
 
   return useMutation({
     mutationFn: async (vars: { id: string }) => {
-      const result = await deleteOrderLetterTemplateAssignment(dispensarySlug!, vars);
+      const result = await deleteOrderLetterTemplateAssignment(dispensarySlug, vars);
       handleAction(result);
       return vars.id;
     },

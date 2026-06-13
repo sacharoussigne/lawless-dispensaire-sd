@@ -1,7 +1,7 @@
 'use client';
 
 import { useQueries } from '@tanstack/react-query';
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
+import { useRequiredDispensarySlug } from '@/app/_contexts/PermissionsContext';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Modal,
@@ -68,7 +68,7 @@ export default function CraftModal({
   initialChestId = null,
   chests = [],
 }: CraftModalProps) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const [selectedCraftItem, setSelectedCraftItem] = useState<string | null>(null);
   const [craftQuantity, setCraftQuantity] = useState<number>(1);
   const [selectedRecipe, setSelectedRecipe] = useState<string | null>(null);
@@ -96,8 +96,8 @@ export default function CraftModal({
     queries: trackedChestIds
       .filter((id) => id !== sourceChestId)
       .map((chestId) => ({
-        queryKey: stockKeys.items(dispensarySlug!, chestId),
-        queryFn: () => fetchStockItemsForChest(dispensarySlug!, chestId),
+        queryKey: stockKeys.items(dispensarySlug, chestId),
+        queryFn: () => fetchStockItemsForChest(dispensarySlug, chestId),
         enabled: opened && Boolean(dispensarySlug && chestId),
         staleTime: DEFAULT_STALE_TIME_MS,
       })),
@@ -161,7 +161,7 @@ export default function CraftModal({
   const loadRecipesForItem = useCallback(async (itemId: string) => {
     setLoadingRecipes(true);
     try {
-      const result = await getCraftRecipesByItemId(dispensarySlug!, itemId, true);
+      const result = await getCraftRecipesByItemId(dispensarySlug, itemId, true);
       const data = handleAction(result);
       return (data ?? []) as CraftRecipeWithIngredients[];
     } finally {
@@ -415,15 +415,6 @@ export default function CraftModal({
     const missing = Math.max(0, requiredQuantity - available);
     const yieldPerCraft = Math.max(1, recipe.quantity);
     const timesNeeded = Math.max(1, Math.ceil(missing / yieldPerCraft));
-
-    const nextCtx: CraftContextV1 = {
-      craftedItemId: ingredientItemId,
-      recipeId: recipe.id,
-      times: timesNeeded,
-      sourceChestId,
-      destinationChestId,
-      ingredientChests: {},
-    };
 
     const currentCtx = getCurrentContext();
     const nextStack = pushCraftNavStack(currentCtx);

@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
+import { useRequiredDispensarySlug } from '@/app/_contexts/PermissionsContext';
 import { getItemsWithStockForDate, overwriteStockForDate } from '@/app/_actions/stock';
 import { handleAction } from '@/lib/action';
 import { DEFAULT_STALE_TIME_MS } from '@/lib/react-query/QueryProvider';
@@ -21,16 +21,16 @@ export function useOverwriteStockItems(
   initialItems: ItemWithStock[],
   initialDate: string,
 ) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const isInitial =
     selectedDate === initialDate &&
     selectedChestId === null;
 
   return useQuery({
-    queryKey: overwriteStockKeys.items(dispensarySlug!, selectedDate, selectedChestId),
+    queryKey: overwriteStockKeys.items(dispensarySlug, selectedDate, selectedChestId),
     queryFn: async () => {
       const date = dayjs(selectedDate).toDate();
-      const result = await getItemsWithStockForDate(dispensarySlug!, date, selectedChestId);
+      const result = await getItemsWithStockForDate(dispensarySlug, date, selectedChestId);
       return handleAction(result) as ItemWithStock[];
     },
     initialData: isInitial ? initialItems : undefined,
@@ -40,7 +40,7 @@ export function useOverwriteStockItems(
 }
 
 export function useOverwriteStockMutation() {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -51,7 +51,7 @@ export function useOverwriteStockMutation() {
       chestName: string;
       queryKey: readonly unknown[];
     }) => {
-      const result = await overwriteStockForDate(dispensarySlug!, {
+      const result = await overwriteStockForDate(dispensarySlug, {
         date: dayjs(vars.date).toDate(),
         stocks: vars.stocks,
         chestId: vars.chestId,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { payrollReportResultSchema, type PayrollReportResult } from '@/lib/payroll/schema';
 import { recalculatePayrollResult } from '@/lib/payroll/recalculatePayrollResult';
 import type { PayrollDay } from './payrollDetailUtils';
@@ -13,7 +13,7 @@ export function usePayrollReportDraft(report: {
   const [draft, setDraft] = useState<PayrollReportResult | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [pricingSectionOpen, setPricingSectionOpen] = useState(false);
-  const baselineJson = useRef('');
+  const [baselineSnapshot, setBaselineSnapshot] = useState('');
 
   const resultFingerprint = JSON.stringify(report.resultJson ?? null);
 
@@ -21,15 +21,17 @@ export function usePayrollReportDraft(report: {
     setIsEditing(false);
     if (report.errorMessage) {
       setDraft(null);
+      setBaselineSnapshot('');
       return;
     }
     const p = payrollReportResultSchema.safeParse(report.resultJson);
     if (p.success) {
       const r = recalculatePayrollResult(p.data);
       setDraft(r);
-      baselineJson.current = JSON.stringify(r);
+      setBaselineSnapshot(JSON.stringify(r));
     } else {
       setDraft(null);
+      setBaselineSnapshot('');
     }
   }, [report.errorMessage, report.id, resultFingerprint, report.resultJson]);
 
@@ -39,7 +41,7 @@ export function usePayrollReportDraft(report: {
     }
   }, [isEditing]);
 
-  const isDirty = draft != null && JSON.stringify(draft) !== baselineJson.current;
+  const isDirty = draft != null && JSON.stringify(draft) !== baselineSnapshot;
 
   const updateSchedule = useCallback(
     (empIndex: number, day: PayrollDay, field: 'caisse' | 'presence', raw: string | null) => {
@@ -143,10 +145,9 @@ export function usePayrollReportDraft(report: {
   }, []);
 
   const handleCancelEdit = useCallback(() => {
-    const raw = baselineJson.current;
-    if (raw) {
+    if (baselineSnapshot) {
       try {
-        const p = payrollReportResultSchema.safeParse(JSON.parse(raw) as unknown);
+        const p = payrollReportResultSchema.safeParse(JSON.parse(baselineSnapshot) as unknown);
         if (p.success) {
           setDraft(recalculatePayrollResult(p.data));
         }
@@ -155,11 +156,11 @@ export function usePayrollReportDraft(report: {
       }
     }
     setIsEditing(false);
-  }, []);
+  }, [baselineSnapshot]);
 
   const markSaved = useCallback(() => {
     if (draft) {
-      baselineJson.current = JSON.stringify(draft);
+      setBaselineSnapshot(JSON.stringify(draft));
     }
     setIsEditing(false);
   }, [draft]);

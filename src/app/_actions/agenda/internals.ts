@@ -3,7 +3,6 @@ import {
   requireAgendaRead,
   requireAgendaWrite,
   requireAgendaOwner,
-  resolveAgendaAccess,
 } from '@/lib/agenda/access';
 import prisma from '@/lib/prisma';
 import { isPlatformAdmin } from '@/lib/dispensary/platformAdmin';

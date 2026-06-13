@@ -1,6 +1,6 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
+import { useRequiredDispensarySlug } from '@/app/_contexts/PermissionsContext';
 import { useState, useEffect } from 'react';
 import {
   Container,
@@ -54,7 +54,7 @@ interface SearchItemsPageClientProps {
 export default function SearchItemsPageClient({
   initialItems,
 }: SearchItemsPageClientProps) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [itemsWithStock, setItemsWithStock] = useState<ItemWithDetailedStock[]>([]);
   const [loading, setLoading] = useState(false);
@@ -72,7 +72,7 @@ export default function SearchItemsPageClient({
 
     try {
       setLoading(true);
-      const result = await getItemsWithDetailedStock(dispensarySlug!, selectedItemIds);
+      const result = await getItemsWithDetailedStock(dispensarySlug, selectedItemIds);
       const data = handleAction(result);
       if (data) {
         setItemsWithStock(data);
