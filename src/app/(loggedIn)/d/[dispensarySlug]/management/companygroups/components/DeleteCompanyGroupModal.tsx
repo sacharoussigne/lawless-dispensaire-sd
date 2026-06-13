@@ -1,79 +1,64 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
-import { Modal, Stack, Button, Group, Text } from '@mantine/core';
-import { notifications } from '@mantine/notifications';
-import { deleteCompanyGroup } from '@/app/_actions/companyGroups';
-import { handleAction } from '@/lib/action';
+import { Button, Text } from '@mantine/core';
 import type { CompanyGroupWithRelations } from '@/types/companyGroups';
+import { AppModal, AppModalFooter } from '@/app/_components/AppModal/AppModal';
+import type { useDeleteCompanyGroupMutation } from '../hooks/useCompanyGroupsQueries';
 
 interface DeleteCompanyGroupModalProps {
   opened: boolean;
   onClose: () => void;
   companyGroupToDelete: CompanyGroupWithRelations | null;
-  onSuccess: () => void;
+  deleteMutation: ReturnType<typeof useDeleteCompanyGroupMutation>;
 }
 
 export function DeleteCompanyGroupModal({
   opened,
   onClose,
   companyGroupToDelete,
-  onSuccess,
+  deleteMutation,
 }: DeleteCompanyGroupModalProps) {
-  const { dispensarySlug } = usePermissions();
   const handleDelete = async () => {
     if (!companyGroupToDelete) return;
 
     try {
-      const result = await deleteCompanyGroup(dispensarySlug!, { id: companyGroupToDelete.id });
-      handleAction(result);
-      notifications.show({
-        title: 'Succès',
-        message: 'Groupe d\'entreprises supprimé avec succès',
-        color: 'green',
-      });
+      await deleteMutation.mutateAsync({ id: companyGroupToDelete.id });
       onClose();
-      onSuccess();
-    } catch (error: any) {
-      notifications.show({
-        title: 'Erreur',
-        message: error.message || 'Erreur lors de la suppression',
-        color: 'red',
-      });
+    } catch {
+      // Error notification handled by mutation
     }
   };
 
+  const itemCount = companyGroupToDelete?._count.items ?? 0;
+  const companyCount = companyGroupToDelete?.companies.length ?? 0;
+
   return (
-    <Modal
+    <AppModal
       opened={opened}
       onClose={onClose}
       title="Confirmer la suppression"
       size="md"
-    >
-      <Stack>
-        <Text>
-          Êtes-vous sûr de vouloir supprimer le groupe d'entreprises{' '}
-          <strong>{companyGroupToDelete?.name}</strong> ?
-          {companyGroupToDelete &&
-            (companyGroupToDelete.items.length > 0 ||
-              companyGroupToDelete.companies.length > 0) && (
-              <Text c="red" size="sm" mt="xs">
-                Attention : Ce groupe d'entreprises contient{' '}
-                {companyGroupToDelete.items.length} item(s) et{' '}
-                {companyGroupToDelete.companies.length} entreprise(s).
-              </Text>
-            )}
-        </Text>
-        <Group justify="flex-end" mt="md">
-          <Button variant="subtle" onClick={onClose}>
+      footer={
+        <AppModalFooter>
+          <Button variant="subtle" color="slate" onClick={onClose}>
             Annuler
           </Button>
-          <Button color="red" onClick={handleDelete}>
+          <Button color="danger" onClick={handleDelete} loading={deleteMutation.isPending}>
             Supprimer
           </Button>
-        </Group>
-      </Stack>
-    </Modal>
+        </AppModalFooter>
+      }
+    >
+      <Text>
+        Êtes-vous sûr de vouloir supprimer le groupe d&apos;entreprises{' '}
+        <strong>{companyGroupToDelete?.name}</strong> ?
+        {(itemCount > 0 || companyCount > 0) && (
+          <Text c="danger" size="sm" mt="xs">
+            Attention : Ce groupe d&apos;entreprises contient {itemCount} objet(s) et{' '}
+            {companyCount} entreprise(s).
+          </Text>
+        )}
+      </Text>
+    </AppModal>
   );
 }
-

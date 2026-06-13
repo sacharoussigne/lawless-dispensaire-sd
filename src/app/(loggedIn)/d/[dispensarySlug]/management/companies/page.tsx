@@ -1,17 +1,25 @@
 import { getCompanies } from '@/app/_actions/companies';
+import { getCompanyGroupsForSelect } from '@/app/_actions/companyGroups';
 import CompaniesPageClient from './CompaniesPageClient';
 import { SuspenseLoader } from '@/app/_components/SuspenseLoader/SuspenseLoader';
 import { getDataOrThrow } from '@/lib/response';
 
 async function CompaniesContent({ dispensarySlug }: { dispensarySlug: string }) {
-  const companiesResult = await getCompanies(dispensarySlug);
+  const [companiesResult, companyGroupsResult] = await Promise.all([
+    getCompanies(dispensarySlug),
+    getCompanyGroupsForSelect(dispensarySlug),
+  ]);
 
-  // Lance une erreur si une des réponses est une erreur (sera capturée par error.tsx)
   const companies = getDataOrThrow(companiesResult, 'Erreur lors du chargement des entreprises');
+  const companyGroups = getDataOrThrow(
+    companyGroupsResult,
+    'Erreur lors du chargement des groupes d\'entreprises',
+  );
 
   return (
     <CompaniesPageClient
       initialCompanies={companies}
+      initialCompanyGroups={companyGroups}
     />
   );
 }

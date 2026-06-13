@@ -19,12 +19,12 @@ import {
 } from '@mantine/core';
 import { IconTrash, IconAlertTriangle } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
-import { getCompanyGroups } from '@/app/_actions/companyGroups';
 import {
   useActiveOrdersForGroup,
   useCreateOrderMutation,
   useOrderFormItems,
 } from '../hooks/useOrdersQueries';
+import { useCompanyGroupsForOrders } from '@/app/(loggedIn)/d/[dispensarySlug]/management/companygroups/hooks/useCompanyGroupsQueries';
 import { getAvailableItemsForOrder } from '@/lib/orders/getAvailableItemsForOrder';
 import type { ActiveOrderSummary } from '@/types/orders';
 import {
@@ -43,6 +43,12 @@ import type { ItemWithRelations } from '@/types/stock';
 import { OrderTypeEnum } from '@/types/enum/orderType';
 import { orderTypeSelectOptions } from '@/lib/orders/orderSelectOptions';
 
+function orderClientLabel(order: ActiveOrderSummary): string {
+  return order.individualCustomer?.name ?? order.company?.name ?? '—';
+}
+
+type ClientMode = 'company' | 'individual';
+
 interface CreateOrderModalProps {
   opened: boolean;
   onClose: () => void;
@@ -56,18 +62,6 @@ interface CreateOrderLineItem {
   quantity: number;
   item: ItemWithRelations;
 }
-
-interface CompanyGroupWithCompanies {
-  id: string;
-  name: string;
-  companies: Array<{ companyId: string; company: { id: string; name: string } }>;
-}
-
-function orderClientLabel(order: ActiveOrderSummary): string {
-  return order.individualCustomer?.name ?? order.company?.name ?? '—';
-}
-
-type ClientMode = 'company' | 'individual';
 
 const EMPTY_ITEMS: ItemWithRelations[] = [];
 const EMPTY_ACTIVE_ORDERS: ActiveOrderSummary[] = [];
@@ -83,7 +77,8 @@ export default function CreateOrderModal({
   const { dispensarySlug } = usePermissions();
   const createOrderMutation = useCreateOrderMutation();
   const { data: fetchedItems } = useOrderFormItems(null, opened && items.length === 0);
-  const [allCompanyGroups, setAllCompanyGroups] = useState<CompanyGroupWithCompanies[]>([]);
+  const { data: allCompanyGroups = [], isFetching: loadingCompanyGroups } =
+    useCompanyGroupsForOrders(opened);
   const [selectedCompanyGroupId, setSelectedCompanyGroupId] = useState<string | null>(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   const [orderType, setOrderType] = useState<OrderTypeEnum>(OrderTypeEnum.INCOMING);
@@ -104,48 +99,32 @@ export default function CreateOrderModal({
   );
   const [individualCustomerInput, setIndividualCustomerInput] = useState('');
 
-  // Charger les groupes d'entreprises et les entreprises
+  // Load individual customers when modal opens
   useEffect(() => {
-    if (opened) {
-      loadData();
-    }
-  }, [opened]);
+    if (!opened) return;
 
-  const loadData = async () => {
-    try {
-      setLoadingData(true);
-      const [groupsResult, individualsResult] = await Promise.all([
-        getCompanyGroups(dispensarySlug!, ),
-        getIndividualCustomers(dispensarySlug!),
-      ]);
-
-      const groupsData = handleAction(groupsResult);
-
-      if (groupsData) {
-        // Stocker tous les groupes (sans filtrage)
-        setAllCompanyGroups(
-          groupsData.map((g) => ({
-            id: g.id,
-            name: g.name,
-            companies: g.companies || [],
-          }))
-        );
+    const loadIndividualCustomers = async () => {
+      try {
+        setLoadingData(true);
+        const individualsResult = await getIndividualCustomers(dispensarySlug!);
+        const individualsData = handleAction(individualsResult);
+        if (individualsData) {
+          setIndividualCustomers(individualsData);
+        }
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Erreur lors du chargement des données';
+        notifications.show({
+          title: 'Erreur',
+          message,
+          color: 'danger',
+        });
+      } finally {
+        setLoadingData(false);
       }
+    };
 
-      const individualsData = handleAction(individualsResult);
-      if (individualsData) {
-        setIndividualCustomers(individualsData);
-      }
-    } catch (error: any) {
-      notifications.show({
-        title: 'Erreur',
-        message: error.message || 'Erreur lors du chargement des données',
-        color: 'danger',
-      });
-    } finally {
-      setLoadingData(false);
-    }
-  };
+    void loadIndividualCustomers();
+  }, [opened, dispensarySlug]);
 
   const itemsToUse = useMemo(() => {
     if (items.length > 0) {
@@ -573,7 +552,7 @@ export default function CreateOrderModal({
               onChange={(value) => setSelectedCompanyGroupId(value)}
               required
               searchable
-              disabled={loadingData}
+              disabled={loadingData || loadingCompanyGroups}
             />
 
             <Select
@@ -593,7 +572,7 @@ export default function CreateOrderModal({
               onChange={(value) => setSelectedCompanyId(value)}
               required
               searchable
-              disabled={loadingData || !selectedCompanyGroupId}
+              disabled={loadingData || loadingCompanyGroups || !selectedCompanyGroupId}
             />
           </Group>
         )}

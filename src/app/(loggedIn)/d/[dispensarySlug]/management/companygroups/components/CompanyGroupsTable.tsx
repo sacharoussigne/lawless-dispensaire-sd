@@ -3,6 +3,7 @@
 import { Paper, TextInput, Group, ActionIcon, Badge, Text } from '@mantine/core';
 import { DataTable } from 'mantine-datatable';
 import { IconEdit, IconTrash } from '@tabler/icons-react';
+import { apothecaryBooleanPills } from '@/lib/apothecaryPill';
 import type { CompanyGroupWithRelations } from '@/types/companyGroups';
 
 interface CompanyGroupsTableProps {
@@ -66,10 +67,10 @@ export function CompanyGroupsTable({
             ),
           },
           {
-            accessor: 'items.length',
+            accessor: '_count.items',
             title: "Nombre d'items",
             render: (companyGroup: CompanyGroupWithRelations) =>
-              companyGroup.items.length,
+              companyGroup._count.items,
           },
           {
             accessor: 'companies',
@@ -85,7 +86,13 @@ export function CompanyGroupsTable({
                     const company = companyRelation.company;
                     if (!company) return null;
                     return (
-                      <Badge key={companyRelation.id} variant="light" size="sm">
+                      <Badge
+                        key={companyRelation.id}
+                        variant="outline"
+                        radius="sm"
+                        size="sm"
+                        style={apothecaryBooleanPills.commerce}
+                      >
                         {company.name}
                       </Badge>
                     );

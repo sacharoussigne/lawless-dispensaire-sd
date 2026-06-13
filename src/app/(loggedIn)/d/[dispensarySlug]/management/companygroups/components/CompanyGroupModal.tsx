@@ -1,30 +1,25 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
 import { useEffect } from 'react';
-import {
-  Modal,
-  Stack,
-  TextInput,
-  Textarea,
-  MultiSelect,
-  Button,
-  Group,
-} from '@mantine/core';
+import { Stack, TextInput, Textarea, MultiSelect, Button } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { notifications } from '@mantine/notifications';
-import { createCompanyGroup, updateCompanyGroup } from '@/app/_actions/companyGroups';
-import { handleAction } from '@/lib/action';
 import { handleApiZodError } from '@/lib/services/zod';
 import { ParsedZodError } from '@/lib/errors/ParsedZodError';
-import type { CompanyGroupWithRelations, CompanyWithRelations } from '@/types/companyGroups';
+import type { CompanyGroupWithRelations } from '@/types/companyGroups';
+import type { CompanySelect } from '@/types/companies';
+import { AppModal, AppModalFooter } from '@/app/_components/AppModal/AppModal';
+import type {
+  useCreateCompanyGroupMutation,
+  useUpdateCompanyGroupMutation,
+} from '../hooks/useCompanyGroupsQueries';
 
 interface CompanyGroupModalProps {
   opened: boolean;
   onClose: () => void;
   editingCompanyGroup: CompanyGroupWithRelations | null;
-  companies: CompanyWithRelations[];
-  onSuccess: () => void;
+  companies: CompanySelect[];
+  createMutation: ReturnType<typeof useCreateCompanyGroupMutation>;
+  updateMutation: ReturnType<typeof useUpdateCompanyGroupMutation>;
 }
 
 export function CompanyGroupModal({
@@ -32,9 +27,9 @@ export function CompanyGroupModal({
   onClose,
   editingCompanyGroup,
   companies,
-  onSuccess,
+  createMutation,
+  updateMutation,
 }: CompanyGroupModalProps) {
-  const { dispensarySlug } = usePermissions();
   const form = useForm({
     initialValues: {
       name: '',
@@ -46,70 +41,55 @@ export function CompanyGroupModal({
     },
   });
 
-  // Initialiser le formulaire quand le groupe change
   useEffect(() => {
     if (editingCompanyGroup) {
       form.setValues({
         name: editingCompanyGroup.name,
         description: editingCompanyGroup.description || '',
-        companyIds: editingCompanyGroup.companies.map((c) => c.companyId || c.id),
+        companyIds: editingCompanyGroup.companies.map(
+          (c) => c.companyId ?? c.company.id,
+        ),
       });
     } else {
       form.reset();
     }
   }, [editingCompanyGroup, opened]);
 
+  const isPending = createMutation.isPending || updateMutation.isPending;
+  const formId = 'company-group-modal-form';
+
   const handleSubmit = async (values: typeof form.values) => {
     try {
-      let result;
+      const payload = {
+        name: values.name,
+        description: values.description || undefined,
+        companyIds: values.companyIds.length > 0 ? values.companyIds : undefined,
+      };
+
       if (editingCompanyGroup) {
-        result = await updateCompanyGroup(dispensarySlug!, {
+        await updateMutation.mutateAsync({
           id: editingCompanyGroup.id,
-          name: values.name,
-          description: values.description || undefined,
-          companyIds: values.companyIds.length > 0 ? values.companyIds : undefined,
+          ...payload,
         });
       } else {
-        result = await createCompanyGroup(dispensarySlug!, {
-          name: values.name,
-          description: values.description || undefined,
-          companyIds: values.companyIds.length > 0 ? values.companyIds : undefined,
-        });
+        await createMutation.mutateAsync(payload);
       }
-
-      handleAction(result);
-      notifications.show({
-        title: 'Succès',
-        message: editingCompanyGroup
-          ? 'Groupe d\'entreprises modifié avec succès'
-          : 'Groupe d\'entreprises créé avec succès',
-        color: 'green',
-      });
       onClose();
       form.reset();
-      onSuccess();
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof ParsedZodError) {
         handleApiZodError(error.error, form);
-      } else {
-        notifications.show({
-          title: 'Erreur',
-          message: error.message || 'Erreur lors de la sauvegarde',
-          color: 'red',
-        });
       }
     }
   };
 
-  const companyOptions = [...companies]
-    .sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }))
-    .map((company) => ({
-      value: company.id,
-      label: company.name,
-    }));
+  const companyOptions = companies.map((company) => ({
+    value: company.id,
+    label: company.name,
+  }));
 
   return (
-    <Modal
+    <AppModal
       opened={opened}
       onClose={() => {
         onClose();
@@ -117,8 +97,25 @@ export function CompanyGroupModal({
       }}
       title={editingCompanyGroup ? 'Modifier le groupe d\'entreprises' : 'Créer un groupe d\'entreprises'}
       size="md"
+      footer={
+        <AppModalFooter>
+          <Button
+            variant="subtle"
+            color="slate"
+            onClick={() => {
+              onClose();
+              form.reset();
+            }}
+          >
+            Annuler
+          </Button>
+          <Button type="submit" form={formId} loading={isPending}>
+            {editingCompanyGroup ? 'Modifier' : 'Créer'}
+          </Button>
+        </AppModalFooter>
+      }
     >
-      <form onSubmit={form.onSubmit(handleSubmit)}>
+      <form id={formId} onSubmit={form.onSubmit(handleSubmit)}>
         <Stack>
           <TextInput
             label="Nom"
@@ -146,23 +143,8 @@ export function CompanyGroupModal({
             searchable
             clearable
           />
-          <Group justify="flex-end" mt="md">
-            <Button
-              variant="subtle"
-              onClick={() => {
-                onClose();
-                form.reset();
-              }}
-            >
-              Annuler
-            </Button>
-            <Button type="submit">
-              {editingCompanyGroup ? 'Modifier' : 'Créer'}
-            </Button>
-          </Group>
         </Stack>
       </form>
-    </Modal>
+    </AppModal>
   );
 }
-
