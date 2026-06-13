@@ -204,12 +204,15 @@ export async function deleteChest(
       };
     }
 
-    const targetChest = await prisma.chest.findFirst({
+    const chests = await prisma.chest.findMany({
       where: {
-        id: validatedData.targetChestId,
+        id: { in: [validatedData.id, validatedData.targetChestId] },
         ...tenantWhere(dispensaryId),
       },
     });
+
+    const chestToDelete = chests.find((c) => c.id === validatedData.id);
+    const targetChest = chests.find((c) => c.id === validatedData.targetChestId);
 
     if (!targetChest) {
       return {
@@ -217,13 +220,6 @@ export async function deleteChest(
         error: 'Le coffre de destination n\'existe pas.',
       };
     }
-
-    const chestToDelete = await prisma.chest.findFirst({
-      where: {
-        id: validatedData.id,
-        ...tenantWhere(dispensaryId),
-      },
-    });
 
     if (!chestToDelete) {
       return {
@@ -271,7 +267,7 @@ export async function reorderChests(
 
     const validatedData = reorderChestsSchema.parse(data);
 
-    await Promise.all(
+    await prisma.$transaction(
       validatedData.items.map(({ id, order }) =>
         prisma.chest.update({
           where: { id, ...tenantWhere(dispensaryId) },

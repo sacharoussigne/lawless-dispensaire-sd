@@ -4,11 +4,11 @@ import { Group, Text } from '@mantine/core';
 import { IconGripVertical } from '@tabler/icons-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { ChestWithStockHistory } from '@/types/chests';
+import type { Chest } from '@prisma/client';
 import { sortableRowGripStyle, sortableRowStyles } from '@/lib/sortableRowStyles';
 
 interface SortableChestRowProps {
-  chest: ChestWithStockHistory;
+  chest: Pick<Chest, 'id' | 'name'>;
 }
 
 export function SortableChestRow({ chest }: SortableChestRowProps) {
