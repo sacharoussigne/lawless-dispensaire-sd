@@ -1,7 +1,6 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import {
   Stack,
   TextInput,
@@ -15,22 +14,29 @@ import {
   SimpleGrid,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { notifications } from '@mantine/notifications';
-import { createItem, updateItem } from '@/app/_actions/items';
-import { handleAction } from '@/lib/action';
 import { handleApiZodError } from '@/lib/services/zod';
 import { ParsedZodError } from '@/lib/errors/ParsedZodError';
-import type { ItemWithRelations, CategoryItem, CompanyGroup } from '@/types/items';
+import type { ItemWithRelations, CompanyGroupSelect } from '@/types/items';
+import type { CategoryItemWithCount } from '@/types/categoryItems';
 import { AppModal, AppModalFooter } from '@/app/_components/AppModal/AppModal';
 import { FormSection } from '@/app/_components/AppModal/FormSection';
+import {
+  toCategorySelectOptions,
+  toCompanyGroupSelectOptions,
+} from '@/lib/items/selectOptions';
+import type {
+  useCreateItemMutation,
+  useUpdateItemMutation,
+} from '../hooks/useItemsQueries';
 
 interface ItemModalProps {
   opened: boolean;
   onClose: () => void;
   editingItem: ItemWithRelations | null;
-  categoryItems: CategoryItem[];
-  companyGroups: CompanyGroup[];
-  onSuccess: () => void;
+  categoryItems: CategoryItemWithCount[];
+  companyGroups: CompanyGroupSelect[];
+  createMutation: ReturnType<typeof useCreateItemMutation>;
+  updateMutation: ReturnType<typeof useUpdateItemMutation>;
 }
 
 export function ItemModal({
@@ -39,9 +45,9 @@ export function ItemModal({
   editingItem,
   categoryItems,
   companyGroups,
-  onSuccess,
+  createMutation,
+  updateMutation,
 }: ItemModalProps) {
-  const { dispensarySlug } = usePermissions();
   const form = useForm({
     initialValues: {
       name: '',
@@ -73,7 +79,7 @@ export function ItemModal({
     if (form.values.isCraftable && form.values.companyGroupId) {
       form.setFieldValue('companyGroupId', '');
     }
-  }, [form.values.isCraftable]);
+  }, [form.values.isCraftable, form.values.companyGroupId]);
 
   useEffect(() => {
     if (editingItem) {
@@ -94,6 +100,16 @@ export function ItemModal({
     }
   }, [editingItem, opened]);
 
+  const categoryOptions = useMemo(
+    () => toCategorySelectOptions(categoryItems),
+    [categoryItems],
+  );
+
+  const companyGroupOptions = useMemo(
+    () => toCompanyGroupSelectOptions(companyGroups),
+    [companyGroups],
+  );
+
   const handleClose = () => {
     onClose();
     form.reset();
@@ -108,78 +124,34 @@ export function ItemModal({
       const priceToSave =
         values.price !== null && values.price !== undefined ? values.price : null;
 
-      const result = editingItem
-        ? await updateItem(dispensarySlug!, {
-            id: editingItem.id,
-            name: values.name,
-            description: values.description || undefined,
-            minimalQuantity: values.minimalQuantity,
-            isCraftable: values.isCraftable,
-            isEnabled: values.isEnabled,
-            canBeSold: values.canBeSold,
-            price: priceToSave,
-            weight: values.weight,
-            categoryId: values.categoryId,
-            companyGroupId,
-          })
-        : await createItem(dispensarySlug!, {
-            name: values.name,
-            description: values.description || undefined,
-            minimalQuantity: values.minimalQuantity,
-            isCraftable: values.isCraftable,
-            isEnabled: values.isEnabled,
-            canBeSold: values.canBeSold,
-            price: priceToSave,
-            weight: values.weight,
-            categoryId: values.categoryId,
-            companyGroupId,
-          });
+      const payload = {
+        name: values.name,
+        description: values.description || undefined,
+        minimalQuantity: values.minimalQuantity,
+        isCraftable: values.isCraftable,
+        isEnabled: values.isEnabled,
+        canBeSold: values.canBeSold,
+        price: priceToSave,
+        weight: values.weight,
+        categoryId: values.categoryId,
+        companyGroupId,
+      };
 
-      handleAction(result);
-      notifications.show({
-        title: 'Succès',
-        message: editingItem
-          ? 'Objet modifié avec succès'
-          : 'Objet créé avec succès',
-        color: 'green',
-      });
+      if (editingItem) {
+        await updateMutation.mutateAsync({ id: editingItem.id, ...payload });
+      } else {
+        await createMutation.mutateAsync(payload);
+      }
+
       handleClose();
-      onSuccess();
     } catch (error: unknown) {
-      console.error(error);
       if (error instanceof ParsedZodError) {
         handleApiZodError(error.error, form);
-      } else {
-        notifications.show({
-          title: 'Erreur',
-          message:
-            error instanceof Error ? error.message : 'Erreur lors de la sauvegarde',
-          color: 'red',
-        });
       }
     }
   };
 
-  const categoryOptions = [...categoryItems]
-    .sort((a, b) => {
-      if (a.order !== undefined && b.order !== undefined) {
-        return a.order - b.order;
-      }
-      if (a.order !== undefined) return -1;
-      if (b.order !== undefined) return 1;
-      return a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' });
-    })
-    .map((category) => ({
-      value: category.id,
-      label: category.name,
-    }));
-
-  const companyGroupOptions = [...companyGroups]
-    .sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }))
-    .map((group) => ({
-      value: group.id,
-      label: group.name,
-    }));
+  const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
     <AppModal
@@ -189,10 +161,10 @@ export function ItemModal({
       size="lg"
       footer={
         <AppModalFooter>
-          <Button variant="subtle" onClick={handleClose}>
+          <Button variant="subtle" color="slate" onClick={handleClose}>
             Annuler
           </Button>
-          <Button type="submit" form="item-modal-form">
+          <Button type="submit" form="item-modal-form" loading={isPending}>
             {editingItem ? 'Modifier' : 'Créer'}
           </Button>
         </AppModalFooter>

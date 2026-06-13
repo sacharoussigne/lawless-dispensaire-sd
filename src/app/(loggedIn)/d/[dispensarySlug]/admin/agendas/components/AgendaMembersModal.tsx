@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActionIcon,
   Button,
@@ -8,11 +8,11 @@ import {
   Select,
   Stack,
   Text,
-  TextInput,
 } from '@mantine/core';
 import { IconTrash, IconUsers } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { AppModal, AppModalFooter } from '@/app/_components/AppModal/AppModal';
+import { UserPseudoSearch } from '@/app/_components/UserPseudoSearch/UserPseudoSearch';
 import {
   removeAgendaMember,
   searchDispensaryUsersForAgenda,
@@ -44,9 +44,12 @@ export function AgendaMembersModal({
 }: AgendaMembersModalProps) {
   const [members, setMembers] = useState<AgendaMemberDTO[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<{ id: string; name: string }[]>([]);
   const [accessLevel, setAccessLevel] = useState<AgendaAccessLevel>('READ');
+
+  const memberUserIds = useMemo(
+    () => members.map((member) => member.userId),
+    [members],
+  );
 
   const loadMembers = useCallback(async () => {
     if (!agendaId) return;
@@ -61,45 +64,31 @@ export function AgendaMembersModal({
       notifications.show({
         title: 'Erreur',
         message: error instanceof Error ? error.message : 'Chargement impossible',
-        color: 'red',
+        color: 'danger',
       });
     } finally {
       setLoading(false);
     }
   }, [agendaId, dispensarySlug]);
 
+  const searchAgendaUsers = useCallback(
+    async (query: string) => {
+      const result = await searchDispensaryUsersForAgenda(
+        dispensarySlug,
+        query,
+        { adminContext: true },
+      );
+      const data = handleAction(result);
+      return data ?? [];
+    },
+    [dispensarySlug],
+  );
+
   useEffect(() => {
     if (opened && agendaId) {
       void loadMembers();
     }
   }, [opened, agendaId, loadMembers]);
-
-  useEffect(() => {
-    if (!opened || searchQuery.trim().length < 2) {
-      setSearchResults([]);
-      return;
-    }
-
-    const timer = setTimeout(async () => {
-      try {
-        const result = await searchDispensaryUsersForAgenda(
-          dispensarySlug,
-          searchQuery,
-          { adminContext: true },
-        );
-        const data = handleAction(result);
-        if (data) {
-          setSearchResults(
-            data.filter((u) => !members.some((m) => m.userId === u.id)),
-          );
-        }
-      } catch {
-        setSearchResults([]);
-      }
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [searchQuery, dispensarySlug, members, opened]);
 
   const handleAddMember = async (userId: string) => {
     if (!agendaId) return;
@@ -110,13 +99,12 @@ export function AgendaMembersModal({
         accessLevel,
       });
       handleAction(result);
-      setSearchQuery('');
       await loadMembers();
     } catch (error: unknown) {
       notifications.show({
         title: 'Erreur',
         message: error instanceof Error ? error.message : 'Ajout impossible',
-        color: 'red',
+        color: 'danger',
       });
     }
   };
@@ -135,7 +123,7 @@ export function AgendaMembersModal({
       notifications.show({
         title: 'Erreur',
         message: error instanceof Error ? error.message : 'Mise à jour impossible',
-        color: 'red',
+        color: 'danger',
       });
     }
   };
@@ -150,7 +138,7 @@ export function AgendaMembersModal({
       notifications.show({
         title: 'Erreur',
         message: error instanceof Error ? error.message : 'Suppression impossible',
-        color: 'red',
+        color: 'danger',
       });
     }
   };
@@ -172,16 +160,13 @@ export function AgendaMembersModal({
     >
       <Stack gap="md">
         <Group align="flex-end" grow>
-          <TextInput
-            label="Rechercher un utilisateur"
-            placeholder="Pseudo…"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.currentTarget.value)}
-            autoComplete="off"
-            name="agenda-member-user-search"
-            data-1p-ignore
-            data-lpignore="true"
-            data-form-type="other"
+          <UserPseudoSearch
+            enabled={opened}
+            inputName="agenda-member-user-search"
+            excludeUserIds={memberUserIds}
+            onSearch={searchAgendaUsers}
+            onSelect={(user) => void handleAddMember(user.id)}
+            actionLabel="Ajouter"
           />
           <Select
             label="Permission"
@@ -193,24 +178,6 @@ export function AgendaMembersModal({
             onChange={(v) => setAccessLevel((v as AgendaAccessLevel) ?? 'READ')}
           />
         </Group>
-
-        {searchResults.length > 0 && (
-          <Stack gap="xs">
-            {searchResults.map((user) => (
-              <Group key={user.id} justify="space-between">
-                <Text size="sm">{user.name}</Text>
-                <Button
-                  size="xs"
-                  color="sage"
-                  variant="light"
-                  onClick={() => void handleAddMember(user.id)}
-                >
-                  Ajouter
-                </Button>
-              </Group>
-            ))}
-          </Stack>
-        )}
 
         <Stack gap="sm">
           <Text fw={500} size="sm">Membres actuels</Text>

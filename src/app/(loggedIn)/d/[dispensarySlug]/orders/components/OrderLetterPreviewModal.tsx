@@ -1,53 +1,70 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
 import { useEffect, useState } from 'react';
-import { Modal, Stack, Text, Button, Group, Loader, Paper } from '@mantine/core';
+import { Stack, Text, Button, Loader, Paper } from '@mantine/core';
 import { IconCopy, IconCheck } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { generateOrderMailPreview } from '@/app/_actions/mailTemplates';
 import { handleAction } from '@/lib/action';
-import type { OrderWithRelations } from '@/types/orders';
+import { AppModal, AppModalFooter } from '@/app/_components/AppModal/AppModal';
+import { useRequiredDispensarySlug } from '@/app/_contexts/PermissionsContext';
+import { useOrderDetail } from '../hooks/useOrdersQueries';
 
 interface OrderLetterPreviewModalProps {
   opened: boolean;
   onClose: () => void;
-  order: OrderWithRelations | null;
+  orderId: string | null;
 }
 
 export function OrderLetterPreviewModal({
   opened,
   onClose,
-  order,
+  orderId,
 }: OrderLetterPreviewModalProps) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
+  const { data: order, isLoading: loadingOrder } = useOrderDetail(
+    orderId,
+    opened && Boolean(orderId),
+  );
   const [preview, setPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (opened && order) {
-      loadPreview();
+      void loadPreview(order);
     } else {
       setPreview(null);
     }
   }, [opened, order]);
 
-  const loadPreview = async () => {
-    if (!order) return;
-
+  const loadPreview = async (orderData: NonNullable<typeof order>) => {
     try {
       setLoading(true);
-      const result = await generateOrderMailPreview(dispensarySlug!, { orderId: order.id });
+      const result = await generateOrderMailPreview(dispensarySlug, {
+        order: {
+          type: orderData.type,
+          status: orderData.status,
+          price: orderData.price,
+          company: orderData.company,
+          individualCustomer: orderData.individualCustomer,
+          items: orderData.items.map((orderItem) => ({
+            quantity: orderItem.quantity,
+            item: { name: orderItem.item.name },
+          })),
+        },
+      });
       const data = handleAction(result);
       if (data) {
         setPreview(data.preview);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : 'Erreur lors du chargement de l\'aperçu';
       notifications.show({
         title: 'Erreur',
-        message: error.message || 'Erreur lors du chargement de l\'aperçu',
-        color: 'red',
+        message,
+        color: 'danger',
       });
     } finally {
       setLoading(false);
@@ -63,61 +80,63 @@ export function OrderLetterPreviewModal({
       notifications.show({
         title: 'Succès',
         message: 'Courrier copié dans le presse-papiers',
-        color: 'green',
+        color: 'moss',
       });
-      // Réinitialiser l'état après 2 secondes
       setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
+    } catch {
       notifications.show({
         title: 'Erreur',
         message: 'Impossible de copier le courrier',
-        color: 'red',
+        color: 'danger',
       });
     }
   };
 
+  const isLoading = loadingOrder || loading;
+
   return (
-    <Modal
+    <AppModal
       opened={opened}
       onClose={onClose}
       title="Aperçu du courrier"
       size="lg"
-    >
-      <Stack>
-        {loading ? (
-          <Group justify="center" py="xl">
-            <Loader />
-          </Group>
-        ) : preview ? (
-          <Paper p="md" withBorder>
-            <Text
-              style={{
-                whiteSpace: 'pre-wrap',
-                fontFamily: 'monospace',
-                fontSize: '14px',
-                lineHeight: 1.6,
-              }}
-            >
-              {preview}
-            </Text>
-          </Paper>
-        ) : (
-          <Text c="dimmed">Aucun aperçu disponible</Text>
-        )}
-        <Group justify="flex-end" mt="md">
-          {preview && (
+      footer={
+        preview ? (
+          <AppModalFooter>
             <Button
               leftSection={copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
               onClick={handleCopy}
-              variant={copied ? 'light' : 'default'}
-              color={copied ? 'green' : undefined}
+              color={copied ? 'moss' : 'sage'}
             >
-              {copied ? 'Copiée !' : 'Copier le courrier'}
+              {copied ? 'Copié !' : 'Copier le courrier'}
             </Button>
-          )}
-          <Button onClick={onClose}>Fermer</Button>
-        </Group>
-      </Stack>
-    </Modal>
+          </AppModalFooter>
+        ) : undefined
+      }
+    >
+      {isLoading ? (
+        <Stack align="center" py="xl">
+          <Loader />
+          <Text size="sm" c="dimmed">
+            Génération de l&apos;aperçu...
+          </Text>
+        </Stack>
+      ) : preview ? (
+        <Paper p="md" withBorder>
+          <Text
+            style={{
+              whiteSpace: 'pre-wrap',
+              fontFamily: 'var(--disp-font-ui)',
+            }}
+          >
+            {preview}
+          </Text>
+        </Paper>
+      ) : (
+        <Text c="dimmed" ta="center">
+          Aucun aperçu disponible
+        </Text>
+      )}
+    </AppModal>
   );
 }

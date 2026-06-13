@@ -17,10 +17,9 @@ import {
   genericDoctorFallbackName,
   getDiscordAccountIdForUser,
   getLatestDiscordDisplayNames,
-  mergeResolvedDisplayNames,
   resolveDiscordDisplayName,
 } from '@/lib/dispensaryWeeklyActivity/resolveDisplayName';
-import { serializeDispensaryWeeklyActivityApiRow } from '@/lib/dispensaryWeeklyActivity/apiRow';
+import { listSerializedWeeklyActivities } from '@/lib/dispensaryWeeklyActivity/listSerialized';
 import {
   dispensaryWeeklyActivityCreateSchema,
   dispensaryWeeklyActivityMetricsSchema,
@@ -30,7 +29,6 @@ import {
   createDispensaryWeeklyActivityWithHistory,
   deleteDispensaryWeeklyActivityWithHistory,
   findWeeklyActivityByDoctorAndPeriod,
-  syncActivityUserIdFromDiscordIfMissing,
   updateDispensaryWeeklyActivityWithHistory,
   WEEKLY_ACTIVITY_DUPLICATE_MESSAGE,
 } from '@/lib/dispensaryWeeklyActivity/service';
@@ -38,7 +36,6 @@ import { getAppSettings } from '@/lib/appSettings';
 import {
   applyVisibilityToCreateInput,
   applyVisibilityToUpdateInput,
-  redactSerializedWeeklyActivityRow,
   weeklyActivityFieldVisibilityFromSettings,
 } from '@/lib/dispensaryWeeklyActivity/fieldVisibility';
 import { requireTenantServerActionContext } from '@/lib/serverActionAuth';
@@ -91,7 +88,10 @@ async function listWhereForSession(
   return { ...tenantFilter, OR: or };
 }
 
-export async function listDispensaryWeeklyActivities(dispensarySlug: string) {
+export async function listDispensaryWeeklyActivities(
+  dispensarySlug: string,
+  options?: { periodStart: Date; periodEnd: Date },
+) {
   try {
     const gate = await requireWeeklyActivityView(dispensarySlug);
     if (!gate.ok) {
@@ -102,50 +102,18 @@ export async function listDispensaryWeeklyActivities(dispensarySlug: string) {
 
     const where = await listWhereForSession(dispensaryId, session.user.id, tenant.effectiveRole);
 
-    const rows = await prisma.dispensaryWeeklyActivity.findMany({
-      where,
-      orderBy: { periodStart: 'desc' },
-    });
-
-    for (const r of rows) {
-      if (!r.userId) {
-        await syncActivityUserIdFromDiscordIfMissing(prisma, r);
-      }
+    if (options) {
+      Object.assign(where, {
+        periodStart: { lte: options.periodEnd },
+        periodEnd: { gte: options.periodStart },
+      });
     }
 
-    const refreshed = await prisma.dispensaryWeeklyActivity.findMany({
-      where,
-      orderBy: { periodStart: 'desc' },
-    });
-
-    const withNames = await mergeResolvedDisplayNames(prisma, refreshed);
-    const settings = await getAppSettings(dispensaryId);
-    const visibility = weeklyActivityFieldVisibilityFromSettings(settings);
+    const data = await listSerializedWeeklyActivities(where, dispensaryId);
 
     return {
       status: 200 as const,
-      data: withNames.map((r) =>
-        redactSerializedWeeklyActivityRow(
-          serializeDispensaryWeeklyActivityApiRow({
-          id: r.id,
-          periodStart: r.periodStart,
-          periodEnd: r.periodEnd,
-          displayName: r.displayName,
-          resolvedDisplayName: r.resolvedDisplayName,
-          discordUserId: r.discordUserId,
-          userId: r.userId,
-          chestDays: r.chestDays,
-          presenceDays: r.presenceDays,
-          sherifCount: r.sherifCount,
-          patientsCount: r.patientsCount,
-          infusionsCount: r.infusionsCount,
-          poppyMilkCount: r.poppyMilkCount,
-          createdAt: r.createdAt,
-          updatedAt: r.updatedAt,
-        }),
-          visibility,
-        ),
-      ),
+      data,
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors du chargement des activités');
@@ -245,8 +213,6 @@ export async function getDispensaryWeeklyActivityHistory(
           actorUserName: h.actorUser?.name ?? null,
           actorDiscordUserId,
           actorResolvedName,
-          previousValues: h.previousValues,
-          nextValues: h.nextValues,
           createdAt: h.createdAt.toISOString(),
         };
       }),
@@ -346,19 +312,19 @@ export async function createDispensaryWeeklyActivity(
     let discordUserId: string;
     let displayName: string;
     let resolvedUserId: string | null;
+    const actorDiscordUserId = await getDiscordAccountIdForUser(prisma, session.user.id);
 
     if (!editAll) {
-      const ownDiscord = await getDiscordAccountIdForUser(prisma, session.user.id);
-      if (!ownDiscord) {
+      if (!actorDiscordUserId) {
         return {
           status: 400 as const,
           error: 'Compte Discord requis pour créer une activité (liez Discord dans les paramètres).',
         };
       }
-      discordUserId = ownDiscord;
+      discordUserId = actorDiscordUserId;
       displayName =
         parsed.data.displayName?.trim() ||
-        (await resolveDiscordDisplayName(prisma, ownDiscord));
+        (await resolveDiscordDisplayName(prisma, actorDiscordUserId));
       resolvedUserId = session.user.id;
     } else {
       if (!parsed.data.targetUserId) {
@@ -422,7 +388,7 @@ export async function createDispensaryWeeklyActivity(
     const created = await createDispensaryWeeklyActivityWithHistory(createInput, {
       source: 'INTRANET',
       actorUserId: session.user.id,
-      actorDiscordUserId: (await getDiscordAccountIdForUser(prisma, session.user.id)) ?? null,
+      actorDiscordUserId: actorDiscordUserId ?? null,
       dispensaryId,
     });
 
@@ -482,11 +448,12 @@ export async function updateDispensaryWeeklyActivity(
     const settings = await getAppSettings(dispensaryId);
     const visibility = weeklyActivityFieldVisibilityFromSettings(settings);
     const updateInput = applyVisibilityToUpdateInput(parsedBody.data, visibility);
+    const actorDiscordUserId = await getDiscordAccountIdForUser(prisma, gate.session.user.id);
 
     await updateDispensaryWeeklyActivityWithHistory(parsedId.data.id, updateInput, {
       source: 'INTRANET',
       actorUserId: gate.session.user.id,
-      actorDiscordUserId: (await getDiscordAccountIdForUser(prisma, gate.session.user.id)) ?? null,
+      actorDiscordUserId: actorDiscordUserId ?? null,
     });
 
     return { status: 200 as const, data: { ok: true } };
@@ -529,10 +496,12 @@ export async function deleteDispensaryWeeklyActivity(
       return { status: 403 as const, error: 'Permission refusée' };
     }
 
+    const actorDiscordUserId = await getDiscordAccountIdForUser(prisma, gate.session.user.id);
+
     await deleteDispensaryWeeklyActivityWithHistory(parsed.data.id, {
       source: 'INTRANET',
       actorUserId: gate.session.user.id,
-      actorDiscordUserId: (await getDiscordAccountIdForUser(prisma, gate.session.user.id)) ?? null,
+      actorDiscordUserId: actorDiscordUserId ?? null,
     });
 
     return { status: 200 as const, data: { ok: true } };

@@ -1,11 +1,11 @@
 import { notFound, redirect } from 'next/navigation';
+import { getPayrollReportById } from '@/app/_actions/payrollReports';
 import { getAuthSession } from '@/lib/auth';
-import prisma from '@/lib/prisma';
 import { checkRolePermission } from '@/lib/auth/permissions';
 import { getEffectiveRoleForDispensary, requireDispensaryFromSlug } from '@/lib/dispensary/context';
 import type { AuthSession } from '@/types/session';
 import { routes } from '@/types/routes';
-import PayrollReportDetail from './PayrollReportDetail';
+import PayrollReportDetailPageClient from './PayrollReportDetailPageClient';
 
 type PageProps = { params: Promise<{ dispensarySlug: string; id: string }> };
 
@@ -24,30 +24,20 @@ export default async function PayrollReportByIdPage({ params }: PageProps) {
 
   const canDelete = checkRolePermission(effectiveRole, 'payroll_reports', 'create');
 
-  const report = await prisma.payrollWeeklyReport.findUnique({
-    where: { id },
-    include: { createdBy: { select: { name: true, email: true } } },
-  });
-
-  if (!report) {
+  const result = await getPayrollReportById(dispensarySlug, id);
+  if (result.status === 404) {
     notFound();
+  }
+  if (result.status !== 200 || !('data' in result)) {
+    throw new Error('Erreur lors du chargement du rapport');
   }
 
   return (
-    <PayrollReportDetail
+    <PayrollReportDetailPageClient
+      reportId={id}
+      initialReport={result.data.report}
       canDelete={canDelete}
       canEdit={canDelete}
-      report={{
-        id: report.id,
-        weekStart: report.weekStart.toISOString(),
-        weekEnd: report.weekEnd.toISOString(),
-        reportType: report.reportType,
-        resultJson: report.resultJson,
-        errorMessage: report.errorMessage,
-        createdAt: report.createdAt.toISOString(),
-        createdBy: report.createdBy,
-      }}
     />
   );
 }
-

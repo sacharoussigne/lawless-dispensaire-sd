@@ -108,6 +108,7 @@ model PayrollWeeklyReport {
   @@index([createdById])
   @@index([weekStart])
   @@index([dispensaryId])
+  @@index([dispensaryId, weekStart(sort: Desc)])
   @@map("payroll_weekly_report")
 }
 
@@ -304,6 +305,7 @@ model StockHistory {
   @@index([itemId])
   @@index([chestId])
   @@index([timestamp])
+  @@index([itemId, chestId, timestamp])
   @@map("stock_history")
 }
 
@@ -461,6 +463,7 @@ model Order {
   @@index([status])
   @@index([type])
   @@index([dispensaryId])
+  @@index([dispensaryId, createdAt(sort: Desc)])
   @@map("order")
 }
 
@@ -737,6 +740,7 @@ model DispensaryWeeklyActivity {
   @@index([discordUserId])
   @@index([userId])
   @@index([dispensaryId])
+  @@index([dispensaryId, periodStart])
   @@map("dispensary_weekly_activity")
 }
 
@@ -754,6 +758,7 @@ model DispensaryWeeklyActivityHistory {
   createdAt          DateTime                          @default(now())
 
   @@index([activityId])
+  @@index([activityId, createdAt])
   @@index([actorUserId])
   @@map("dispensary_weekly_activity_history")
 }

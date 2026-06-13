@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma';
 import { actionErrorParser } from '@/lib/action';
 import { requirePermission, requireTenantServerActionContext } from '@/lib/serverActionAuth';
 import { tenantWhere } from '@/lib/dispensary/tenantWhere';
+import type { OrderStatus, OrderType } from '@prisma/client';
 
 const optionalDefaultMailName = z
   .string()
@@ -33,6 +34,27 @@ const updateMailTemplateSchema = z.object({
 const deleteMailTemplateSchema = z.object({
   id: z.string().uuid('ID invalide'),
 });
+
+const getUserMailTemplatesPageSchema = z.object({
+  page: z.number().int().min(1).default(1),
+  pageSize: z.number().int().min(1).max(50).default(10),
+  nameSearch: z.string().max(255).optional(),
+});
+
+const getUserMailTemplateByIdSchema = z.object({
+  id: z.string().uuid('ID invalide'),
+});
+
+const MANAGEMENT_MAIL_TEMPLATE_LIST_SELECT = {
+  id: true,
+  name: true,
+  description: true,
+  defaultMailName: true,
+  createdAt: true,
+  updatedAt: true,
+  dispensaryId: true,
+  userId: true,
+} as const;
 
 export async function createMailTemplate(
   dispensarySlug: string,
@@ -88,6 +110,7 @@ export async function getMailTemplates(dispensarySlug: string) {
       orderBy: {
         createdAt: 'desc',
       },
+      select: MANAGEMENT_MAIL_TEMPLATE_LIST_SELECT,
     });
 
     return {
@@ -96,6 +119,43 @@ export async function getMailTemplates(dispensarySlug: string) {
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la récupération des modèles de courriers');
+  }
+}
+
+export async function getManagementMailTemplateById(
+  dispensarySlug: string,
+  data: { id: string },
+) {
+  try {
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'mails',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
+
+    const { id } = getUserMailTemplateByIdSchema.parse(data);
+
+    const mailTemplate = await prisma.mailTemplate.findFirst({
+      where: {
+        id,
+        userId: null,
+        ...tenantWhere(dispensaryId),
+      },
+    });
+
+    if (!mailTemplate) {
+      return {
+        status: 404,
+        error: 'Template introuvable',
+      };
+    }
+
+    return {
+      status: 200,
+      data: mailTemplate,
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de la récupération du modèle de courrier');
   }
 }
 
@@ -208,10 +268,23 @@ export async function deleteMailTemplate(dispensarySlug: string, data: { id: str
   }
 }
 
+type OrderMailPreviewSource = {
+  type: string;
+  status: string;
+  price: unknown;
+  company: { name: string } | null;
+  individualCustomer: { name: string } | null;
+  items: Array<{
+    quantity: number;
+    item: { name: string };
+  }>;
+};
+
 export async function generateOrderMailPreview(
   dispensarySlug: string,
   data: {
-    orderId: string;
+    orderId?: string;
+    order?: OrderMailPreviewSource;
   },
 ) {
   try {
@@ -221,48 +294,61 @@ export async function generateOrderMailPreview(
     if (!ctx.ok) return ctx.response;
     const { dispensaryId } = ctx.tenant;
 
-    const order = await prisma.order.findFirst({
-      where: { id: data.orderId, ...tenantWhere(dispensaryId) },
-      include: {
-        company: {
-          select: {
-            id: true,
-            name: true,
+    let order: OrderMailPreviewSource | null = data.order ?? null;
+
+    if (!order) {
+      if (!data.orderId) {
+        return {
+          status: 400,
+          error: 'Commande requise pour générer l\'aperçu',
+        };
+      }
+
+      const dbOrder = await prisma.order.findFirst({
+        where: { id: data.orderId, ...tenantWhere(dispensaryId) },
+        include: {
+          company: {
+            select: {
+              id: true,
+              name: true,
+            },
           },
-        },
-        individualCustomer: {
-          select: {
-            id: true,
-            name: true,
+          individualCustomer: {
+            select: {
+              id: true,
+              name: true,
+            },
           },
-        },
-        items: {
-          include: {
-            item: {
-              select: {
-                id: true,
-                name: true,
-                price: true,
+          items: {
+            include: {
+              item: {
+                select: {
+                  id: true,
+                  name: true,
+                  price: true,
+                },
               },
             },
           },
         },
-      },
-    });
+      });
 
-    if (!order) {
-      return {
-        status: 404,
-        error: 'Commande introuvable',
-      };
+      if (!dbOrder) {
+        return {
+          status: 404,
+          error: 'Commande introuvable',
+        };
+      }
+
+      order = dbOrder;
     }
 
     const assignment = await prisma.orderMailTemplateAssignment.findUnique({
       where: {
         dispensaryId_orderType_orderStatus: {
           dispensaryId,
-          orderType: order.type,
-          orderStatus: order.status,
+          orderType: order.type as OrderType,
+          orderStatus: order.status as OrderStatus,
         },
       },
       include: {
@@ -287,7 +373,11 @@ export async function generateOrderMailPreview(
       })
       .join('\n');
 
-    const priceText = order.price != null ? `${order.price.toFixed(2)} $` : 'Non spécifié';
+    const priceValue = order.price != null ? Number(order.price) : null;
+    const priceText =
+      priceValue != null && Number.isFinite(priceValue)
+        ? `${priceValue.toFixed(2)} $`
+        : 'Non spécifié';
 
     const username = ctx.session.user.name || 'Utilisateur';
 
@@ -340,7 +430,14 @@ export async function generateOrderMailPreview(
   }
 }
 
-export async function getUserMailTemplates(dispensarySlug: string) {
+export async function getUserMailTemplatesPage(
+  dispensarySlug: string,
+  params: {
+    page?: number;
+    pageSize?: number;
+    nameSearch?: string;
+  } = {},
+) {
   try {
     const ctx = await requireTenantServerActionContext(dispensarySlug, {
       feature: 'mails',
@@ -348,19 +445,115 @@ export async function getUserMailTemplates(dispensarySlug: string) {
     if (!ctx.ok) return ctx.response;
     const { dispensaryId } = ctx.tenant;
 
-    const mailTemplates = await prisma.mailTemplate.findMany({
+    const { page, pageSize, nameSearch } =
+      getUserMailTemplatesPageSchema.parse(params);
+    const nameTerm = nameSearch?.trim();
+
+    const where = {
+      userId: ctx.session.user.id,
+      ...tenantWhere(dispensaryId),
+      ...(nameTerm
+        ? {
+            name: {
+              contains: nameTerm,
+              mode: 'insensitive' as const,
+            },
+          }
+        : {}),
+    };
+
+    const [mailTemplates, totalCount] = await Promise.all([
+      prisma.mailTemplate.findMany({
+        where,
+        orderBy: { name: 'asc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          defaultMailName: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      }),
+      prisma.mailTemplate.count({ where }),
+    ]);
+
+    return {
+      status: 200,
+      data: {
+        items: mailTemplates,
+        totalCount,
+        page,
+        pageSize,
+      },
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de la récupération des modèles de courriers');
+  }
+}
+
+export async function getUserMailTemplateById(
+  dispensarySlug: string,
+  data: { id: string },
+) {
+  try {
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'mails',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
+
+    const { id } = getUserMailTemplateByIdSchema.parse(data);
+
+    const mailTemplate = await prisma.mailTemplate.findFirst({
+      where: {
+        id,
+        userId: ctx.session.user.id,
+        ...tenantWhere(dispensaryId),
+      },
+    });
+
+    if (!mailTemplate) {
+      return {
+        status: 404,
+        error: 'Template introuvable',
+      };
+    }
+
+    return {
+      status: 200,
+      data: mailTemplate,
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de la récupération du modèle de courrier');
+  }
+}
+
+export async function getUserMailTemplateOptions(dispensarySlug: string) {
+  try {
+    const ctx = await requireTenantServerActionContext(dispensarySlug, {
+      feature: 'mails',
+    });
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
+
+    const options = await prisma.mailTemplate.findMany({
       where: {
         userId: ctx.session.user.id,
         ...tenantWhere(dispensaryId),
       },
-      orderBy: {
-        createdAt: 'desc',
+      orderBy: { name: 'asc' },
+      select: {
+        id: true,
+        name: true,
       },
     });
 
     return {
       status: 200,
-      data: mailTemplates,
+      data: options,
     };
   } catch (error) {
     return actionErrorParser(error, 'Erreur lors de la récupération des modèles de courriers');

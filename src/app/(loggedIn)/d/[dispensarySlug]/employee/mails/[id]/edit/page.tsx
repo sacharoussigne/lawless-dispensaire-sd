@@ -1,4 +1,4 @@
-import { getMails } from '@/app/_actions/mails';
+import { getMailById } from '@/app/_actions/mails';
 import EditMailPageClient from './EditMailPageClient';
 import { SuspenseLoader } from '@/app/_components/SuspenseLoader/SuspenseLoader';
 import { getDataOrThrow } from '@/lib/response';
@@ -12,14 +12,13 @@ async function EditMailContent({
   dispensarySlug: string;
   mailId: string;
 }) {
-  const mailsResult = await getMails(dispensarySlug);
-  const mails = getDataOrThrow(mailsResult, 'Erreur lors du chargement des courriers');
+  const mailResult = await getMailById(dispensarySlug, { id: mailId });
 
-  const mail = mails.find((m) => m.id === mailId);
-
-  if (!mail) {
+  if (mailResult.status === 404) {
     redirect(tenantRoutes(dispensarySlug).employee.mails);
   }
+
+  const mail = getDataOrThrow(mailResult, 'Erreur lors du chargement du courrier');
 
   return <EditMailPageClient mail={mail} />;
 }

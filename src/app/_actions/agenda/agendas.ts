@@ -97,6 +97,64 @@ export async function listAccessibleAgendas(dispensarySlug: string) {
   }
 }
 
+export async function getAgendaPageBootstrap(dispensarySlug: string) {
+  try {
+    const ctx = await getAgendaSessionContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+
+    const { dispensaryId, effectiveRole } = ctx.tenant;
+    const { session } = ctx;
+
+    const hasAccess = await userHasAnyAgendaAccess(
+      dispensaryId,
+      session.user.id,
+      session.user.role,
+      effectiveRole,
+    );
+
+    const isAdmin = isDispensaryAdminRole(session.user.role, effectiveRole);
+
+    if (!hasAccess) {
+      return { status: 200, data: { hasAccess: false, isAdmin, agendas: [] as AgendaSummaryDTO[] } };
+    }
+
+    const agendaIds = await listAccessibleAgendaIds(
+      dispensaryId,
+      session.user.id,
+      session.user.role,
+      effectiveRole,
+    );
+
+    if (agendaIds.length === 0) {
+      return { status: 200, data: { hasAccess: true, isAdmin, agendas: [] as AgendaSummaryDTO[] } };
+    }
+
+    const agendas = await prisma.agenda.findMany({
+      where: { id: { in: agendaIds }, ...tenantWhere(dispensaryId) },
+      include: {
+        members: {
+          where: { userId: session.user.id },
+          select: { accessLevel: true },
+        },
+        _count: { select: { members: true } },
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    const data: AgendaSummaryDTO[] = agendas.map((a) => ({
+      id: a.id,
+      name: a.name,
+      description: a.description,
+      accessLevel: a.members[0]?.accessLevel ?? null,
+      memberCount: a._count.members,
+    }));
+
+    return { status: 200, data: { hasAccess: true, isAdmin, agendas: data } };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors du chargement de la page agenda');
+  }
+}
+
 export async function checkAgendaModuleAccess(dispensarySlug: string) {
   try {
     const ctx = await getAgendaSessionContext(dispensarySlug);

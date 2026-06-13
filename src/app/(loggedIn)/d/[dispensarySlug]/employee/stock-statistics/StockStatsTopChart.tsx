@@ -6,12 +6,9 @@ import {
   getStockStatsValueColor,
   type StockStatsDisplayMode,
 } from '@/lib/stock/movements';
+import type { StockStatsChartRow } from '@/lib/stock/statsClient';
 
-export type StockStatsChartRow = {
-  itemId: string;
-  itemName: string;
-  value: number;
-};
+export type { StockStatsChartRow };
 
 export function StockStatsTopChart({
   rows,

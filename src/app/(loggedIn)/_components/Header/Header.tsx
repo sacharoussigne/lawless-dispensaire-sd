@@ -15,7 +15,7 @@ import { authClient } from '@/lib/client';
 import { useRouter, usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { notifications } from '@mantine/notifications';
-import { AuthSession } from '@/types/session';
+import { type AuthSession } from '@/types/session';
 import { routes, tenantRoutes } from '@/types/routes';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -43,15 +43,7 @@ export default function Header({
   const pathname = usePathname();
   const [userMenuOpened, setUserMenuOpened] = useState(false);
   const [stoppingImpersonation, setStoppingImpersonation] = useState(false);
-  const {
-    permissions,
-    userRole,
-    appSettings,
-    dispensarySlug: ctxSlug,
-    accessibleDispensaries,
-    agendaModuleAccess,
-  } = usePermissions();
-
+  const { permissions, userRole, appSettings, accessibleDispensaries, agendaModuleAccess, dispensarySlug: ctxSlug } = usePermissions();
   const dispensarySlug = dispensarySlugProp ?? ctxSlug;
   const t = dispensarySlug ? tenantRoutes(dispensarySlug) : null;
   const isPlatformAdminUser = isPlatformAdmin(session?.user?.role);
@@ -200,9 +192,9 @@ export default function Header({
                     ]}
                   />
                 )}
-                {appSettings.featureAgendaEnabled && agendaModuleAccess && (
+                {appSettings.featureAgendaEnabled && agendaModuleAccess && dispensarySlug && (
                   <HeaderUpcomingEvents
-                    dispensarySlug={dispensarySlug!}
+                    dispensarySlug={dispensarySlug}
                     agendaHref={t.agenda.index}
                   />
                 )}
@@ -276,7 +268,7 @@ export default function Header({
                 </Menu>
                 {isImpersonating && (
                   <Button
-                    color="orange"
+                    color="amber"
                     variant="light"
                     leftSection={<IconArrowBackUp size={18} />}
                     loading={stoppingImpersonation}

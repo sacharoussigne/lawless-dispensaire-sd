@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { isAppFeatureEnabled, loadAppSettingsFromDb, type AppFeatureKey } from '@/lib/appSettings';
 import { routes } from '@/types/routes';
 import type { AppMiddlewareSession } from '@/types/middlewareSession';

@@ -339,31 +339,6 @@
   }
 }
 
-.todoListTitle {
-  display: block;
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
-.todoListEditInput {
-  display: block;
-  width: 100%;
-  background: var(--mantine-color-sage-0);
-  border: none;
-  border-bottom: 1px dashed var(--mantine-color-sage-4);
-  border-radius: var(--mantine-radius-xs) var(--mantine-radius-xs) 0 0;
-  padding: 0.2rem 0.25rem;
-  font-family: var(--disp-font-display);
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--disp-ink);
-  outline: none;
-
-  &:focus {
-    border-bottom-color: var(--mantine-color-sage-6);
-  }
-}
-
 .todoCategory {
   padding: var(--mantine-spacing-sm) 0;
   border: none;

@@ -3,10 +3,10 @@
 import { Paper, TextInput, Group, ActionIcon } from '@mantine/core';
 import { DataTable } from 'mantine-datatable';
 import { IconEdit, IconTrash } from '@tabler/icons-react';
-import type { CategoryItemWithItems } from '@/types/categoryItems';
+import type { CategoryItemWithCount } from '@/types/categoryItems';
 
 interface CategoryItemsTableProps {
-  items: CategoryItemWithItems[];
+  items: CategoryItemWithCount[];
   loading: boolean;
   nameFilter: string;
   page: number;
@@ -14,8 +14,8 @@ interface CategoryItemsTableProps {
   totalRecords: number;
   onNameFilterChange: (value: string) => void;
   onPageChange: (page: number) => void;
-  onEdit: (categoryItem: CategoryItemWithItems) => void;
-  onDelete: (categoryItem: CategoryItemWithItems) => void;
+  onEdit: (categoryItem: CategoryItemWithCount) => void;
+  onDelete: (categoryItem: CategoryItemWithCount) => void;
 }
 
 export function CategoryItemsTable({
@@ -50,7 +50,7 @@ export function CategoryItemsTable({
           {
             accessor: 'color',
             title: 'Couleur',
-            render: (categoryItem: CategoryItemWithItems) => (
+            render: (categoryItem: CategoryItemWithCount) => (
               <Group gap="xs">
                 <div
                   style={{
@@ -66,14 +66,14 @@ export function CategoryItemsTable({
             ),
           },
           {
-            accessor: 'items.length',
+            accessor: '_count.items',
             title: "Nombre d'objets",
-            render: (categoryItem: CategoryItemWithItems) => categoryItem.items.length,
+            render: (categoryItem: CategoryItemWithCount) => categoryItem._count.items,
           },
           {
             accessor: 'actions',
             title: 'Actions',
-            render: (categoryItem: CategoryItemWithItems) => (
+            render: (categoryItem: CategoryItemWithCount) => (
               <Group gap="xs" wrap="nowrap" justify="flex-end">
                 <ActionIcon
                   variant="light"
@@ -116,4 +116,3 @@ export function CategoryItemsTable({
     </Paper>
   );
 }
-

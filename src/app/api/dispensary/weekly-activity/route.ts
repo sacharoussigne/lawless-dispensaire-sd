@@ -1,20 +1,14 @@
 import { NextResponse } from 'next/server';
 import { isDispensaryBotApiAuthorized, getDiscordUserIdFromBotRequest } from '@/lib/dispensaryWeeklyActivityApiAuth';
-import prisma from '@/lib/prisma';
-import { serializeDispensaryWeeklyActivityApiRow } from '@/lib/dispensaryWeeklyActivity/apiRow';
-import { mergeResolvedDisplayNames } from '@/lib/dispensaryWeeklyActivity/resolveDisplayName';
 import { dispensaryWeeklyActivityCreateSchema } from '@/lib/dispensaryWeeklyActivity/schemas';
 import { getAppSettings } from '@/lib/appSettings';
 import {
   applyVisibilityToCreateInput,
-  redactSerializedWeeklyActivityRow,
   weeklyActivityFieldVisibilityFromSettings,
 } from '@/lib/dispensaryWeeklyActivity/fieldVisibility';
 import { loadSerializedWeeklyActivityByIdForDispensary } from '@/lib/dispensaryWeeklyActivity/loadSerializedRow';
-import {
-  createDispensaryWeeklyActivityWithHistory,
-  syncActivityUserIdFromDiscordIfMissing,
-} from '@/lib/dispensaryWeeklyActivity/service';
+import { listSerializedWeeklyActivities } from '@/lib/dispensaryWeeklyActivity/listSerialized';
+import { createDispensaryWeeklyActivityWithHistory } from '@/lib/dispensaryWeeklyActivity/service';
 import { resolveBotDispensaryContext } from '@/lib/dispensaryWeeklyActivity/botRequestContext';
 
 function jsonError(status: number, error: string) {
@@ -35,51 +29,12 @@ export async function GET(request: Request) {
     return jsonError(400, 'En-tête X-Discord-User-Id requis');
   }
 
-  const initial = await prisma.dispensaryWeeklyActivity.findMany({
-    where: { dispensaryId: dispensaryCtx.dispensaryId, discordUserId },
-    orderBy: { periodStart: 'desc' },
-  });
+  const data = await listSerializedWeeklyActivities(
+    { dispensaryId: dispensaryCtx.dispensaryId, discordUserId },
+    dispensaryCtx.dispensaryId,
+  );
 
-  for (const r of initial) {
-    if (!r.userId) {
-      await syncActivityUserIdFromDiscordIfMissing(prisma, r);
-    }
-  }
-
-  const refreshed = await prisma.dispensaryWeeklyActivity.findMany({
-    where: { dispensaryId: dispensaryCtx.dispensaryId, discordUserId },
-    orderBy: { periodStart: 'desc' },
-  });
-
-  const withNames = await mergeResolvedDisplayNames(prisma, refreshed);
-  const settings = await getAppSettings(dispensaryCtx.dispensaryId);
-  const visibility = weeklyActivityFieldVisibilityFromSettings(settings);
-
-  return NextResponse.json({
-    status: 200,
-    data: withNames.map((r) =>
-      redactSerializedWeeklyActivityRow(
-        serializeDispensaryWeeklyActivityApiRow({
-        id: r.id,
-        periodStart: r.periodStart,
-        periodEnd: r.periodEnd,
-        displayName: r.displayName,
-        resolvedDisplayName: r.resolvedDisplayName,
-        discordUserId: r.discordUserId,
-        userId: r.userId,
-        chestDays: r.chestDays,
-        presenceDays: r.presenceDays,
-        sherifCount: r.sherifCount,
-        patientsCount: r.patientsCount,
-        infusionsCount: r.infusionsCount,
-        poppyMilkCount: r.poppyMilkCount,
-        createdAt: r.createdAt,
-        updatedAt: r.updatedAt,
-      }),
-        visibility,
-      ),
-    ),
-  });
+  return NextResponse.json({ status: 200, data });
 }
 
 export async function POST(request: Request) {

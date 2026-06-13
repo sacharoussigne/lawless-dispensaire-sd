@@ -1,8 +1,9 @@
 'use client';
 
-import { Paper, TextInput, Group, ActionIcon } from '@mantine/core';
+import { Paper, TextInput, Group, ActionIcon, Badge, Text } from '@mantine/core';
 import { DataTable } from 'mantine-datatable';
 import { IconEdit, IconTrash } from '@tabler/icons-react';
+import { apothecaryBooleanPills } from '@/lib/apothecaryPill';
 import type { CompanyWithRelations } from '@/types/companies';
 
 interface CompaniesTableProps {
@@ -30,7 +31,6 @@ export function CompaniesTable({
   onEdit,
   onDelete,
 }: CompaniesTableProps) {
-
   return (
     <Paper shadow="sm" p="md" withBorder w="100%">
       <DataTable
@@ -46,6 +46,37 @@ export function CompaniesTable({
                 onChange={(e) => onNameFilterChange(e.currentTarget.value)}
                 style={{ minWidth: 200 }}
               />
+            ),
+          },
+          {
+            accessor: 'companyGroups',
+            title: "Groupes d'entreprises",
+            render: (company: CompanyWithRelations) => (
+              <Group gap="xs">
+                {company.companyGroups.length === 0 ? (
+                  <Text c="dimmed" size="sm">
+                    -
+                  </Text>
+                ) : (
+                  [...company.companyGroups]
+                    .sort((a, b) =>
+                      a.companyGroup.name.localeCompare(b.companyGroup.name, 'fr', {
+                        sensitivity: 'base',
+                      }),
+                    )
+                    .map((membership) => (
+                    <Badge
+                      key={membership.companyGroupId}
+                      variant="outline"
+                      radius="sm"
+                      size="sm"
+                      style={apothecaryBooleanPills.craft}
+                    >
+                      {membership.companyGroup.name}
+                    </Badge>
+                  ))
+                )}
+              </Group>
             ),
           },
           {
@@ -94,4 +125,3 @@ export function CompaniesTable({
     </Paper>
   );
 }
-

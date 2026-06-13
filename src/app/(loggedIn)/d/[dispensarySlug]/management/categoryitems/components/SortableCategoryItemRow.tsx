@@ -4,11 +4,11 @@ import { Group, Text } from '@mantine/core';
 import { IconGripVertical } from '@tabler/icons-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { CategoryItemWithItems } from '@/types/categoryItems';
+import type { CategoryItemWithCount } from '@/types/categoryItems';
 import { sortableRowGripStyle, sortableRowStyles } from '@/lib/sortableRowStyles';
 
 interface SortableCategoryItemRowProps {
-  categoryItem: CategoryItemWithItems;
+  categoryItem: Pick<CategoryItemWithCount, 'id' | 'name'>;
 }
 
 export function SortableCategoryItemRow({ categoryItem }: SortableCategoryItemRowProps) {

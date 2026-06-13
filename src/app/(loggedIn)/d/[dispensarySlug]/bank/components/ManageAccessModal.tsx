@@ -1,6 +1,6 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
+import { useRequiredDispensarySlug } from '@/app/_contexts/PermissionsContext';
 import { useEffect, useState } from 'react';
 import {
   Modal,
@@ -42,7 +42,7 @@ export function ManageAccessModal({
   account,
   onSuccess,
 }: ManageAccessModalProps) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const [localAccount, setLocalAccount] = useState<BankAccountWithRelations | null>(account);
   const [users, setUsers] = useState<BankAccessUser[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -59,13 +59,13 @@ export function ManageAccessModal({
   const reloadAccount = async () => {
     if (!localAccount) return;
     try {
-      const result = await getBankAccount(dispensarySlug!, localAccount.id);
+      const result = await getBankAccount(dispensarySlug, localAccount.id);
       const data = handleAction(result);
       if (data) {
         setLocalAccount(data);
         loadUsers(data);
       }
-    } catch (error) {
+    } catch (_error) {
       // Ignore
     }
   };
@@ -96,7 +96,7 @@ export function ManageAccessModal({
 
     try {
       setLoading(true);
-      const result = await createBankAccountAccess(dispensarySlug!, {
+      const result = await createBankAccountAccess(dispensarySlug, {
         accountId: localAccount.id,
         userId: selectedUserId,
         accessType,
@@ -130,7 +130,7 @@ export function ManageAccessModal({
 
     try {
       setLoading(true);
-      const result = await deleteBankAccountAccess(dispensarySlug!, {
+      const result = await deleteBankAccountAccess(dispensarySlug, {
         id: accessId,
       });
 

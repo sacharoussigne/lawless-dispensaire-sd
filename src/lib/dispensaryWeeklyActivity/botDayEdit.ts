@@ -36,7 +36,11 @@ export function resolveParisDayAnchor(input: BotDayEditResolveInput): Date {
   }
 
   if (hasDate) {
-    const parsed = dayjs.tz(input.date!, 'YYYY-MM-DD', TZ);
+    const dateStr = input.date;
+    if (!dateStr) {
+      throw new BotDayEditError('Date invalide (format attendu : YYYY-MM-DD).');
+    }
+    const parsed = dayjs.tz(dateStr, 'YYYY-MM-DD', TZ);
     if (!parsed.isValid()) {
       throw new BotDayEditError('Date invalide (format attendu : YYYY-MM-DD).');
     }
@@ -45,7 +49,11 @@ export function resolveParisDayAnchor(input: BotDayEditResolveInput): Date {
 
   const { start: weekStart } = getBankWeekBounds(new Date());
   const weekStartParis = dayjs(weekStart).tz(TZ).startOf('day');
-  const index = WEEKDAY_KEYS.indexOf(input.weekday!);
+  const weekday = input.weekday;
+  if (!weekday) {
+    throw new BotDayEditError('Jour de semaine invalide.');
+  }
+  const index = WEEKDAY_KEYS.indexOf(weekday);
   if (index < 0) {
     throw new BotDayEditError('Jour de semaine invalide.');
   }

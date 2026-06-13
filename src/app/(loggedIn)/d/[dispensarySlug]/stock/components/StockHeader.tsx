@@ -6,7 +6,6 @@ import { PageHeader } from '@/app/_components/PageHeader/PageHeader';
 
 interface StockHeaderProps {
   itemsWithStockToday: number;
-  totalItems: number;
   selectedChestId: string | null;
   isEditing: boolean;
   saving: boolean;
@@ -23,7 +22,6 @@ interface StockHeaderProps {
 
 export function StockHeader({
   itemsWithStockToday,
-  totalItems,
   selectedChestId,
   isEditing,
   saving,
@@ -87,7 +85,7 @@ export function StockHeader({
                       leftSection={<IconX size={16} />}
                       onClick={onCancelEdit}
                       variant="subtle"
-                      color="gray"
+                      color="slate"
                     >
                       Annuler
                     </Button>

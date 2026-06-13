@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 import type { Permissions, PermissionsContextType, AccessibleDispensary } from '@/types/permissions';
 import type { AppSettingsDTO } from '@/lib/appSettingsShared';
 import { APP_SETTINGS_DEFAULTS } from '@/lib/appSettingsShared';
@@ -74,4 +74,12 @@ export function useTenantRoutes() {
     throw new Error('useTenantRoutes requires an active dispensary context');
   }
   return tenantRoutes(dispensarySlug);
+}
+
+export function useRequiredDispensarySlug(): string {
+  const { dispensarySlug } = usePermissions();
+  if (!dispensarySlug) {
+    throw new Error('useRequiredDispensarySlug requires an active dispensary context');
+  }
+  return dispensarySlug;
 }

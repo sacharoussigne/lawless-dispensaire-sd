@@ -1,35 +1,27 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
 import { useEffect } from 'react';
 import { useForm } from '@mantine/form';
 import { Modal, Stack, Select, Button, Group } from '@mantine/core';
+import type { OrderType, OrderStatus } from '@prisma/client';
+import type { MailTemplateListItem } from '@/types/mailTemplates';
 import {
-  createOrderLetterTemplateAssignment,
-  updateOrderLetterTemplateAssignment,
-} from '@/app/_actions/orderLetterTemplateAssignments';
-import { handleAction } from '@/lib/action';
-import { notifications } from '@mantine/notifications';
-import type { OrderMailTemplateAssignment, OrderType, OrderStatus } from '@prisma/client';
-import type { MailTemplate } from '@/types/mailTemplates';
-import { OrderTypeEnum } from '@/types/enum/orderType';
-import { OrderStatusEnum } from '@/types/enum/orderStatus';
-import { getOrderTypeLabel } from '@/types/enum/orderType';
-import { getOrderStatusLabel } from '@/types/enum/orderStatus';
-
-interface OrderMailTemplateAssignmentWithTemplate extends OrderMailTemplateAssignment {
-  mailTemplate: {
-    id: string;
-    name: string;
-  };
-}
+  orderStatusSelectOptions,
+  orderTypeSelectOptions,
+} from '@/lib/orders/orderSelectOptions';
+import type {
+  OrderLetterTemplateAssignmentWithTemplate,
+  useCreateOrderLetterAssignmentMutation,
+  useUpdateOrderLetterAssignmentMutation,
+} from '../hooks/useMailTemplatesQueries';
 
 interface OrderLetterTemplateAssignmentModalProps {
   opened: boolean;
   onClose: () => void;
-  editingAssignment: OrderMailTemplateAssignmentWithTemplate | null;
-  mailTemplates: MailTemplate[];
-  onSuccess: () => void;
+  editingAssignment: OrderLetterTemplateAssignmentWithTemplate | null;
+  mailTemplates: MailTemplateListItem[];
+  createMutation: ReturnType<typeof useCreateOrderLetterAssignmentMutation>;
+  updateMutation: ReturnType<typeof useUpdateOrderLetterAssignmentMutation>;
 }
 
 export function OrderLetterTemplateAssignmentModal({
@@ -37,9 +29,9 @@ export function OrderLetterTemplateAssignmentModal({
   onClose,
   editingAssignment,
   mailTemplates,
-  onSuccess,
+  createMutation,
+  updateMutation,
 }: OrderLetterTemplateAssignmentModalProps) {
-  const { dispensarySlug } = usePermissions();
   const form = useForm({
     initialValues: {
       orderType: '' as OrderType | '',
@@ -65,57 +57,28 @@ export function OrderLetterTemplateAssignmentModal({
     }
   }, [editingAssignment, opened]);
 
+  const isPending = createMutation.isPending || updateMutation.isPending;
+
   const handleSubmit = async (values: typeof form.values) => {
     try {
-      let result;
       if (editingAssignment) {
-        result = await updateOrderLetterTemplateAssignment(dispensarySlug!, {
+        await updateMutation.mutateAsync({
           id: editingAssignment.id,
           mailTemplateId: values.mailTemplateId,
         });
       } else {
-        result = await createOrderLetterTemplateAssignment(dispensarySlug!, {
+        await createMutation.mutateAsync({
           orderType: values.orderType as OrderType,
           orderStatus: values.orderStatus as OrderStatus,
           mailTemplateId: values.mailTemplateId,
         });
       }
-
-      const data = handleAction(result);
-      if (data) {
-        notifications.show({
-          title: 'Succès',
-          message: editingAssignment
-            ? 'Assignation modifiée avec succès'
-            : 'Assignation créée avec succès',
-          color: 'green',
-        });
-        onSuccess();
-        onClose();
-        form.reset();
-      }
-    } catch (error: any) {
-      notifications.show({
-        title: 'Erreur',
-        message: error.message || 'Erreur lors de la sauvegarde de l\'assignation',
-        color: 'red',
-      });
+      onClose();
+      form.reset();
+    } catch {
+      // Error notification handled by mutation
     }
   };
-
-  const orderTypeOptions = [
-    { value: OrderTypeEnum.INCOMING, label: getOrderTypeLabel(OrderTypeEnum.INCOMING) },
-    { value: OrderTypeEnum.OUTGOING, label: getOrderTypeLabel(OrderTypeEnum.OUTGOING) },
-  ];
-
-  const orderStatusOptions = [
-    { value: OrderStatusEnum.DRAFT, label: getOrderStatusLabel(OrderStatusEnum.DRAFT) },
-    { value: OrderStatusEnum.LETTER_SENT, label: getOrderStatusLabel(OrderStatusEnum.LETTER_SENT) },
-    { value: OrderStatusEnum.PROCESSING, label: getOrderStatusLabel(OrderStatusEnum.PROCESSING) },
-    { value: OrderStatusEnum.READY, label: getOrderStatusLabel(OrderStatusEnum.READY) },
-    { value: OrderStatusEnum.COMPLETED, label: getOrderStatusLabel(OrderStatusEnum.COMPLETED) },
-    { value: OrderStatusEnum.CANCELLED, label: getOrderStatusLabel(OrderStatusEnum.CANCELLED) },
-  ];
 
   const mailTemplateOptions = mailTemplates.map((template) => ({
     value: template.id,
@@ -137,7 +100,7 @@ export function OrderLetterTemplateAssignmentModal({
           <Select
             label="Type de commande"
             placeholder="Sélectionner un type"
-            data={orderTypeOptions}
+            data={orderTypeSelectOptions}
             required
             disabled={!!editingAssignment}
             {...form.getInputProps('orderType')}
@@ -145,7 +108,7 @@ export function OrderLetterTemplateAssignmentModal({
           <Select
             label="Statut de commande"
             placeholder="Sélectionner un statut"
-            data={orderStatusOptions}
+            data={orderStatusSelectOptions}
             required
             disabled={!!editingAssignment}
             {...form.getInputProps('orderStatus')}
@@ -161,6 +124,7 @@ export function OrderLetterTemplateAssignmentModal({
           <Group justify="flex-end" mt="md">
             <Button
               variant="subtle"
+              color="slate"
               onClick={() => {
                 onClose();
                 form.reset();
@@ -168,7 +132,7 @@ export function OrderLetterTemplateAssignmentModal({
             >
               Annuler
             </Button>
-            <Button type="submit">
+            <Button type="submit" loading={isPending}>
               {editingAssignment ? 'Modifier' : 'Créer'}
             </Button>
           </Group>

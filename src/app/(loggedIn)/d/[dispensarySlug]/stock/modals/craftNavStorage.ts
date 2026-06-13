@@ -27,7 +27,7 @@ export function loadCraftNavStack(): CraftContextV1[] {
   }
 }
 
-export function saveCraftNavStack(stack: CraftContextV1[]): void {
+function saveCraftNavStack(stack: CraftContextV1[]): void {
   if (!isBrowser()) return;
   try {
     window.localStorage.setItem(NAV_STACK_KEY_V1, JSON.stringify(stack));
@@ -63,7 +63,7 @@ export function clearCraftNavStack(): void {
   }
 }
 
-export function loadLastRecipeByItem(): Record<string, string> {
+function loadLastRecipeByItem(): Record<string, string> {
   if (!isBrowser()) return {};
   try {
     const raw = window.localStorage.getItem(LAST_RECIPE_BY_ITEM_KEY_V1);

@@ -27,6 +27,7 @@ import {
   parisYesterdayStartUtc,
   parseWeekdayFlagsJson,
 } from '@/lib/dispensaryWeeklyActivity/weekdayFlags';
+import { DISCORD_ACCOUNT_PROVIDER_ID } from '@/lib/dispensaryWeeklyActivity/constants';
 
 export function getNormalizedWeeklyActivityPeriod(anchor: Date): {
   periodStart: Date;
@@ -75,6 +76,46 @@ export async function syncActivityUserIdFromDiscordIfMissing(
   return client.dispensaryWeeklyActivity.update({
     where: { id: activity.id },
     data: { userId: uid },
+  });
+}
+
+export async function batchSyncActivityUserIds<T extends DispensaryWeeklyActivity>(
+  client: WeeklyActivityDb,
+  rows: T[],
+): Promise<T[]> {
+  const missing = rows.filter((r) => !r.userId);
+  if (missing.length === 0) return rows;
+
+  const discordUserIds = [...new Set(missing.map((r) => r.discordUserId))];
+  const accounts = await client.account.findMany({
+    where: {
+      providerId: DISCORD_ACCOUNT_PROVIDER_ID,
+      accountId: { in: discordUserIds },
+    },
+    select: { accountId: true, userId: true },
+  });
+
+  const discordToUserId = new Map(accounts.map((a) => [a.accountId, a.userId]));
+  const updates: { id: string; userId: string }[] = [];
+  for (const row of missing) {
+    const userId = discordToUserId.get(row.discordUserId);
+    if (userId) {
+      updates.push({ id: row.id, userId });
+    }
+  }
+
+  if (updates.length > 0) {
+    await Promise.all(
+      updates.map(({ id, userId }) =>
+        client.dispensaryWeeklyActivity.update({ where: { id }, data: { userId } }),
+      ),
+    );
+  }
+
+  const userIdByRowId = new Map(updates.map((u) => [u.id, u.userId]));
+  return rows.map((row) => {
+    const userId = userIdByRowId.get(row.id);
+    return userId ? { ...row, userId } : row;
   });
 }
 
@@ -225,7 +266,10 @@ export async function updateDispensaryWeeklyActivityWithHistory(
 
     const data: Prisma.DispensaryWeeklyActivityUpdateInput = {};
     if (input.periodStart !== undefined || input.periodEnd !== undefined) {
-      const anchor = (input.periodStart ?? input.periodEnd)!;
+      const anchor = input.periodStart ?? input.periodEnd;
+      if (!anchor) {
+        throw new Error('periodStart or periodEnd is required');
+      }
       const normalized = normalizeParisWeekBounds(anchor);
       data.periodStart = normalized.periodStart;
       data.periodEnd = normalized.periodEnd;

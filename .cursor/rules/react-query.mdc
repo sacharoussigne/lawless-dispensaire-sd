@@ -1,0 +1,40 @@
+---
+description: Data fetching client — React Query + server actions (standard projet)
+globs: "**/*.{tsx,ts}"
+alwaysApply: false
+---
+
+# React Query + Server Actions
+
+**Obligatoire** pour toute nouvelle feature ou refonte qui charge/mute des données serveur côté client.
+
+Lire [`docs/react-query.md`](../../docs/react-query.md) avant d'implémenter.
+
+## Règles
+
+1. **Server actions** = source de vérité serveur ; React Query = cache/déduplication/invalidation uniquement
+2. **`queryFn`** : `() => handleAction(await serverAction(...))` — jamais Prisma direct depuis le client
+3. **SSR** : `initialData` depuis la page Server Component ; `staleTime` pour éviter le double fetch au montage
+4. **Mutations** : `useMutation` + `invalidateQueries` — pas de `loadX()` manuel post-mutation
+5. **Query keys** : `src/lib/<feature>/queryKeys.ts`, inclure `dispensarySlug`
+6. **Hooks** : `src/app/.../<feature>/hooks/` — copier la structure du module stock
+
+## Structure de référence (stock)
+
+- [`src/lib/stock/queryKeys.ts`](../../src/lib/stock/queryKeys.ts)
+- [`src/app/(loggedIn)/d/[dispensarySlug]/stock/hooks/useStockQueries.ts`](../../src/app/(loggedIn)/d/[dispensarySlug]/stock/hooks/useStockQueries.ts)
+- [`src/lib/react-query/QueryProvider.tsx`](../../src/lib/react-query/QueryProvider.tsx)
+
+## Interdit dans du code neuf
+
+- `useState` + `useEffect` + `loadItems()` quand SSR fournit déjà les données
+- `cacheRef` / cache manuel dans les modales
+- Invalidation globale quand une invalidation ciblée suffit
+
+## État local UI
+
+Modales, formulaires, sélections → `useState` local. Seules les **données serveur** passent par React Query.
+
+## Legacy
+
+`runAsyncEffect` + fetch manuel (agenda) : migrer lors d'une refonte, ne pas reproduire. Voir aussi [`react-quality.mdc`](./react-quality.mdc).

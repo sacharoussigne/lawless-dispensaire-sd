@@ -6,18 +6,61 @@ import { actionErrorParser } from '@/lib/action';
 import { requireTenantServerActionContext } from '@/lib/serverActionAuth';
 import { tenantWhere } from '@/lib/dispensary/tenantWhere';
 import type { OrderStatus } from '@prisma/client';
-import type { OrderWithRelations } from '@/types/orders';
+import type {
+  ActiveOrderSummary,
+  OrderSummary,
+  OrdersPageResult,
+  OrderWithRelations,
+} from '@/types/orders';
 import { calculateOrderPriceFromItems } from '@/lib/orders/calculateOrderPriceFromItems';
+import { slugifyOrderText } from '@/lib/orders/slugify';
 
-function slugifyOrderNameSegment(name: string): string {
-  const slug = name
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-  return slug || 'commande';
-}
+const ORDER_DETAIL_INCLUDE = {
+  company: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
+  individualCustomer: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
+  items: {
+    include: {
+      item: {
+        select: {
+          id: true,
+          name: true,
+          price: true,
+          weight: true,
+        },
+      },
+    },
+  },
+} as const;
+
+const ORDER_LIST_INCLUDE = {
+  company: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
+  individualCustomer: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
+  _count: {
+    select: {
+      items: true,
+    },
+  },
+} as const;
 
 function serializeOrderForClient(order: {
   price: unknown;
@@ -156,7 +199,7 @@ export async function createOrder(
         });
 
         const sequentialNumber = String(orderCount + 1).padStart(4, '0');
-        orderName = `${slugifyOrderNameSegment(company.name)}-${sequentialNumber}`;
+        orderName = `${slugifyOrderText(company.name)}-${sequentialNumber}`;
       } else if (validatedData.individualCustomerId) {
         const customer = await prisma.individualCustomer.findFirst({
           where: { id: validatedData.individualCustomerId, ...tenantWhere(dispensaryId) },
@@ -178,7 +221,7 @@ export async function createOrder(
         });
 
         const sequentialNumber = String(orderCount + 1).padStart(4, '0');
-        orderName = `${slugifyOrderNameSegment(customer.name)}-${sequentialNumber}`;
+        orderName = `${slugifyOrderText(customer.name)}-${sequentialNumber}`;
       }
     }
 
@@ -271,25 +314,187 @@ const deleteOrderSchema = z.object({
   id: z.string().uuid('ID invalide'),
 });
 
-export async function getOrders(dispensarySlug: string) {
+const orderStatusValues = [
+  'DRAFT',
+  'LETTER_SENT',
+  'PROCESSING',
+  'READY',
+  'COMPLETED',
+  'CANCELLED',
+] as const;
+
+const getOrdersPageSchema = z.object({
+  page: z.number().int().min(1).default(1),
+  pageSize: z.number().int().min(1).max(50).default(10),
+  status: z.enum(orderStatusValues).optional().nullable(),
+  search: z.string().max(255).optional(),
+});
+
+const getOrderByIdSchema = z.object({
+  id: z.string().uuid('ID invalide'),
+});
+
+const getActiveOrdersForCompanyGroupSchema = z.object({
+  companyGroupId: z.string().uuid('ID de groupe invalide'),
+});
+
+function serializeOrderSummary(
+  order: Omit<OrderSummary, 'price' | 'itemCount'> & {
+    price: unknown;
+    _count: { items: number };
+  },
+): OrderSummary {
+  const { _count, price, ...rest } = order;
+  return {
+    ...rest,
+    price: price != null ? Number(price as number) : null,
+    itemCount: _count.items,
+  };
+}
+
+async function requireOrdersViewContext(dispensarySlug: string) {
+  return requireTenantServerActionContext(dispensarySlug, {
+    feature: 'orders',
+    permission: {
+      resource: 'orders',
+      action: 'view',
+      message: 'Permission refusée : vous n\'avez pas la permission de voir les commandes',
+    },
+  });
+}
+
+export async function getOrdersPage(
+  dispensarySlug: string,
+  params: {
+    page?: number;
+    pageSize?: number;
+    status?: (typeof orderStatusValues)[number] | null;
+    search?: string;
+  } = {},
+) {
   try {
-    const ctx = await requireTenantServerActionContext(dispensarySlug, {
-      feature: 'orders',
-      permission: {
-        resource: 'orders',
-        action: 'view',
-        message: 'Permission refusée : vous n\'avez pas la permission de voir les commandes',
-      },
-    });
+    const ctx = await requireOrdersViewContext(dispensarySlug);
     if (!ctx.ok) return ctx.response;
     const { dispensaryId } = ctx.tenant;
 
-    const orders = await prisma.order.findMany({
-      where: tenantWhere(dispensaryId),
-      orderBy: {
-        createdAt: 'desc',
+    const { page, pageSize, status, search } = getOrdersPageSchema.parse(params);
+    const searchTerm = search?.trim();
+
+    const where = {
+      ...tenantWhere(dispensaryId),
+      ...(status ? { status } : {}),
+      ...(searchTerm
+        ? {
+            name: {
+              contains: searchTerm,
+              mode: 'insensitive' as const,
+            },
+          }
+        : {}),
+    };
+
+    const [orders, totalCount] = await Promise.all([
+      prisma.order.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: ORDER_LIST_INCLUDE,
+      }),
+      prisma.order.count({ where }),
+    ]);
+
+    const result: OrdersPageResult = {
+      orders: orders.map((order) => serializeOrderSummary(order)),
+      totalCount,
+      page,
+      pageSize,
+    };
+
+    return {
+      status: 200,
+      data: result,
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de la récupération des commandes');
+  }
+}
+
+export async function getOrderById(dispensarySlug: string, data: { id: string }) {
+  try {
+    const ctx = await requireOrdersViewContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
+
+    const { id } = getOrderByIdSchema.parse(data);
+
+    const order = await prisma.order.findFirst({
+      where: { id, ...tenantWhere(dispensaryId) },
+      include: ORDER_DETAIL_INCLUDE,
+    });
+
+    if (!order) {
+      return {
+        status: 404,
+        error: 'Commande non trouvée',
+      };
+    }
+
+    return {
+      status: 200,
+      data: serializeOrderForClient(order),
+    };
+  } catch (error) {
+    return actionErrorParser(error, 'Erreur lors de la récupération de la commande');
+  }
+}
+
+export async function getActiveOrdersForCompanyGroup(
+  dispensarySlug: string,
+  data: { companyGroupId: string },
+) {
+  try {
+    const ctx = await requireOrdersViewContext(dispensarySlug);
+    if (!ctx.ok) return ctx.response;
+    const { dispensaryId } = ctx.tenant;
+
+    const { companyGroupId } = getActiveOrdersForCompanyGroupSchema.parse(data);
+
+    const group = await prisma.companyGroup.findFirst({
+      where: { id: companyGroupId, ...tenantWhere(dispensaryId) },
+      select: {
+        companies: {
+          select: {
+            companyId: true,
+          },
+        },
       },
-      include: {
+    });
+
+    if (!group) {
+      return {
+        status: 404,
+        error: 'Groupe d\'entreprises introuvable',
+      };
+    }
+
+    const companyIds = group.companies.map((entry) => entry.companyId);
+
+    const orders = await prisma.order.findMany({
+      where: {
+        ...tenantWhere(dispensaryId),
+        status: { notIn: ['COMPLETED', 'CANCELLED'] },
+        OR: [
+          { companyGroupId },
+          ...(companyIds.length > 0 ? [{ companyId: { in: companyIds } }] : []),
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        companyGroupId: true,
         company: {
           select: {
             id: true,
@@ -303,13 +508,13 @@ export async function getOrders(dispensarySlug: string) {
           },
         },
         items: {
-          include: {
+          select: {
+            itemId: true,
+            quantity: true,
             item: {
               select: {
                 id: true,
                 name: true,
-                price: true,
-                weight: true,
               },
             },
           },
@@ -319,10 +524,13 @@ export async function getOrders(dispensarySlug: string) {
 
     return {
       status: 200,
-      data: orders.map((order) => serializeOrderForClient(order)),
+      data: orders as ActiveOrderSummary[],
     };
   } catch (error) {
-    return actionErrorParser(error, 'Erreur lors de la récupération des commandes');
+    return actionErrorParser(
+      error,
+      'Erreur lors de la récupération des commandes actives',
+    );
   }
 }
 
@@ -401,51 +609,28 @@ export async function updateOrder(
       updateData.price = orderPrice;
     }
 
-    if (validatedData.items) {
-      await prisma.orderItem.deleteMany({
-        where: { orderId: validatedData.id },
+    const order = await prisma.$transaction(async (tx) => {
+      if (validatedData.items) {
+        await tx.orderItem.deleteMany({
+          where: { orderId: validatedData.id },
+        });
+
+        updateData.items = {
+          create: itemsToUse.map((item) => ({
+            itemId: item.itemId,
+            quantity: item.quantity,
+          })),
+        };
+      }
+
+      return tx.order.update({
+        where: {
+          id: validatedData.id,
+          ...tenantWhere(dispensaryId),
+        },
+        data: updateData,
+        include: ORDER_DETAIL_INCLUDE,
       });
-
-      updateData.items = {
-        create: itemsToUse.map((item) => ({
-          itemId: item.itemId,
-          quantity: item.quantity,
-        })),
-      };
-    }
-
-    const order = await prisma.order.update({
-      where: {
-        id: validatedData.id,
-        ...tenantWhere(dispensaryId),
-      },
-      data: updateData,
-      include: {
-        company: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        individualCustomer: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        items: {
-          include: {
-            item: {
-              select: {
-                id: true,
-                name: true,
-                price: true,
-                weight: true,
-              },
-            },
-          },
-        },
-      },
     });
 
     const serializedOrder = serializeOrderForClient(order);

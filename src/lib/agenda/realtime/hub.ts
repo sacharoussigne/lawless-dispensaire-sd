@@ -34,8 +34,8 @@ export function subscribeAgendaRealtime(
   subscribers.add(subscriber);
 
   return () => {
-    subscribers!.delete(subscriber);
-    if (subscribers!.size === 0) {
+    subscribers.delete(subscriber);
+    if (subscribers.size === 0) {
       channels.delete(dispensaryId);
     }
   };

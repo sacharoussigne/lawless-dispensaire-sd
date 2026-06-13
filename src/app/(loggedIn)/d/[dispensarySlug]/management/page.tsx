@@ -66,7 +66,7 @@ export default async function ManagementPage({
     {
       title: 'Entreprises',
       description:
-        "Gérez les entreprises partenaires, leurs coordonnées et informations de contact.",
+        'Gérez le référentiel des entreprises partenaires liées aux groupes et aux commandes.',
       icon: IconBuildingStore,
       href: t.management.companies,
       visible: true,

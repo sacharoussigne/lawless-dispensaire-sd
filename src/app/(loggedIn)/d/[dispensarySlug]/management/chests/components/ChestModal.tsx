@@ -1,38 +1,32 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
 import { useEffect } from 'react';
-import {
-  Modal,
-  Stack,
-  TextInput,
-  Textarea,
-  Button,
-  Group,
-  Switch,
-} from '@mantine/core';
+import { Stack, TextInput, Textarea, Switch, Button } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { notifications } from '@mantine/notifications';
-import { createChest, updateChest } from '@/app/_actions/chests';
-import { handleAction } from '@/lib/action';
 import { handleApiZodError } from '@/lib/services/zod';
 import { ParsedZodError } from '@/lib/errors/ParsedZodError';
 import type { ChestWithStockHistory } from '@/types/chests';
+import { AppModal, AppModalFooter } from '@/app/_components/AppModal/AppModal';
+import type {
+  useCreateChestMutation,
+  useUpdateChestMutation,
+} from '../hooks/useChestsQueries';
 
 interface ChestModalProps {
   opened: boolean;
   onClose: () => void;
   editingChest: ChestWithStockHistory | null;
-  onSuccess: () => void;
+  createMutation: ReturnType<typeof useCreateChestMutation>;
+  updateMutation: ReturnType<typeof useUpdateChestMutation>;
 }
 
 export function ChestModal({
   opened,
   onClose,
   editingChest,
-  onSuccess,
+  createMutation,
+  updateMutation,
 }: ChestModalProps) {
-  const { dispensarySlug } = usePermissions();
   const form = useForm({
     initialValues: {
       name: '',
@@ -44,7 +38,6 @@ export function ChestModal({
     },
   });
 
-  // Initialize form when chest changes
   useEffect(() => {
     if (editingChest) {
       form.setValues({
@@ -55,53 +48,35 @@ export function ChestModal({
     } else {
       form.reset();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingChest, opened]);
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
+  const formId = 'chest-modal-form';
 
   const handleSubmit = async (values: typeof form.values) => {
     try {
-      let result;
-      if (editingChest) {
-        result = await updateChest(dispensarySlug!, {
-          id: editingChest.id,
-          name: values.name,
-          description: values.description || undefined,
-          isEnabled: values.isEnabled,
-        });
-      } else {
-        result = await createChest(dispensarySlug!, {
-          name: values.name,
-          description: values.description || undefined,
-          isEnabled: values.isEnabled,
-        });
-      }
+      const payload = {
+        name: values.name,
+        description: values.description || undefined,
+        isEnabled: values.isEnabled,
+      };
 
-      handleAction(result);
-      notifications.show({
-        title: 'Succès',
-        message: editingChest
-          ? 'Coffre modifié avec succès'
-          : 'Coffre créé avec succès',
-        color: 'green',
-      });
+      if (editingChest) {
+        await updateMutation.mutateAsync({ id: editingChest.id, ...payload });
+      } else {
+        await createMutation.mutateAsync(payload);
+      }
       onClose();
       form.reset();
-      onSuccess();
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof ParsedZodError) {
         handleApiZodError(error.error, form);
-      } else {
-        notifications.show({
-          title: 'Erreur',
-          message: error.message || 'Erreur lors de la sauvegarde',
-          color: 'red',
-        });
       }
     }
   };
 
   return (
-    <Modal
+    <AppModal
       opened={opened}
       onClose={() => {
         onClose();
@@ -109,8 +84,25 @@ export function ChestModal({
       }}
       title={editingChest ? 'Modifier le coffre' : 'Créer un coffre'}
       size="md"
+      footer={
+        <AppModalFooter>
+          <Button
+            variant="subtle"
+            color="slate"
+            onClick={() => {
+              onClose();
+              form.reset();
+            }}
+          >
+            Annuler
+          </Button>
+          <Button type="submit" form={formId} loading={isPending}>
+            {editingChest ? 'Modifier' : 'Créer'}
+          </Button>
+        </AppModalFooter>
+      }
     >
-      <form onSubmit={form.onSubmit(handleSubmit)}>
+      <form id={formId} onSubmit={form.onSubmit(handleSubmit)}>
         <Stack>
           <TextInput
             label="Nom"
@@ -129,22 +121,8 @@ export function ChestModal({
             description="Un coffre désactivé ne sera pas disponible dans les sélections"
             {...form.getInputProps('isEnabled', { type: 'checkbox' })}
           />
-          <Group justify="flex-end" mt="md">
-            <Button
-              variant="subtle"
-              onClick={() => {
-                onClose();
-                form.reset();
-              }}
-            >
-              Annuler
-            </Button>
-            <Button type="submit">
-              {editingChest ? 'Modifier' : 'Créer'}
-            </Button>
-          </Group>
         </Stack>
       </form>
-    </Modal>
+    </AppModal>
   );
 }

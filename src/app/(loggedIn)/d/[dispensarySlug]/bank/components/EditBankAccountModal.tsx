@@ -1,6 +1,6 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
+import { useRequiredDispensarySlug } from '@/app/_contexts/PermissionsContext';
 import { useEffect } from 'react';
 import { Modal, Stack, TextInput, Button, Group } from '@mantine/core';
 import { useForm } from '@mantine/form';
@@ -24,7 +24,7 @@ export function EditBankAccountModal({
   editingAccount,
   onSuccess,
 }: EditBankAccountModalProps) {
-  const { dispensarySlug } = usePermissions();
+  const dispensarySlug = useRequiredDispensarySlug();
   const form = useForm({
     initialValues: {
       name: '',
@@ -46,7 +46,7 @@ export function EditBankAccountModal({
     if (!editingAccount) return;
 
     try {
-      const result = await updateBankAccount(dispensarySlug!, {
+      const result = await updateBankAccount(dispensarySlug, {
         id: editingAccount.id,
         name: values.name,
       });

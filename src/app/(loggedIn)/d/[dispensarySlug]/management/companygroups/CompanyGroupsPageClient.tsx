@@ -1,68 +1,73 @@
 'use client';
 
-import { usePermissions } from '@/app/_contexts/PermissionsContext';
-import { useEffect, useState } from 'react';
-import { Container, Title, Group, Button } from '@mantine/core';
+import { useEffect, useMemo, useState } from 'react';
+import { Container, Button } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
-import { getCompanyGroups } from '@/app/_actions/companyGroups';
-import { handleAction } from '@/lib/action';
-import { notifications } from '@mantine/notifications';
 import { CompanyGroupModal } from './components/CompanyGroupModal';
 import { DeleteCompanyGroupModal } from './components/DeleteCompanyGroupModal';
 import { ActiveFilters } from '@/app/_components/ActiveFilters/ActiveFilters';
+import { PageHeader } from '@/app/_components/PageHeader/PageHeader';
 import { CompanyGroupsTable } from './components/CompanyGroupsTable';
-import type { CompanyGroupWithRelations, CompanyWithRelations } from '@/types/companyGroups';
-import { ManagementSectionThemeProvider } from '../ManagementSectionThemeProvider';
+import type { CompanyGroupWithRelations } from '@/types/companyGroups';
+import type { CompanySelect } from '@/types/companies';
+import { normalizeString } from '@/lib/string/normalizeString';
+import { sortCompanyGroups } from '@/lib/companyGroups/sortCompanyGroups';
+import { useCompaniesForSelect } from '../companies/hooks/useCompaniesQueries';
+import {
+  useManagementCompanyGroups,
+  useCreateCompanyGroupMutation,
+  useUpdateCompanyGroupMutation,
+  useDeleteCompanyGroupMutation,
+} from './hooks/useCompanyGroupsQueries';
 
 interface CompanyGroupsPageClientProps {
   initialCompanyGroups: CompanyGroupWithRelations[];
-  initialCompanies: CompanyWithRelations[];
+  initialCompanies: CompanySelect[];
 }
-
-// Fonction pour normaliser les chaînes (enlever les accents et mettre en minuscule)
-const normalizeString = (str: string): string => {
-  return str
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
-};
 
 export default function CompanyGroupsPageClient({
   initialCompanyGroups,
   initialCompanies,
 }: CompanyGroupsPageClientProps) {
-  const { dispensarySlug } = usePermissions();
-  const [companyGroups, setCompanyGroups] = useState<CompanyGroupWithRelations[]>(initialCompanyGroups);
-  const [companies] = useState<CompanyWithRelations[]>(initialCompanies);
-  const [loading, setLoading] = useState(false);
+  const { data: companyGroups = [], isFetching } = useManagementCompanyGroups(initialCompanyGroups);
+  const { data: companies = [] } = useCompaniesForSelect(initialCompanies);
+  const createMutation = useCreateCompanyGroupMutation();
+  const updateMutation = useUpdateCompanyGroupMutation();
+  const deleteMutation = useDeleteCompanyGroupMutation();
+
   const [modalOpened, setModalOpened] = useState(false);
   const [editingCompanyGroup, setEditingCompanyGroup] = useState<CompanyGroupWithRelations | null>(null);
   const [deleteModalOpened, setDeleteModalOpened] = useState(false);
   const [companyGroupToDelete, setCompanyGroupToDelete] = useState<CompanyGroupWithRelations | null>(null);
 
-  const [nameFilter, setNameFilter] = useState<string>('');
-  const [descriptionFilter, setDescriptionFilter] = useState<string>('');
+  const [nameFilter, setNameFilter] = useState('');
+  const [descriptionFilter, setDescriptionFilter] = useState('');
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(10);
+  const pageSize = 10;
 
-  const loadCompanyGroups = async () => {
-    try {
-      setLoading(true);
-      const result = await getCompanyGroups(dispensarySlug!, );
-      const data = handleAction(result);
-      if (data) {
-        setCompanyGroups(data);
-      }
-    } catch (error: any) {
-      notifications.show({
-        title: 'Erreur',
-        message: error.message || 'Erreur lors du chargement des groupes d\'entreprises',
-        color: 'red',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { paginatedCompanyGroups, totalRecords } = useMemo(() => {
+    const filtered = companyGroups.filter((companyGroup) => {
+      const matchesName =
+        !nameFilter ||
+        normalizeString(companyGroup.name).includes(normalizeString(nameFilter));
+      const matchesDescription =
+        !descriptionFilter ||
+        (companyGroup.description &&
+          normalizeString(companyGroup.description).includes(
+            normalizeString(descriptionFilter),
+          ));
+      return matchesName && matchesDescription;
+    });
+    const sorted = sortCompanyGroups(filtered);
+    return {
+      paginatedCompanyGroups: sorted.slice((page - 1) * pageSize, page * pageSize),
+      totalRecords: sorted.length,
+    };
+  }, [companyGroups, nameFilter, descriptionFilter, page, pageSize]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [nameFilter, descriptionFilter]);
 
   const handleEdit = (companyGroup: CompanyGroupWithRelations) => {
     setEditingCompanyGroup(companyGroup);
@@ -74,46 +79,17 @@ export default function CompanyGroupsPageClient({
     setModalOpened(true);
   };
 
-  // Filtrer les groupes d'entreprises par nom et description
-  const filteredCompanyGroups = companyGroups.filter((companyGroup) => {
-    const matchesName =
-      !nameFilter ||
-      normalizeString(companyGroup.name).includes(normalizeString(nameFilter));
-    const matchesDescription =
-      !descriptionFilter ||
-      (companyGroup.description &&
-        normalizeString(companyGroup.description).includes(
-          normalizeString(descriptionFilter)
-        ));
-    return matchesName && matchesDescription;
-  });
-
-  // Trier par nom
-  const sortedCompanyGroups = [...filteredCompanyGroups].sort((a, b) =>
-    a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' })
-  );
-
-  // Calculer la pagination
-  const totalRecords = sortedCompanyGroups.length;
-  const paginatedCompanyGroups = sortedCompanyGroups.slice(
-    (page - 1) * pageSize,
-    page * pageSize
-  );
-
-  // Réinitialiser la page quand les filtres changent
-  useEffect(() => {
-    setPage(1);
-  }, [nameFilter, descriptionFilter]);
-
   return (
-    <ManagementSectionThemeProvider section="companyGroups">
-      <Container size="xl" py="xl">
-      <Group justify="space-between" mb="xl">
-        <Title order={1}>Groupes d'entreprises</Title>
-        <Button leftSection={<IconPlus size={16} />} onClick={openCreateModal}>
-          Créer un groupe d'entreprises
-        </Button>
-      </Group>
+    <Container size="xl" py="xl">
+      <PageHeader
+        title="Groupes d'entreprises"
+        description="Regroupez les entreprises par structure pour simplifier le suivi et les conventions."
+        actions={
+          <Button leftSection={<IconPlus size={16} />} onClick={openCreateModal}>
+            Créer un groupe d'entreprises
+          </Button>
+        }
+      />
 
       <ActiveFilters
         filters={[
@@ -132,7 +108,7 @@ export default function CompanyGroupsPageClient({
 
       <CompanyGroupsTable
         companyGroups={paginatedCompanyGroups}
-        loading={loading}
+        loading={isFetching}
         nameFilter={nameFilter}
         descriptionFilter={descriptionFilter}
         page={page}
@@ -156,7 +132,8 @@ export default function CompanyGroupsPageClient({
         }}
         editingCompanyGroup={editingCompanyGroup}
         companies={companies}
-        onSuccess={loadCompanyGroups}
+        createMutation={createMutation}
+        updateMutation={updateMutation}
       />
 
       <DeleteCompanyGroupModal
@@ -166,10 +143,8 @@ export default function CompanyGroupsPageClient({
           setCompanyGroupToDelete(null);
         }}
         companyGroupToDelete={companyGroupToDelete}
-        onSuccess={loadCompanyGroups}
+        deleteMutation={deleteMutation}
       />
-      </Container>
-    </ManagementSectionThemeProvider>
+    </Container>
   );
 }
-

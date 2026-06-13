@@ -25,8 +25,10 @@ html[data-mantine-color-scheme] body {
 .mantine-Menu-item {
   color: var(--disp-ink);
 
+  &[data-hovered],
   &:hover:not([data-disabled]),
   &:focus:not([data-disabled]) {
+    background-color: var(--mantine-color-sage-0);
     color: var(--disp-sage);
   }
 }
@@ -95,6 +97,15 @@ html[data-mantine-color-scheme] body {
 .mantine-MultiSelect-section {
   display: flex;
   align-items: center;
+}
+
+.mantine-Button-root {
+  &:disabled:not([data-loading]),
+  &[data-disabled]:not([data-loading]) {
+    background-color: var(--disp-table-header);
+    color: var(--disp-ink-muted);
+    border-color: transparent;
+  }
 }
 
 /* mantine-datatable */
@@ -200,6 +211,8 @@ html[data-mantine-color-scheme] body {
 
 .mantine-Tabs-tab {
   &[data-active] {
+    color: var(--disp-sage);
+    border-color: var(--disp-sage);
     background-color: var(--disp-surface);
   }
 
@@ -247,6 +260,12 @@ html[data-mantine-color-scheme] body {
 }
 
 /* Accordion (payroll employee cards, etc.) */
+.mantine-Accordion-control {
+  &:hover {
+    background-color: var(--mantine-color-sage-0);
+  }
+}
+
 .mantine-Accordion-root[data-variant='contained'] {
   .mantine-Accordion-item {
     border-color: var(--disp-surface-border);

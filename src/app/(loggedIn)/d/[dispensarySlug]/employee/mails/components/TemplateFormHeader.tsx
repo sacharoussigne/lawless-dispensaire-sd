@@ -41,7 +41,7 @@ export function TemplateFormHeader({
             leftSection={copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
             onClick={onCopy}
             variant={copied ? 'light' : 'default'}
-            color={copied ? 'green' : undefined}
+            color={copied ? 'moss' : undefined}
           >
             {copied ? 'Copiée !' : 'Copier le template'}
           </Button>
